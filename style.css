@@ -399,61 +399,13 @@ nav.sidebar-nav {
     gap: 1px;
 }
 
-/* + New Chat Button - Styled identically to nav items with active pill highlight */
-.sidebar-new-chat-btn {
-    width: 100%;
-    height: 34px;
-    background: transparent;
-    border: none;
-    border-radius: 8px;
-    color: #c4c7c5;
-    font-family: var(--font-sans);
-    font-size: 14px;
-    font-weight: 500;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 0 8px;
-    margin-bottom: 0px;
-    cursor: pointer;
-    transition: background 0.15s ease, color 0.15s ease;
-    flex-shrink: 0;
-}
-
-.sidebar-new-chat-btn:hover {
-    background: #1e1f20;
-    color: #e3e3e3;
-}
-
-.sidebar-new-chat-btn.active {
-    background: #2d2e30;
-    color: #e3e3e3;
-}
-
-.nav-item-icon {
-    width: 22px;
-    height: 22px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-    color: #8e918f;
-}
-
-.sidebar-new-chat-btn:hover .nav-item-icon,
-.sidebar-nav .nav-item:hover .nav-item-icon,
-.sidebar-new-chat-btn.active .nav-item-icon,
-.sidebar-nav .nav-item.active .nav-item-icon {
-    color: #e3e3e3;
-}
-
-.sidebar-nav .nav-item {
+/* Sidebar Nav Links matching Claude style */
+.sidebar-nav-link {
     height: 34px;
     padding: 0 8px;
     font-size: 14px;
     font-weight: 500;
     border-radius: 8px;
-    margin-bottom: 0px;
     gap: 8px;
     display: flex;
     align-items: center;
@@ -461,79 +413,192 @@ nav.sidebar-nav {
     text-decoration: none;
     transition: background 0.15s ease, color 0.15s ease;
     flex-shrink: 0;
+    user-select: none;
 }
 
-.sidebar-nav .nav-item:hover {
+.sidebar-nav-link:hover {
     background: #1e1f20;
     color: #e3e3e3;
 }
 
-.sidebar-nav .nav-item.active {
+.sidebar-nav-link.active {
     background: #2d2e30;
     color: #e3e3e3;
 }
 
-/* Chats and Tasks Section */
-.sidebar-chats-section {
+.nav-upgrade-badge {
+    margin-left: auto;
+    background: #182234;
+    color: #60a5fa;
+    border: 1px solid rgba(96, 165, 250, 0.25);
+    border-radius: 9999px;
+    padding: 1.5px 8px;
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 1.3;
+}
+
+.nav-item-icon {
+    width: 20px;
+    height: 20px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    color: #8e918f;
+}
+
+.sidebar-nav-link:hover .nav-item-icon,
+.sidebar-nav-link.active .nav-item-icon {
+    color: #e3e3e3;
+}
+
+/* Sidebar Section Headers */
+.sidebar-section {
     display: flex;
     flex-direction: column;
-    margin-top: 18px;
+    margin-top: 14px;
+}
+
+.sidebar-projects-section {
+    flex-shrink: 0;
+}
+
+.sidebar-chats-section {
     flex: 1;
     min-height: 0;
     overflow: hidden;
+    margin-top: 16px;
     padding-left: 2px;
-    margin-right: -8px; /* extends directly to the right edge of sidebar */
+    margin-right: -8px;
 }
 
-.chats-section-header {
-    display: inline-flex;
+.sidebar-section-header {
+    display: flex;
     align-items: center;
-    gap: 6px;
+    justify-content: space-between;
     padding: 4px 6px;
-    cursor: pointer;
-    user-select: none;
-    border-radius: 6px;
-    width: fit-content;
-    transition: background 0.15s ease;
     margin-bottom: 3px;
     flex-shrink: 0;
 }
 
-.chats-section-header:hover {
-    background: rgba(255, 255, 255, 0.04);
+.sidebar-section-title-wrap {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    cursor: pointer;
+    user-select: none;
+    border-radius: 4px;
+    transition: color 0.15s ease;
 }
 
-.chats-section-title {
+.sidebar-section-title-wrap:hover .sidebar-section-title {
+    color: #e3e3e3;
+}
+
+.sidebar-section-title {
     font-size: 13px;
     font-weight: 600;
     color: #9aa0a6;
     letter-spacing: 0.01em;
 }
 
-.chats-collapse-toggle-btn,
-.chats-chevron-inline {
-    background: transparent;
-    border: none;
+.sidebar-chevron-inline {
+    display: inline-flex;
+    align-items: center;
     color: #8e918f;
-    cursor: pointer;
+    transition: transform 0.2s ease;
+}
+
+.sidebar-chevron-inline.collapsed {
+    transform: rotate(-90deg);
+}
+
+.sidebar-section-actions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.sidebar-action-icon-btn {
+    width: 22px;
+    height: 22px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 14px;
-    height: 14px;
-    transition: transform 0.2s ease, color 0.15s ease;
-    opacity: 0.7;
+    background: transparent;
+    border: none;
+    border-radius: 4px;
+    color: #8e918f;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    padding: 0;
 }
 
-.chats-section-header:hover .chats-chevron-inline,
-.chats-section-header:hover .chats-collapse-toggle-btn {
-    opacity: 1;
-    color: #e3e3e3;
+.sidebar-action-icon-btn:hover {
+    background: #27272a;
+    color: #f4f4f5;
 }
 
-.chats-collapse-toggle-btn.collapsed .chevron-icon,
-.chats-chevron-inline.collapsed .chevron-icon {
-    transform: rotate(-90deg);
+/* Sidebar Projects List */
+.sidebar-projects-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    overflow: hidden;
+    transition: max-height 0.2s ease;
+}
+
+.sidebar-projects-list.collapsed {
+    display: none;
+}
+
+.sidebar-project-item {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    height: 32px;
+    padding: 0 8px;
+    border-radius: 6px;
+    color: #d1d5db;
+    font-size: 13.5px;
+    font-weight: 400;
+    text-decoration: none;
+    cursor: pointer;
+    transition: background 0.12s, color 0.12s;
+    user-select: none;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.sidebar-project-item:hover {
+    background: #1e1f20;
+    color: #ffffff;
+}
+
+.sidebar-project-item.active {
+    background: #27272a;
+    color: #ffffff;
+    font-weight: 500;
+}
+
+.sidebar-project-icon {
+    display: inline-flex;
+    align-items: center;
+    color: #9ca3af;
+    flex-shrink: 0;
+}
+
+.sidebar-project-item:hover .sidebar-project-icon,
+.sidebar-project-item.active .sidebar-project-icon {
+    color: #ffffff;
+}
+
+.sidebar-project-name {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 /* Chat list scroll area - fills 100% available vertical space down to the footer */

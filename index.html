@@ -7,7 +7,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;600;700&family=Google+Sans+Text:wght@400;500;600&family=Inter:wght@400;500;600;700&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400;1,6..72,500&family=Roboto+Mono:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=620">
+    <link rel="stylesheet" href="style.css?v=630">
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%231a73e8'/%3E%3Cpath d='M8 16 L16 8 L24 16 L16 24 Z' fill='white'/%3E%3Cpath d='M12 16 L16 12 L20 16 L16 20 Z' fill='%231a73e8'/%3E%3C/svg%3E">
 </head>
 <body class="dark-theme">
@@ -67,61 +67,60 @@
             </div>
         </div>
 
-        <!-- Navigation Links as in important.png -->
+        <!-- Navigation Links matching Claude Sidebar Reference -->
         <nav class="sidebar-nav">
-            <!-- + New Chat Button Card -->
-            <button class="sidebar-new-chat-btn active" id="btnSidebarNewChat" title="Start New Chat">
+            <!-- Top Links -->
+            <a href="#" class="sidebar-nav-link active" id="navCode" data-view="viewArchitect" title="Code Studio">
                 <span class="nav-item-icon">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
                 </span>
-                <span>New Chat</span>
-            </button>
-
-            <!-- Top Navigation Items -->
-            <a href="#" class="nav-item" id="navProjects" data-view="viewProjects" title="Projects & Context Workspaces">
-                <span class="nav-item-icon">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
-                </span>
-                <span>Projects</span>
+                <span class="nav-item-text">Code</span>
+                <span class="nav-upgrade-badge">Upgrade</span>
             </a>
 
-            <a href="#" class="nav-item" id="navSkills" data-view="viewSkills" title="Skills & Grounding Engine">
+            <a href="#" class="sidebar-nav-link" id="navCustomize" data-view="viewSkills" title="Customize Connectors & Settings">
                 <span class="nav-item-icon">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="12" y1="12" x2="12" y2="12.01"/></svg>
                 </span>
-                <span>Skills</span>
+                <span class="nav-item-text">Customize</span>
             </a>
 
-            <a href="#" class="nav-item" id="navWorkspace" data-view="viewWorkspace" title="Workspaces & OneLake Items">
-                <span class="nav-item-icon">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
-                </span>
-                <span>Workspaces</span>
-            </a>
+            <!-- Projects Section in Sidebar -->
+            <div class="sidebar-section sidebar-projects-section">
+                <div class="sidebar-section-header" id="sidebarProjectsHeader">
+                    <div class="sidebar-section-title-wrap" id="btnToggleSidebarProjects" title="Toggle Projects">
+                        <span class="sidebar-section-title">Projects</span>
+                        <span class="sidebar-chevron-inline" id="projectsChevronInline">
+                            <svg class="chevron-icon" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+                        </span>
+                    </div>
+                    <div class="sidebar-section-actions">
+                        <button class="sidebar-action-icon-btn" id="btnSidebarViewAllProjects" title="View all projects" type="button">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="7" y1="17" x2="17" y2="7"/><polyline points="7 7 17 7 17 17"/></svg>
+                        </button>
+                        <button class="sidebar-action-icon-btn" id="btnSidebarNewProject" title="Create a project" type="button">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                        </button>
+                    </div>
+                </div>
 
-            <a href="#" class="nav-item" id="navApps" data-view="viewIngestion" title="Apps & Connectors">
-                <span class="nav-item-icon">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/>
-                    </svg>
-                </span>
-                <span>Apps</span>
-            </a>
+                <!-- Projects List in Sidebar -->
+                <div class="sidebar-projects-list" id="sidebarProjectsList">
+                    <!-- Populated dynamically via renderSidebarProjects() -->
+                </div>
+            </div>
 
-            <a href="#" class="nav-item" id="navCustomize" title="Customize Connectors & Settings">
-                <span class="nav-item-icon">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>
-                </span>
-                <span>Customize</span>
-            </a>
-
-            <!-- Chats and tasks Section (Collapsible with immediate right Chevron) -->
-            <div class="sidebar-chats-section">
-                <div class="chats-section-header" id="chatsSectionHeader" title="Click to collapse/expand chats">
-                    <span class="chats-section-title">Chats and tasks</span>
-                    <span class="chats-chevron-inline" id="chatsCollapseToggle">
-                        <svg class="chevron-icon" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
-                    </span>
+            <!-- Chats and tasks Section -->
+            <div class="sidebar-section sidebar-chats-section">
+                <div class="sidebar-section-header" id="chatsSectionHeader">
+                    <div class="sidebar-section-title-wrap" id="btnToggleSidebarChats" title="Toggle Chats">
+                        <span class="sidebar-section-title">Chats and tasks</span>
+                    </div>
+                    <div class="sidebar-section-actions">
+                        <button class="sidebar-action-icon-btn" id="btnSidebarFilterChats" title="Filter / Manage Chats" type="button">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>
+                        </button>
+                    </div>
                 </div>
 
                 <!-- Roll-up Chat List Container -->
@@ -2151,6 +2150,6 @@
 </div>
 
 <script src="flow_renderer.js?v=310"></script>
-<script src="app.js?v=620"></script>
+<script src="app.js?v=630"></script>
 </body>
 </html>

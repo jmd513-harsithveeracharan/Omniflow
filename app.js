@@ -102,11 +102,11 @@ function switchView(viewId) {
     App.activeView = viewId;
 
     // Update active nav item
-    document.querySelectorAll('.sidebar-nav .nav-item, .sidebar-new-chat-btn').forEach(btn => {
+    document.querySelectorAll('.sidebar-nav-link, .sidebar-nav .nav-item, .sidebar-new-chat-btn').forEach(btn => {
         const dv = btn.getAttribute('data-view');
         if (dv && dv === viewId) {
             btn.classList.add('active');
-        } else if (viewId === 'viewArchitect' && btn.id === 'btnSidebarNewChat') {
+        } else if (viewId === 'viewArchitect' && (btn.id === 'navCode' || btn.id === 'btnSidebarNewChat')) {
             btn.classList.add('active');
         } else {
             btn.classList.remove('active');
@@ -150,13 +150,46 @@ function switchView(viewId) {
 }
 
 function initNavigation() {
-    const navItems = document.querySelectorAll('.nav-item[data-view]');
+    const navItems = document.querySelectorAll('.sidebar-nav-link[data-view], .nav-item[data-view]');
     navItems.forEach(item => {
         item.addEventListener('click', (e) => {
             e.preventDefault();
             const targetView = item.getAttribute('data-view');
             switchView(targetView);
         });
+    });
+
+    // Projects Section in Sidebar Controls
+    document.getElementById('btnToggleSidebarProjects')?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const list = document.getElementById('sidebarProjectsList');
+        const chevron = document.getElementById('projectsChevronInline');
+        if (list) {
+            list.classList.toggle('collapsed');
+            chevron?.classList.toggle('collapsed', list.classList.contains('collapsed'));
+        }
+    });
+
+    document.getElementById('btnSidebarViewAllProjects')?.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        switchView('viewProjects');
+    });
+
+    document.getElementById('btnSidebarNewProject')?.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (window.openNewProjectModal) {
+            window.openNewProjectModal();
+        }
+    });
+
+    document.getElementById('btnSidebarFilterChats')?.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (window.toggleConversationsDrawer) {
+            window.toggleConversationsDrawer();
+        }
     });
 
     const sidebar = document.getElementById('sidebar');
@@ -1724,11 +1757,61 @@ function initProjectsView() {
             _allProjects = [];
         }
         renderProjects();
+        renderSidebarProjects(_allProjects);
     }
 
     updateViewToggleUi();
     loadProjects();
 }
+
+function renderSidebarProjects(projects = null) {
+    const listEl = document.getElementById('sidebarProjectsList');
+    if (!listEl) return;
+    const projs = projects || _allProjects || [];
+    
+    // Sort pinned to top, then recent
+    const sorted = [...projs].sort((a, b) => {
+        if (a.is_pinned !== b.is_pinned) return b.is_pinned - a.is_pinned;
+        return new Date(b.updated_at || b.created_at || 0) - new Date(a.updated_at || a.created_at || 0);
+    });
+
+    if (sorted.length === 0) {
+        listEl.innerHTML = '<div style="padding: 6px 8px; font-size: 12px; color: #71717a;">No projects yet</div>';
+        return;
+    }
+
+    // Stack container icon matching reference image
+    const stackIconSvg = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="3" width="16" height="5" rx="1.5"/><path d="M4 8v10a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"/><line x1="4" y1="13" x2="20" y2="13"/></svg>`;
+
+    listEl.innerHTML = sorted.slice(0, 8).map(p => {
+        const safeName = escapeHtml(p.name);
+        const isActive = App.activeProject && App.activeProject.id === p.id;
+        return `
+            <div class="sidebar-project-item ${isActive ? 'active' : ''}" data-project-id="${p.id}" title="${safeName}" onclick="selectSidebarProject('${p.id}')">
+                <span class="sidebar-project-icon">${stackIconSvg}</span>
+                <span class="sidebar-project-name">${safeName}</span>
+            </div>
+        `;
+    }).join('');
+}
+
+function selectSidebarProject(projectId) {
+    const proj = (_allProjects || []).find(p => p.id === projectId);
+    if (!proj) return;
+    App.activeProject = proj;
+    document.querySelectorAll('.sidebar-project-item').forEach(item => {
+        item.classList.toggle('active', item.getAttribute('data-project-id') === projectId);
+    });
+    switchView('viewArchitect');
+    const chatInput = document.getElementById('chatInput');
+    if (chatInput) {
+        chatInput.placeholder = `Ask anything about ${proj.name}...`;
+        chatInput.focus();
+    }
+}
+
+window.selectSidebarProject = selectSidebarProject;
+window.renderSidebarProjects = renderSidebarProjects;
 window.initProjectsView = initProjectsView;
 
 // ── Skills Gallery & Inspector Controller (Claude Artifacts Layout) ──────────
