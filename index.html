@@ -7,7 +7,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;600;700&family=Google+Sans+Text:wght@400;500;600&family=Inter:wght@400;500;600;700&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400;1,6..72,500&family=Roboto+Mono:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=445">
+    <link rel="stylesheet" href="style.css?v=450">
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%231a73e8'/%3E%3Cpath d='M8 16 L16 8 L24 16 L16 24 Z' fill='white'/%3E%3Cpath d='M12 16 L16 12 L20 16 L16 20 Z' fill='%231a73e8'/%3E%3C/svg%3E">
 </head>
 <body class="dark-theme">
@@ -1923,49 +1923,49 @@
     </div>
 </div>
 
-<!-- ═══════════════ ADD CUSTOM CONNECTOR MODAL DIALOG ═══════════════════════════ -->
+<!-- ═══════════════ ADD CUSTOM CONNECTOR MODAL DIALOG (CLAUDE AESTHETIC) ═══════════════════════════ -->
 <div class="sso-modal-backdrop" id="modalAddCustomConnector" style="display: none;" onclick="if(event.target===this) window.closeAddConnectorModal();">
-    <div class="project-modal-card custom-connector-modal-card">
-        <div class="project-modal-header">
-            <div class="project-modal-title-group">
-                <div class="project-modal-icon-badge" style="background: rgba(6, 182, 212, 0.15); color: #06b6d4;">
+    <div class="custom-connector-modal-card">
+        <div class="claude-modal-header">
+            <div class="claude-modal-title-group">
+                <div class="claude-modal-icon-badge">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M2 12h20M4.93 4.93l14.14 14.14M4.93 19.07l14.14-14.14"/></svg>
                 </div>
                 <div>
-                    <h3 class="project-modal-title">Add Custom Connector</h3>
-                    <p class="project-modal-sub">Scaffold parameters manually with Key-Value pairs or auto-generate with AI</p>
+                    <h3 class="claude-modal-title">Add custom connector</h3>
+                    <p class="claude-modal-sub">Define connection parameters manually or auto-generate schema with AI</p>
                 </div>
             </div>
-            <button class="btn-close-modal-icon" id="btnCloseAddConnectorModal" type="button" onclick="window.closeAddConnectorModal();"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+            <button class="btn-subtle-icon btn-close-modal-icon" id="btnCloseAddConnectorModal" type="button" onclick="window.closeAddConnectorModal();"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
         </div>
 
-        <div class="project-modal-body">
-            <!-- ⚡ AI AUTO-PROMPT SCAFFOLD SECTION -->
-            <div class="ai-prompt-box">
-                <div class="ai-prompt-header">
-                    <span class="ai-prompt-badge">⚡ Auto-Generate with AI</span>
-                    <span class="ai-prompt-hint">Describe source & required parameters</span>
+        <div class="claude-modal-body">
+            <!-- ⚡ AI AUTO-PROMPT SECTION -->
+            <div class="claude-ai-prompt-card">
+                <div class="claude-ai-prompt-header">
+                    <span class="claude-ai-badge">Auto-generate with AI</span>
+                    <span class="claude-ai-hint">Describe source, port & credentials</span>
                 </div>
-                <div class="ai-prompt-input-row">
-                    <input type="text" class="project-input" id="inputAiConnectorPrompt" placeholder="e.g. Create ClickHouse Cloud connector on port 8443 with database, user, password" autocomplete="off">
-                    <button type="button" class="btn-ai-generate" id="btnRunAiConnectorPrompt">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                <div class="claude-ai-input-row">
+                    <input type="text" class="claude-modal-input" id="inputAiConnectorPrompt" placeholder="e.g. Create ClickHouse Cloud connector on port 8443 with database, user, password" autocomplete="off">
+                    <button type="button" class="btn-claude-generate" id="btnRunAiConnectorPrompt">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
                         <span>Generate</span>
                     </button>
                 </div>
             </div>
 
-            <div class="form-divider-label"><span>OR CONFIGURE MANUALLY</span></div>
+            <div class="claude-divider-row"><span>Or configure manually</span></div>
 
-            <!-- Manual Fields -->
-            <div class="form-row-dual">
-                <div class="project-field-group">
-                    <label class="project-field-label">Connector Name <span class="req-star">*</span></label>
-                    <input type="text" class="project-input" id="inputCustomConnName" placeholder="e.g. ClickHouse Cloud Analytics" autocomplete="off">
+            <!-- Manual Fields Grid -->
+            <div class="claude-form-grid-2">
+                <div class="claude-field-group">
+                    <label class="claude-field-label">Connector name <span class="req-dot">*</span></label>
+                    <input type="text" class="claude-modal-input" id="inputCustomConnName" placeholder="e.g. ClickHouse Cloud Analytics" autocomplete="off">
                 </div>
-                <div class="project-field-group">
-                    <label class="project-field-label">Category</label>
-                    <select class="project-select" id="selectCustomConnCategory">
+                <div class="claude-field-group">
+                    <label class="claude-field-label">Category</label>
+                    <select class="claude-modal-select" id="selectCustomConnCategory">
                         <option value="Relational Database">Relational Database (JDBC / SQL)</option>
                         <option value="Cloud Data Warehouse">Cloud Data Warehouse (Snowflake / Redshift / ClickHouse)</option>
                         <option value="Enterprise SaaS API">Enterprise SaaS API (REST / OAuth2)</option>
@@ -1975,37 +1975,40 @@
                 </div>
             </div>
 
-            <div class="form-row-dual">
-                <div class="project-field-group">
-                    <label class="project-field-label">Default Port</label>
-                    <input type="text" class="project-input" id="inputCustomConnPort" placeholder="e.g. 8443, 5432, 9092" value="5432">
+            <div class="claude-form-grid-2">
+                <div class="claude-field-group">
+                    <label class="claude-field-label">Default port</label>
+                    <input type="text" class="claude-modal-input" id="inputCustomConnPort" placeholder="e.g. 8443, 5432, 9092" value="5432">
                 </div>
-                <div class="project-field-group">
-                    <label class="project-field-label">Driver Class / Protocol</label>
-                    <input type="text" class="project-input" id="inputCustomConnDriver" placeholder="e.g. org.postgresql.Driver or rest_oauth" value="org.postgresql.Driver">
+                <div class="claude-field-group">
+                    <label class="claude-field-label">Driver class / protocol</label>
+                    <input type="text" class="claude-modal-input" id="inputCustomConnDriver" placeholder="e.g. org.postgresql.Driver or rest_oauth" value="org.postgresql.Driver">
                 </div>
             </div>
 
             <!-- Dynamic Key-Value Pairs List -->
-            <div class="key-value-section">
-                <div class="key-value-header">
-                    <label class="project-field-label" style="margin: 0;">Connection Parameters (Key-Value Schema)</label>
-                    <button type="button" class="btn-add-kv" id="btnAddParamRow">+ Add Parameter</button>
+            <div class="claude-kv-card">
+                <div class="claude-kv-header">
+                    <div>
+                        <span class="claude-kv-title">Connection parameters</span>
+                        <span class="claude-kv-sub">Key-Value schema definitions</span>
+                    </div>
+                    <button type="button" class="btn-claude-add-row" id="btnAddParamRow">+ Add parameter</button>
                 </div>
-                <div class="key-value-list" id="customConnParamsList">
-                    <!-- Dynamic rows will be injected here -->
+                <div class="claude-kv-list" id="customConnParamsList">
+                    <!-- Dynamic rows injected here -->
                 </div>
             </div>
         </div>
 
-        <div class="project-modal-footer">
-            <button class="project-btn-cancel" id="btnCancelAddConnector" type="button" onclick="window.closeAddConnectorModal();">Cancel</button>
-            <button class="project-btn-create" id="btnSaveCustomConnector" type="button">Save & Register Connector</button>
+        <div class="claude-modal-footer">
+            <button class="btn-claude-ghost" id="btnCancelAddConnector" type="button" onclick="window.closeAddConnectorModal();">Cancel</button>
+            <button class="btn-claude-primary" id="btnSaveCustomConnector" type="button">Save & register connector</button>
         </div>
     </div>
 </div>
 
 <script src="flow_renderer.js?v=310"></script>
-<script src="app.js?v=445"></script>
+<script src="app.js?v=450"></script>
 </body>
 </html>

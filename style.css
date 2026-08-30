@@ -8810,201 +8810,282 @@ ul.chat-md-list {
     border-color: rgba(56, 189, 248, 0.3);
 }
 
-/* ═══════════════ ADD CUSTOM CONNECTOR MODAL STYLES ═══════════════ */
-.sso-modal-backdrop {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100vw;
-    height: 100vh;
-    background: rgba(0, 0, 0, 0.7);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
+/* ═══════════════ ADD CUSTOM CONNECTOR MODAL (CLAUDE AESTHETIC) ═══════════════ */
+.custom-connector-modal-card {
+    background: #141416;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 18px;
+    width: 620px;
+    max-width: 94vw;
+    max-height: 88vh;
+    box-shadow: 0 24px 80px rgba(0, 0, 0, 0.95);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    animation: fadeInMsg 0.15s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    box-sizing: border-box;
+    font-family: var(--font-sans);
+}
+
+.claude-modal-header {
+    padding: 20px 24px 16px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    background: #141416;
+}
+
+.claude-modal-title-group {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.claude-modal-icon-badge {
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
+    background: #202024;
+    border: 1px solid rgba(255, 255, 255, 0.08);
     display: flex;
     align-items: center;
     justify-content: center;
-    z-index: 999999;
+    color: #e4e4e7;
+    flex-shrink: 0;
 }
 
-.custom-connector-modal-card {
-    max-width: 640px;
-    width: 90vw;
-    max-height: 88vh;
+.claude-modal-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: #ffffff;
+    margin: 0 0 2px 0;
+    letter-spacing: -0.01em;
+}
+
+.claude-modal-sub {
+    font-size: 12.5px;
+    color: #8e918f;
+    margin: 0;
+    line-height: 1.4;
+}
+
+.claude-modal-body {
+    padding: 20px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
     overflow-y: auto;
+    background: #141416;
 }
 
-.ai-prompt-box {
-    background: rgba(6, 182, 212, 0.04);
-    border: 1px solid rgba(6, 182, 212, 0.25);
-    border-radius: 10px;
+/* ⚡ Claude Minimalist AI Prompt Card */
+.claude-ai-prompt-card {
+    background: #18181b;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
     padding: 12px 14px;
-    margin-bottom: 16px;
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
 }
 
-.ai-prompt-header {
+.claude-ai-prompt-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 8px;
 }
 
-.ai-prompt-badge {
+.claude-ai-badge {
     font-size: 11px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    color: #06b6d4;
-    background: rgba(6, 182, 212, 0.12);
-    padding: 2px 8px;
-    border-radius: 4px;
+    font-weight: 500;
+    color: #e4e4e7;
+    background: #27272a;
+    padding: 3px 8px;
+    border-radius: 6px;
+    border: 1px solid rgba(255, 255, 255, 0.06);
 }
 
-.ai-prompt-hint {
-    font-size: 11px;
-    color: #9ca3af;
+.claude-ai-hint {
+    font-size: 11.5px;
+    color: #71717a;
 }
 
-.ai-prompt-input-row {
+.claude-ai-input-row {
     display: flex;
     gap: 8px;
 }
 
-.ai-prompt-input-row .project-input {
-    flex: 1;
-    background: #141416;
-    border-color: rgba(255, 255, 255, 0.12);
-}
-
-.btn-ai-generate {
-    display: inline-flex;
+.btn-claude-generate {
+    background: #27272a;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    color: #ffffff;
+    border-radius: 8px;
+    padding: 0 14px;
+    font-size: 12.5px;
+    font-weight: 500;
+    cursor: pointer;
+    display: flex;
     align-items: center;
     gap: 6px;
-    padding: 0 14px;
-    background: linear-gradient(135deg, #06b6d4, #0284c7);
-    border: none;
-    border-radius: 6px;
-    color: #ffffff;
-    font-size: 12.5px;
-    font-weight: 600;
-    cursor: pointer;
     transition: all 0.15s ease;
     white-space: nowrap;
+    font-family: var(--font-sans);
 }
 
-.btn-ai-generate:hover {
-    filter: brightness(1.15);
-    transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(6, 182, 212, 0.3);
+.btn-claude-generate:hover {
+    background: #3f3f46;
+    color: #ffffff;
 }
 
-.form-divider-label {
+.claude-divider-row {
     position: relative;
     text-align: center;
-    margin: 16px 0;
+    margin: 4px 0;
 }
 
-.form-divider-label::before {
+.claude-divider-row::before {
     content: "";
     position: absolute;
     top: 50%;
     left: 0;
     right: 0;
     height: 1px;
-    background: rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.06);
     z-index: 1;
 }
 
-.form-divider-label span {
+.claude-divider-row span {
     position: relative;
     z-index: 2;
-    background: #1e1f20;
+    background: #141416;
     padding: 0 10px;
-    font-size: 10.5px;
-    font-weight: 600;
-    letter-spacing: 0.05em;
-    color: #6b7280;
-    text-transform: uppercase;
+    font-size: 11px;
+    font-weight: 500;
+    color: #71717a;
 }
 
-.form-row-dual {
+.claude-form-grid-2 {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 12px;
-    margin-bottom: 10px;
 }
 
-.key-value-section {
-    margin-top: 14px;
-    background: rgba(0, 0, 0, 0.2);
-    border: 1px solid rgba(255, 255, 255, 0.07);
+.claude-field-group {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.claude-field-label {
+    font-size: 12px;
+    font-weight: 500;
+    color: #a1a1aa;
+    letter-spacing: -0.01em;
+}
+
+.claude-field-label .req-dot {
+    color: #ef4444;
+    margin-left: 2px;
+}
+
+.claude-modal-input,
+.claude-modal-select {
+    background: #18181b;
+    border: 1px solid rgba(255, 255, 255, 0.09);
     border-radius: 8px;
-    padding: 12px;
+    padding: 8px 12px;
+    color: #ffffff;
+    font-size: 13px;
+    font-family: var(--font-sans);
+    outline: none;
+    transition: all 0.15s ease;
+    width: 100%;
+    box-sizing: border-box;
 }
 
-.key-value-header {
+.claude-modal-input:focus,
+.claude-modal-select:focus {
+    border-color: rgba(255, 255, 255, 0.25);
+    background: #1c1c20;
+}
+
+/* 📋 Key-Value Container */
+.claude-kv-card {
+    background: #18181b;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+    padding: 14px;
+}
+
+.claude-kv-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 10px;
+    margin-bottom: 12px;
 }
 
-.btn-add-kv {
-    background: rgba(255, 255, 255, 0.06);
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    border-radius: 5px;
-    color: #38bdf8;
+.claude-kv-title {
+    font-size: 13px;
+    font-weight: 500;
+    color: #ffffff;
+    display: block;
+}
+
+.claude-kv-sub {
     font-size: 11.5px;
-    font-weight: 600;
-    padding: 3px 10px;
+    color: #71717a;
+    display: block;
+}
+
+.btn-claude-add-row {
+    background: #27272a;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: #ffffff;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 500;
+    padding: 4px 10px;
     cursor: pointer;
     transition: all 0.15s ease;
+    font-family: var(--font-sans);
 }
 
-.btn-add-kv:hover {
-    background: rgba(56, 189, 248, 0.15);
-    border-color: rgba(56, 189, 248, 0.3);
+.btn-claude-add-row:hover {
+    background: #3f3f46;
 }
 
-.key-value-list {
+.claude-kv-list {
     display: flex;
     flex-direction: column;
     gap: 8px;
+    max-height: 220px;
+    overflow-y: auto;
 }
 
 .key-value-row {
     display: grid;
-    grid-template-columns: 1fr 1fr 110px 32px;
+    grid-template-columns: 1fr 1fr 115px 32px;
     gap: 8px;
     align-items: center;
 }
 
-.key-value-row input,
-.key-value-row select {
-    background: #141416;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 5px;
-    color: #e5e7eb;
-    font-size: 12px;
-    padding: 6px 8px;
-    outline: none;
-}
-
-.key-value-row input:focus,
-.key-value-row select:focus {
-    border-color: #06b6d4;
+.key-value-row .claude-modal-input,
+.key-value-row .claude-modal-select {
+    padding: 7px 10px;
+    font-size: 12.5px;
 }
 
 .btn-remove-kv {
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 28px;
-    height: 28px;
+    width: 30px;
+    height: 30px;
     background: transparent;
-    border: 1px solid transparent;
-    border-radius: 4px;
-    color: #9ca3af;
+    border: none;
+    border-radius: 6px;
+    color: #71717a;
     cursor: pointer;
     transition: all 0.15s ease;
 }
@@ -9012,7 +9093,55 @@ ul.chat-md-list {
 .btn-remove-kv:hover {
     color: #ef4444;
     background: rgba(239, 68, 68, 0.1);
-    border-color: rgba(239, 68, 68, 0.2);
 }
+
+/* ── Modal Footer ────────────────────────────── */
+.claude-modal-footer {
+    padding: 14px 24px;
+    border-top: 1px solid rgba(255, 255, 255, 0.07);
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 10px;
+    background: #111113;
+    border-bottom-left-radius: 18px;
+    border-bottom-right-radius: 18px;
+}
+
+.btn-claude-ghost {
+    background: transparent;
+    border: none;
+    color: #a1a1aa;
+    font-size: 13px;
+    font-weight: 500;
+    padding: 8px 14px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: color 0.15s ease;
+    font-family: var(--font-sans);
+}
+
+.btn-claude-ghost:hover {
+    color: #ffffff;
+}
+
+.btn-claude-primary {
+    background: #ffffff;
+    color: #111113;
+    border: none;
+    font-size: 13px;
+    font-weight: 500;
+    padding: 8px 16px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    font-family: var(--font-sans);
+}
+
+.btn-claude-primary:hover {
+    background: #e4e4e7;
+    transform: translateY(-1px);
+}
+
 
 

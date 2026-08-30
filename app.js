@@ -5693,9 +5693,9 @@ window.addParamRow = function(key = '', label = '', type = 'text', placeholder =
     const row = document.createElement('div');
     row.className = 'key-value-row';
     row.innerHTML = `
-        <input type="text" class="param-key" placeholder="Key (e.g. host)" value="${escapeHtml(key)}" />
-        <input type="text" class="param-label" placeholder="Display Label" value="${escapeHtml(label || key)}" />
-        <select class="param-type">
+        <input type="text" class="claude-modal-input param-key" placeholder="Key (e.g. host)" value="${escapeHtml(key)}" />
+        <input type="text" class="claude-modal-input param-label" placeholder="Display Label" value="${escapeHtml(label || key)}" />
+        <select class="claude-modal-select param-type">
             <option value="text" ${type === 'text' ? 'selected' : ''}>Text</option>
             <option value="password" ${type === 'password' ? 'selected' : ''}>Password 🔒</option>
             <option value="number" ${type === 'number' ? 'selected' : ''}>Number</option>
