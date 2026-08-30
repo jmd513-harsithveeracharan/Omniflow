@@ -1273,264 +1273,7 @@ function initClaudeSettingsModal() {
     initSkillsManager();
 }
 
-// ── Projects Controller (Claude-Style Redesign) ─────────────────────────────
-let _projectsListenersAttached = false;
-let _projectSortBy = 'updated';
 
-const DEFAULT_PROJECTS = [
-    {
-        id: 'proj_retail_pos',
-        name: 'Retail POS & Medallion Pipeline',
-        description: 'End-to-end ingestion and star schema modeling for enterprise point-of-sale transactions into Bronze, Silver upserts, and Gold star schema.',
-        targetLakehouse: 'lh_retail_bronze',
-        instructions: 'Always use Delta Lake MERGE statements with partition pruning on transaction_date.',
-        conversationsCount: 3,
-        updatedAt: Date.now() - 3600000 * 2,
-        createdAt: Date.now() - 86400000 * 3
-    },
-    {
-        id: 'proj_sap_finance',
-        name: 'SAP S/4HANA Finance Sync',
-        description: 'Real-time ingestion of General Ledger and Accounts Payable via SAP ODP connector with incremental watermarking.',
-        targetLakehouse: 'lh_finance_silver',
-        instructions: 'Ensure all financial currency conversions use the standard ISO reference exchange table in OneLake.',
-        conversationsCount: 2,
-        updatedAt: Date.now() - 3600000 * 6,
-        createdAt: Date.now() - 86400000 * 5
-    }
-];
-
-function getStoredProjects() {
-    try {
-        const stored = localStorage.getItem('fabric_ai_projects');
-        if (stored) {
-            const parsed = JSON.parse(stored);
-            if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-            if (Array.isArray(parsed) && parsed.length === 0) return [];
-        }
-    } catch(e) {}
-    saveStoredProjects(DEFAULT_PROJECTS);
-    return DEFAULT_PROJECTS;
-}
-
-function saveStoredProjects(projects) {
-    try {
-        localStorage.setItem('fabric_ai_projects', JSON.stringify(projects));
-    } catch(e) {}
-}
-
-function initProjectsView() {
-    App.projects = getStoredProjects();
-    renderProjectsGrid();
-
-    if (_projectsListenersAttached) return;
-    _projectsListenersAttached = true;
-
-    // Search Toggle & Live Input
-    const searchBtn = document.getElementById('btnProjectsSearchToggle');
-    const searchInput = document.getElementById('projectsSearchInput');
-    searchBtn?.addEventListener('click', () => {
-        if (!searchInput) return;
-        const isHidden = searchInput.style.display === 'none';
-        searchInput.style.display = isHidden ? 'block' : 'none';
-        if (isHidden) searchInput.focus();
-    });
-
-    searchInput?.addEventListener('input', () => {
-        renderProjectsGrid();
-    });
-
-    // Sort Dropdown
-    const sortBtn = document.getElementById('btnProjectsSort');
-    const sortMenu = document.getElementById('projectsSortMenu');
-    const sortLabel = document.getElementById('projectsSortLabel');
-
-    sortBtn?.addEventListener('click', (e) => {
-        e.stopPropagation();
-        if (sortMenu) {
-            const isHidden = sortMenu.style.display === 'none';
-            sortMenu.style.display = isHidden ? 'flex' : 'none';
-        }
-    });
-
-    document.addEventListener('click', (e) => {
-        if (sortMenu && !sortBtn?.contains(e.target) && !sortMenu.contains(e.target)) {
-            sortMenu.style.display = 'none';
-        }
-    });
-
-    document.querySelectorAll('.projects-sort-item').forEach(item => {
-        item.addEventListener('click', () => {
-            const sort = item.getAttribute('data-sort') || 'updated';
-            _projectSortBy = sort;
-            if (sortLabel) sortLabel.textContent = item.textContent;
-            document.querySelectorAll('.projects-sort-item').forEach(i => i.classList.toggle('active', i === item));
-            if (sortMenu) sortMenu.style.display = 'none';
-            renderProjectsGrid();
-        });
-    });
-
-    // New Project Buttons
-    document.getElementById('btnNewProjectTop')?.addEventListener('click', openNewProjectModal);
-    document.getElementById('btnNewProjectCenter')?.addEventListener('click', openNewProjectModal);
-    document.getElementById('btnSubmitNewProject')?.addEventListener('click', submitNewProject);
-
-    // Help Tooltip
-    document.getElementById('btnProjectsHelp')?.addEventListener('click', () => {
-        showToast('Projects allow you to set custom grounding instructions, target lakehouses, and organize chat threads in one space.', 'info');
-    });
-}
-
-function openNewProjectModal() {
-    const modal = document.getElementById('modalNewProject');
-    if (!modal) return;
-    modal.style.display = 'flex';
-    const nameInput = document.getElementById('inputProjectName');
-    if (nameInput) {
-        nameInput.value = '';
-        nameInput.focus();
-    }
-    const descInput = document.getElementById('inputProjectDesc');
-    if (descInput) descInput.value = '';
-    const instInput = document.getElementById('inputProjectInstructions');
-    if (instInput) instInput.value = '';
-}
-
-function closeNewProjectModal() {
-    const modal = document.getElementById('modalNewProject');
-    if (modal) modal.style.display = 'none';
-}
-
-window.openNewProjectModal = openNewProjectModal;
-window.closeNewProjectModal = closeNewProjectModal;
-
-function submitNewProject() {
-    const nameInput = document.getElementById('inputProjectName');
-    const descInput = document.getElementById('inputProjectDesc');
-    const lhInput = document.getElementById('selectProjectTargetLakehouse');
-    const instInput = document.getElementById('inputProjectInstructions');
-
-    const name = nameInput?.value.trim();
-    if (!name) {
-        if (nameInput) {
-            nameInput.focus();
-            nameInput.style.borderColor = '#f87171';
-            setTimeout(() => { nameInput.style.borderColor = ''; }, 1500);
-        }
-        return;
-    }
-
-    const newProject = {
-        id: 'proj_' + Math.random().toString(36).substring(2, 9),
-        name: name,
-        description: descInput?.value.trim() || 'Custom Fabric project workspace.',
-        targetLakehouse: lhInput?.value || 'lh_retail_bronze',
-        instructions: instInput?.value.trim() || '',
-        conversationsCount: 1,
-        createdAt: Date.now(),
-        updatedAt: Date.now()
-    };
-
-    App.projects = getStoredProjects();
-    App.projects.unshift(newProject);
-    saveStoredProjects(App.projects);
-
-    closeNewProjectModal();
-    renderProjectsGrid();
-    showToast(`Project "${name}" created.`, 'success');
-}
-
-function renderProjectsGrid() {
-    const emptyState = document.getElementById('projectsEmptyState');
-    const grid = document.getElementById('projectsCardsGrid');
-    const searchInput = document.getElementById('projectsSearchInput');
-    const query = (searchInput?.value || '').toLowerCase().trim();
-
-    let list = [...(App.projects || [])];
-
-    if (query) {
-        list = list.filter(p => 
-            (p.name || '').toLowerCase().includes(query) ||
-            (p.description || '').toLowerCase().includes(query) ||
-            (p.targetLakehouse || '').toLowerCase().includes(query)
-        );
-    }
-
-    if (_projectSortBy === 'name') {
-        list.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-    } else if (_projectSortBy === 'created') {
-        list.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
-    } else {
-        list.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
-    }
-
-    if (list.length === 0 && !query) {
-        if (emptyState) emptyState.style.display = 'flex';
-        if (grid) grid.style.display = 'none';
-        return;
-    }
-
-    if (emptyState) emptyState.style.display = 'none';
-    if (grid) {
-        grid.style.display = 'grid';
-        grid.innerHTML = '';
-
-        list.forEach(proj => {
-            const card = document.createElement('div');
-            card.className = 'project-card';
-            const timeAgo = formatRelativeTime(proj.updatedAt || proj.createdAt);
-
-            card.innerHTML = `
-                <div>
-                    <div class="project-card-top">
-                        <h3 class="project-card-title">${escapeHtml(proj.name)}</h3>
-                        <span class="project-lakehouse-tag">${escapeHtml(proj.targetLakehouse || 'Lakehouse')}</span>
-                    </div>
-                    <p class="project-card-desc">${escapeHtml(proj.description || 'Custom Fabric project workspace.')}</p>
-                </div>
-                <div class="project-card-footer">
-                    <span>${escapeHtml(timeAgo)}</span>
-                    <button class="ws-action-btn ws-btn-del" title="Delete project" style="margin-left: auto;">
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-                    </button>
-                </div>
-            `;
-
-            // Click card to open in Chat with project context
-            card.addEventListener('click', (e) => {
-                if (e.target.closest('.ws-btn-del')) return;
-                openProjectWorkspace(proj);
-            });
-
-            // Delete project
-            const delBtn = card.querySelector('.ws-btn-del');
-            delBtn?.addEventListener('click', (e) => {
-                e.stopPropagation();
-                if (confirm(`Delete project "${proj.name}"?`)) {
-                    App.projects = (App.projects || []).filter(p => p.id !== proj.id);
-                    saveStoredProjects(App.projects);
-                    renderProjectsGrid();
-                    showToast('Project deleted.', 'info');
-                }
-            });
-
-            grid.appendChild(card);
-        });
-    }
-}
-
-function openProjectWorkspace(project) {
-    App.activeProject = project;
-    switchView('viewArchitect');
-    
-    // Set custom project placeholder and focus chat
-    const chatInput = document.getElementById('chatInput');
-    if (chatInput) {
-        chatInput.placeholder = `Ask anything about ${project.name}...`;
-        chatInput.focus();
-    }
-    showToast(`Loaded context for project "${project.name}"`, 'success');
-}
 
 // ── Skills Gallery & Inspector Controller (Claude Artifacts Layout) ──────────
 const DEFAULT_SKILLS = [
@@ -5871,7 +5614,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     window.initProjectsView = function() {
         const searchToggle = document.getElementById('btnProjectsSearchToggle');
+        const searchBox = document.getElementById('projectsSearchInputBox');
         const searchInput = document.getElementById('projectsSearchInput');
+        const btnCloseSearch = document.getElementById('btnCloseProjectsSearch');
         const sortBtn = document.getElementById('btnProjectsSort');
         const sortMenu = document.getElementById('projectsSortMenu');
         const sortLabel = document.getElementById('projectsSortLabel');
@@ -5914,13 +5659,32 @@ document.addEventListener('DOMContentLoaded', () => {
             renderProjects();
         });
 
-        // Search toggle & input
+        // Search expanding toggle & input
         searchToggle?.addEventListener('click', (e) => {
             e.stopPropagation();
-            if (searchInput) {
-                const isVisible = searchInput.style.display !== 'none';
-                searchInput.style.display = isVisible ? 'none' : 'block';
-                if (!isVisible) searchInput.focus();
+            if (searchToggle) searchToggle.style.display = 'none';
+            if (searchBox) {
+                searchBox.style.display = 'flex';
+                searchInput?.focus();
+            }
+        });
+
+        const closeSearch = () => {
+            if (searchInput) searchInput.value = '';
+            if (searchBox) searchBox.style.display = 'none';
+            if (searchToggle) searchToggle.style.display = 'inline-flex';
+            renderProjects();
+        };
+
+        btnCloseSearch?.addEventListener('click', (e) => {
+            e.stopPropagation();
+            closeSearch();
+        });
+
+        searchInput?.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                e.stopPropagation();
+                closeSearch();
             }
         });
 

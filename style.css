@@ -4125,21 +4125,56 @@ ul.chat-md-list {
     align-items: center;
 }
 
-.projects-search-input {
+.projects-search-input-box {
+    display: flex;
+    align-items: center;
     background: #18181b;
     border: 1px solid rgba(255, 255, 255, 0.12);
     border-radius: 8px;
-    padding: 7px 12px;
+    padding: 0 10px;
+    height: 36px;
+    gap: 8px;
+    animation: fadeInMsg 0.12s ease-out;
+}
+
+.search-input-icon {
+    color: #71717a;
+    flex-shrink: 0;
+}
+
+.projects-search-input {
+    background: transparent;
+    border: none;
+    padding: 6px 0;
     font-size: 13px;
     color: #ffffff;
     outline: none;
     width: 200px;
-    margin-left: 8px;
-    transition: all 0.15s ease;
+    font-family: var(--font-sans);
 }
 
-.projects-search-input:focus {
-    border-color: rgba(255, 255, 255, 0.3);
+.projects-search-input::placeholder {
+    color: #71717a;
+}
+
+.btn-clear-search {
+    background: transparent;
+    border: none;
+    color: #71717a;
+    font-size: 12px;
+    cursor: pointer;
+    padding: 2px 4px;
+    border-radius: 4px;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.12s;
+}
+
+.btn-clear-search:hover {
+    color: #ffffff;
+    background: rgba(255, 255, 255, 0.08);
 }
 
 /* Sort Dropdown */
