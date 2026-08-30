@@ -7,7 +7,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;600;700&family=Google+Sans+Text:wght@400;500;600&family=Inter:wght@400;500;600;700&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400;1,6..72,500&family=Roboto+Mono:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=500">
+    <link rel="stylesheet" href="style.css?v=510">
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%231a73e8'/%3E%3Cpath d='M8 16 L16 8 L24 16 L16 24 Z' fill='white'/%3E%3Cpath d='M12 16 L16 12 L20 16 L16 20 Z' fill='%231a73e8'/%3E%3C/svg%3E">
 </head>
 <body class="dark-theme">
@@ -1278,9 +1278,13 @@
 
                 <!-- Group 2: Customize -->
                 <div class="settings-nav-group-label" style="margin-top: 10px;">Customize</div>
-                <button class="claude-settings-nav-item active" data-tab="tabConnectors" type="button">
+                <button class="claude-settings-nav-item active" data-tab="tabSourceSystems" type="button">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+                    <span>Source Systems</span>
+                </button>
+                <button class="claude-settings-nav-item" data-tab="tabConnectors" type="button">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/></svg>
-                    <span>Connectors</span>
+                    <span>Connectors & Tools</span>
                 </button>
                 <button class="claude-settings-nav-item" data-tab="tabPlugins" type="button">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4"/><path d="M12 18v4"/><path d="M4.93 4.93l2.83 2.83"/><path d="M16.24 16.24l2.83 2.83"/><path d="M2 12h4"/><path d="M18 12h4"/><path d="M4.93 19.07l2.83-2.83"/><path d="M16.24 7.76l2.83-2.83"/></svg>
@@ -1295,20 +1299,219 @@
 
         <!-- RIGHT CONTENT PANEL -->
         <main class="claude-settings-body">
-            <!-- ── TAB: CONNECTORS (IMAGE 2) ────────────────────────── -->
-            <div class="settings-tab-pane" id="paneConnectors">
+            <!-- ── TAB 1: SOURCE SYSTEMS (RAW DATA ORIGINS FOR INGESTION) ── -->
+            <div class="settings-tab-pane" id="paneSourceSystems">
                 <div class="pane-header-row">
-                    <h2 class="pane-title">Connectors</h2>
+                    <div>
+                        <h2 class="pane-title">Source Systems</h2>
+                        <span style="font-size: 12.5px; color: #71717a;">Origin databases, ERPs & APIs ingested into Bronze Lakehouse</span>
+                    </div>
                     <div class="pane-header-actions">
-                        <button class="btn-subtle-icon" title="Search connectors"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></button>
-                        <button class="btn-subtle-dropdown" id="btnConnectorsAddMenu" onclick="window.openAddConnectorModal();">Add <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg></button>
+                        <button class="btn-subtle-icon" title="Search source systems"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></button>
+                        <button class="btn-subtle-dropdown" id="btnConnectorsAddMenu" onclick="window.openAddConnectorModal();">Add ▾</button>
                         <button class="btn-subtle-icon btn-close-modal-icon" title="Close dialog"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
                     </div>
                 </div>
 
-                <!-- Popular Cards Grid (Exact Claude Layout) -->
+                <!-- Popular Sources Grid -->
                 <div class="popular-connectors-section">
-                    <div class="section-micro-label">Popular</div>
+                    <div class="section-micro-label">Popular Sources</div>
+                    <div class="popular-cards-grid">
+                        <div class="popular-card">
+                            <div class="popular-card-left">
+                                <span class="popular-card-icon">
+                                    <svg width="22" height="15" viewBox="0 0 48 24" fill="none">
+                                        <rect width="48" height="24" rx="4" fill="#00386B"/>
+                                        <text x="24" y="17" font-family="'Inter', sans-serif" font-weight="800" font-size="14" fill="#ffffff" text-anchor="middle">SAP</text>
+                                    </svg>
+                                </span>
+                                <span class="popular-card-name">SAP S/4HANA</span>
+                            </div>
+                            <button class="btn-pill-connect">Connect</button>
+                        </div>
+                        <div class="popular-card">
+                            <div class="popular-card-left">
+                                <span class="popular-card-icon">
+                                    <svg width="18" height="18" viewBox="0 0 32 32" fill="none">
+                                        <path d="M16 3C9.37 3 4 4.79 4 7v18c0 2.21 5.37 4 12 4s12-1.79 12-4V7c0-2.21-5.37-4-12-4z" fill="#0078D4"/>
+                                        <ellipse cx="16" cy="7" rx="12" ry="4" fill="#50E6FF"/>
+                                        <path d="M4 13c0 2.21 5.37 4 12 4s12-1.79 12-4" stroke="#ffffff" stroke-width="1.5" fill="none"/>
+                                        <path d="M4 19c0 2.21 5.37 4 12 4s12-1.79 12-4" stroke="#ffffff" stroke-width="1.5" fill="none"/>
+                                    </svg>
+                                </span>
+                                <span class="popular-card-name">Azure SQL</span>
+                            </div>
+                            <button class="btn-pill-connect">Connect</button>
+                        </div>
+                        <div class="popular-card">
+                            <div class="popular-card-left">
+                                <span class="popular-card-icon">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                                        <rect width="24" height="24" rx="4" fill="#F80000"/>
+                                        <circle cx="12" cy="12" r="6" fill="#ffffff"/>
+                                    </svg>
+                                </span>
+                                <span class="popular-card-name">Oracle DB</span>
+                            </div>
+                            <button class="btn-pill-connect">Connect</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Filter Pills -->
+                <div class="connectors-filter-row">
+                    <button class="filter-pill active" data-filter="all">All</button>
+                    <button class="filter-pill" data-filter="connected">Connected</button>
+                    <button class="filter-pill" data-filter="not_connected">Not connected</button>
+                </div>
+
+                <!-- Top 7 Enterprise Source Systems Table -->
+                <div class="connectors-table-container">
+                    <div class="connectors-table-header">
+                        <span>Source System</span>
+                        <span>Category</span>
+                        <span style="text-align: right;">Status</span>
+                    </div>
+
+                    <div class="connectors-table-body" id="sourceSystemsTableBody">
+                        <!-- 1. SAP S/4HANA -->
+                        <div class="connector-row" data-status="not_connected">
+                            <div class="connector-cell-name">
+                                <span class="connector-avatar">
+                                    <svg width="22" height="15" viewBox="0 0 48 24" fill="none"><rect width="48" height="24" rx="4" fill="#00386B"/><text x="24" y="17" font-family="'Inter', sans-serif" font-weight="800" font-size="14" fill="#ffffff" text-anchor="middle">SAP</text></svg>
+                                </span>
+                                <div class="connector-name-details">
+                                    <span class="connector-name">SAP S/4HANA & ERP (ECC)</span>
+                                    <span class="connector-meta">Enterprise ERP / Financials (ODP / CDS)</span>
+                                </div>
+                            </div>
+                            <div class="connector-cell-type">Enterprise ERP</div>
+                            <div class="connector-cell-action">
+                                <button class="btn-pill-connect">Connect</button>
+                            </div>
+                        </div>
+
+                        <!-- 2. Azure SQL Database -->
+                        <div class="connector-row" data-status="not_connected">
+                            <div class="connector-cell-name">
+                                <span class="connector-avatar">
+                                    <svg width="18" height="18" viewBox="0 0 32 32" fill="none"><path d="M16 3C9.37 3 4 4.79 4 7v18c0 2.21 5.37 4 12 4s12-1.79 12-4V7c0-2.21-5.37-4-12-4z" fill="#0078D4"/><ellipse cx="16" cy="7" rx="12" ry="4" fill="#50E6FF"/></svg>
+                                </span>
+                                <div class="connector-name-details">
+                                    <span class="connector-name">Azure SQL Database</span>
+                                    <span class="connector-meta">Relational OLTP / Data Warehouse</span>
+                                </div>
+                            </div>
+                            <div class="connector-cell-type">Database</div>
+                            <div class="connector-cell-action">
+                                <button class="btn-pill-connect">Connect</button>
+                            </div>
+                        </div>
+
+                        <!-- 3. Oracle Enterprise -->
+                        <div class="connector-row" data-status="not_connected">
+                            <div class="connector-cell-name">
+                                <span class="connector-avatar">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><rect width="24" height="24" rx="4" fill="#F80000"/><circle cx="12" cy="12" r="6" fill="#ffffff"/></svg>
+                                </span>
+                                <div class="connector-name-details">
+                                    <span class="connector-name">Oracle Enterprise Database</span>
+                                    <span class="connector-meta">Mission-Critical RDBMS & Exadata</span>
+                                </div>
+                            </div>
+                            <div class="connector-cell-type">Database</div>
+                            <div class="connector-cell-action">
+                                <button class="btn-pill-connect">Connect</button>
+                            </div>
+                        </div>
+
+                        <!-- 4. PostgreSQL & MySQL -->
+                        <div class="connector-row" data-status="not_connected">
+                            <div class="connector-cell-name">
+                                <span class="connector-avatar">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z" fill="#336791"/><path d="M12 6c-3.31 0-6 2.69-6 6s2.69 6 6 6 6-2.69 6-6-2.69-6-6-6z" fill="#ffffff"/></svg>
+                                </span>
+                                <div class="connector-name-details">
+                                    <span class="connector-name">PostgreSQL / MySQL</span>
+                                    <span class="connector-meta">App Microservices & Operational DBs</span>
+                                </div>
+                            </div>
+                            <div class="connector-cell-type">Database</div>
+                            <div class="connector-cell-action">
+                                <button class="btn-pill-connect">Connect</button>
+                            </div>
+                        </div>
+
+                        <!-- 5. Salesforce CRM -->
+                        <div class="connector-row" data-status="not_connected">
+                            <div class="connector-cell-name">
+                                <span class="connector-avatar">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M19.5 10c0-.8-.3-1.5-.8-2-.5-.5-1.2-.8-2-.8-.4 0-.8.1-1.2.3-.5-.9-1.4-1.5-2.5-1.5-.7 0-1.4.3-1.9.8-.5-.8-1.4-1.3-2.4-1.3-1.5 0-2.8 1.1-3 2.6-.5-.2-1-.3-1.5-.3-1.7 0-3 1.3-3 3 0 .3.1.7.2 1-.9.6-1.4 1.6-1.4 2.7 0 1.9 1.6 3.5 3.5 3.5h14c1.9 0 3.5-1.6 3.5-3.5 0-1.4-.8-2.6-2-3.2.3-.6.5-1.2.5-1.9z" fill="#00A1E0"/></svg>
+                                </span>
+                                <div class="connector-name-details">
+                                    <span class="connector-name">Salesforce CRM</span>
+                                    <span class="connector-meta">Customer 360, Leads & Opportunities</span>
+                                </div>
+                            </div>
+                            <div class="connector-cell-type">SaaS API</div>
+                            <div class="connector-cell-action">
+                                <button class="btn-pill-connect">Connect</button>
+                            </div>
+                        </div>
+
+                        <!-- 6. MongoDB Atlas -->
+                        <div class="connector-row" data-status="not_connected">
+                            <div class="connector-cell-name">
+                                <span class="connector-avatar">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 2C11.5 2 7 8 7 13c0 3 2 5.5 5 6.5 3-1 5-3.5 5-6.5 0-5-4.5-11-5-11z" fill="#47A248"/></svg>
+                                </span>
+                                <div class="connector-name-details">
+                                    <span class="connector-name">MongoDB Atlas</span>
+                                    <span class="connector-meta">NoSQL Documents, Catalogs & Telemetry</span>
+                                </div>
+                            </div>
+                            <div class="connector-cell-type">NoSQL</div>
+                            <div class="connector-cell-action">
+                                <button class="btn-pill-connect">Connect</button>
+                            </div>
+                        </div>
+
+                        <!-- 7. Apache Kafka / Event Hubs -->
+                        <div class="connector-row" data-status="not_connected">
+                            <div class="connector-cell-name">
+                                <span class="connector-avatar">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="3" fill="#231F20"/><circle cx="6" cy="6" r="2" fill="#231F20"/><circle cx="18" cy="6" r="2" fill="#231F20"/><circle cx="6" cy="18" r="2" fill="#231F20"/><circle cx="18" cy="18" r="2" fill="#231F20"/><line x1="8" y1="8" x2="10" y2="10" stroke="#231F20" stroke-width="2"/><line x1="16" y1="8" x2="14" y2="10" stroke="#231F20" stroke-width="2"/><line x1="8" y1="16" x2="10" y2="14" stroke="#231F20" stroke-width="2"/><line x1="16" y1="16" x2="14" y2="14" stroke="#231F20" stroke-width="2"/></svg>
+                                </span>
+                                <div class="connector-name-details">
+                                    <span class="connector-name">Apache Kafka / Event Hubs</span>
+                                    <span class="connector-meta">Real-Time Streams & Event Brokers</span>
+                                </div>
+                            </div>
+                            <div class="connector-cell-type">Streaming</div>
+                            <div class="connector-cell-action">
+                                <button class="btn-pill-connect">Connect</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ── TAB 2: CONNECTORS & INTEGRATIONS (PLATFORMS & TOOLS) ── -->
+            <div class="settings-tab-pane" id="paneConnectors" style="display: none;">
+                <div class="pane-header-row">
+                    <div>
+                        <h2 class="pane-title">Connectors & Integrations</h2>
+                        <span style="font-size: 12.5px; color: #71717a;">Platform engines, lakehouse catalogs, CI/CD & transformation tools</span>
+                    </div>
+                    <div class="pane-header-actions">
+                        <button class="btn-subtle-icon" title="Search platform connectors"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></button>
+                        <button class="btn-subtle-icon btn-close-modal-icon" title="Close dialog"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+                    </div>
+                </div>
+
+                <!-- Popular Platforms Grid -->
+                <div class="popular-connectors-section">
+                    <div class="section-micro-label">Core Integrations</div>
                     <div class="popular-cards-grid">
                         <div class="popular-card">
                             <div class="popular-card-left">
@@ -1329,16 +1532,15 @@
                         <div class="popular-card">
                             <div class="popular-card-left">
                                 <span class="popular-card-icon">
-                                    <svg width="18" height="18" viewBox="0 0 32 32" fill="none">
-                                        <path d="M16 3C9.37 3 4 4.79 4 7v18c0 2.21 5.37 4 12 4s12-1.79 12-4V7c0-2.21-5.37-4-12-4z" fill="#0078D4"/>
-                                        <ellipse cx="16" cy="7" rx="12" ry="4" fill="#50E6FF"/>
-                                        <path d="M4 13c0 2.21 5.37 4 12 4s12-1.79 12-4" stroke="#ffffff" stroke-width="1.5" fill="none"/>
-                                        <path d="M4 19c0 2.21 5.37 4 12 4s12-1.79 12-4" stroke="#ffffff" stroke-width="1.5" fill="none"/>
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                                        <path d="M12 2L2 7l10 5 10-5-10-5z" fill="#FF3621"/>
+                                        <path d="M2 12l10 5 10-5" stroke="#FF3621" stroke-width="2" fill="none"/>
+                                        <path d="M2 17l10 5 10-5" stroke="#FF3621" stroke-width="2" fill="none"/>
                                     </svg>
                                 </span>
-                                <span class="popular-card-name">Azure SQL</span>
+                                <span class="popular-card-name">Databricks</span>
                             </div>
-                            <button class="btn-pill-connect" id="btnPopAzureSql">Connect</button>
+                            <button class="btn-pill-connect">Connect</button>
                         </div>
                         <div class="popular-card">
                             <div class="popular-card-left">
@@ -1350,43 +1552,32 @@
                                 </span>
                                 <span class="popular-card-name">Snowflake</span>
                             </div>
-                            <button class="btn-pill-connect" id="btnPopSnowflake">Connect</button>
+                            <button class="btn-pill-connect">Connect</button>
                         </div>
                     </div>
                 </div>
 
-                <!-- Filter Pills -->
-                <div class="connectors-filter-row">
-                    <button class="filter-pill active" data-filter="all">All</button>
-                    <button class="filter-pill" data-filter="connected">Connected</button>
-                    <button class="filter-pill" data-filter="not_connected">Not connected</button>
-                </div>
-
-                <!-- Connectors Table -->
+                <!-- Platform Connectors Table -->
                 <div class="connectors-table-container">
                     <div class="connectors-table-header">
-                        <span>Connector</span>
+                        <span>Platform / Tool</span>
                         <span>Type</span>
                         <span style="text-align: right;">Status</span>
                     </div>
 
                     <div class="connectors-table-body">
-                        <!-- Row 1: Fabric REST API & Workspace -->
+                        <!-- 1. Fabric REST API -->
                         <div class="connector-row" data-status="connected">
                             <div class="connector-cell-name">
                                 <span class="connector-avatar">
-                                    <svg width="18" height="18" viewBox="0 0 32 32" fill="none">
-                                        <path d="M16 3L3 10.5V21.5L16 29L29 21.5V10.5L16 3Z" fill="#008272"/>
-                                        <path d="M16 3L29 10.5V21.5L16 29V3Z" fill="#00A88F"/>
-                                        <path d="M16 3L29 10.5L16 18L3 10.5L16 3Z" fill="#00D2A0"/>
-                                    </svg>
+                                    <svg width="18" height="18" viewBox="0 0 32 32" fill="none"><path d="M16 3L3 10.5V21.5L16 29L29 21.5V10.5L16 3Z" fill="#008272"/><path d="M16 3L29 10.5V21.5L16 29V3Z" fill="#00A88F"/><path d="M16 3L29 10.5L16 18L3 10.5L16 3Z" fill="#00D2A0"/></svg>
                                 </span>
                                 <div class="connector-name-details">
                                     <span class="connector-name">Microsoft Fabric REST API</span>
-                                    <span class="connector-meta" id="tableActiveWsName">Active: PBT_DATA_AGENT</span>
+                                    <span class="connector-meta" id="tableActiveWsName">Active Workspace: PBT_DATA_AGENT</span>
                                 </div>
                             </div>
-                            <div class="connector-cell-type">Cloud / Fabric</div>
+                            <div class="connector-cell-type">Lakehouse Platform</div>
                             <div class="connector-cell-action">
                                 <button class="btn-pill-connected" id="btnManageFabricWs">
                                     <span class="status-dot-green"></span>
@@ -1395,103 +1586,86 @@
                             </div>
                         </div>
 
-                        <!-- Row 2: Azure SQL -->
+                        <!-- 2. Databricks Unity Catalog -->
                         <div class="connector-row" data-status="not_connected">
                             <div class="connector-cell-name">
                                 <span class="connector-avatar">
-                                    <svg width="18" height="18" viewBox="0 0 32 32" fill="none">
-                                        <path d="M16 3C9.37 3 4 4.79 4 7v18c0 2.21 5.37 4 12 4s12-1.79 12-4V7c0-2.21-5.37-4-12-4z" fill="#0078D4"/>
-                                        <ellipse cx="16" cy="7" rx="12" ry="4" fill="#50E6FF"/>
-                                        <path d="M4 13c0 2.21 5.37 4 12 4s12-1.79 12-4" stroke="#ffffff" stroke-width="1.5" fill="none"/>
-                                        <path d="M4 19c0 2.21 5.37 4 12 4s12-1.79 12-4" stroke="#ffffff" stroke-width="1.5" fill="none"/>
-                                    </svg>
-                                </span>
-                                <div class="connector-name-details">
-                                    <span class="connector-name">Azure SQL Database</span>
-                                    <span class="connector-meta">Relational OLTP / DW</span>
-                                </div>
-                            </div>
-                            <div class="connector-cell-type">Database</div>
-                            <div class="connector-cell-action">
-                                <button class="btn-pill-connect">Connect</button>
-                            </div>
-                        </div>
-
-                        <!-- Row 3: SAP ERP -->
-                        <div class="connector-row" data-status="not_connected">
-                            <div class="connector-cell-name">
-                                <span class="connector-avatar">
-                                    <svg width="22" height="15" viewBox="0 0 48 24" fill="none">
-                                        <rect width="48" height="24" rx="4" fill="#00386B"/>
-                                        <text x="24" y="17" font-family="'Inter', sans-serif" font-weight="800" font-size="14" fill="#ffffff" text-anchor="middle">SAP</text>
-                                    </svg>
-                                </span>
-                                <div class="connector-name-details">
-                                    <span class="connector-name">SAP ERP Connector (ECC/S4)</span>
-                                    <span class="connector-meta">ODP / CDS Views</span>
-                                </div>
-                            </div>
-                            <div class="connector-cell-type">Enterprise ERP</div>
-                            <div class="connector-cell-action">
-                                <button class="btn-pill-connect">Connect</button>
-                            </div>
-                        </div>
-
-                        <!-- Row 4: Snowflake -->
-                        <div class="connector-row" data-status="not_connected">
-                            <div class="connector-cell-name">
-                                <span class="connector-avatar">
-                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-                                        <path d="M12 2v20M2 12h20M4.93 4.93l14.14 14.14M4.93 19.07l14.14-14.14" stroke="#29B5E8" stroke-width="2" stroke-linecap="round"/>
-                                        <circle cx="12" cy="12" r="2" fill="#29B5E8"/>
-                                    </svg>
-                                </span>
-                                <div class="connector-name-details">
-                                    <span class="connector-name">Snowflake Data Warehouse</span>
-                                    <span class="connector-meta">External Staging</span>
-                                </div>
-                            </div>
-                            <div class="connector-cell-type">Data Lakehouse</div>
-                            <div class="connector-cell-action">
-                                <button class="btn-pill-connect">Connect</button>
-                            </div>
-                        </div>
-
-                        <!-- Row 5: Databricks Unity Catalog -->
-                        <div class="connector-row" data-status="not_connected">
-                            <div class="connector-cell-name">
-                                <span class="connector-avatar">
-                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-                                        <path d="M12 2L2 7l10 5 10-5-10-5z" fill="#FF3621"/>
-                                        <path d="M2 12l10 5 10-5" stroke="#FF3621" stroke-width="2" fill="none"/>
-                                        <path d="M2 17l10 5 10-5" stroke="#FF3621" stroke-width="2" fill="none"/>
-                                    </svg>
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 2L2 7l10 5 10-5-10-5z" fill="#FF3621"/><path d="M2 12l10 5 10-5" stroke="#FF3621" stroke-width="2" fill="none"/><path d="M2 17l10 5 10-5" stroke="#FF3621" stroke-width="2" fill="none"/></svg>
                                 </span>
                                 <div class="connector-name-details">
                                     <span class="connector-name">Databricks Unity Catalog</span>
-                                    <span class="connector-meta">Delta Lake Direct</span>
+                                    <span class="connector-meta">Delta Lake Compute & Delta Sharing</span>
                                 </div>
                             </div>
-                            <div class="connector-cell-type">Delta Lake</div>
+                            <div class="connector-cell-type">Lakehouse Compute</div>
                             <div class="connector-cell-action">
                                 <button class="btn-pill-connect">Connect</button>
                             </div>
                         </div>
 
-                        <!-- Row 6: GitHub Integration -->
+                        <!-- 3. Snowflake Data Cloud -->
                         <div class="connector-row" data-status="not_connected">
                             <div class="connector-cell-name">
                                 <span class="connector-avatar">
-                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="#ffffff">
-                                        <path fill-rule="evenodd" clip-rule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"/>
-                                    </svg>
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 2v20M2 12h20M4.93 4.93l14.14 14.14M4.93 19.07l14.14-14.14" stroke="#29B5E8" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="12" r="2" fill="#29B5E8"/></svg>
                                 </span>
                                 <div class="connector-name-details">
-                                    <span class="connector-name">GitHub Integration</span>
-                                    <span class="connector-meta">Git Sync & CI/CD</span>
+                                    <span class="connector-name">Snowflake Data Cloud</span>
+                                    <span class="connector-meta">External Iceberg & Data Sharing</span>
                                 </div>
                             </div>
-                            <div class="connector-cell-type">Web</div>
+                            <div class="connector-cell-type">Cloud Data Warehouse</div>
+                            <div class="connector-cell-action">
+                                <button class="btn-pill-connect">Connect</button>
+                            </div>
+                        </div>
+
+                        <!-- 4. dbt Core / Cloud -->
+                        <div class="connector-row" data-status="not_connected">
+                            <div class="connector-cell-name">
+                                <span class="connector-avatar">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><rect width="24" height="24" rx="4" fill="#FF694A"/><path d="M6 6h6v6H6z" fill="#ffffff"/><path d="M12 12h6v6h-6z" fill="#ffffff"/></svg>
+                                </span>
+                                <div class="connector-name-details">
+                                    <span class="connector-name">dbt Core / dbt Cloud</span>
+                                    <span class="connector-meta">SQL Transformation Models & Lineage</span>
+                                </div>
+                            </div>
+                            <div class="connector-cell-type">Transformations</div>
+                            <div class="connector-cell-action">
+                                <button class="btn-pill-connect">Connect</button>
+                            </div>
+                        </div>
+
+                        <!-- 5. GitHub / Azure DevOps -->
+                        <div class="connector-row" data-status="not_connected">
+                            <div class="connector-cell-name">
+                                <span class="connector-avatar">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="#ffffff"><path fill-rule="evenodd" clip-rule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"/></svg>
+                                </span>
+                                <div class="connector-name-details">
+                                    <span class="connector-name">GitHub / Azure DevOps</span>
+                                    <span class="connector-meta">Git Repository Sync & CI/CD Pipelines</span>
+                                </div>
+                            </div>
+                            <div class="connector-cell-type">Source Control</div>
+                            <div class="connector-cell-action">
+                                <button class="btn-pill-connect">Connect</button>
+                            </div>
+                        </div>
+
+                        <!-- 6. Power BI Direct Lake -->
+                        <div class="connector-row" data-status="not_connected">
+                            <div class="connector-cell-name">
+                                <span class="connector-avatar">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><rect x="4" y="10" width="3" height="10" rx="1" fill="#F2C811"/><rect x="10" y="6" width="3" height="14" rx="1" fill="#F2C811"/><rect x="16" y="2" width="3" height="18" rx="1" fill="#F2C811"/></svg>
+                                </span>
+                                <div class="connector-name-details">
+                                    <span class="connector-name">Power BI Direct Lake</span>
+                                    <span class="connector-meta">Direct Lake Semantic Models & Reporting</span>
+                                </div>
+                            </div>
+                            <div class="connector-cell-type">Business Intelligence</div>
                             <div class="connector-cell-action">
                                 <button class="btn-pill-connect">Connect</button>
                             </div>
@@ -1983,6 +2157,6 @@
 </div>
 
 <script src="flow_renderer.js?v=310"></script>
-<script src="app.js?v=500"></script>
+<script src="app.js?v=510"></script>
 </body>
 </html>

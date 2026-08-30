@@ -1048,7 +1048,7 @@ function initClaudeSettingsModal() {
     const connectorRows = document.querySelectorAll('.connectors-table-body .connector-row');
 
     // Open function
-    window.openClaudeSettings = (tabName = 'tabConnectors') => {
+    window.openClaudeSettings = (tabName = 'tabSourceSystems') => {
         if (!modal) return;
         modal.style.display = 'flex';
         switchSettingsTab(tabName);
@@ -1078,7 +1078,7 @@ function initClaudeSettingsModal() {
     navCustomize?.addEventListener('click', (e) => {
         e.preventDefault();
         App.previousActiveView = App.activeView || 'viewArchitect';
-        openClaudeSettings('tabConnectors');
+        openClaudeSettings('tabSourceSystems');
     });
 
     // Open from user profile menu Settings button
@@ -1155,6 +1155,7 @@ function initClaudeSettingsModal() {
         });
 
         const panes = {
+            tabSourceSystems: document.getElementById('paneSourceSystems'),
             tabConnectors: document.getElementById('paneConnectors'),
             tabGeneral: document.getElementById('paneGeneral'),
             tabApiKeys: document.getElementById('paneApiKeys'),
