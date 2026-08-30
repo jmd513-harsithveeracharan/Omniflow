@@ -4297,45 +4297,38 @@ ul.chat-md-list {
     transform: translateY(-1px);
 }
 
-/* Projects Grid */
+/* ═══════════════ PROJECTS 2-COLUMN GRID (IMAGE 1) ═══════════════ */
 .projects-cards-grid {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(2, 1fr);
     gap: 16px;
     margin-top: 10px;
 }
 
-@media (max-width: 900px) {
-    .projects-cards-grid {
-        grid-template-columns: repeat(2, 1fr);
-    }
-}
-
-@media (max-width: 600px) {
+@media (max-width: 768px) {
     .projects-cards-grid {
         grid-template-columns: 1fr;
     }
 }
 
 .project-card {
-    background: #141517;
-    border: 1px solid rgba(255, 255, 255, 0.06);
-    border-radius: 14px;
+    background: #141416;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
     padding: 18px 20px;
     display: flex;
     flex-direction: column;
     justify-content: space-between;
-    min-height: 160px;
+    min-height: 125px;
     cursor: pointer;
-    transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
     position: relative;
+    transition: background 0.15s ease, border-color 0.15s ease;
 }
 
+/* Zero lift on hover, just subtle lighter background */
 .project-card:hover {
-    background: #1a1b1e;
+    background: #1c1c20;
     border-color: rgba(255, 255, 255, 0.16);
-    transform: translateY(-2px);
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
 }
 
 .project-card-top {
@@ -4346,19 +4339,60 @@ ul.chat-md-list {
     margin-bottom: 8px;
 }
 
+.project-card-title-wrap {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
 .project-card-title {
     font-size: 15px;
     font-weight: 600;
-    color: #ffffff;
+    color: #f4f4f5;
     margin: 0;
     line-height: 1.3;
 }
 
+.project-card-pin-btn {
+    background: transparent;
+    border: none;
+    color: #71717a;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    padding: 0;
+    transition: color 0.12s;
+}
+
+.project-card-pin-btn:hover,
+.project-card-pin-btn.pinned {
+    color: #e4e4e7;
+}
+
+.project-card-menu-btn {
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    background: transparent;
+    border: none;
+    color: #71717a;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.12s;
+}
+
+.project-card-menu-btn:hover {
+    background: #27272a;
+    color: #f4f4f5;
+}
+
 .project-card-desc {
-    font-size: 12.5px;
-    color: #8e918f;
+    font-size: 13.5px;
+    color: #a1a1aa;
     line-height: 1.45;
-    margin-bottom: 14px;
+    margin: 0 0 16px 0;
     display: -webkit-box;
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
@@ -4369,167 +4403,132 @@ ul.chat-md-list {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    font-size: 11px;
-    color: #71717a;
-    padding-top: 10px;
-    border-top: 1px solid rgba(255, 255, 255, 0.04);
-}
-
-.project-lakehouse-tag {
-    font-family: var(--font-mono);
-    font-size: 10.5px;
-    color: #2dd4bf;
-    background: rgba(45, 212, 191, 0.08);
-    border: 1px solid rgba(45, 212, 191, 0.2);
-    padding: 2px 7px;
-    border-radius: 5px;
-}
-
-/* New Project Modal Card */
-.project-modal-card {
-    background: #161719;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 16px;
-    width: 92%;
-    max-width: 520px;
-    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5);
-    overflow: hidden;
-    animation: modalPopIn 0.18s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.project-modal-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 18px 22px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-    background: #121314;
-}
-
-.project-modal-title-group {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-}
-
-.project-modal-icon-badge {
-    width: 36px;
-    height: 36px;
-    border-radius: 10px;
-    background: rgba(56, 189, 248, 0.1);
-    border: 1px solid rgba(56, 189, 248, 0.25);
-    color: #38bdf8;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.project-modal-title {
-    font-size: 16px;
-    font-weight: 600;
-    color: #ffffff;
-    margin: 0;
-}
-
-.project-modal-sub {
-    font-size: 11.5px;
-    color: #71717a;
-    margin: 2px 0 0 0;
-}
-
-.project-modal-body {
-    padding: 20px 22px;
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-}
-
-.project-field-group {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-}
-
-.project-field-label {
     font-size: 12px;
-    font-weight: 600;
-    color: #c4c7c5;
-    text-transform: uppercase;
-    letter-spacing: 0.03em;
+    color: #71717a;
 }
 
-.req-star {
+/* 3-Dots Action Menu (Image 1) */
+.project-action-menu {
+    position: absolute;
+    top: 48px;
+    right: 16px;
+    width: 145px;
+    background: #1c1c20;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 10px;
+    padding: 5px;
+    box-shadow: 0 12px 36px rgba(0, 0, 0, 0.6);
+    z-index: 100;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.project-action-item {
+    background: transparent;
+    border: none;
+    color: #e4e4e7;
+    font-size: 13px;
+    font-weight: 500;
+    padding: 7px 10px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    cursor: pointer;
+    text-align: left;
+    transition: all 0.12s;
+    font-family: var(--font-sans);
+}
+
+.project-action-item:hover {
+    background: #27272a;
+    color: #ffffff;
+}
+
+.project-action-item.delete-item {
     color: #f87171;
 }
 
-.project-input,
-.project-select,
-.project-textarea {
-    background: #101112;
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: 8px;
-    padding: 9px 12px;
-    color: #ffffff;
+.project-action-item.delete-item:hover {
+    background: rgba(239, 68, 68, 0.15);
+    color: #ef4444;
+}
+
+/* ═══════════════ PROJECTS LIST TABLE VIEW (IMAGE 2) ═══════════════ */
+.projects-list-container {
+    width: 100%;
+    margin-top: 10px;
+}
+
+.projects-list-header {
+    display: grid;
+    grid-template-columns: 1fr 140px 40px;
+    padding: 12px 16px;
     font-size: 13px;
-    font-family: inherit;
-    outline: none;
-    transition: all 0.15s;
+    font-weight: 500;
+    color: #71717a;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
 }
 
-.project-input:focus,
-.project-select:focus,
-.project-textarea:focus {
-    border-color: rgba(56, 189, 248, 0.4);
-    box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.1);
+.projects-list-body {
+    display: flex;
+    flex-direction: column;
 }
 
-.project-textarea {
-    min-height: 80px;
-    resize: vertical;
+.projects-list-row {
+    display: grid;
+    grid-template-columns: 1fr 140px 40px;
+    padding: 12px 16px;
+    align-items: center;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    cursor: pointer;
+    transition: background 0.12s ease;
+    border-radius: 6px;
 }
 
-.project-modal-footer {
+.projects-list-row:hover {
+    background: #18181b;
+}
+
+.project-list-name-col {
     display: flex;
     align-items: center;
-    justify-content: flex-end;
-    gap: 10px;
-    padding: 14px 22px;
-    background: #121314;
-    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    gap: 14px;
 }
 
-.project-btn-cancel {
-    background: transparent;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    color: #c4c7c5;
-    padding: 7px 16px;
+.project-list-folder-icon {
+    width: 36px;
+    height: 36px;
     border-radius: 8px;
-    font-size: 12.5px;
+    background: #1c1c20;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #e4e4e7;
+    flex-shrink: 0;
+}
+
+.project-list-name-text {
+    font-size: 14px;
     font-weight: 500;
-    cursor: pointer;
-    transition: all 0.12s;
+    color: #f4f4f5;
 }
 
-.project-btn-cancel:hover {
-    background: #1a1b1e;
-    color: #ffffff;
+.project-list-mod-col {
+    font-size: 13px;
+    color: #a1a1aa;
 }
 
-.project-btn-create {
-    background: #ffffff;
-    color: #000000;
-    border: none;
-    padding: 7px 18px;
-    border-radius: 8px;
-    font-size: 12.5px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.12s;
+.project-list-pin-col {
+    display: flex;
+    justify-content: flex-end;
+    color: #71717a;
 }
 
-.project-btn-create:hover {
-    background: #f0f0f2;
-    box-shadow: 0 2px 8px rgba(255, 255, 255, 0.2);
+.project-list-pin-col.pinned {
+    color: #e4e4e7;
 }
 
 /* ═══════════════ VIEW 4: LIVE MONITORING ═════════════════════════════════════ */

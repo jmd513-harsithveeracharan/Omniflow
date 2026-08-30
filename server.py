@@ -707,6 +707,11 @@ class FabricAIHandler(http.server.SimpleHTTPRequestHandler):
                 "total_count": len(items_list)
             }, session_id=session_id)
 
+        elif path in ("/api/projects", "/api/projects/list"):
+            from app import session_store as store
+            projects = store.get_all_projects()
+            _json_response(self, {"success": True, "projects": projects}, session_id=session_id)
+
         elif path in ("/sse", "/mcp"):
             # MCP Server-Sent Events handshake
             self.send_response(200)
@@ -733,8 +738,43 @@ class FabricAIHandler(http.server.SimpleHTTPRequestHandler):
         mem = MemoryManager.get_or_create(session_id)
         current_session_id = mem.session_id
 
+        # ── Projects API ─────────────────────────────────────────────────────
+        if path == "/api/projects/new":
+            from app import session_store as store
+            name = body.get("name", "").strip()
+            desc = body.get("description", "").strip()
+            if not name:
+                _json_response(self, {"success": False, "error": "Project name is required"}, status=400, session_id=current_session_id)
+            else:
+                p = store.create_project(name, desc)
+                _json_response(self, {"success": True, "project": p}, session_id=current_session_id)
+
+        elif path == "/api/projects/update":
+            from app import session_store as store
+            pid = body.get("id") or body.get("project_id")
+            if not pid:
+                _json_response(self, {"success": False, "error": "Project ID required"}, status=400, session_id=current_session_id)
+            else:
+                ok = store.update_project(
+                    pid,
+                    name=body.get("name"),
+                    description=body.get("description"),
+                    is_pinned=body.get("is_pinned"),
+                    is_archived=body.get("is_archived")
+                )
+                _json_response(self, {"success": ok}, session_id=current_session_id)
+
+        elif path == "/api/projects/delete":
+            from app import session_store as store
+            pid = body.get("id") or body.get("project_id")
+            if not pid:
+                _json_response(self, {"success": False, "error": "Project ID required"}, status=400, session_id=current_session_id)
+            else:
+                ok = store.delete_project(pid)
+                _json_response(self, {"success": ok}, session_id=current_session_id)
+
         # ── Data Source Connectors & Zero-Leak Vault ─────────────────────────
-        if path in ("/api/connectors/diagnose", "/api/connector/diagnose"):
+        elif path in ("/api/connectors/diagnose", "/api/connector/diagnose"):
             from connectors.network_doctor import NetworkDoctor
             host = body.get("host", "")
             port = body.get("port", 5432)

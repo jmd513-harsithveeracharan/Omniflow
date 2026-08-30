@@ -5836,6 +5836,39 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // ── PROJECTS VIEW MANAGER ──────────────────────────────────────────────────
+    let _allProjects = [];
+    let _editingProjectId = null;
+    let _activeProjectActionMenu = null;
+
+    function formatRelativeTime(dateStr) {
+        if (!dateStr) return 'Recently';
+        try {
+            const d = new Date(dateStr);
+            const now = new Date();
+            const diffSec = Math.floor((now - d) / 1000);
+            if (diffSec < 60) return 'Just now';
+            const diffMin = Math.floor(diffSec / 60);
+            if (diffMin < 60) return `${diffMin} minute${diffMin > 1 ? 's' : ''} ago`;
+            const diffHr = Math.floor(diffMin / 60);
+            if (diffHr < 24) return `${diffHr} hour${diffHr > 1 ? 's' : ''} ago`;
+            const diffDays = Math.floor(diffHr / 24);
+            if (diffDays < 7) return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
+            return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        } catch (e) {
+            return dateStr;
+        }
+    }
+
+    function formatShortDate(dateStr) {
+        if (!dateStr) return '';
+        try {
+            const d = new Date(dateStr);
+            return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        } catch (e) {
+            return dateStr;
+        }
+    }
+
     window.initProjectsView = function() {
         const searchToggle = document.getElementById('btnProjectsSearchToggle');
         const searchInput = document.getElementById('projectsSearchInput');
@@ -5845,8 +5878,43 @@ document.addEventListener('DOMContentLoaded', () => {
         const sortItems = document.querySelectorAll('.projects-sort-item');
         const btnNewTop = document.getElementById('btnNewProjectTop');
         const btnNewCenter = document.getElementById('btnNewProjectCenter');
+        const btnViewToggle = document.getElementById('btnProjectsViewToggle');
+        const iconGrid = document.getElementById('iconProjectsGrid');
+        const iconList = document.getElementById('iconProjectsList');
+        const gridContainer = document.getElementById('projectsCardsGrid');
+        const listContainer = document.getElementById('projectsListContainer');
+        const listBody = document.getElementById('projectsListBody');
+        const emptyState = document.getElementById('projectsEmptyState');
 
-        // Search toggle
+        let currentViewMode = localStorage.getItem('fabric_projects_view_mode') || 'grid';
+        let currentSort = 'updated';
+
+        function updateViewToggleUi() {
+            if (currentViewMode === 'grid') {
+                if (iconGrid) iconGrid.style.display = 'block';
+                if (iconList) iconList.style.display = 'none';
+                if (btnViewToggle) btnViewToggle.title = 'Switch to List view';
+                if (gridContainer) gridContainer.style.display = 'grid';
+                if (listContainer) listContainer.style.display = 'none';
+            } else {
+                if (iconGrid) iconGrid.style.display = 'none';
+                if (iconList) iconList.style.display = 'block';
+                if (btnViewToggle) btnViewToggle.title = 'Switch to Grid view';
+                if (gridContainer) gridContainer.style.display = 'none';
+                if (listContainer) listContainer.style.display = 'block';
+            }
+        }
+
+        // View toggle handler
+        btnViewToggle?.addEventListener('click', (e) => {
+            e.stopPropagation();
+            currentViewMode = currentViewMode === 'grid' ? 'list' : 'grid';
+            localStorage.setItem('fabric_projects_view_mode', currentViewMode);
+            updateViewToggleUi();
+            renderProjects();
+        });
+
+        // Search toggle & input
         searchToggle?.addEventListener('click', (e) => {
             e.stopPropagation();
             if (searchInput) {
@@ -5854,6 +5922,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 searchInput.style.display = isVisible ? 'none' : 'block';
                 if (!isVisible) searchInput.focus();
             }
+        });
+
+        searchInput?.addEventListener('input', () => {
+            renderProjects();
         });
 
         // Sort menu toggle
@@ -5870,38 +5942,324 @@ document.addEventListener('DOMContentLoaded', () => {
                 e.stopPropagation();
                 sortItems.forEach(si => si.classList.remove('active'));
                 item.classList.add('active');
+                currentSort = item.getAttribute('data-sort') || 'updated';
                 if (sortLabel) sortLabel.textContent = item.textContent.trim();
                 if (sortMenu) sortMenu.style.display = 'none';
+                renderProjects();
             });
         });
 
-        // Close dropdown on click outside
+        // Close dropdowns on outside click
         document.addEventListener('click', (e) => {
             if (sortMenu && sortMenu.style.display !== 'none' && !sortBtn?.contains(e.target) && !sortMenu.contains(e.target)) {
                 sortMenu.style.display = 'none';
             }
+            if (_activeProjectActionMenu && !_activeProjectActionMenu.contains(e.target)) {
+                _activeProjectActionMenu.remove();
+                _activeProjectActionMenu = null;
+            }
         });
 
-        window.openNewProjectModal = function() {
+        // Open modal for new project
+        window.openNewProjectModal = function(editProj = null) {
             const modal = document.getElementById('modalNewProject');
-            if (modal) {
-                modal.style.display = 'flex';
-                const nameInput = document.getElementById('inputProjectName');
-                if (nameInput) {
-                    nameInput.value = '';
-                    setTimeout(() => nameInput.focus(), 50);
-                }
-                const descInput = document.getElementById('inputProjectDesc');
-                if (descInput) descInput.value = '';
-            }
+            if (!modal) return;
+            _editingProjectId = editProj ? editProj.id : null;
+            const titleElem = modal.querySelector('.project-modal-title');
+            const submitBtn = document.getElementById('btnSubmitNewProject');
+            const nameInput = document.getElementById('inputProjectName');
+            const descInput = document.getElementById('inputProjectDesc');
+
+            if (titleElem) titleElem.textContent = editProj ? 'Edit project' : 'Create a project';
+            if (submitBtn) submitBtn.textContent = editProj ? 'Save changes' : 'Create project';
+            if (nameInput) nameInput.value = editProj ? editProj.name : '';
+            if (descInput) descInput.value = editProj ? (editProj.description || '') : '';
+
+            modal.style.display = 'flex';
+            setTimeout(() => nameInput?.focus(), 50);
         };
 
         window.closeNewProjectModal = function() {
             const modal = document.getElementById('modalNewProject');
             if (modal) modal.style.display = 'none';
+            _editingProjectId = null;
         };
 
-        btnNewTop?.addEventListener('click', window.openNewProjectModal);
-        btnNewCenter?.addEventListener('click', window.openNewProjectModal);
+        btnNewTop?.addEventListener('click', () => window.openNewProjectModal());
+        btnNewCenter?.addEventListener('click', () => window.openNewProjectModal());
+
+        // Submit create / edit project
+        const btnSubmit = document.getElementById('btnSubmitNewProject');
+        btnSubmit?.addEventListener('click', async () => {
+            const nameInput = document.getElementById('inputProjectName');
+            const descInput = document.getElementById('inputProjectDesc');
+            const name = nameInput ? nameInput.value.trim() : '';
+            const description = descInput ? descInput.value.trim() : '';
+
+            if (!name) {
+                showToast('Please enter a project name', 'error');
+                nameInput?.focus();
+                return;
+            }
+
+            btnSubmit.disabled = true;
+            btnSubmit.textContent = _editingProjectId ? 'Saving...' : 'Creating...';
+
+            try {
+                if (_editingProjectId) {
+                    const res = await fetch('/api/projects/update', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ id: _editingProjectId, name, description })
+                    });
+                    const data = await res.json();
+                    if (data.success) {
+                        showToast('Project updated', 'success');
+                        window.closeNewProjectModal();
+                        await loadProjects();
+                    } else {
+                        showToast('Failed to update project: ' + (data.error || ''), 'error');
+                    }
+                } else {
+                    const res = await fetch('/api/projects/new', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ name, description })
+                    });
+                    const data = await res.json();
+                    if (data.success) {
+                        showToast('Project created', 'success');
+                        window.closeNewProjectModal();
+                        await loadProjects();
+                    } else {
+                        showToast('Failed to create project: ' + (data.error || ''), 'error');
+                    }
+                }
+            } catch (err) {
+                showToast('Request failed: ' + err.message, 'error');
+            } finally {
+                btnSubmit.disabled = false;
+                btnSubmit.textContent = _editingProjectId ? 'Save changes' : 'Create project';
+            }
+        });
+
+        // ── Action Handlers ──────────────────────────────────────────────────
+        window.togglePinProject = async function(e, projectId, currentPinned) {
+            e.stopPropagation();
+            try {
+                const res = await fetch('/api/projects/update', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id: projectId, is_pinned: currentPinned ? 0 : 1 })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    await loadProjects();
+                }
+            } catch (err) {
+                showToast('Failed to update pin: ' + err.message, 'error');
+            }
+        };
+
+        window.openProjectActionMenu = function(e, project) {
+            e.stopPropagation();
+            if (_activeProjectActionMenu) {
+                _activeProjectActionMenu.remove();
+                _activeProjectActionMenu = null;
+            }
+
+            const card = e.currentTarget.closest('.project-card');
+            if (!card) return;
+
+            const menu = document.createElement('div');
+            menu.className = 'project-action-menu';
+            menu.innerHTML = `
+                <button class="project-action-item" id="btnActionPin" type="button">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="17" x2="12" y2="22"/><path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z"/></svg>
+                    <span>${project.is_pinned ? 'Unpin' : 'Pin'}</span>
+                </button>
+                <button class="project-action-item" id="btnActionEdit" type="button">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+                    <span>Edit details</span>
+                </button>
+                <button class="project-action-item" id="btnActionArchive" type="button">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
+                    <span>Archive</span>
+                </button>
+                <button class="project-action-item delete-item" id="btnActionDelete" type="button">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                    <span>Delete</span>
+                </button>
+            `;
+
+            menu.querySelector('#btnActionPin').addEventListener('click', (ev) => {
+                menu.remove();
+                _activeProjectActionMenu = null;
+                window.togglePinProject(ev, project.id, project.is_pinned);
+            });
+
+            menu.querySelector('#btnActionEdit').addEventListener('click', (ev) => {
+                ev.stopPropagation();
+                menu.remove();
+                _activeProjectActionMenu = null;
+                window.openNewProjectModal(project);
+            });
+
+            menu.querySelector('#btnActionArchive').addEventListener('click', async (ev) => {
+                ev.stopPropagation();
+                menu.remove();
+                _activeProjectActionMenu = null;
+                try {
+                    await fetch('/api/projects/update', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ id: project.id, is_archived: 1 })
+                    });
+                    showToast('Project archived', 'info');
+                    await loadProjects();
+                } catch (err) {
+                    showToast('Failed to archive: ' + err.message, 'error');
+                }
+            });
+
+            menu.querySelector('#btnActionDelete').addEventListener('click', async (ev) => {
+                ev.stopPropagation();
+                menu.remove();
+                _activeProjectActionMenu = null;
+                if (confirm(`Are you sure you want to delete "${project.name}"?`)) {
+                    try {
+                        const res = await fetch('/api/projects/delete', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ id: project.id })
+                        });
+                        const data = await res.json();
+                        if (data.success) {
+                            showToast('Project deleted', 'info');
+                            await loadProjects();
+                        }
+                    } catch (err) {
+                        showToast('Delete failed: ' + err.message, 'error');
+                    }
+                }
+            });
+
+            card.appendChild(menu);
+            _activeProjectActionMenu = menu;
+        };
+
+        function renderProjects() {
+            const query = (searchInput?.value || '').toLowerCase().trim();
+            let filtered = _allProjects.filter(p => {
+                if (!query) return true;
+                return p.name.toLowerCase().includes(query) || (p.description && p.description.toLowerCase().includes(query));
+            });
+
+            // Sorting
+            filtered.sort((a, b) => {
+                // Pinned projects always stay on top
+                if (a.is_pinned !== b.is_pinned) {
+                    return b.is_pinned - a.is_pinned;
+                }
+                if (currentSort === 'name') {
+                    return a.name.localeCompare(b.name);
+                } else if (currentSort === 'created') {
+                    return new Date(b.created_at || 0) - new Date(a.created_at || 0);
+                } else {
+                    return new Date(b.updated_at || b.created_at || 0) - new Date(a.updated_at || a.created_at || 0);
+                }
+            });
+
+            if (_allProjects.length === 0) {
+                if (emptyState) emptyState.style.display = 'flex';
+                if (gridContainer) gridContainer.style.display = 'none';
+                if (listContainer) listContainer.style.display = 'none';
+                return;
+            }
+
+            if (emptyState) emptyState.style.display = 'none';
+            updateViewToggleUi();
+
+            // Render 2-Column Grid (Image 1)
+            if (gridContainer && currentViewMode === 'grid') {
+                gridContainer.innerHTML = filtered.map(p => {
+                    const isPinned = Boolean(p.is_pinned);
+                    const timeAgo = formatRelativeTime(p.updated_at || p.created_at);
+                    const safeName = escapeHtml(p.name);
+                    const safeDesc = p.description ? escapeHtml(p.description) : 'No description provided';
+                    const pinIconSvg = isPinned 
+                        ? `<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M16 12V4h1V2H7v2h1v8l-2 2v2h5v6l1 1 1-1v-6h5v-2l-2-2z"/></svg>`
+                        : `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M16 12V4h1V2H7v2h1v8l-2 2v2h5v6l1 1 1-1v-6h5v-2l-2-2z"/></svg>`;
+
+                    return `
+                        <div class="project-card" data-project-id="${p.id}" onclick="showToast('Project: ${safeName}', 'info')">
+                            <div>
+                                <div class="project-card-top">
+                                    <div class="project-card-title-wrap">
+                                        <h3 class="project-card-title">${safeName}</h3>
+                                        <button class="project-card-pin-btn ${isPinned ? 'pinned' : ''}" title="${isPinned ? 'Unpin' : 'Pin'}" type="button" onclick="event.stopPropagation(); window.togglePinProject(event, '${p.id}', ${isPinned ? 1 : 0});">
+                                            ${pinIconSvg}
+                                        </button>
+                                    </div>
+                                    <button class="project-card-menu-btn" title="More options" type="button" onclick="event.stopPropagation(); window.openProjectActionMenu(event, {id: '${p.id}', name: '${safeName}', is_pinned: ${isPinned ? 1 : 0}, description: '${escapeHtml(p.description || '')}'});">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>
+                                    </button>
+                                </div>
+                                <div class="project-card-desc">${safeDesc}</div>
+                            </div>
+                            <div class="project-card-footer">
+                                <span>${timeAgo}</span>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            }
+
+            // Render List Table View (Image 2)
+            if (listBody && currentViewMode === 'list') {
+                listBody.innerHTML = filtered.map(p => {
+                    const isPinned = Boolean(p.is_pinned);
+                    const shortDate = formatShortDate(p.updated_at || p.created_at);
+                    const safeName = escapeHtml(p.name);
+                    const pinIconSvg = isPinned 
+                        ? `<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M16 12V4h1V2H7v2h1v8l-2 2v2h5v6l1 1 1-1v-6h5v-2l-2-2z"/></svg>`
+                        : '';
+
+                    return `
+                        <div class="projects-list-row" data-project-id="${p.id}" onclick="showToast('Project: ${safeName}', 'info')">
+                            <div class="project-list-name-col">
+                                <div class="project-list-folder-icon">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+                                </div>
+                                <span class="project-list-name-text">${safeName}</span>
+                            </div>
+                            <div class="project-list-mod-col">${shortDate}</div>
+                            <div class="project-list-pin-col ${isPinned ? 'pinned' : ''}">
+                                ${pinIconSvg}
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            }
+        }
+
+        async function loadProjects() {
+            try {
+                const res = await fetch('/api/projects');
+                const data = await res.json();
+                if (data.success && Array.isArray(data.projects)) {
+                    _allProjects = data.projects;
+                } else {
+                    _allProjects = [];
+                }
+            } catch (err) {
+                console.error('[PROJECTS] Failed to fetch projects:', err);
+                _allProjects = [];
+            }
+            renderProjects();
+        }
+
+        updateViewToggleUi();
+        loadProjects();
     };
 });
