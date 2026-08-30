@@ -9197,45 +9197,43 @@ ul.chat-md-list {
 }
 
 .project-modal-header {
-    padding: 22px 24px 16px 24px;
+    padding: 24px 24px 14px 24px;
     display: flex;
     align-items: center;
     justify-content: space-between;
     background: #141416;
+    border: none;
 }
 
 .project-modal-title {
-    font-size: 17px;
-    font-weight: 600;
+    font-size: 20px;
+    font-weight: 500;
     color: #f4f4f5;
     margin: 0;
     letter-spacing: -0.01em;
 }
 
 .project-modal-body {
-    padding: 10px 24px 20px 24px;
+    padding: 6px 24px 16px 24px;
     display: flex;
     flex-direction: column;
-    gap: 18px;
+    gap: 20px;
     background: #141416;
+    border: none;
 }
 
 .project-field-group {
     display: flex;
     flex-direction: column;
-    gap: 7px;
+    gap: 8px;
 }
 
 .project-field-label {
-    font-size: 11px;
-    font-weight: 600;
-    color: #a1a1aa;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-}
-
-.project-field-label .req-star {
-    color: #ef4444;
+    font-size: 13.5px;
+    font-weight: 500;
+    color: #f4f4f5;
+    letter-spacing: -0.01em;
+    text-transform: none;
 }
 
 .project-input {
@@ -9244,7 +9242,7 @@ ul.chat-md-list {
     border-radius: 8px;
     padding: 10px 14px;
     color: #f4f4f5;
-    font-size: 13.5px;
+    font-size: 14px;
     font-family: var(--font-sans);
     outline: none;
     transition: all 0.15s ease;
@@ -9254,8 +9252,9 @@ ul.chat-md-list {
 
 .project-input:focus,
 .project-textarea:focus {
-    border-color: rgba(255, 255, 255, 0.25);
-    background: #1c1c20;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 1px #3b82f6;
+    background: #18181b;
 }
 
 .project-input::placeholder,
@@ -9269,24 +9268,25 @@ ul.chat-md-list {
     border-radius: 8px;
     padding: 10px 14px;
     color: #f4f4f5;
-    font-size: 13.5px;
+    font-size: 14px;
     font-family: var(--font-sans);
     outline: none;
     transition: all 0.15s ease;
     width: 100%;
     box-sizing: border-box;
     resize: vertical;
-    min-height: 90px;
+    min-height: 95px;
     line-height: 1.5;
 }
 
 .project-modal-footer {
-    padding: 16px 24px 22px 24px;
+    padding: 12px 24px 24px 24px;
     display: flex;
     align-items: center;
     justify-content: flex-end;
     gap: 10px;
     background: #141416;
+    border: none;
 }
 
 .project-btn-cancel {
