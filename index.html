@@ -7,7 +7,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;600;700&family=Google+Sans+Text:wght@400;500;600&family=Inter:wght@400;500;600;700&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400;1,6..72,500&family=Roboto+Mono:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=460">
+    <link rel="stylesheet" href="style.css?v=470">
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%231a73e8'/%3E%3Cpath d='M8 16 L16 8 L24 16 L16 24 Z' fill='white'/%3E%3Cpath d='M12 16 L16 12 L20 16 L16 20 Z' fill='%231a73e8'/%3E%3C/svg%3E">
 </head>
 <body class="dark-theme">
@@ -1944,10 +1944,10 @@
             <div class="claude-ai-prompt-card">
                 <div class="claude-ai-prompt-header">
                     <span class="claude-ai-badge">Auto-generate with AI</span>
-                    <span class="claude-ai-hint">Describe source, port & credentials</span>
+                    <span class="claude-ai-hint">Describe your source or platform</span>
                 </div>
                 <div class="claude-ai-input-row">
-                    <input type="text" class="claude-modal-input" id="inputAiConnectorPrompt" placeholder="e.g. Create ClickHouse Cloud connector on port 8443 with database, user, password" autocomplete="off">
+                    <input type="text" class="claude-modal-input" id="inputAiConnectorPrompt" placeholder="e.g. I have data in SAP, create a connector for it" autocomplete="off">
                     <button type="button" class="btn-claude-generate" id="btnRunAiConnectorPrompt">
                         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
                         <span>Generate</span>
@@ -1960,21 +1960,24 @@
             <!-- Single Clean Connector Name -->
             <div class="claude-field-group" style="margin-bottom: 8px;">
                 <label class="claude-field-label">Connector name <span class="req-dot">*</span></label>
-                <input type="text" class="claude-modal-input" id="inputCustomConnName" placeholder="e.g. SAP HANA, Salesforce CRM, ClickHouse" autocomplete="off">
+                <input type="text" class="claude-modal-input" id="inputCustomConnName" placeholder="e.g. SAP HANA, Shopify, Salesforce" autocomplete="off">
             </div>
 
             <!-- Dynamic Key-Value Pairs List -->
             <div class="claude-kv-card">
                 <div class="claude-kv-header">
                     <div>
-                        <span class="claude-kv-title">Connection fields</span>
-                        <span class="claude-kv-sub">Fields user needs to enter to connect</span>
+                        <span class="claude-kv-title">Connection parameters</span>
+                        <span class="claude-kv-sub">Define Key & Value pairs needed to connect</span>
                     </div>
-                    <button type="button" class="btn-claude-add-row" id="btnAddParamRow">+ Add field</button>
                 </div>
                 <div class="claude-kv-list" id="customConnParamsList">
                     <!-- Dynamic rows injected here -->
                 </div>
+                <button type="button" class="btn-claude-add-row-below" id="btnAddParamRow">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                    <span>Add row</span>
+                </button>
             </div>
         </div>
 
@@ -1986,6 +1989,6 @@
 </div>
 
 <script src="flow_renderer.js?v=310"></script>
-<script src="app.js?v=460"></script>
+<script src="app.js?v=470"></script>
 </body>
 </html>

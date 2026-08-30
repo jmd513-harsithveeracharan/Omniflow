@@ -9065,15 +9065,39 @@ ul.chat-md-list {
 
 .key-value-row {
     display: grid;
-    grid-template-columns: 1fr 1fr 115px 32px;
+    grid-template-columns: 1fr 1fr 32px;
     gap: 8px;
     align-items: center;
 }
 
-.key-value-row .claude-modal-input,
-.key-value-row .claude-modal-select {
+.key-value-row .claude-modal-input {
     padding: 7px 10px;
     font-size: 12.5px;
+}
+
+.btn-claude-add-row-below {
+    margin-top: 10px;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    background: #202024;
+    border: 1px dashed rgba(255, 255, 255, 0.15);
+    color: #e4e4e7;
+    border-radius: 8px;
+    font-size: 12.5px;
+    font-weight: 500;
+    padding: 7px 12px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    font-family: var(--font-sans);
+}
+
+.btn-claude-add-row-below:hover {
+    background: #27272a;
+    border-color: rgba(255, 255, 255, 0.3);
+    color: #ffffff;
 }
 
 .btn-remove-kv {
