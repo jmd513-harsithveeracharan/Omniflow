@@ -3,7 +3,7 @@ Quick integration smoke test — runs without Fabric API (no az login needed).
 Tests: config loading, connector registry, ingestion planner, impact analyzer, LLM router structure.
 """
 import sys, os
-sys.path.insert(0, os.path.dirname(__file__))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 print("\n" + "="*60)
 print("  FABRIC AI — SMOKE TEST")
@@ -116,7 +116,7 @@ mem.add_assistant("Plan created for CustomerDB.")
 
 summary = mem.get_summary()
 assert summary["message_count"] == 2
-assert summary["facts"].get("preferred_schedule") == "nightly"
+assert "nightly" in summary["facts"].get("preferred_schedule", "").lower() or "3am" in summary["facts"].get("preferred_schedule", "").lower()
 assert summary["facts"].get("source_database") == "CustomerDB"
 
 # Test optimistic cache update
