@@ -5826,6 +5826,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 } else {
                     alert('Save failed: ' + (data.error || 'Unknown error'));
                 }
+            } catch (err) {
+                alert('Save request failed: ' + err.message);
+            } finally {
+                btnSave.disabled = false;
+                btnSave.textContent = 'Save & register connector';
+            }
         });
     }
 
