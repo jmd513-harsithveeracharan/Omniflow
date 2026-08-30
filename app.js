@@ -5824,6 +5824,13 @@ async function loadActiveConversation() {
     if (!App.sessionId) return;
     const data = await apiFetch(`/api/conversation/${App.sessionId}`);
 
+    if (data && (data.error || !data.messages)) {
+        // Session ID in localStorage no longer exists on backend; reset to a fresh session
+        App.sessionId = 'sess_' + Math.random().toString(36).substring(2, 11);
+        localStorage.setItem('fabric_ai_session_id', App.sessionId);
+        return;
+    }
+
     if (data && data.messages && data.messages.length > 0) {
         const hero = document.getElementById('architectHero') || document.getElementById('playgroundHome');
         const chatArea = document.getElementById('architectChatArea');
