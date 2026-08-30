@@ -1789,6 +1789,120 @@ function initProjectsView() {
     loadProjects();
 }
 
+let _sidebarProjectsExpanded = false;
+let _activeSidebarProjectMenu = null;
+
+function closeSidebarProjectMenu() {
+    if (_activeSidebarProjectMenu) {
+        _activeSidebarProjectMenu.remove();
+        _activeSidebarProjectMenu = null;
+    }
+    document.querySelectorAll('.sidebar-project-item.menu-open').forEach(i => i.classList.remove('menu-open'));
+}
+
+document.addEventListener('click', (e) => {
+    if (!e.target.closest('.sidebar-project-menu-popup') && !e.target.closest('.sidebar-project-more-btn')) {
+        closeSidebarProjectMenu();
+    }
+});
+
+function toggleSidebarProjectsExpanded() {
+    _sidebarProjectsExpanded = !_sidebarProjectsExpanded;
+    renderSidebarProjects();
+}
+window.toggleSidebarProjectsExpanded = toggleSidebarProjectsExpanded;
+
+function openSidebarProjectMenu(e, projectId) {
+    e.stopPropagation();
+    const item = e.currentTarget.closest('.sidebar-project-item');
+    if (!item) return;
+
+    // Toggle off if clicking same item button
+    if (_activeSidebarProjectMenu && _activeSidebarProjectMenu.dataset.projectId === projectId) {
+        closeSidebarProjectMenu();
+        return;
+    }
+
+    closeSidebarProjectMenu();
+
+    const proj = (_allProjects || []).find(p => p.id === projectId);
+    if (!proj) return;
+
+    item.classList.add('menu-open');
+    const rect = e.currentTarget.getBoundingClientRect();
+
+    const menu = document.createElement('div');
+    menu.className = 'sidebar-project-menu-popup';
+    menu.dataset.projectId = projectId;
+    menu.innerHTML = `
+        <button class="sidebar-project-menu-item" id="btnSideProjPin" type="button">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="17" x2="12" y2="22"/><path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z"/></svg>
+            <span>${proj.is_pinned ? 'Unpin' : 'Pin'}</span>
+        </button>
+        <button class="sidebar-project-menu-item" id="btnSideProjEdit" type="button">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+            <span>Edit details</span>
+        </button>
+        <button class="sidebar-project-menu-item" id="btnSideProjArchive" type="button">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
+            <span>Archive</span>
+        </button>
+        <button class="sidebar-project-menu-item delete-item" id="btnSideProjDelete" type="button">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+            <span>Delete</span>
+        </button>
+    `;
+
+    menu.style.top = `${rect.bottom + 4}px`;
+    menu.style.left = `${Math.min(rect.left, window.innerWidth - 160)}px`;
+
+    menu.querySelector('#btnSideProjPin').addEventListener('click', async (ev) => {
+        ev.stopPropagation();
+        closeSidebarProjectMenu();
+        await window.togglePinProject(ev, proj.id, proj.is_pinned);
+    });
+
+    menu.querySelector('#btnSideProjEdit').addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        closeSidebarProjectMenu();
+        if (window.openNewProjectModal) {
+            window.openNewProjectModal(proj);
+        }
+    });
+
+    menu.querySelector('#btnSideProjArchive').addEventListener('click', async (ev) => {
+        ev.stopPropagation();
+        closeSidebarProjectMenu();
+        try {
+            await fetch('/api/projects/update', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id: proj.id, is_archived: 1 })
+            });
+            if (window.initProjectsView) window.initProjectsView();
+        } catch (e) {}
+    });
+
+    menu.querySelector('#btnSideProjDelete').addEventListener('click', async (ev) => {
+        ev.stopPropagation();
+        closeSidebarProjectMenu();
+        if (confirm(`Delete project "${proj.name}"?`)) {
+            try {
+                await fetch('/api/projects/delete', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id: proj.id })
+                });
+                if (window.initProjectsView) window.initProjectsView();
+            } catch (e) {}
+        }
+    });
+
+    document.body.appendChild(menu);
+    _activeSidebarProjectMenu = menu;
+}
+window.openSidebarProjectMenu = openSidebarProjectMenu;
+
 function renderSidebarProjects(projects = null) {
     const listEl = document.getElementById('sidebarProjectsList');
     if (!listEl) return;
@@ -1805,19 +1919,37 @@ function renderSidebarProjects(projects = null) {
         return;
     }
 
+    const limit = 5;
+    const visibleProjects = _sidebarProjectsExpanded ? sorted : sorted.slice(0, limit);
+    const hasMore = sorted.length > limit;
+
     // Stack container icon matching reference image
     const stackIconSvg = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="3" width="16" height="5" rx="1.5"/><path d="M4 8v10a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"/><line x1="4" y1="13" x2="20" y2="13"/></svg>`;
+    const dotsIconSvg = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>`;
 
-    listEl.innerHTML = sorted.slice(0, 8).map(p => {
+    let html = visibleProjects.map(p => {
         const safeName = escapeHtml(p.name);
         const isActive = App.activeProject && App.activeProject.id === p.id;
         return `
             <div class="sidebar-project-item ${isActive ? 'active' : ''}" data-project-id="${p.id}" title="${safeName}" onclick="selectSidebarProject('${p.id}')">
                 <span class="sidebar-project-icon">${stackIconSvg}</span>
                 <span class="sidebar-project-name">${safeName}</span>
+                <button class="sidebar-project-more-btn" title="More options" type="button" onclick="openSidebarProjectMenu(event, '${p.id}')">
+                    ${dotsIconSvg}
+                </button>
             </div>
         `;
     }).join('');
+
+    if (hasMore) {
+        html += `
+            <button class="sidebar-projects-show-more-btn" type="button" onclick="toggleSidebarProjectsExpanded()">
+                <span>${_sidebarProjectsExpanded ? 'Show less' : `Show ${sorted.length - limit} more`}</span>
+            </button>
+        `;
+    }
+
+    listEl.innerHTML = html;
 }
 
 function selectSidebarProject(projectId) {
