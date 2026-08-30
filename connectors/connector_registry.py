@@ -61,14 +61,21 @@ _load_all_connectors()
 def get_connector(source_id: str) -> BaseConnector:
     """
     Returns the connector instance for the given source_id.
-    Raises KeyError with helpful message if not found.
+    If not already registered, dynamically synthesizes a JIT connector on-the-fly.
     """
     if source_id not in _REGISTRY:
-        available = list(_REGISTRY.keys())
-        raise KeyError(
-            f"Unknown connector '{source_id}'. "
-            f"Available connectors: {available}"
-        )
+        try:
+            from connectors.jit_connector_factory import synthesize_connector
+            jit_instance = synthesize_connector(source_id)
+            _REGISTRY[source_id] = jit_instance
+            print(f"[REGISTRY] Dynamically synthesized JIT connector: {source_id} ({jit_instance.name})")
+            return jit_instance
+        except Exception as e:
+            available = list(_REGISTRY.keys())
+            raise KeyError(
+                f"Could not synthesize connector '{source_id}'. Error: {e}. "
+                f"Available connectors: {available}"
+            )
     return _REGISTRY[source_id]
 
 
