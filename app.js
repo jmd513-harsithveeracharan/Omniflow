@@ -1526,13 +1526,16 @@ function initProjectsView() {
 
         window.openProjectActionMenu = function(e, project) {
             e.stopPropagation();
-            if (_activeProjectActionMenu) {
-                _activeProjectActionMenu.remove();
-                _activeProjectActionMenu = null;
-            }
-
             const card = e.currentTarget.closest('.project-card');
             if (!card) return;
+
+            // If menu is ALREADY open for THIS card, toggle close
+            if (_activeProjectActionMenu) {
+                const wasSameCard = _activeProjectActionMenu.parentElement === card;
+                _activeProjectActionMenu.remove();
+                _activeProjectActionMenu = null;
+                if (wasSameCard) return;
+            }
 
             const menu = document.createElement('div');
             menu.className = 'project-action-menu';
