@@ -712,9 +712,13 @@ nav.sidebar-nav {
     color: #ffffff;
 }
 
-.sidebar-project-menu-item.delete-item:hover {
-    background: rgba(239, 68, 68, 0.18);
+.sidebar-project-menu-item.delete-item {
     color: #f87171;
+}
+
+.sidebar-project-menu-item.delete-item:hover {
+    background: rgba(239, 68, 68, 0.15);
+    color: #ef4444;
 }
 
 /* Chat list scroll area - fills 100% available vertical space down to the footer */
