@@ -4067,13 +4067,13 @@ ul.chat-md-list {
     padding: 0;
     height: calc(100vh - var(--topbar-h, 56px));
     overflow-y: auto;
-    background: var(--bg-base, #131314);
+    background: #0f0f11;
 }
 
 .projects-page-container {
-    max-width: 1100px;
+    max-width: 980px;
     margin: 0 auto;
-    padding: 36px 40px 80px 40px;
+    padding: 48px 32px 80px 32px;
 }
 
 /* Header Row */
@@ -4081,15 +4081,15 @@ ul.chat-md-list {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 36px;
+    margin-bottom: 60px;
 }
 
 .projects-page-title {
-    font-family: 'Newsreader', 'Google Sans', 'Georgia', serif;
-    font-size: 28px;
-    font-weight: 500;
-    color: #ffffff;
-    letter-spacing: -0.01em;
+    font-family: 'Newsreader', 'Georgia', serif;
+    font-size: 32px;
+    font-weight: 400;
+    color: #f4f4f5;
+    letter-spacing: -0.015em;
     margin: 0;
 }
 
@@ -4100,12 +4100,12 @@ ul.chat-md-list {
 }
 
 .projects-icon-btn {
-    width: 32px;
-    height: 32px;
+    width: 36px;
+    height: 36px;
     border-radius: 8px;
-    background: #18191b;
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    color: #9aa0a6;
+    background: #18181b;
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    color: #a1a1aa;
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -4114,9 +4114,9 @@ ul.chat-md-list {
 }
 
 .projects-icon-btn:hover {
-    background: #232428;
+    background: #27272a;
     color: #ffffff;
-    border-color: rgba(255, 255, 255, 0.16);
+    border-color: rgba(255, 255, 255, 0.18);
 }
 
 .projects-search-wrap {
@@ -4126,21 +4126,20 @@ ul.chat-md-list {
 }
 
 .projects-search-input {
-    background: #141517;
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: #18181b;
+    border: 1px solid rgba(255, 255, 255, 0.12);
     border-radius: 8px;
-    padding: 6px 12px;
-    font-size: 12.5px;
+    padding: 7px 12px;
+    font-size: 13px;
     color: #ffffff;
     outline: none;
-    width: 180px;
-    margin-left: 6px;
+    width: 200px;
+    margin-left: 8px;
     transition: all 0.15s ease;
 }
 
 .projects-search-input:focus {
-    border-color: rgba(56, 189, 248, 0.4);
-    box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.1);
+    border-color: rgba(255, 255, 255, 0.3);
 }
 
 /* Sort Dropdown */
@@ -4151,37 +4150,38 @@ ul.chat-md-list {
 .projects-sort-btn {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
-    background: #18191b;
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    color: #9aa0a6;
-    font-size: 12.5px;
-    padding: 6px 12px;
+    gap: 8px;
+    background: #18181b;
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    color: #a1a1aa;
+    font-size: 13px;
+    padding: 7px 14px;
     border-radius: 8px;
     cursor: pointer;
     transition: all 0.15s ease;
 }
 
 .projects-sort-btn strong {
-    color: #e3e3e3;
+    color: #f4f4f5;
     font-weight: 500;
 }
 
 .projects-sort-btn:hover {
-    background: #232428;
+    background: #27272a;
     color: #ffffff;
+    border-color: rgba(255, 255, 255, 0.18);
 }
 
 .projects-sort-menu {
     position: absolute;
     top: calc(100% + 6px);
     right: 0;
-    width: 140px;
-    background: #18191b;
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    width: 150px;
+    background: #18181b;
+    border: 1px solid rgba(255, 255, 255, 0.12);
     border-radius: 8px;
-    padding: 4px;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+    padding: 5px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
     z-index: 50;
     display: flex;
     flex-direction: column;
@@ -4191,9 +4191,9 @@ ul.chat-md-list {
 .projects-sort-item {
     background: transparent;
     border: none;
-    color: #9aa0a6;
-    font-size: 12px;
-    padding: 6px 10px;
+    color: #a1a1aa;
+    font-size: 12.5px;
+    padding: 7px 10px;
     border-radius: 6px;
     text-align: left;
     cursor: pointer;
@@ -4201,24 +4201,25 @@ ul.chat-md-list {
 }
 
 .projects-sort-item:hover {
-    background: #232428;
+    background: #27272a;
     color: #ffffff;
 }
 
 .projects-sort-item.active {
-    color: #34d399;
+    color: #ffffff;
     font-weight: 600;
+    background: rgba(255, 255, 255, 0.06);
 }
 
-/* New Project Button (White Pill Top CTA) */
+/* New Project Button (Crisp White Pill Top CTA) */
 .projects-btn-new-primary {
     background: #ffffff;
-    color: #0d0e10;
+    color: #111113;
     border: none;
-    border-radius: 20px;
-    padding: 7px 16px;
-    font-size: 13px;
-    font-weight: 600;
+    border-radius: 8px;
+    padding: 8px 15px;
+    font-size: 13.5px;
+    font-weight: 500;
     cursor: pointer;
     transition: all 0.15s ease;
     display: inline-flex;
@@ -4227,9 +4228,8 @@ ul.chat-md-list {
 }
 
 .projects-btn-new-primary:hover {
-    background: #f0f0f2;
-    transform: translateY(-1px);
-    box-shadow: 0 4px 14px rgba(255, 255, 255, 0.15);
+    background: #f4f4f5;
+    transform: translateY(-0.5px);
 }
 
 /* Empty State */
@@ -4238,44 +4238,57 @@ ul.chat-md-list {
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    padding: 80px 20px;
+    padding: 60px 20px;
     text-align: center;
-    margin-top: 20px;
+    margin-top: 40px;
 }
 
 .projects-illustration-box {
-    margin-bottom: 20px;
-    color: #e3e3e3;
-    opacity: 0.9;
+    margin-bottom: 24px;
+    color: #f4f4f5;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.projects-empty-icon {
+    width: 64px;
+    height: 64px;
+    stroke: #e4e4e7;
 }
 
 .projects-empty-title {
     font-family: var(--font-sans);
-    font-size: 19px;
+    font-size: 18px;
     font-weight: 600;
-    color: #ffffff;
+    color: #f4f4f5;
     margin: 0 0 8px 0;
     letter-spacing: -0.01em;
 }
 
 .projects-empty-desc {
-    font-size: 13.5px;
-    color: #8e918f;
-    max-width: 420px;
+    font-size: 14px;
+    color: #a1a1aa;
+    max-width: 440px;
     line-height: 1.5;
     margin: 0 0 24px 0;
 }
 
 .projects-btn-new-secondary {
-    background: #232428;
-    color: #ffffff;
-    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: #27272a;
+    color: #f4f4f5;
+    border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 8px;
-    padding: 8px 20px;
-    font-size: 13px;
+    padding: 8px 18px;
+    font-size: 13.5px;
     font-weight: 500;
     cursor: pointer;
     transition: all 0.15s ease;
+}
+
+.projects-btn-new-secondary:hover {
+    background: #3f3f46;
+    border-color: rgba(255, 255, 255, 0.18);
 }
 
 .projects-btn-new-secondary:hover {

@@ -5826,12 +5826,62 @@ document.addEventListener('DOMContentLoaded', () => {
                 } else {
                     alert('Save failed: ' + (data.error || 'Unknown error'));
                 }
-            } catch (err) {
-                alert('Save request failed: ' + err.message);
-            } finally {
-                btnSave.disabled = false;
-                btnSave.textContent = 'Save & register connector';
-            }
         });
     }
+
+    // ── PROJECTS VIEW MANAGER ──────────────────────────────────────────────────
+    window.initProjectsView = function() {
+        const searchToggle = document.getElementById('btnProjectsSearchToggle');
+        const searchInput = document.getElementById('projectsSearchInput');
+        const sortBtn = document.getElementById('btnProjectsSort');
+        const sortMenu = document.getElementById('projectsSortMenu');
+        const sortLabel = document.getElementById('projectsSortLabel');
+        const sortItems = document.querySelectorAll('.projects-sort-item');
+        const btnNewTop = document.getElementById('btnNewProjectTop');
+        const btnNewCenter = document.getElementById('btnNewProjectCenter');
+
+        // Search toggle
+        searchToggle?.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (searchInput) {
+                const isVisible = searchInput.style.display !== 'none';
+                searchInput.style.display = isVisible ? 'none' : 'block';
+                if (!isVisible) searchInput.focus();
+            }
+        });
+
+        // Sort menu toggle
+        sortBtn?.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (sortMenu) {
+                sortMenu.style.display = sortMenu.style.display === 'none' ? 'flex' : 'none';
+            }
+        });
+
+        // Sort items selection
+        sortItems.forEach(item => {
+            item.addEventListener('click', (e) => {
+                e.stopPropagation();
+                sortItems.forEach(si => si.classList.remove('active'));
+                item.classList.add('active');
+                if (sortLabel) sortLabel.textContent = item.textContent.trim();
+                if (sortMenu) sortMenu.style.display = 'none';
+            });
+        });
+
+        // Close dropdown on click outside
+        document.addEventListener('click', (e) => {
+            if (sortMenu && sortMenu.style.display !== 'none' && !sortBtn?.contains(e.target) && !sortMenu.contains(e.target)) {
+                sortMenu.style.display = 'none';
+            }
+        });
+
+        const handleNewProject = () => {
+            // Placeholder trigger for project creation modal/step
+            showToast('Project creation flow will be configured next!', 'info');
+        };
+
+        btnNewTop?.addEventListener('click', handleNewProject);
+        btnNewCenter?.addEventListener('click', handleNewProject);
+    };
 });
