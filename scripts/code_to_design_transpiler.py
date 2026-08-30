@@ -140,60 +140,80 @@ def build_penpot_payload_from_dom(dom_data):
             return null;
         }
 
+        // Sort elements by area (largest first for backgrounds)
+        const containers = [];
+        const textElements = [];
+        const svgElements = [];
+
         elements.forEach(el => {
             const bgHex = toHex(el.bg);
             const borderHex = toHex(el.borderColor);
-            const colorHex = toHex(el.color);
             
-            // 1. If SVG icon
-            if (el.svgData && typeof penpot.createShapeFromSvg === 'function') {
+            // Skip redundant full-screen solid background rectangles that cover the board
+            const isFullScreenCover = el.w >= 1400 && el.h >= 850 && (bgHex === '#131314' || bgHex === '#0e0e0e');
+            
+            if (el.svgData) {
+                svgElements.push(el);
+            }
+            if (el.text && el.text.trim().length > 0) {
+                textElements.push(el);
+            }
+            if (!isFullScreenCover && (bgHex || (borderHex && el.borderWidth > 0))) {
+                containers.push({ ...el, bgHex, borderHex, area: el.w * el.h });
+            }
+        });
+
+        // 1. PASS 1: Render background cards & containers (largest to smallest)
+        containers.sort((a, b) => b.area - a.area);
+        containers.forEach(el => {
+            const r = penpot.createRectangle();
+            board.appendChild(r);
+            r.x = el.x;
+            r.y = el.y;
+            r.resize(el.w, el.h);
+            if (el.bgHex) {
+                r.fills = [{ fillColor: el.bgHex }];
+            } else {
+                r.fills = [];
+            }
+            if (el.borderRadius > 0) {
+                r.borderRadius = el.borderRadius;
+            }
+            if (el.borderHex && el.borderWidth > 0) {
+                r.strokes = [{ strokeColor: el.borderHex, strokeWidth: el.borderWidth, strokeStyle: 'solid', strokeAlignment: 'center' }];
+            }
+        });
+
+        // 2. PASS 2: Render SVG icons
+        svgElements.forEach(el => {
+            if (typeof penpot.createShapeFromSvg === 'function') {
                 try {
                     const svgShape = penpot.createShapeFromSvg(el.svgData);
                     if (svgShape) {
                         board.appendChild(svgShape);
                         svgShape.x = el.x;
                         svgShape.y = el.y;
-                        svgShape.resize(el.w, el.h);
-                        return;
+                        svgShape.resize(Math.max(el.w, 14), Math.max(el.h, 14));
                     }
                 } catch(e) {}
             }
-            
-            // 2. If rectangular container with background or border
-            if (bgHex || (borderHex && el.borderWidth > 0)) {
-                const r = penpot.createRectangle();
-                board.appendChild(r);
-                r.x = el.x;
-                r.y = el.y;
-                r.resize(el.w, el.h);
-                if (bgHex) {
-                    r.fills = [{ fillColor: bgHex }];
-                } else {
-                    r.fills = [];
-                }
-                if (el.borderRadius > 0) {
-                    r.borderRadius = el.borderRadius;
-                }
-                if (borderHex && el.borderWidth > 0) {
-                    r.strokes = [{ strokeColor: borderHex, strokeWidth: el.borderWidth, strokeStyle: 'solid', strokeAlignment: 'center' }];
-                }
-            }
-            
-            // 3. If text element
-            if (el.text && el.text.trim().length > 0) {
-                const t = penpot.createText(el.text.trim());
-                if (t) {
-                    board.appendChild(t);
-                    t.x = el.x;
-                    t.y = el.y;
-                    t.fontSize = String(Math.round(el.fontSize));
-                    t.growType = "auto-width";
-                    t.fills = [{ fillColor: colorHex || "#e3e3e3" }];
-                }
+        });
+
+        // 3. PASS 3: Render Text Elements on TOP
+        textElements.forEach(el => {
+            const colorHex = toHex(el.color) || "#ffffff";
+            const t = penpot.createText(el.text.trim());
+            if (t) {
+                board.appendChild(t);
+                t.x = el.x;
+                t.y = el.y;
+                t.fontSize = String(Math.max(Math.round(el.fontSize), 11));
+                t.growType = "auto-width";
+                t.fills = [{ fillColor: colorHex }];
             }
         });
         
-        return { success: true, count: elements.length };
+        return { success: true, containers: containers.length, texts: textElements.length, svgs: svgElements.length };
     })();
     """
     return js_code
