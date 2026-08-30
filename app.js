@@ -1048,7 +1048,7 @@ function initClaudeSettingsModal() {
     const connectorRows = document.querySelectorAll('.connectors-table-body .connector-row');
 
     // Open function
-    window.openClaudeSettings = (tabName = 'tabSourceSystems') => {
+    window.openClaudeSettings = (tabName = 'tabConnectors') => {
         if (!modal) return;
         modal.style.display = 'flex';
         switchSettingsTab(tabName);
@@ -1078,7 +1078,7 @@ function initClaudeSettingsModal() {
     navCustomize?.addEventListener('click', (e) => {
         e.preventDefault();
         App.previousActiveView = App.activeView || 'viewArchitect';
-        openClaudeSettings('tabSourceSystems');
+        openClaudeSettings('tabConnectors');
     });
 
     // Open from user profile menu Settings button
