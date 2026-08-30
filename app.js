@@ -1101,31 +1101,45 @@ function initClaudeSettingsModal() {
         if (e.target === modal) closeClaudeSettingsModal();
     });
 
-    // Global ESC key listener to close modals and popups
+    // Global ESC key listener to close modals hierarchically (topmost active modal first)
     document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape' || e.key === 'Esc') {
-            if (modal && modal.style.display === 'flex') {
-                closeClaudeSettingsModal();
+            // 1. Topmost child modals (e.g. Add Custom Connector)
+            const customModal = document.getElementById('modalAddCustomConnector');
+            if (customModal && customModal.style.display !== 'none') {
+                window.closeAddConnectorModal();
+                return;
             }
             const modalProj = document.getElementById('modalNewProject');
-            if (modalProj && modalProj.style.display === 'flex') {
+            if (modalProj && (modalProj.style.display === 'flex' || modalProj.style.display === 'block')) {
                 modalProj.style.display = 'none';
+                return;
             }
             const modalFab = document.getElementById('modalFabricConnections');
             if (modalFab && modalFab.style.display === 'flex') {
                 modalFab.style.display = 'none';
+                return;
             }
             const modalSkill = document.getElementById('modalSkillInspector');
             if (modalSkill && modalSkill.style.display === 'flex') {
                 modalSkill.style.display = 'none';
+                return;
             }
+            // 2. Base Settings & Customize modal
+            if (modal && modal.style.display === 'flex') {
+                closeClaudeSettingsModal();
+                return;
+            }
+            // 3. Dropdowns and drawers
             const userMenu = document.getElementById('userProfileMenu');
             if (userMenu && userMenu.style.display === 'block') {
                 userMenu.style.display = 'none';
+                return;
             }
             const convDrawer = document.getElementById('conversationsDrawerBackdrop');
             if (convDrawer && convDrawer.classList.contains('open')) {
                 convDrawer.classList.remove('open');
+                return;
             }
         }
     });
@@ -5819,26 +5833,4 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     }
-
-    // ── GLOBAL ESCAPE KEY MODAL CLOSER ──
-    document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape' || e.key === 'Esc') {
-            const customModal = document.getElementById('modalAddCustomConnector');
-            if (customModal && customModal.style.display !== 'none') {
-                window.closeAddConnectorModal();
-                e.stopPropagation();
-                return;
-            }
-            const settingsModal = document.getElementById('modalClaudeSettings');
-            if (settingsModal && settingsModal.style.display !== 'none') {
-                settingsModal.style.display = 'none';
-                return;
-            }
-            const projectModal = document.getElementById('modalNewProject');
-            if (projectModal && projectModal.style.display !== 'none') {
-                window.closeNewProjectModal();
-                return;
-            }
-        }
-    });
 });
