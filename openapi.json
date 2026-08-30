@@ -1,0 +1,106 @@
+{
+  "openapi": "3.0.1",
+  "info": {
+    "title": "Fabric AI Studio Action",
+    "description": "Enables Microsoft 365 Copilot to inspect and control Microsoft Fabric data architectures.",
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "https://eight-crabs-type.loca.lt"
+    }
+  ],
+  "paths": {
+    "/api/copilot/status": {
+      "get": {
+        "operationId": "getFabricStatus",
+        "summary": "Check Fabric AI connection status and active workspace",
+        "description": "Returns status of Fabric AI Studio, active workspace name, and Azure authentication state.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": { "type": "string" },
+                    "workspace_name": { "type": "string" },
+                    "authenticated_user": { "type": "string" },
+                    "total_items": { "type": "integer" },
+                    "message": { "type": "string" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/copilot/items": {
+      "get": {
+        "operationId": "getWorkspaceItems",
+        "summary": "List Lakehouses and Notebooks in the Fabric workspace",
+        "description": "Returns a summary list of all deployed Lakehouses and PySpark Notebooks.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "workspace_name": { "type": "string" },
+                    "lakehouses": { "type": "array", "items": { "type": "string" } },
+                    "notebooks": { "type": "array", "items": { "type": "string" } },
+                    "total_count": { "type": "integer" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/copilot/create_lakehouse": {
+      "post": {
+        "operationId": "createLakehouse",
+        "summary": "Create a new Lakehouse in Microsoft Fabric",
+        "description": "Provisions a new Delta Lakehouse in the active Fabric workspace.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["lakehouse_name"],
+                "properties": {
+                  "lakehouse_name": { "type": "string", "description": "Name of the lakehouse, e.g. lh_sales_bronze" },
+                  "layer": { "type": "string", "description": "Medallion layer: Bronze, Silver, or Gold" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean" },
+                    "message": { "type": "string" },
+                    "item_id": { "type": "string" },
+                    "workspace": { "type": "string" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

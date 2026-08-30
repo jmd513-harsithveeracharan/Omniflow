@@ -1,0 +1,688 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fabric AI Studio — Multi-Agent Forward-Chaining Execution Flow</title>
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&family=JetBrains+Mono:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
+    
+    <!-- Open-Source Animation & SFX Engines -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/TextPlugin.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
+
+    <style>
+        :root {
+            --bg: #030712;
+            --primary: #6366f1;
+            --primary-glow: rgba(99, 102, 241, 0.45);
+            --cyan: #06b6d4;
+            --cyan-glow: rgba(6, 182, 212, 0.4);
+            --emerald: #10b981;
+            --emerald-glow: rgba(16, 185, 129, 0.4);
+            --amber: #f59e0b;
+            --amber-glow: rgba(245, 158, 11, 0.4);
+            --purple: #a855f7;
+            --border: rgba(255, 255, 255, 0.12);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; user-select: none; }
+
+        html, body {
+            width: 100vw;
+            height: 100vh;
+            background-color: var(--bg);
+            color: #f8fafc;
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            overflow: hidden;
+            position: fixed;
+            inset: 0;
+        }
+
+        #webgl-bg {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+            pointer-events: none;
+        }
+
+        #master-stage {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            z-index: 10;
+        }
+
+        /* ── Floating Header ── */
+        .cinema-nav {
+            position: absolute;
+            top: 24px;
+            left: 40px;
+            right: 40px;
+            height: 48px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            z-index: 100;
+        }
+        .brand-pill {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            background: rgba(15, 23, 42, 0.7);
+            border: 1px solid var(--border);
+            padding: 8px 18px;
+            border-radius: 9999px;
+            backdrop-filter: blur(20px);
+        }
+        .brand-icon {
+            width: 26px;
+            height: 26px;
+            background: linear-gradient(135deg, #6366f1, #06b6d4);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 13px;
+            font-weight: 800;
+            box-shadow: 0 0 15px var(--primary-glow);
+        }
+        .brand-name { font-weight: 800; font-size: 14px; letter-spacing: -0.02em; }
+
+        .phase-indicator {
+            background: rgba(15, 23, 42, 0.7);
+            border: 1px solid var(--border);
+            padding: 8px 22px;
+            border-radius: 9999px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            color: #38bdf8;
+            backdrop-filter: blur(20px);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .pulse-dot { width: 8px; height: 8px; background: #06b6d4; border-radius: 50%; box-shadow: 0 0 10px #06b6d4; }
+
+        /* ── Viewport Stage ── */
+        .motion-stage {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 80px 40px 100px 40px;
+        }
+
+        .agent-scene {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            pointer-events: none;
+            text-align: center;
+            padding: 0 40px;
+        }
+
+        /* ── Typography & Tags ── */
+        .kicker-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 18px;
+            border-radius: 9999px;
+            font-size: 12px;
+            font-weight: 800;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            margin-bottom: 14px;
+        }
+        .hero-title {
+            font-size: 48px;
+            font-weight: 900;
+            letter-spacing: -0.04em;
+            line-height: 1.15;
+            max-width: 950px;
+            background: linear-gradient(135deg, #ffffff 40%, #94a3b8 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 12px;
+        }
+        .hero-subtitle {
+            font-size: 18px;
+            color: #94a3b8;
+            max-width: 720px;
+            line-height: 1.5;
+            margin-bottom: 30px;
+        }
+
+        /* ── Interactive Flow Components ── */
+        
+        /* Scene 1: Prompt Dock */
+        .prompt-dock-box {
+            width: 800px;
+            background: rgba(15, 23, 42, 0.9);
+            border: 1.5px solid #6366f1;
+            border-radius: 9999px;
+            padding: 18px 30px;
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            box-shadow: 0 0 50px rgba(99, 102, 241, 0.35);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 15px;
+            text-align: left;
+        }
+
+        /* Scene 2: Plan Generation Flow */
+        .plan-stack {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            width: 720px;
+        }
+        .plan-item {
+            background: rgba(15, 23, 42, 0.85);
+            border: 1px solid var(--border);
+            padding: 14px 24px;
+            border-radius: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 14px;
+            font-weight: 700;
+            backdrop-filter: blur(20px);
+        }
+
+        /* Multi-Agent Forward Chaining Visualizer */
+        .forward-chain-canvas {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 20px;
+            width: 1100px;
+        }
+        
+        .agent-terminal {
+            width: 500px;
+            background: #020617;
+            border: 1px solid var(--border);
+            border-radius: 18px;
+            padding: 20px 24px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12.5px;
+            line-height: 1.7;
+            text-align: left;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.8);
+            color: #94a3b8;
+        }
+
+        .llm-core-node {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            background: radial-gradient(circle, #6366f1, #06b6d4);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
+            box-shadow: 0 0 40px var(--primary-glow);
+            flex-shrink: 0;
+            position: relative;
+        }
+
+        .data-stream-arrow {
+            width: 60px;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.1);
+            position: relative;
+            border-radius: 2px;
+            overflow: hidden;
+            flex-shrink: 0;
+        }
+        .stream-pulse {
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, #6366f1, #06b6d4, #10b981, transparent);
+        }
+
+        /* Token Passing Animation Badge */
+        .token-payload-badge {
+            background: rgba(6, 182, 212, 0.15);
+            border: 1px solid rgba(6, 182, 212, 0.4);
+            color: #38bdf8;
+            padding: 8px 18px;
+            border-radius: 9999px;
+            font-size: 12px;
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 700;
+            box-shadow: 0 0 25px var(--cyan-glow);
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        /* Syntax colors */
+        .kw { color: #c084fc; font-weight: 700; }
+        .fn { color: #38bdf8; font-weight: 600; }
+        .str { color: #34d399; }
+        .cmt { color: #64748b; font-style: italic; }
+
+        /* Floating Controls */
+        .cinema-controls {
+            position: absolute;
+            bottom: 24px;
+            left: 40px;
+            right: 40px;
+            height: 52px;
+            background: rgba(15, 23, 42, 0.8);
+            border: 1px solid var(--border);
+            border-radius: 9999px;
+            backdrop-filter: blur(24px);
+            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.6);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 24px;
+            z-index: 100;
+        }
+        .ctrl-btn {
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid var(--border);
+            color: #ffffff;
+            padding: 6px 16px;
+            border-radius: 9999px;
+            font-size: 12px;
+            font-weight: 700;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .ctrl-btn:hover { background: var(--primary); box-shadow: 0 0 15px var(--primary-glow); }
+        .timeline-track {
+            flex: 1;
+            margin: 0 20px;
+            height: 5px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 3px;
+            overflow: hidden;
+            position: relative;
+            cursor: pointer;
+        }
+        .timeline-bar-fill {
+            position: absolute;
+            top: 0;
+            left: 0;
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, #6366f1, #06b6d4, #10b981);
+        }
+        .timecode-label {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            color: #94a3b8;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="webgl-bg"></canvas>
+
+    <div id="master-stage">
+        <!-- Header -->
+        <div class="cinema-nav">
+            <div class="brand-pill">
+                <div class="brand-icon">⚡</div>
+                <span class="brand-name">Fabric AI Studio</span>
+            </div>
+            <div class="phase-indicator" id="phasePill">
+                <span class="pulse-dot"></span>
+                <span id="phaseText">STEP 1 • NATURAL LANGUAGE INGESTION</span>
+            </div>
+            <div style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #64748b; font-weight: 600;">
+                MULTI-AGENT PIPELINE
+            </div>
+        </div>
+
+        <!-- Master Viewport -->
+        <div class="motion-stage">
+            
+            <!-- ── STEP 1: Prompt Ingestion ── -->
+            <div class="agent-scene" id="sc1">
+                <div class="kicker-tag" style="background: rgba(99,102,241,0.15); border: 1px solid rgba(99,102,241,0.4); color: #a5b4fc;">
+                    ⚡ 1. PROMPT INGESTION
+                </div>
+                <h1 class="hero-title">Natural Language Prompt Lands.</h1>
+                <p class="hero-subtitle">The user defines the business goal. The system begins forward-chaining agent execution.</p>
+                <div class="prompt-dock-box">
+                    <span style="color: #6366f1; font-weight: 800;">❯</span>
+                    <span id="typePrompt"></span>
+                </div>
+            </div>
+
+            <!-- ── STEP 2: Plan Decomposition ── -->
+            <div class="agent-scene" id="sc2">
+                <div class="kicker-tag" style="background: rgba(6,182,212,0.15); border: 1px solid rgba(6,182,212,0.4); color: #38bdf8;">
+                    🧠 2. META-PLANNER SYNTHESIS
+                </div>
+                <h1 class="hero-title">LLM Generates Grounded Execution Plan.</h1>
+                <p class="hero-subtitle">Breaks down the high-level goal into deterministic, forward-chained agent worker tasks.</p>
+                <div class="plan-stack">
+                    <div class="plan-item" id="p1" style="border-color: #f59e0b;"><span style="color: #f59e0b;">Task 1: Bronze Ingestion Worker</span><span style="color: #10b981;">✔ ASSIGNED</span></div>
+                    <div class="plan-item" id="p2" style="border-color: #06b6d4;"><span style="color: #06b6d4;">Task 2: Silver Cleansing & Delta MERGE</span><span style="color: #38bdf8;">✔ ASSIGNED</span></div>
+                    <div class="plan-item" id="p3" style="border-color: #10b981;"><span style="color: #10b981;">Task 3: Gold Star Schema & Power BI Model</span><span style="color: #a855f7;">✔ ASSIGNED</span></div>
+                </div>
+            </div>
+
+            <!-- ── STEP 3: Worker 1 (Bronze Ingestion Agent & Live Code Stream) ── -->
+            <div class="agent-scene" id="sc3">
+                <div class="kicker-tag" style="background: rgba(245,158,11,0.15); border: 1px solid rgba(245,158,11,0.4); color: #fbbf24;">
+                    🥉 3. WORKER 1 • BRONZE INGESTION
+                </div>
+                <h1 class="hero-title">Input Enters LLM ➔ Code Streams in Real-Time</h1>
+                <p class="hero-subtitle">Worker 1 receives source metadata payload, generates PySpark ingestion, and produces Lakehouse artifacts.</p>
+                <div class="forward-chain-canvas">
+                    <div class="token-payload-badge" id="tok1">
+                        📦 INPUT: { source: "SAP_ORDERS", watermark: "updated_at" }
+                    </div>
+                    <div class="data-stream-arrow"><div class="stream-pulse" id="sp1"></div></div>
+                    <div class="llm-core-node">🤖</div>
+                    <div class="data-stream-arrow"><div class="stream-pulse" id="sp2"></div></div>
+                    <div class="agent-terminal" id="termBronze">
+                        <div style="color: #f59e0b; font-weight: 700; margin-bottom: 6px;"># Streaming Bronze PySpark Ingestion:</div>
+                        <div id="codeBronze"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ── STEP 4: Token Forward-Chaining (Worker 1 Output ➔ Worker 2 Input) ── -->
+            <div class="agent-scene" id="sc4">
+                <div class="kicker-tag" style="background: rgba(6,182,212,0.15); border: 1px solid rgba(6,182,212,0.4); color: #38bdf8;">
+                    🔄 4. FORWARD-CHAINING HANDOFF
+                </div>
+                <h1 class="hero-title">Worker 1 Output Becomes Worker 2 Input.</h1>
+                <p class="hero-subtitle">The synthesized Bronze Lakehouse schema is injected as grounded context into the Silver Cleansing Agent.</p>
+                <div style="display: flex; flex-direction: column; align-items: center; gap: 20px;">
+                    <div class="token-payload-badge" id="tokPass">
+                        ⚡ FORWARD PAYLOAD: { bronze_lh: "lh_sales_bronze", pk: "order_id", rows: 148920 }
+                    </div>
+                    <div style="font-size: 32px; color: #6366f1;">➔ Forward Chained to Silver Worker ➔</div>
+                </div>
+            </div>
+
+            <!-- ── STEP 5: Worker 2 (Silver Cleansing & Delta MERGE Live Stream) ── -->
+            <div class="agent-scene" id="sc5">
+                <div class="kicker-tag" style="background: rgba(6,182,212,0.15); border: 1px solid rgba(6,182,212,0.4); color: #38bdf8;">
+                    🥈 5. WORKER 2 • SILVER DELTA MERGE
+                </div>
+                <h1 class="hero-title">Synthesizing Delta ACID Upsert Logic.</h1>
+                <p class="hero-subtitle">Worker 2 uses Bronze output to write idempotent Delta MERGE logic with deduplication.</p>
+                <div class="forward-chain-canvas">
+                    <div class="llm-core-node" style="background: radial-gradient(circle, #06b6d4, #10b981);">⚡</div>
+                    <div class="data-stream-arrow"><div class="stream-pulse" id="sp3"></div></div>
+                    <div class="agent-terminal" id="termSilver" style="border-color: #06b6d4;">
+                        <div style="color: #06b6d4; font-weight: 700; margin-bottom: 6px;"># Streaming Silver Delta Upsert:</div>
+                        <div id="codeSilver"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ── STEP 6: Worker 3 (Gold Star Schema & Direct Lake Deployment) ── -->
+            <div class="agent-scene" id="sc6">
+                <div class="kicker-tag" style="background: rgba(16,185,129,0.15); border: 1px solid rgba(16,185,129,0.4); color: #34d399;">
+                    🥇 6. WORKER 3 • FABRIC REST DEPLOYMENT
+                </div>
+                <h1 class="hero-title">Gold Star Schema Deployed Directly to OneLake.</h1>
+                <p class="hero-subtitle">Worker 3 passes validated Base64 definitions to Microsoft Fabric REST APIs in AI_Test_Folder.</p>
+                <div class="forward-chain-canvas">
+                    <div class="llm-core-node" style="background: radial-gradient(circle, #10b981, #6366f1);">🚀</div>
+                    <div class="data-stream-arrow"><div class="stream-pulse" id="sp4"></div></div>
+                    <div class="agent-terminal" id="termGold" style="border-color: #10b981;">
+                        <div style="color: #10b981; font-weight: 700; margin-bottom: 6px;"># Deploying to Microsoft Fabric REST API:</div>
+                        <div style="color: #f8fafc;">POST /v1/workspaces/{id}/items (lh_sales_gold)</div>
+                        <div style="color: #38bdf8;">POST /v1/workspaces/{id}/notebooks (nb_sales_pipeline)</div>
+                        <div style="color: #10b981; font-weight: 700; margin-top: 8px;">✔ 200 OK • Deployed in AI_Test_Folder</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ── STEP 7: Auditor Verification & Direct Lake Power BI ── -->
+            <div class="agent-scene" id="sc7">
+                <div class="kicker-tag" style="background: rgba(16,185,129,0.15); border: 1px solid rgba(16,185,129,0.4); color: #34d399;">
+                    🏆 7. AUDITOR VERIFICATION & COMPLETE
+                </div>
+                <h1 class="hero-title">Multi-Agent Pipeline Verified & Live in Power BI.</h1>
+                <p class="hero-subtitle">The Auditor reconciles original intent against live Fabric deployment. 100% Zero-Error Execution.</p>
+                <div style="display: flex; align-items: center; justify-content: center; gap: 32px;">
+                    <div class="token-payload-badge" style="border-color: #10b981; color: #34d399; font-size: 14px; padding: 14px 28px;">
+                        ✔ ALL 3 AGENTS SUCCEEDED • 0.0s DIRECT LAKE QUERY
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Floating Cinema Controls -->
+        <div class="cinema-controls">
+            <button class="ctrl-btn" id="btnPlayPause">❚❚ Pause</button>
+            <div class="timeline-track" id="timelineTrack">
+                <div class="timeline-bar-fill" id="timelineFill"></div>
+            </div>
+            <div class="timecode-label" id="cinemaTimer">
+                00:00 / 00:36
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ── 1. Three.js Background Constellation ──
+        const canvas = document.getElementById('webgl-bg');
+        const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+        const scene3D = new THREE.Scene();
+        const camera3D = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera3D.position.z = 80;
+
+        const count = 600;
+        const geom = new THREE.BufferGeometry();
+        const pos = new Float32Array(count * 3);
+        const col = new Float32Array(count * 3);
+        const palette = [new THREE.Color('#6366f1'), new THREE.Color('#06b6d4'), new THREE.Color('#10b981'), new THREE.Color('#a855f7')];
+
+        for (let i = 0; i < count * 3; i += 3) {
+            pos[i] = (Math.random() - 0.5) * 180;
+            pos[i + 1] = (Math.random() - 0.5) * 180;
+            pos[i + 2] = (Math.random() - 0.5) * 180;
+            const c = palette[Math.floor(Math.random() * palette.length)];
+            col[i] = c.r; col[i + 1] = c.g; col[i + 2] = c.b;
+        }
+        geom.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+        geom.setAttribute('color', new THREE.BufferAttribute(col, 3));
+        const mat = new THREE.PointsMaterial({ size: 1.6, vertexColors: true, transparent: true, opacity: 0.55, blending: THREE.AdditiveBlending });
+        const points = new THREE.Points(geom, mat);
+        scene3D.add(points);
+
+        function render3D() {
+            points.rotation.y += 0.0007;
+            points.rotation.x += 0.0004;
+            renderer.render(scene3D, camera3D);
+            requestAnimationFrame(render3D);
+        }
+        render3D();
+
+        window.addEventListener('resize', () => {
+            camera3D.aspect = window.innerWidth / window.innerHeight;
+            camera3D.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        // ── 2. Web Audio Sound Synthesizer ──
+        const SFX = {
+            ctx: null,
+            init() { if (!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)(); },
+            whoosh() {
+                try {
+                    this.init();
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = "sine";
+                    osc.frequency.setValueAtTime(140, this.ctx.currentTime);
+                    osc.frequency.exponentialRampToValueAtTime(550, this.ctx.currentTime + 0.3);
+                    gain.gain.setValueAtTime(0.06, this.ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.3);
+                    osc.connect(gain); gain.connect(this.ctx.destination);
+                    osc.start(); osc.stop(this.ctx.currentTime + 0.3);
+                } catch(e) {}
+            },
+            typeKey() {
+                try {
+                    this.init();
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = "triangle";
+                    osc.frequency.setValueAtTime(1200, this.ctx.currentTime);
+                    gain.gain.setValueAtTime(0.03, this.ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.04);
+                    osc.connect(gain); gain.connect(this.ctx.destination);
+                    osc.start(); osc.stop(this.ctx.currentTime + 0.04);
+                } catch(e) {}
+            },
+            chime() {
+                try {
+                    this.init();
+                    [523.25, 659.25, 783.99, 1046.50].forEach((freq, i) => {
+                        const osc = this.ctx.createOscillator();
+                        const gain = this.ctx.createGain();
+                        osc.type = "sine";
+                        osc.frequency.setValueAtTime(freq, this.ctx.currentTime + i * 0.07);
+                        gain.gain.setValueAtTime(0.05, this.ctx.currentTime + i * 0.07);
+                        gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + i * 0.07 + 0.35);
+                        osc.connect(gain); gain.connect(this.ctx.destination);
+                        osc.start(this.ctx.currentTime + i * 0.07);
+                        osc.stop(this.ctx.currentTime + i * 0.07 + 0.35);
+                    });
+                } catch(e) {}
+            }
+        };
+
+        // ── 3. Master Multi-Agent Forward-Chaining GSAP Timeline ──
+        gsap.registerPlugin(TextPlugin);
+        const tl = gsap.timeline({ repeat: -1, repeatDelay: 1.5 });
+        const phaseText = document.getElementById('phaseText');
+        const timelineFill = document.getElementById('timelineFill');
+        const cinemaTimer = document.getElementById('cinemaTimer');
+
+        tl
+        // ── STEP 1: Prompt Ingestion (4.5s) ──
+        .set(phaseText, { text: "STEP 1 • PROMPT INGESTION" })
+        .fromTo("#sc1", { opacity: 0, scale: 0.95 }, { opacity: 1, scale: 1, duration: 0.6, ease: "power3.out" })
+        .to("#typePrompt", {
+            duration: 2,
+            text: "Build an SAP Sales Medallion Pipeline in Microsoft Fabric with Incremental Delta Merge.",
+            ease: "none",
+            onUpdate: () => { if (Math.random() > 0.6) SFX.typeKey(); }
+        })
+        .to("#sc1", { opacity: 0, scale: 0.95, duration: 0.5, delay: 2.2, onStart: () => SFX.whoosh() })
+
+        // ── STEP 2: Plan Generation (4.5s) ──
+        .set(phaseText, { text: "STEP 2 • META-PLANNER DECOMPOSITION" })
+        .fromTo("#sc2", { opacity: 0, scale: 0.95 }, { opacity: 1, scale: 1, duration: 0.6, ease: "power3.out" })
+        .fromTo("#p1", { x: -40, opacity: 0 }, { x: 0, opacity: 1, duration: 0.5, ease: "back.out(1.5)" })
+        .fromTo("#p2", { x: -40, opacity: 0 }, { x: 0, opacity: 1, duration: 0.5, ease: "back.out(1.5)" }, "-=0.2")
+        .fromTo("#p3", { x: -40, opacity: 0 }, { x: 0, opacity: 1, duration: 0.5, ease: "back.out(1.5)" }, "-=0.2")
+        .to("#sc2", { opacity: 0, scale: 0.95, duration: 0.5, delay: 2.5, onStart: () => SFX.whoosh() })
+
+        // ── STEP 3: Worker 1 (Bronze PySpark Code Stream) (5.5s) ──
+        .set(phaseText, { text: "STEP 3 • WORKER 1: BRONZE CODE STREAMING" })
+        .fromTo("#sc3", { opacity: 0, scale: 0.95 }, { opacity: 1, scale: 1, duration: 0.6, ease: "power3.out" })
+        .fromTo("#tok1", { x: -50, opacity: 0 }, { x: 0, opacity: 1, duration: 0.5, ease: "back.out(1.5)" })
+        .fromTo("#sp1", { left: "-100%" }, { left: "100%", duration: 0.5, ease: "power1.inOut" })
+        .fromTo("#sp2", { left: "-100%" }, { left: "100%", duration: 0.5, ease: "power1.inOut" })
+        .to("#codeBronze", {
+            duration: 2.2,
+            text: "df = spark.read.format('parquet').load('sap_vbak')\ndf.write.format('delta').mode('append').saveAsTable('lh_sales_bronze')",
+            ease: "none",
+            onUpdate: () => { if (Math.random() > 0.65) SFX.typeKey(); }
+        })
+        .to("#sc3", { opacity: 0, scale: 0.95, duration: 0.5, delay: 2.5, onStart: () => SFX.whoosh() })
+
+        // ── STEP 4: Forward-Chaining Handoff (4s) ──
+        .set(phaseText, { text: "STEP 4 • FORWARD-CHAINING TOKEN HANDOFF" })
+        .fromTo("#sc4", { opacity: 0, scale: 0.95 }, { opacity: 1, scale: 1, duration: 0.6, ease: "power3.out" })
+        .fromTo("#tokPass", { scale: 0.5, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.6, ease: "back.out(1.8)" })
+        .to("#sc4", { opacity: 0, scale: 0.95, duration: 0.5, delay: 2.5, onStart: () => SFX.whoosh() })
+
+        // ── STEP 5: Worker 2 (Silver Delta MERGE Stream) (5.5s) ──
+        .set(phaseText, { text: "STEP 5 • WORKER 2: SILVER DELTA MERGE" })
+        .fromTo("#sc5", { opacity: 0, scale: 0.95 }, { opacity: 1, scale: 1, duration: 0.6, ease: "power3.out" })
+        .fromTo("#sp3", { left: "-100%" }, { left: "100%", duration: 0.5, ease: "power1.inOut" })
+        .to("#codeSilver", {
+            duration: 2.2,
+            text: "target = DeltaTable.forPath(spark, 'lh_sales_silver')\ntarget.alias('tgt').merge(df_updates.alias('src'), 'tgt.order_id = src.order_id')\n  .whenMatchedUpdateAll().whenNotMatchedInsertAll().execute()",
+            ease: "none",
+            onUpdate: () => { if (Math.random() > 0.65) SFX.typeKey(); }
+        })
+        .to("#sc5", { opacity: 0, scale: 0.95, duration: 0.5, delay: 2.5, onStart: () => SFX.whoosh() })
+
+        // ── STEP 6: Worker 3 (Gold Fabric REST Deployment) (4.5s) ──
+        .set(phaseText, { text: "STEP 6 • WORKER 3: FABRIC REST DEPLOYMENT" })
+        .fromTo("#sc6", { opacity: 0, scale: 0.95 }, { opacity: 1, scale: 1, duration: 0.6, ease: "power3.out" })
+        .fromTo("#sp4", { left: "-100%" }, { left: "100%", duration: 0.5, ease: "power1.inOut" })
+        .to("#sc6", { opacity: 0, scale: 0.95, duration: 0.5, delay: 2.8, onStart: () => SFX.whoosh() })
+
+        // ── STEP 7: Auditor Verification & Climax (5s) ──
+        .set(phaseText, { text: "STEP 7 • AUDITOR VERIFICATION & DEPLOYED" })
+        .fromTo("#sc7", { opacity: 0, scale: 0.92 }, { opacity: 1, scale: 1, duration: 0.7, ease: "back.out(1.5)",
+            onComplete: () => {
+                SFX.chime();
+                confetti({ particleCount: 160, spread: 90, origin: { y: 0.6 } });
+            }
+        })
+        .to("#sc7", { opacity: 0, scale: 0.95, duration: 0.6, delay: 4, onStart: () => SFX.whoosh() });
+
+        // Update Timeline
+        tl.eventCallback("onUpdate", () => {
+            const progress = tl.progress() * 100;
+            timelineFill.style.width = progress + "%";
+            const curSec = Math.floor(tl.time()).toString().padStart(2, '0');
+            const totSec = Math.floor(tl.duration()).toString().padStart(2, '0');
+            cinemaTimer.textContent = `00:${curSec} / 00:${totSec}`;
+        });
+
+        // Controls
+        const btnPlay = document.getElementById('btnPlayPause');
+        btnPlay.addEventListener('click', () => {
+            if (tl.paused()) { tl.play(); btnPlay.textContent = "❚❚ Pause"; }
+            else { tl.pause(); btnPlay.textContent = "▶ Play"; }
+        });
+
+        document.getElementById('timelineTrack').addEventListener('click', (e) => {
+            const rect = e.currentTarget.getBoundingClientRect();
+            const pos = (e.clientX - rect.left) / rect.width;
+            tl.progress(pos);
+        });
+    </script>
+</body>
+</html>

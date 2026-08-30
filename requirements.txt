@@ -1,0 +1,20 @@
+# Fabric AI Studio — Python Dependencies
+# Install with: pip install -r requirements.txt
+
+# HTTP + API
+requests>=2.31.0
+
+# Environment variable loading from .env file
+python-dotenv>=1.0.0
+
+# LLM Providers (install only what you have API keys for)
+anthropic>=0.34.0        # Claude Sonnet — recommended for code gen
+openai>=1.35.0           # GPT-4o
+google-generativeai>=0.7.0  # Gemini Flash
+
+# Source Connector & SQL Parsing
+pyodbc>=5.0.0            # Azure SQL / SQL Server connector
+sqlglot>=25.0.0          # Pure-Python SQL AST parser, transpiler & lineage
+
+# Testing
+pytest>=9.0.0

@@ -1,0 +1,41 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Environment & Secrets — NEVER commit these
+.env
+*.env.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs & DB
+*.log
+logs/
+*.db
+
+# Reference Repos & Archives
+_reference_repos/
+_deleted_archive/
+scratch/
+claude_response.txt
+
+# Test artifacts
+.pytest_cache/
+.coverage
+htmlcov/
