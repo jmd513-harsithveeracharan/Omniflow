@@ -459,7 +459,7 @@ class FabricAIHandler(http.server.SimpleHTTPRequestHandler):
             if data:
                 _json_response(self, data, session_id=sid)
             else:
-                _json_response(self, {"error": f"Conversation '{sid}' not found"}, 404, session_id=session_id)
+                _json_response(self, {"success": False, "notFound": True, "messages": []}, 200, session_id=session_id)
 
         elif path.startswith("/api/ingestion/status/"):
             run_id = _extract_run_id(path, "/api/ingestion/status/")
