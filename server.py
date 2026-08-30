@@ -774,6 +774,28 @@ class FabricAIHandler(http.server.SimpleHTTPRequestHandler):
             else:
                 _json_response(self, {"success": False, "error": "Invalid master PIN/password."}, status=401, session_id=current_session_id)
 
+        elif path == "/api/connectors/ai-generate":
+            from connectors.jit_connector_factory import ai_synthesize_from_prompt
+            prompt_text = body.get("prompt", "").strip()
+            if not prompt_text:
+                _json_response(self, {"error": "Prompt cannot be empty."}, 400, session_id=current_session_id)
+            else:
+                synth = ai_synthesize_from_prompt(prompt_text)
+                _json_response(self, {"success": True, "connector": synth}, session_id=current_session_id)
+
+        elif path == "/api/connectors/custom/save":
+            from connectors.jit_connector_factory import save_custom_connector
+            from connectors.connector_registry import reload_connectors
+            connector_def = body.get("connector", body)
+            saved_instance = save_custom_connector(connector_def)
+            reload_connectors()
+            _json_response(self, {
+                "success": True, 
+                "source_id": saved_instance.source_id,
+                "name": saved_instance.name,
+                "info": saved_instance.to_info_dict()
+            }, session_id=current_session_id)
+
         # ── Auth & Workspace Management ──────────────────────────────────────
         elif path == "/api/auth/refresh":
             from app.auth import clear_token_cache, get_auth_status

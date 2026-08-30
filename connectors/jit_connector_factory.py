@@ -15,6 +15,7 @@ connectors/jit_connector_factory.py — Enterprise Dynamic JIT Connector Synthes
 
 import os
 import re
+import json
 from typing import Dict, Any, List, Optional
 from connectors.base_connector import BaseConnector
 
@@ -324,9 +325,163 @@ else:
 """
 
 
+CUSTOM_CONNECTORS_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "scratch")
+CUSTOM_CONNECTORS_FILE = os.path.join(CUSTOM_CONNECTORS_DIR, "custom_connectors.json")
+
+
+def load_custom_connectors() -> Dict[str, Any]:
+    """Loads saved custom user-defined connectors from disk."""
+    if not os.path.exists(CUSTOM_CONNECTORS_FILE):
+        return {}
+    try:
+        with open(CUSTOM_CONNECTORS_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+
+def save_custom_connector(connector_def: Dict[str, Any]) -> BaseConnector:
+    """Saves a new custom connector definition and returns the synthesized instance."""
+    os.makedirs(CUSTOM_CONNECTORS_DIR, exist_ok=True)
+    all_custom = load_custom_connectors()
+    
+    source_id = connector_def.get("source_id", "").strip().lower().replace("-", "_").replace(" ", "_")
+    if not source_id:
+        source_id = connector_def.get("name", "custom_source").strip().lower().replace("-", "_").replace(" ", "_")
+    
+    all_custom[source_id] = {
+        "source_id": source_id,
+        "name": connector_def.get("name", source_id.title()),
+        "category": connector_def.get("category", "Custom Source"),
+        "default_port": connector_def.get("default_port", "5432"),
+        "driver_class": connector_def.get("driver_class", "org.postgresql.Driver"),
+        "jdbc_prefix": connector_def.get("jdbc_prefix", "jdbc:custom://"),
+        "required_params": connector_def.get("required_params", []),
+        "mock_tables": connector_def.get("mock_tables", [
+            {"schema": "public", "table": "records", "type": "TABLE", "full_name": "public.records", "est_rows": 100000}
+        ])
+    }
+    
+    with open(CUSTOM_CONNECTORS_FILE, "w", encoding="utf-8") as f:
+        json.dump(all_custom, f, indent=2, ensure_ascii=False)
+        
+    return DynamicJITConnector(source_id, all_custom[source_id])
+
+
+def ai_synthesize_from_prompt(prompt_text: str) -> Dict[str, Any]:
+    """
+    Intelligently analyzes a natural language prompt to generate a tailored connector definition:
+    - Extracts platform name, category, protocol, default port
+    - Formulates required parameter keys (Host, Port, DB, User, Secret/API Keys)
+    """
+    text_lower = prompt_text.lower()
+    
+    # 1. Detect Category & Platform Name
+    if any(k in text_lower for k in ["clickhouse"]):
+        source_id = "clickhouse"
+        name = "ClickHouse Cloud Analytics"
+        category = "Cloud Data Warehouse"
+        port = "8443" if "8443" in text_lower or "https" in text_lower else "8123"
+        driver = "com.clickhouse.jdbc.ClickHouseDriver"
+        prefix = "jdbc:clickhouse://"
+        params = [
+            {"key": "host", "label": "Cluster Host", "type": "text", "placeholder": "xxx.clickhouse.cloud"},
+            {"key": "port", "label": "Port", "type": "text", "placeholder": port, "default": port},
+            {"key": "database", "label": "Database", "type": "text", "placeholder": "default", "default": "default"},
+            {"key": "username", "label": "User ID", "type": "text", "placeholder": "default"},
+            {"key": "password", "label": "Password / Token", "type": "password", "placeholder": "••••••••••••"}
+        ]
+    elif any(k in text_lower for k in ["hubspot", "crm"]):
+        source_id = "hubspot"
+        name = "HubSpot CRM"
+        category = "Enterprise SaaS API"
+        port = "443"
+        driver = "generic_rest_oauth"
+        prefix = "https://"
+        params = [
+            {"key": "access_token", "label": "Private App Access Token", "type": "password", "placeholder": "pat-na1-..."},
+            {"key": "api_domain", "label": "API Domain", "type": "text", "placeholder": "api.hubapi.com", "default": "api.hubapi.com"}
+        ]
+    elif any(k in text_lower for k in ["mongo", "document"]):
+        source_id = "mongodb"
+        name = "MongoDB Atlas / NoSQL"
+        category = "NoSQL Database"
+        port = "27017"
+        driver = "mongodb.spark.connector"
+        prefix = "mongodb+srv://"
+        params = [
+            {"key": "connection_uri", "label": "Connection URI", "type": "password", "placeholder": "mongodb+srv://user:pass@cluster.mongodb.net/"},
+            {"key": "database", "label": "Database Name", "type": "text", "placeholder": "production"},
+            {"key": "collection", "label": "Collection Name", "type": "text", "placeholder": "events"}
+        ]
+    elif any(k in text_lower for k in ["elastic", "opensearch"]):
+        source_id = "elasticsearch"
+        name = "Elasticsearch / OpenSearch"
+        category = "Search & Log Engine"
+        port = "9200"
+        driver = "org.elasticsearch.spark.sql"
+        prefix = "https://"
+        params = [
+            {"key": "endpoint", "label": "Cluster Endpoint", "type": "text", "placeholder": "https://es-cluster.corp.internal:9200"},
+            {"key": "api_key", "label": "API Key / Token", "type": "password", "placeholder": "••••••••••••"},
+            {"key": "index_pattern", "label": "Index Pattern", "type": "text", "placeholder": "logs-*"}
+        ]
+    elif any(k in text_lower for k in ["kafka", "redpanda", "confluent"]):
+        source_id = "kafka"
+        name = "Apache Kafka / Confluent"
+        category = "Streaming & Event Broker"
+        port = "9092"
+        driver = "spark-sql-kafka"
+        prefix = ""
+        params = [
+            {"key": "bootstrap_servers", "label": "Bootstrap Servers", "type": "text", "placeholder": "broker1:9092,broker2:9092"},
+            {"key": "topic", "label": "Topic Name", "type": "text", "placeholder": "telemetry-events"},
+            {"key": "api_key", "label": "API Key / User", "type": "text", "placeholder": "••••••••"},
+            {"key": "api_secret", "label": "API Secret", "type": "password", "placeholder": "••••••••••••"}
+        ]
+    else:
+        # Generic Custom DB Inference
+        clean_words = [w for w in re.sub(r'[^a-zA-Z0-9\s]', '', prompt_text).split() if len(w) > 2]
+        title_name = " ".join(clean_words[:3]).title() or "Custom Enterprise Platform"
+        source_id = re.sub(r'[^a-z0-9_]', '', title_name.lower().replace(" ", "_"))
+        category = "Relational Database" if "sql" in text_lower or "db" in text_lower else "Custom Data Source"
+        port = "5432"
+        for w in prompt_text.split():
+            if w.isdigit() and len(w) in (2, 3, 4, 5):
+                port = w
+                break
+        driver = "org.postgresql.Driver"
+        prefix = "jdbc:custom://"
+        params = [
+            {"key": "host", "label": "Host / Endpoint", "type": "text", "placeholder": "host.corp.internal"},
+            {"key": "port", "label": "Port", "type": "text", "placeholder": port, "default": port},
+            {"key": "database", "label": "Database / Service", "type": "text", "placeholder": "analytics_db"},
+            {"key": "username", "label": "User ID / Client Key", "type": "text", "placeholder": "svc_fabric_user"},
+            {"key": "password", "label": "Password / Secret Key", "type": "password", "placeholder": "••••••••••••"}
+        ]
+        
+    return {
+        "source_id": source_id,
+        "name": name if 'name' in locals() else title_name,
+        "category": category,
+        "default_port": port,
+        "driver_class": driver,
+        "jdbc_prefix": prefix,
+        "required_params": params,
+        "generated_from_prompt": prompt_text
+    }
+
+
 def synthesize_connector(source_slug: str) -> BaseConnector:
-    """Creates a new JIT connector matching the requested source archetype."""
+    """Creates a new JIT connector matching the requested source archetype or custom saved definition."""
     normalized = source_slug.lower().replace("-", "_").replace(" ", "_")
+    
+    # 1. Check custom user-defined connectors first
+    custom_connectors = load_custom_connectors()
+    if normalized in custom_connectors:
+        return DynamicJITConnector(normalized, custom_connectors[normalized])
+        
+    # 2. Check built-in archetypes
     archetype = ARCHETYPE_TEMPLATES.get(normalized, {
         "name": source_slug.title(),
         "category": "Relational Database",

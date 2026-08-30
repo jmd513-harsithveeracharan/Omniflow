@@ -90,7 +90,10 @@ class BaseConnector(ABC):
         """Returns connector metadata for the /api/connectors endpoint."""
         return {
             "id": self.source_id,
+            "source_id": self.source_id,
             "name": self.name,
+            "category": getattr(self, "category", "Database"),
+            "default_port": getattr(self, "default_port", "5432"),
             "icon_svg": self.icon_svg,
             "required_params": self.required_params,
         }

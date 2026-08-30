@@ -53,6 +53,16 @@ def _load_all_connectors():
                 except Exception as e:
                     print(f"[REGISTRY] Failed to instantiate {cls.__name__}: {e}")
 
+    # Load custom user-defined connectors from disk
+    try:
+        from connectors.jit_connector_factory import load_custom_connectors, DynamicJITConnector
+        custom_map = load_custom_connectors()
+        for sid, cdef in custom_map.items():
+            _REGISTRY[sid] = DynamicJITConnector(sid, cdef)
+            print(f"[REGISTRY] Loaded custom connector: {sid} ({cdef.get('name')})")
+    except Exception as e:
+        print(f"[REGISTRY] Could not load custom connectors: {e}")
+
 
 # Load connectors on module import
 _load_all_connectors()
