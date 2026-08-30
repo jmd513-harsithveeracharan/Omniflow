@@ -5670,14 +5670,12 @@ window.openAddConnectorModal = function() {
     const modal = document.getElementById('modalAddCustomConnector');
     if (modal) {
         modal.style.display = 'flex';
-        // Initialize with standard parameters if empty
         const list = document.getElementById('customConnParamsList');
         if (list && list.children.length === 0) {
-            window.addParamRow('host', 'Server Host', 'text', 'host.domain.com');
-            window.addParamRow('port', 'Port', 'number', '5432');
-            window.addParamRow('database', 'Database', 'text', 'main_db');
-            window.addParamRow('username', 'User ID', 'text', 'db_user');
-            window.addParamRow('password', 'Password / Secret', 'password', '••••••••••••');
+            window.addParamRow('Server Host / URL', 'text');
+            window.addParamRow('Database / Instance', 'text');
+            window.addParamRow('User ID', 'text');
+            window.addParamRow('Password', 'password');
         }
     }
 };
@@ -5687,20 +5685,19 @@ window.closeAddConnectorModal = function() {
     if (modal) modal.style.display = 'none';
 };
 
-window.addParamRow = function(key = '', label = '', type = 'text', placeholder = '') {
+window.addParamRow = function(label = '', type = 'text') {
     const list = document.getElementById('customConnParamsList');
     if (!list) return;
     const row = document.createElement('div');
     row.className = 'key-value-row';
     row.innerHTML = `
-        <input type="text" class="claude-modal-input param-key" placeholder="Key (e.g. host)" value="${escapeHtml(key)}" />
-        <input type="text" class="claude-modal-input param-label" placeholder="Display Label" value="${escapeHtml(label || key)}" />
+        <input type="text" class="claude-modal-input param-label" placeholder="Field name (e.g. Host, User ID, Password, API Key)" value="${escapeHtml(label)}" style="grid-column: span 2;" />
         <select class="claude-modal-select param-type">
             <option value="text" ${type === 'text' ? 'selected' : ''}>Text</option>
             <option value="password" ${type === 'password' ? 'selected' : ''}>Password 🔒</option>
             <option value="number" ${type === 'number' ? 'selected' : ''}>Number</option>
         </select>
-        <button type="button" class="btn-remove-kv" title="Remove Parameter" onclick="this.parentElement.remove();">
+        <button type="button" class="btn-remove-kv" title="Remove Field" onclick="this.parentElement.remove();">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
         </button>
     `;
@@ -5746,20 +5743,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (data.success && data.connector) {
                     const c = data.connector;
                     const nameInput = document.getElementById('inputCustomConnName');
-                    const catSelect = document.getElementById('selectCustomConnCategory');
-                    const portInput = document.getElementById('inputCustomConnPort');
-                    const driverInput = document.getElementById('inputCustomConnDriver');
                     if (nameInput) nameInput.value = c.name || '';
-                    if (catSelect && c.category) catSelect.value = c.category;
-                    if (portInput) portInput.value = c.default_port || '5432';
-                    if (driverInput) driverInput.value = c.driver_class || 'org.postgresql.Driver';
 
                     // Clear and populate dynamic rows
                     const list = document.getElementById('customConnParamsList');
                     if (list) {
                         list.innerHTML = '';
                         (c.required_params || []).forEach(p => {
-                            window.addParamRow(p.key, p.label, p.type || 'text', p.placeholder || '');
+                            window.addParamRow(p.label || p.key, p.type || 'text');
                         });
                     }
                 } else {
@@ -5769,7 +5760,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 alert('Request failed: ' + err.message);
             } finally {
                 btnAi.disabled = false;
-                btnAi.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg><span>Generate</span>';
+                btnAi.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg><span>Generate</span>';
             }
         });
     }
@@ -5783,19 +5774,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 alert('Please enter a connector name.');
                 return;
             }
-            const category = document.getElementById('selectCustomConnCategory')?.value || 'Custom Data Source';
-            const default_port = document.getElementById('inputCustomConnPort')?.value.trim() || '5432';
-            const driver_class = document.getElementById('inputCustomConnDriver')?.value.trim() || 'org.postgresql.Driver';
 
             const paramRows = document.querySelectorAll('#customConnParamsList .key-value-row');
             const required_params = [];
             paramRows.forEach(row => {
-                const key = row.querySelector('.param-key')?.value.trim();
-                const label = row.querySelector('.param-label')?.value.trim() || key;
+                const label = row.querySelector('.param-label')?.value.trim();
                 const type = row.querySelector('.param-type')?.value || 'text';
-                if (key) {
+                if (label) {
+                    const key = label.toLowerCase().replace(/[^a-z0-9_]/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '');
                     required_params.push({
-                        key: key,
+                        key: key || 'param',
                         label: label,
                         type: type,
                         placeholder: type === 'password' ? '••••••••••••' : `Enter ${label}`
@@ -5812,9 +5800,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     body: JSON.stringify({
                         connector: {
                             name: name,
-                            category: category,
-                            default_port: default_port,
-                            driver_class: driver_class,
                             required_params: required_params
                         }
                     })
@@ -5823,7 +5808,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (data.success) {
                     alert(`Connector '${name}' registered successfully!`);
                     window.closeAddConnectorModal();
-                    // Trigger table refresh if available
                     if (window.loadConnectorsTable) window.loadConnectorsTable();
                 } else {
                     alert('Save failed: ' + (data.error || 'Unknown error'));
@@ -5832,7 +5816,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 alert('Save request failed: ' + err.message);
             } finally {
                 btnSave.disabled = false;
-                btnSave.textContent = 'Save & Register Connector';
+                btnSave.textContent = 'Save & register connector';
             }
         });
     }

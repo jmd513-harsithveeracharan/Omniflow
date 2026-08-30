@@ -348,11 +348,27 @@ def save_custom_connector(connector_def: Dict[str, Any]) -> BaseConnector:
     source_id = connector_def.get("source_id", "").strip().lower().replace("-", "_").replace(" ", "_")
     if not source_id:
         source_id = connector_def.get("name", "custom_source").strip().lower().replace("-", "_").replace(" ", "_")
-    
+
+    name = connector_def.get("name", source_id.title())
+    category = connector_def.get("category")
+    if not category:
+        if any(k in source_id for k in ["sap", "hana"]):
+            category = "Enterprise ERP"
+        elif any(k in source_id for k in ["sql", "postgres", "mysql", "oracle", "db"]):
+            category = "Relational Database"
+        elif any(k in source_id for k in ["hubspot", "salesforce", "shopify", "api", "rest", "crm"]):
+            category = "Enterprise SaaS API"
+        elif any(k in source_id for k in ["kafka", "queue", "stream", "event"]):
+            category = "Streaming & Event Broker"
+        elif any(k in source_id for k in ["snowflake", "redshift", "clickhouse", "bigquery"]):
+            category = "Cloud Data Warehouse"
+        else:
+            category = "Custom Data Source"
+
     all_custom[source_id] = {
         "source_id": source_id,
-        "name": connector_def.get("name", source_id.title()),
-        "category": connector_def.get("category", "Custom Source"),
+        "name": name,
+        "category": category,
         "default_port": connector_def.get("default_port", "5432"),
         "driver_class": connector_def.get("driver_class", "org.postgresql.Driver"),
         "jdbc_prefix": connector_def.get("jdbc_prefix", "jdbc:custom://"),
@@ -377,7 +393,33 @@ def ai_synthesize_from_prompt(prompt_text: str) -> Dict[str, Any]:
     text_lower = prompt_text.lower()
     
     # 1. Detect Category & Platform Name
-    if any(k in text_lower for k in ["clickhouse"]):
+    if any(k in text_lower for k in ["sap", "hana", "s4hana", "ecc"]):
+        source_id = "sap_hana"
+        name = "SAP S/4HANA & ERP"
+        category = "Enterprise ERP"
+        port = "30015"
+        driver = "com.sap.db.jdbc.Driver"
+        prefix = "jdbc:sap://"
+        params = [
+            {"key": "host", "label": "SAP Host / Gateway URL", "type": "text", "placeholder": "sap-server.corp.internal"},
+            {"key": "client_number", "label": "Client Number", "type": "text", "placeholder": "100", "default": "100"},
+            {"key": "system_id", "label": "System ID / Instance", "type": "text", "placeholder": "PRD"},
+            {"key": "username", "label": "User ID", "type": "text", "placeholder": "SAP_INGEST_USER"},
+            {"key": "password", "label": "Password", "type": "password", "placeholder": "••••••••••••"}
+        ]
+    elif any(k in text_lower for k in ["shopify", "e-commerce"]):
+        source_id = "shopify"
+        name = "Shopify Store API"
+        category = "Enterprise SaaS API"
+        port = "443"
+        driver = "generic_rest_oauth"
+        prefix = "https://"
+        params = [
+            {"key": "store_domain", "label": "Store Domain", "type": "text", "placeholder": "my-store.myshopify.com"},
+            {"key": "admin_api_token", "label": "Admin API Access Token", "type": "password", "placeholder": "shpat_xxxxxxxx"},
+            {"key": "api_version", "label": "API Version", "type": "text", "placeholder": "2024-01", "default": "2024-01"}
+        ]
+    elif any(k in text_lower for k in ["clickhouse"]):
         source_id = "clickhouse"
         name = "ClickHouse Cloud Analytics"
         category = "Cloud Data Warehouse"
