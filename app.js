@@ -159,6 +159,31 @@ function initNavigation() {
         });
     });
 
+    document.getElementById('btnSidebarNewChat')?.addEventListener('click', () => {
+        switchView('viewArchitect');
+        if (window.startNewArchitectChat) {
+            window.startNewArchitectChat();
+        }
+    });
+
+    document.getElementById('navCustomize')?.addEventListener('click', (e) => {
+        e.preventDefault();
+        const settingsModal = document.getElementById('modalClaudeSettings');
+        if (settingsModal) {
+            settingsModal.style.display = 'flex';
+        }
+    });
+
+    // Chats Section Toggle
+    document.getElementById('chatsSectionHeader')?.addEventListener('click', () => {
+        const list = document.getElementById('sidebarRecentChatsList');
+        const chevron = document.getElementById('chatsCollapseToggle');
+        if (list) {
+            list.classList.toggle('collapsed');
+            chevron?.classList.toggle('collapsed', list.classList.contains('collapsed'));
+        }
+    });
+
     // Projects Section in Sidebar Controls
     document.getElementById('btnToggleSidebarProjects')?.addEventListener('click', (e) => {
         e.stopPropagation();

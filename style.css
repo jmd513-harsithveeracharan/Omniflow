@@ -399,7 +399,40 @@ nav.sidebar-nav {
     gap: 1px;
 }
 
-/* Sidebar Nav Links matching Claude style */
+/* + New Chat Button - Styled identically to nav items with active pill highlight */
+.sidebar-new-chat-btn {
+    width: 100%;
+    height: 34px;
+    background: transparent;
+    border: none;
+    border-radius: 8px;
+    color: #c4c7c5;
+    font-family: var(--font-sans);
+    font-size: 14px;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 8px;
+    margin-bottom: 0px;
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease;
+    flex-shrink: 0;
+    user-select: none;
+}
+
+.sidebar-new-chat-btn:hover {
+    background: #1e1f20;
+    color: #e3e3e3;
+}
+
+.sidebar-new-chat-btn.active {
+    background: #2d2e30;
+    color: #e3e3e3;
+}
+
+/* Sidebar Nav Items */
+.sidebar-nav .nav-item,
 .sidebar-nav-link {
     height: 34px;
     padding: 0 8px;
@@ -416,26 +449,16 @@ nav.sidebar-nav {
     user-select: none;
 }
 
+.sidebar-nav .nav-item:hover,
 .sidebar-nav-link:hover {
     background: #1e1f20;
     color: #e3e3e3;
 }
 
+.sidebar-nav .nav-item.active,
 .sidebar-nav-link.active {
     background: #2d2e30;
     color: #e3e3e3;
-}
-
-.nav-upgrade-badge {
-    margin-left: auto;
-    background: #182234;
-    color: #60a5fa;
-    border: 1px solid rgba(96, 165, 250, 0.25);
-    border-radius: 9999px;
-    padding: 1.5px 8px;
-    font-size: 11px;
-    font-weight: 600;
-    line-height: 1.3;
 }
 
 .nav-item-icon {
@@ -448,6 +471,10 @@ nav.sidebar-nav {
     color: #8e918f;
 }
 
+.sidebar-new-chat-btn:hover .nav-item-icon,
+.sidebar-new-chat-btn.active .nav-item-icon,
+.sidebar-nav .nav-item:hover .nav-item-icon,
+.sidebar-nav .nav-item.active .nav-item-icon,
 .sidebar-nav-link:hover .nav-item-icon,
 .sidebar-nav-link.active .nav-item-icon {
     color: #e3e3e3;
