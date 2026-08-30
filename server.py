@@ -563,6 +563,10 @@ class FabricAIHandler(http.server.SimpleHTTPRequestHandler):
                 }
             }, session_id=session_id)
 
+        elif path == "/api/vault/status":
+            from app.vault import vault
+            _json_response(self, {"vault_entries": vault.list_connector_statuses()}, session_id=session_id)
+
         elif path == "/api/governance/audit":
             audit_file = os.path.join(BASE_DIR, "audit_trail.json")
             trail = []
@@ -729,8 +733,49 @@ class FabricAIHandler(http.server.SimpleHTTPRequestHandler):
         mem = MemoryManager.get_or_create(session_id)
         current_session_id = mem.session_id
 
+        # ── Data Source Connectors & Zero-Leak Vault ─────────────────────────
+        if path in ("/api/connectors/diagnose", "/api/connector/diagnose"):
+            from connectors.network_doctor import NetworkDoctor
+            host = body.get("host", "")
+            port = body.get("port", 5432)
+            diag = NetworkDoctor.diagnose_target(host, port)
+            _json_response(self, diag, session_id=current_session_id)
+
+        elif path in ("/api/connectors/discover", "/api/connector/discover"):
+            from connectors.connector_registry import get_connector
+            source_id = body.get("source_id", "postgres")
+            conn = get_connector(source_id)
+            tables_res = conn.discover_tables(body.get("params", body))
+            _json_response(self, tables_res, session_id=current_session_id)
+
+        elif path in ("/api/connectors/schema", "/api/connector/schema"):
+            from connectors.connector_registry import get_connector
+            source_id = body.get("source_id", "postgres")
+            table = body.get("table", "orders")
+            conn = get_connector(source_id)
+            schema_res = conn.get_schema(table, body.get("params", body))
+            _json_response(self, schema_res, session_id=current_session_id)
+
+        elif path in ("/api/vault/save", "/api/vault/store"):
+            from app.vault import vault
+            source_id = body.get("source_id", "")
+            creds = body.get("credentials", {})
+            master_pin = body.get("master_pin")
+            success = vault.save_connector_credentials(source_id, creds, master_pin)
+            _json_response(self, {"success": success, "source_id": source_id}, session_id=current_session_id)
+
+        elif path in ("/api/vault/unlock", "/api/vault/verify"):
+            from app.vault import vault
+            master_pin = body.get("master_pin", "")
+            is_valid = vault.verify_master_password(master_pin)
+            if is_valid:
+                entries = vault.list_connector_statuses(master_pin)
+                _json_response(self, {"success": True, "entries": entries}, session_id=current_session_id)
+            else:
+                _json_response(self, {"success": False, "error": "Invalid master PIN/password."}, status=401, session_id=current_session_id)
+
         # ── Auth & Workspace Management ──────────────────────────────────────
-        if path == "/api/auth/refresh":
+        elif path == "/api/auth/refresh":
             from app.auth import clear_token_cache, get_auth_status
             clear_token_cache()
             _json_response(self, {"success": True, "auth": get_auth_status()}, session_id=current_session_id)
