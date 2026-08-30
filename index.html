@@ -7,7 +7,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;600;700&family=Google+Sans+Text:wght@400;500;600&family=Inter:wght@400;500;600;700&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400;1,6..72,500&family=Roboto+Mono:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=540">
+    <link rel="stylesheet" href="style.css?v=550">
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%231a73e8'/%3E%3Cpath d='M8 16 L16 8 L24 16 L16 24 Z' fill='white'/%3E%3Cpath d='M12 16 L16 12 L20 16 L16 20 Z' fill='%231a73e8'/%3E%3C/svg%3E">
 </head>
 <body class="dark-theme">
@@ -2046,47 +2046,25 @@
 <div class="sso-modal-backdrop" id="modalNewProject" style="display: none;" onclick="if(event.target===this) window.closeNewProjectModal();">
     <div class="project-modal-card">
         <div class="project-modal-header">
-            <div class="project-modal-title-group">
-                <div class="project-modal-icon-badge">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
-                </div>
-                <div>
-                    <h3 class="project-modal-title">Create project</h3>
-                    <p class="project-modal-sub">Dedicated workspace with custom prompt grounding and table lineage</p>
-                </div>
-            </div>
-            <button class="btn-close-modal-icon" id="btnCloseNewProjectModal" type="button" onclick="window.closeNewProjectModal();"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+            <h3 class="project-modal-title">Create a Project</h3>
+            <button class="btn-subtle-icon btn-close-modal-icon" id="btnCloseNewProjectModal" type="button" onclick="window.closeNewProjectModal();"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
         </div>
 
         <div class="project-modal-body">
             <div class="project-field-group">
-                <label class="project-field-label">Project name <span class="req-star">*</span></label>
+                <label class="project-field-label">PROJECT NAME <span class="req-star">*</span></label>
                 <input type="text" class="project-input" id="inputProjectName" placeholder="e.g. Retail Medallion Platform" autocomplete="off">
             </div>
 
             <div class="project-field-group">
-                <label class="project-field-label">Description</label>
-                <input type="text" class="project-input" id="inputProjectDesc" placeholder="e.g. End-to-end ingestion and star schema modeling for POS data" autocomplete="off">
-            </div>
-
-            <div class="project-field-group">
-                <label class="project-field-label">Target Lakehouse / Workspace</label>
-                <select class="project-select" id="selectProjectTargetLakehouse">
-                    <option value="lh_retail_bronze">lh_retail_bronze (Raw Delta Lake)</option>
-                    <option value="lh_retail_silver">lh_retail_silver (Cleaned Delta Upserts)</option>
-                    <option value="lh_retail_gold">lh_retail_gold (Semantic Aggregations)</option>
-                </select>
-            </div>
-
-            <div class="project-field-group">
-                <label class="project-field-label">Custom Project Instructions (Optional)</label>
-                <textarea class="project-textarea" id="inputProjectInstructions" placeholder="e.g. Always write idempotent PySpark merge statements with primary keys..."></textarea>
+                <label class="project-field-label">DESCRIPTION</label>
+                <textarea class="project-textarea" id="inputProjectDesc" rows="4" placeholder="e.g. End-to-end ingestion and star schema modeling for POS data"></textarea>
             </div>
         </div>
 
         <div class="project-modal-footer">
             <button class="project-btn-cancel" id="btnCancelNewProject" type="button" onclick="window.closeNewProjectModal();">Cancel</button>
-            <button class="project-btn-create" id="btnSubmitNewProject" type="button">Create project</button>
+            <button class="project-btn-create" id="btnSubmitNewProject" type="button">Create a Project</button>
         </div>
     </div>
 </div>
@@ -2157,6 +2135,6 @@
 </div>
 
 <script src="flow_renderer.js?v=310"></script>
-<script src="app.js?v=540"></script>
+<script src="app.js?v=550"></script>
 </body>
 </html>

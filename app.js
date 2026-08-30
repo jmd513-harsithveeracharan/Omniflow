@@ -5882,12 +5882,26 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
 
-        const handleNewProject = () => {
-            // Placeholder trigger for project creation modal/step
-            showToast('Project creation flow will be configured next!', 'info');
+        window.openNewProjectModal = function() {
+            const modal = document.getElementById('modalNewProject');
+            if (modal) {
+                modal.style.display = 'flex';
+                const nameInput = document.getElementById('inputProjectName');
+                if (nameInput) {
+                    nameInput.value = '';
+                    setTimeout(() => nameInput.focus(), 50);
+                }
+                const descInput = document.getElementById('inputProjectDesc');
+                if (descInput) descInput.value = '';
+            }
         };
 
-        btnNewTop?.addEventListener('click', handleNewProject);
-        btnNewCenter?.addEventListener('click', handleNewProject);
+        window.closeNewProjectModal = function() {
+            const modal = document.getElementById('modalNewProject');
+            if (modal) modal.style.display = 'none';
+        };
+
+        btnNewTop?.addEventListener('click', window.openNewProjectModal);
+        btnNewCenter?.addEventListener('click', window.openNewProjectModal);
     };
 });
