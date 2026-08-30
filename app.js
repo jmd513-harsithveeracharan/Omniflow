@@ -5819,4 +5819,26 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     }
+
+    // ── GLOBAL ESCAPE KEY MODAL CLOSER ──
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' || e.key === 'Esc') {
+            const customModal = document.getElementById('modalAddCustomConnector');
+            if (customModal && customModal.style.display !== 'none') {
+                window.closeAddConnectorModal();
+                e.stopPropagation();
+                return;
+            }
+            const settingsModal = document.getElementById('modalClaudeSettings');
+            if (settingsModal && settingsModal.style.display !== 'none') {
+                settingsModal.style.display = 'none';
+                return;
+            }
+            const projectModal = document.getElementById('modalNewProject');
+            if (projectModal && projectModal.style.display !== 'none') {
+                window.closeNewProjectModal();
+                return;
+            }
+        }
+    });
 });
