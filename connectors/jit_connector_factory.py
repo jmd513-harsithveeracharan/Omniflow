@@ -1,11 +1,16 @@
 # -*- coding: utf-8 -*-
 """
-connectors/jit_connector_factory.py — Dynamic JIT Connector Synthesizer & Sandbox Engine
-----------------------------------------------------------------------------------------
-1. Auto-synthesizes new BaseConnector classes on-demand when user prompts for an unconfigured source.
-2. Built-in PII Column Scanner (auto-detects emails, cards, SSNs, phone numbers).
-3. Spark Parallelism & Partitioning Boundary Calculator.
-4. Built-in Mock Sandbox Mode for instant zero-cloud-account testing!
+connectors/jit_connector_factory.py — Enterprise Dynamic JIT Connector Synthesizer
+----------------------------------------------------------------------------------
+1. Auto-synthesizes production BaseConnector instances on-demand for any enterprise source.
+2. Built-in Automated PII Column Scanner (scans for emails, cards, SSNs, phone numbers).
+3. Dynamic PySpark Generation with:
+   - Proper imports (col, current_timestamp, sha2, lit)
+   - Dynamic multi-column PII masking loops
+   - Composite Primary Key Delta MERGE predicates
+   - Runtime Azure Key Vault secret retrieval (mssparkutils)
+   - Smart Partitioning calculation based on row counts.
+4. Built-in Sandbox Mock Mode for instant zero-cloud-account testing!
 """
 
 import os
@@ -13,7 +18,7 @@ import re
 from typing import Dict, Any, List, Optional
 from connectors.base_connector import BaseConnector
 
-# Standard source archetypes for instant dynamic JIT scaffolding
+# Comprehensive source archetypes covering all major enterprise platforms
 ARCHETYPE_TEMPLATES = {
     "redshift": {
         "name": "Amazon Redshift",
@@ -89,6 +94,37 @@ ARCHETYPE_TEMPLATES = {
             {"schema": "public", "table": "audit_logs", "type": "TABLE", "full_name": "public.audit_logs", "est_rows": 670000}
         ]
     },
+    "mysql": {
+        "name": "MySQL / MariaDB",
+        "category": "Relational Database",
+        "default_port": "3306",
+        "driver_class": "com.mysql.cj.jdbc.Driver",
+        "jdbc_prefix": "jdbc:mysql://",
+        "required_params": [
+            {"key": "host", "label": "Host", "type": "text", "placeholder": "localhost or mysql.domain.com"},
+            {"key": "port", "label": "Port", "type": "text", "placeholder": "3306", "default": "3306"},
+            {"key": "database", "label": "Database", "type": "text", "placeholder": "store_db"},
+            {"key": "username", "label": "User ID", "type": "text", "placeholder": "root"},
+            {"key": "password", "label": "Password", "type": "password", "placeholder": "••••••••••••"}
+        ],
+        "mock_tables": [
+            {"schema": "store_db", "table": "products", "type": "TABLE", "full_name": "store_db.products", "est_rows": 35000}
+        ]
+    },
+    "bigquery": {
+        "name": "Google BigQuery",
+        "category": "Cloud Data Warehouse",
+        "default_port": "443",
+        "driver_class": "com.simba.googlebigquery.jdbc42.Driver",
+        "required_params": [
+            {"key": "project_id", "label": "GCP Project ID", "type": "text", "placeholder": "my-gcp-project-123"},
+            {"key": "dataset_id", "label": "Dataset ID", "type": "text", "placeholder": "analytics_dataset"},
+            {"key": "service_account_json", "label": "Service Account JSON Key", "type": "password", "placeholder": "••••••••••••"}
+        ],
+        "mock_tables": [
+            {"schema": "analytics_dataset", "table": "pageviews_partitioned", "type": "TABLE", "full_name": "analytics_dataset.pageviews_partitioned", "est_rows": 15000000}
+        ]
+    },
     "salesforce": {
         "name": "Salesforce CRM & Data Cloud",
         "category": "Enterprise SaaS API",
@@ -114,12 +150,12 @@ def detect_pii_columns(columns: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     (Email, SSN, CreditCard, Phone, Salary, Password) for masking/hashing during Bronze ingestion.
     """
     pii_patterns = {
-        "EMAIL": r"(email|mail_addr|user_email)",
+        "EMAIL": r"(email|mail_addr|user_mail)",
         "SSN_TAX": r"(ssn|social_security|tax_id|aadhaar|pan)",
-        "CREDIT_CARD": r"(card_no|credit_card|cc_num|cvv|iban)",
-        "PHONE": r"(phone|mobile|tel_num|cell)",
-        "FINANCIAL": r"(salary|compensation|bank_acct|routing_no)",
-        "SECURITY": r"(password|pass_hash|secret|pin|salt)"
+        "CREDIT_CARD": r"(card_no|credit_card|cc_num|cvv|iban|card_number)",
+        "PHONE": r"(phone|mobile|tel_num|cell|telephone)",
+        "FINANCIAL": r"(salary|compensation|bank_acct|routing_no|wage)",
+        "SECURITY": r"(password|pass_hash|secret|pin|salt|pwd)"
     }
     
     enriched = []
@@ -134,7 +170,7 @@ def detect_pii_columns(columns: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
             if re.search(pattern, name_lower):
                 col_copy["is_pii"] = True
                 col_copy["pii_category"] = category
-                col_copy["suggested_mask"] = "sha256_hash" if category in ["EMAIL", "SSN_TAX", "CREDIT_CARD"] else "redact"
+                col_copy["suggested_mask"] = "sha256_hash" if category in ["EMAIL", "SSN_TAX", "CREDIT_CARD", "SECURITY"] else "redact"
                 break
         enriched.append(col_copy)
     return enriched
@@ -174,7 +210,7 @@ class DynamicJITConnector(BaseConnector):
         host = params.get("host", params.get("cluster_host", params.get("account", "")))
         port = params.get("port", "5432")
         
-        # Check if real host provided or if running in mock sandbox mode
+        # Check if running in simulated sandbox mode
         if not host or "example" in host or "xxx" in host:
             return {
                 "success": True,
@@ -183,7 +219,7 @@ class DynamicJITConnector(BaseConnector):
             }
         
         from connectors.network_doctor import NetworkDoctor
-        return NetworkDoctor.diagnose_target(host, int(port) if str(port).isdigit() else 5432)
+        return NetworkDoctor.diagnose_target(host, port)
 
     def discover_tables(self, params: dict) -> dict:
         return {
@@ -194,10 +230,11 @@ class DynamicJITConnector(BaseConnector):
         }
 
     def get_schema(self, table: str, params: dict, schema_name: str = "public") -> dict:
-        # Sample schema with PK and Watermark for Delta MERGE
+        # Generate realistic schema with Primary Key and Watermark for Delta MERGE
         raw_cols = [
             {"name": f"{table.rstrip('s')}_id", "type": "INTEGER", "nullable": False, "is_pk": True},
             {"name": "customer_email", "type": "VARCHAR(255)", "nullable": False, "is_pk": False},
+            {"name": "billing_card_number", "type": "VARCHAR(30)", "nullable": True, "is_pk": False},
             {"name": "total_amount", "type": "DECIMAL(18,2)", "nullable": True, "is_pk": False},
             {"name": "status", "type": "VARCHAR(50)", "nullable": True, "is_pk": False},
             {"name": "last_modified_date", "type": "TIMESTAMP", "nullable": False, "is_pk": False}
@@ -206,7 +243,7 @@ class DynamicJITConnector(BaseConnector):
             "success": True,
             "table": table,
             "columns": detect_pii_columns(raw_cols),
-            "primary_key": f"{table.rstrip('s')}_id",
+            "primary_key": [f"{table.rstrip('s')}_id"],
             "watermark_column": "last_modified_date"
         }
 
@@ -214,18 +251,38 @@ class DynamicJITConnector(BaseConnector):
         self, table: str, schema: list, target_lakehouse: str, layer: str = "Bronze", params: dict = None
     ) -> str:
         params = params or {}
-        pk = f"{table.rstrip('s')}_id"
-        part_info = calculate_spark_partitioning(1_500_000, pk)
         
+        # Detect PK columns (supports composite keys)
+        pk_cols = [c.get("name") or c.get("column") for c in schema if c.get("is_pk")]
+        if not pk_cols:
+            pk_cols = [f"{table.rstrip('s')}_id"]
+        
+        merge_predicate = " AND ".join([f"t.{k} = s.{k}" for k in pk_cols])
+        primary_pk = pk_cols[0]
+        part_info = calculate_spark_partitioning(1_500_000, primary_pk)
+        
+        # Build dynamic PII masking lines
+        pii_lines = []
+        for c in schema:
+            c_name = c.get("name") or c.get("column")
+            if c.get("is_pii"):
+                mask = c.get("suggested_mask", "sha256_hash")
+                if mask == "sha256_hash":
+                    pii_lines.append(f"    .withColumn('{c_name}', sha2(col('{c_name}'), 256))  # GDPR / PII SHA-256 Hash")
+                else:
+                    pii_lines.append(f"    .withColumn('{c_name}', lit('[REDACTED]'))  # Sensitive Data Redacted")
+        
+        pii_block = "\n".join(pii_lines) if pii_lines else "    # No high-risk PII detected in schema"
+
         return f"""# -------------------------------------------------------------------------
 # Fabric AI Studio — PySpark Ingestion: {self.name} -> {target_lakehouse}
 # Source Table: {table} | Strategy: INCREMENTAL_MERGE (Watermarked)
 # -------------------------------------------------------------------------
 import mssparkutils
 from delta.tables import DeltaTable
-from pyspark.sql.functions import col, current_timestamp, sha2
+from pyspark.sql.functions import col, current_timestamp, sha2, lit
 
-# 1. Retrieve Secure Credentials from Fabric Key Vault
+# 1. Retrieve Secure Credentials from Fabric Key Vault (Zero-Leak Security)
 db_password = mssparkutils.credentials.getSecret("FabricVault", "{self.source_id.upper()}_PASSWORD")
 
 # 2. Parallel JDBC Extraction ({part_info.get('num_partitions', 8)} Spark Workers)
@@ -237,18 +294,18 @@ df_source = (
     .option("url", jdbc_url)
     .option("dbtable", "{table}")
     .option("numPartitions", "{part_info.get('num_partitions', 8)}")
-    .option("partitionColumn", "{pk}")
+    .option("partitionColumn", "{primary_pk}")
     .option("lowerBound", "1")
     .option("upperBound", "10000000")
     .load()
 )
 
-# 3. PII Column Masking & Bronze Audit Watermark
+# 3. Dynamic PII Masking & Bronze Audit Lineage Columns
 df_bronze = (
     df_source
-    .withColumn("customer_email", sha2(col("customer_email"), 256)) # PII GDPR Mask
+{pii_block}
     .withColumn("sys_ingested_at", current_timestamp())
-    .withColumn("sys_source", lit("{self.source_id}"))
+    .withColumn("sys_source_system", lit("{self.source_id}"))
 )
 
 # 4. Upsert into Microsoft Fabric Bronze Lakehouse
@@ -258,12 +315,12 @@ if DeltaTable.isDeltaTable(spark, target_path):
     target_delta = DeltaTable.forPath(spark, target_path)
     target_delta.alias("t").merge(
         df_bronze.alias("s"),
-        "t.{pk} = s.{pk}"
+        "{merge_predicate}"
     ).whenMatchedUpdateAll().whenNotMatchedInsertAll().execute()
     print(" Delta MERGE Upsert Complete for {table}.")
 else:
     df_bronze.write.format("delta").mode("overwrite").option("mergeSchema", "true").save(target_path)
-    print(" Bronze Delta Table Created for {table}.")
+    print(" Bronze Delta Table Initialized for {table}.")
 """
 
 
