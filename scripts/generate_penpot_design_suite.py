@@ -46,8 +46,11 @@ PENPOT_JS_CODE = """
         const r = penpot.createRectangle();
         r.x = x; r.y = y;
         r.resize(w, h);
-        if (fill) r.fills = [{ fillColor: fill }];
-        else r.fills = [];
+        if (fill && fill !== "transparent" && fill !== "none") {
+            r.fills = [{ fillColor: fill }];
+        } else {
+            r.fills = [];
+        }
         if (radius) r.borderRadius = radius;
         if (stroke) {
             r.strokes = [{ strokeColor: stroke, strokeWidth: strokeW, strokeStyle: "solid", strokeAlignment: "center" }];
