@@ -243,6 +243,16 @@ def _heuristic_dag(prompt: str) -> StepDAG:
             steps.append(PipelineStep(step_id=sid, type="notebook", name=tok, layer="Notebook",
                                       description=f"PySpark notebook {tok}", depends_on=["step_folder"], can_parallel=True))
             nb_step_ids.append(sid)
+    elif "notebook" in prompt.lower():
+        algo_m = re.search(r"with\s+([A-Za-z0-9_\-]+)\s+code", prompt, re.IGNORECASE)
+        nb_m = re.search(r"notebook\s+(?:named\s+|called\s+)?([A-Za-z0-9_\-]+)", prompt, re.IGNORECASE)
+        name_cand = algo_m.group(1) if algo_m else (nb_m.group(1) if nb_m else "transform")
+        if not name_cand.startswith("nb_"):
+            name_cand = f"nb_{name_cand}"
+        sid = f"step_{name_cand.lower()}"
+        steps.append(PipelineStep(step_id=sid, type="notebook", name=name_cand, layer="Notebook",
+                                  description=f"PySpark algorithm notebook {name_cand}", depends_on=["step_folder"], can_parallel=True))
+        nb_step_ids.append(sid)
 
     lh_tokens = list(dict.fromkeys(re.findall(r"\b(lh_[a-zA-Z0-9_\-]+)\b", prompt, re.IGNORECASE)))
     for lh in lh_tokens:
@@ -258,8 +268,10 @@ def _heuristic_dag(prompt: str) -> StepDAG:
                                description=f"Pipeline {pl_name}", depends_on=nb_step_ids or ["step_folder"],
                                can_parallel=False))
 
+    nb_desc = f"{len(nb_step_ids)} notebook(s)" if nb_step_ids else "PySpark pipeline"
+    sched_text = sched.get("human", "Daily") if isinstance(sched, dict) else str(sched)
     return StepDAG(context_mode="independent", folder=folder, steps=steps,
-                   pipeline=pipeline_dict, summary=f"Heuristic plan for {folder}")
+                   pipeline=pipeline_dict, summary=f"Architecture plan for folder '{folder}' with {nb_desc} orchestrated by pipeline '{pl_name}' ({sched_text}).")
 
 
 # ---------------------------------------------------------------------------

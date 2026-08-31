@@ -150,7 +150,10 @@ import subprocess
 import shutil
 
 def _get_claude_cli_binary() -> str | None:
-    """Finds the Claude Code CLI executable path on the system."""
+    """Finds the Claude Code CLI executable path on the system, preferring native executable binary to avoid cmd batch truncation."""
+    direct_exe = r"C:\Users\BheesettiHarsithVeer\AppData\Roaming\npm\node_modules\@anthropic-ai\claude-code\bin\claude.exe"
+    if os.path.exists(direct_exe):
+        return direct_exe
     found = shutil.which("claude")
     if found:
         return found
@@ -170,15 +173,22 @@ def _call_claude_cli(messages: list, model: str = None, max_tokens: int = 4096) 
     system_prompts = [m["content"] for m in messages if m.get("role") == "system"]
     conversation_turns = [m for m in messages if m.get("role") != "system"]
 
-    sys_text = "\n\n".join(system_prompts).strip() if system_prompts else "You are Fabric AI Studio Data Engineering Assistant. Answer the user prompt directly."
+    sys_text = "\n\n".join(system_prompts).strip() if system_prompts else ""
 
     formatted_parts = []
-    for m in conversation_turns:
-        role = m.get("role", "user").upper()
-        formatted_parts.append(f"{role}:\n{m.get('content', '')}")
+    if sys_text:
+        formatted_parts.append(sys_text)
+
+    if conversation_turns:
+        if len(conversation_turns) == 1 and conversation_turns[0].get("role") == "user":
+            formatted_parts.append(f"USER REQUEST:\n{conversation_turns[0].get('content', '')}")
+        else:
+            for m in conversation_turns:
+                role = m.get("role", "user").upper()
+                formatted_parts.append(f"[{role}]:\n{m.get('content', '')}")
 
     full_prompt = "\n\n---\n\n".join(formatted_parts) if formatted_parts else "Hello"
-    cmd = [claude_bin, "-p", full_prompt, "--system-prompt", sys_text, "--tools", ""]
+    cmd = [claude_bin, "-p", full_prompt, "--tools", ""]
     if model:
         cmd.extend(["--model", model])
 
