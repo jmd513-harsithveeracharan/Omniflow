@@ -26,6 +26,7 @@ import os
 import json
 import time
 import threading
+from datetime import datetime, timezone
 import http.server
 import socketserver
 import urllib.parse
@@ -226,12 +227,64 @@ def _deploy_ingestion_async(run_id: str, plan: dict):
 
 # ── Background Deploy: Architect ──────────────────────────────────────────────
 
-def _deploy_architect_async(run_id: str, plan: dict):
+def format_plan_markdown(plan: dict) -> str:
+    """Formats an architecture plan dict into consistent rich Markdown for chat bubbles & storage."""
+    folder = plan.get("folder", "AI_Test_Folder")
+    msg = f"### 🏛️ Proposed Fabric Architecture: `{folder}`\n\n"
+
+    pl = plan.get("pipeline")
+    if pl:
+        if isinstance(pl, dict):
+            raw_sched = pl.get("schedule")
+            if isinstance(raw_sched, dict):
+                sched_display = raw_sched.get("human") or raw_sched.get("cron") or "Daily"
+            else:
+                sched_display = raw_sched or "Daily"
+            pl_name = pl.get("name", f"pl_{folder.lower()}_etl")
+        else:
+            pl_name = str(pl)
+            sched_display = "Daily"
+        msg += f"**Pipeline**: `{pl_name}` ({sched_display})\n\n"
+
+    if plan.get("environment"):
+        msg += f"**Environment**: `{plan['environment']}`\n\n"
+
+    lakehouses = plan.get("lakehouses") or []
+    if lakehouses:
+        msg += f"**Medallion Lakehouses**: {', '.join([f'`{lh}`' for lh in lakehouses])}\n\n"
+
+    if plan.get("_pipeline_type") == "multi_agent":
+        msg += "> *Generated via 4-Stage Multi-Agent Pipeline*\n\n"
+
+    notebooks = plan.get("notebooks") or []
+    if notebooks:
+        msg += f"**Notebooks ({len(notebooks)})**:\n"
+        for nb in notebooks:
+            if isinstance(nb, dict):
+                nb_name = nb.get("name", "nb_notebook")
+                nb_layer = nb.get("layer", "Transform")
+                nb_desc = nb.get("description", "PySpark transform")
+            else:
+                nb_name = str(nb)
+                nb_layer = "Transform"
+                nb_desc = "PySpark transform"
+            msg += f"- **{nb_name}** [{nb_layer}]: *{nb_desc}*\n"
+
+    return msg.strip()
+
+
+def _deploy_architect_async(run_id: str, plan: dict, session_id: str | None = None):
     """Background thread: creates all Fabric items for an architect plan."""
     start_dep_utc = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S.%f")[:-3] + " UTC"
     t_dep_0 = time.perf_counter()
     steps = []
     step_n = [0]
+
+    from app import session_store as store
+    from app.workspace_cache import invalidate
+
+    # Initialize run in database
+    store.upsert_run(run_id, session_id, status="deploying", plan_json=plan)
 
     def _log(title, detail, status="completed", node_id=None):
         step_n[0] += 1
@@ -251,7 +304,7 @@ def _deploy_architect_async(run_id: str, plan: dict):
                             break
 
     try:
-        ws = ALLOWED_WORKSPACE_ID
+        from app.config import ALLOWED_WORKSPACE_ID as ws, ALLOWED_WORKSPACE_NAME as ws_name
         folder_name = plan.get("folder", "AI_Test_Folder")
         
         # 1. Folder
@@ -361,7 +414,31 @@ def _deploy_architect_async(run_id: str, plan: dict):
             _log(f"Data Pipeline ({pl_name})", f"Pipeline error: {e}", "failed", "pl_root")
 
         with _RUNS_LOCK:
-            _RUNS[run_id]["status"] = "completed"
+            if run_id in _RUNS:
+                _RUNS[run_id]["status"] = "completed"
+                _RUNS[run_id]["steps"] = list(steps)
+
+        # Update SQLite store & invalidate workspace items cache
+        store.upsert_run(run_id, session_id, status="completed", steps_json=steps, plan_json=plan)
+        invalidate(ws)
+
+        # Record deployment completion in session memory if session_id is available
+        if session_id:
+            try:
+                mem = MemoryManager.get_or_create(session_id)
+                dep_msg = (
+                    f"### 🚀 Architecture Deployed to Microsoft Fabric\n\n"
+                    f"- **Target Folder**: `{folder_name}` *(Live in Fabric OneLake)*\n"
+                    f"- **Fabric Workspace**: `{ws_name}`\n"
+                    f"- **Deployment Run ID**: `{run_id}`\n\n"
+                    f"#### 📦 Deployed Fabric Resources\n"
+                )
+                for st in steps:
+                    status_icon = "✅" if st.get("status") == "completed" else "❌"
+                    dep_msg += f"- {status_icon} **{st.get('title')}**: {st.get('detail')}\n"
+                mem.add_assistant(dep_msg.strip())
+            except Exception as mem_err:
+                print(f"[DEPLOY MEMORY RECORD ERROR] {mem_err}")
 
         # Log live deployment audit to execution_traces
         try:
@@ -394,9 +471,17 @@ def _deploy_architect_async(run_id: str, plan: dict):
 
     except Exception as e:
         with _RUNS_LOCK:
-            _RUNS[run_id]["status"] = "error"
-            _RUNS[run_id]["error"] = str(e)
+            if run_id in _RUNS:
+                _RUNS[run_id]["status"] = "error"
+                _RUNS[run_id]["error"] = str(e)
+        store.upsert_run(run_id, session_id, status="error", failure_reason=str(e), plan_json=plan)
         print(f"[ARCHITECT ERROR] run_id={run_id}: {e}")
+        if session_id:
+            try:
+                mem = MemoryManager.get_or_create(session_id)
+                mem.add_assistant(f"⚠️ **Deployment Failed**: {str(e)}")
+            except Exception:
+                pass
 
 
 # ── Request Handler ───────────────────────────────────────────────────────────
@@ -1178,7 +1263,9 @@ class FabricAIHandler(http.server.SimpleHTTPRequestHandler):
             target_model = body.get("model")
             effort       = body.get("effort", "medium")
 
-            mem.add_user(prompt)
+            is_internal_deploy = deploy or prompt.strip().lower() in ("deploy active plan", "deploy plan", "deploy")
+            if not is_internal_deploy and prompt.strip():
+                mem.add_user(prompt)
 
             import uuid
             run_id = uuid.uuid4().hex[:8]
@@ -1442,7 +1529,7 @@ class FabricAIHandler(http.server.SimpleHTTPRequestHandler):
                     with _RUNS_LOCK:
                         _RUNS[deploy_run_id] = {"status": "deploying", "plan": active_plan, "steps": []}
                     mem.track_run(deploy_run_id, status="deploying", plan_json=active_plan)
-                    t = threading.Thread(target=_deploy_architect_async, args=(deploy_run_id, active_plan), daemon=True)
+                    t = threading.Thread(target=_deploy_architect_async, args=(deploy_run_id, active_plan, current_session_id), daemon=True)
                     t.start()
 
                     reply_text = (
@@ -1553,8 +1640,8 @@ class FabricAIHandler(http.server.SimpleHTTPRequestHandler):
                 }, session_id=current_session_id)
                 return
 
-            summary_msg = plan.get("summary", f"Generated architecture plan for {f_name}.")
-            mem.add_assistant(summary_msg)
+            plan_markdown = format_plan_markdown(plan)
+            mem.add_assistant(plan_markdown)
             mem.track_run(plan["run_id"], status="planned", plan_json=plan)
             from app.memory import record_plan_facts
             record_plan_facts(current_session_id, plan)
@@ -1562,8 +1649,8 @@ class FabricAIHandler(http.server.SimpleHTTPRequestHandler):
             if deploy:
                 with _RUNS_LOCK:
                     _RUNS[run_id] = {"status": "deploying", "plan": plan, "steps": []}
-                mem.track_run(run_id, status="deploying")
-                t = threading.Thread(target=_deploy_architect_async, args=(run_id, plan), daemon=True)
+                mem.track_run(run_id, status="deploying", plan_json=plan)
+                t = threading.Thread(target=_deploy_architect_async, args=(run_id, plan, current_session_id), daemon=True)
                 t.start()
                 _json_response(self, {"run_id": run_id, "status": "deploying", "plan": plan}, session_id=current_session_id)
             else:
