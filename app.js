@@ -85,9 +85,16 @@ document.addEventListener('DOMContentLoaded', () => {
     loadSessionSummary();
     loadSystemStats();
     loadConversationsList();
-    if (storedSessionId) {
-        loadActiveConversation();
-    }
+    
+    // Option B: Always open fresh New Chat / Playground landing screen on page refresh
+    App.sessionId = 'sess_' + Math.random().toString(36).substring(2, 11);
+    localStorage.setItem('fabric_ai_session_id', App.sessionId);
+    App.currentPlan = null;
+
+    // Highlight + New Chat button in sidebar on fresh load
+    const btnNewChat = document.getElementById('btnSidebarNewChat');
+    if (btnNewChat) btnNewChat.classList.add('active');
+
     // Also load after a brief delay to catch the case where first call fires before browser is idle
     setTimeout(() => loadConversationsList(), 600);
 
@@ -6281,3 +6288,21 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 });
+
+// ── Public Claude Engine Client API ───────────────────────────────────────────
+window.callClaude = async function({ prompt, systemPrompt, model, maxTokens } = {}) {
+    if (!prompt) throw new Error('prompt is required');
+    return await apiFetch('/api/claude/generate', {
+        method: 'POST',
+        body: {
+            prompt: prompt,
+            system_prompt: systemPrompt,
+            model: model,
+            max_tokens: maxTokens || 4096
+        }
+    });
+};
+
+window.getClaudeStatus = async function() {
+    return await apiFetch('/api/claude/status');
+};

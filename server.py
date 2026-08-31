@@ -648,6 +648,33 @@ class FabricAIHandler(http.server.SimpleHTTPRequestHandler):
                 }
             }, session_id=session_id)
 
+        elif path == "/api/claude/status":
+            from app.llm_router import _get_claude_cli_binary
+            cli_bin = _get_claude_cli_binary()
+            cli_installed = bool(cli_bin)
+            cli_version = ""
+            if cli_installed:
+                try:
+                    import subprocess
+                    r = subprocess.run([cli_bin, "--version"], capture_output=True, text=True, timeout=5)
+                    if r.returncode == 0:
+                        cli_version = r.stdout.strip()
+                except Exception:
+                    pass
+            _json_response(self, {
+                "available": cli_installed or bool(os.getenv("ANTHROPIC_API_KEY")),
+                "cli_installed": cli_installed,
+                "cli_binary": cli_bin,
+                "cli_version": cli_version,
+                "type": "cli_subprocess" if cli_installed else "api_key",
+                "supported_models": [
+                    "claude-3-7-sonnet-20250219",
+                    "claude-3-5-sonnet-20241022",
+                    "claude-3-opus-20240229",
+                    "claude-3-5-haiku-20241022"
+                ]
+            }, session_id=session_id)
+
         elif path == "/api/vault/status":
             from app.vault import vault
             _json_response(self, {"vault_entries": vault.list_connector_statuses()}, session_id=session_id)
@@ -1250,6 +1277,55 @@ class FabricAIHandler(http.server.SimpleHTTPRequestHandler):
                 _json_response(self, {"success": True, "text": transcribed_text.strip()}, session_id=current_session_id)
             except Exception as e:
                 _json_response(self, {"error": str(e)}, 500, session_id=current_session_id)
+
+        # ── Claude Dedicated Generation API (Subprocess Bridge) ──────────────
+        elif path in ("/api/claude/generate", "/api/claude/chat"):
+            prompt = body.get("prompt", "")
+            system_prompt = body.get("system_prompt") or body.get("system", "You are an expert Microsoft Fabric and Data Engineering assistant.")
+            model = body.get("model")
+            max_tokens = int(body.get("max_tokens", 4096))
+
+            if not prompt:
+                _json_response(self, {"error": "prompt is required"}, 400, session_id=current_session_id)
+                return
+
+            try:
+                import time
+                from app.llm_router import _call_claude_cli, _call_anthropic, ANTHROPIC_KEY, _get_claude_cli_binary
+                
+                t0 = time.time()
+                messages = [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": prompt}
+                ]
+
+                if _get_claude_cli_binary():
+                    result = _call_claude_cli(messages, model=model, max_tokens=max_tokens)
+                    engine = "Claude Code CLI Subprocess"
+                elif ANTHROPIC_KEY:
+                    actual_model = model or "claude-3-7-sonnet-20250219"
+                    result = _call_anthropic(messages, model=actual_model, max_tokens=max_tokens)
+                    engine = f"Anthropic API ({actual_model})"
+                else:
+                    raise RuntimeError("Claude Code CLI is not available and ANTHROPIC_API_KEY is not configured.")
+
+                elapsed_ms = int((time.time() - t0) * 1000)
+                _json_response(self, {
+                    "success": True,
+                    "text": result,
+                    "response": result,
+                    "engine": engine,
+                    "model": model or "Default",
+                    "execution_time_ms": elapsed_ms,
+                    "session_id": current_session_id
+                }, session_id=current_session_id)
+            except Exception as e:
+                _json_response(self, {
+                    "success": False,
+                    "error": str(e),
+                    "session_id": current_session_id
+                }, 500, session_id=current_session_id)
+            return
 
         # ── Architect Agent ──────────────────────────────────────────────────
         elif path in ("/api/agent/execute", "/api/architect/plan", "/api/architect/deploy"):

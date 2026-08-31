@@ -145,9 +145,69 @@ def _call_groq(messages: list, model: str, max_tokens: int = 4096) -> str:
         except Exception as e:
             last_err = str(e)
             continue
-    raise RuntimeError(f"All Groq keys exhausted. Last error: {last_err}")
+import os
+import subprocess
+import shutil
+
+def _get_claude_cli_binary() -> str | None:
+    """Finds the Claude Code CLI executable path on the system."""
+    found = shutil.which("claude")
+    if found:
+        return found
+    fallback_win = r"C:\Users\BheesettiHarsithVeer\AppData\Roaming\npm\claude.cmd"
+    if os.path.exists(fallback_win):
+        return fallback_win
+    return None
 
 
+def _call_claude_cli(messages: list, model: str = None, max_tokens: int = 4096) -> str:
+    """Call official Claude Code CLI subprocess (claude -p) using user's active terminal authentication."""
+    claude_bin = _get_claude_cli_binary()
+    if not claude_bin:
+        raise RuntimeError("Claude Code CLI is not installed or not found in PATH.")
+
+    # Format messages cleanly for CLI prompt
+    system_prompts = [m["content"] for m in messages if m.get("role") == "system"]
+    conversation_turns = [m for m in messages if m.get("role") != "system"]
+
+    sys_text = "\n\n".join(system_prompts).strip() if system_prompts else "You are Fabric AI Studio Data Engineering Assistant. Answer the user prompt directly."
+
+    formatted_parts = []
+    for m in conversation_turns:
+        role = m.get("role", "user").upper()
+        formatted_parts.append(f"{role}:\n{m.get('content', '')}")
+
+    full_prompt = "\n\n---\n\n".join(formatted_parts) if formatted_parts else "Hello"
+    cmd = [claude_bin, "-p", full_prompt, "--system-prompt", sys_text, "--tools", ""]
+    if model:
+        cmd.extend(["--model", model])
+
+    try:
+        import tempfile
+        res = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            input="",
+            encoding="utf-8",
+            cwd=tempfile.gettempdir(),
+            timeout=120
+        )
+        if res.returncode == 0:
+            out = res.stdout.strip()
+            if "Warning:" in out:
+                lines = out.split("\n")
+                out = "\n".join([l for l in lines if not l.startswith("Warning:")]).strip()
+            if out:
+                return out
+            raise RuntimeError("Claude Code CLI returned an empty response.")
+        else:
+            err_msg = res.stderr.strip() or res.stdout.strip() or f"Exited with code {res.returncode}"
+            raise RuntimeError(f"Claude Code CLI error: {err_msg}")
+    except subprocess.TimeoutExpired:
+        raise RuntimeError("Claude Code CLI timed out after 120 seconds.")
+    except Exception as e:
+        raise RuntimeError(f"Claude Code CLI invocation failed: {e}")
 
 
 def _call_claude_session(messages: list, model: str = "claude-opus-5", max_tokens: int = 4096) -> str:
@@ -257,7 +317,7 @@ def _call_lmstudio(messages: list, model: str, max_tokens: int = 4096) -> str:
 
 
 def _model_to_provider_call(model_id: str, messages: list, max_tokens: int):
-    """Maps any requested model ID to its native provider attempt (Cloud or Local)."""
+    """Maps any requested model ID to its native provider attempt (Cloud, CLI, or Local)."""
     if not model_id:
         return None
     m = model_id.lower().strip()
@@ -282,26 +342,29 @@ def _model_to_provider_call(model_id: str, messages: list, max_tokens: int):
         actual_model = LLM_MODELS.get("groq_high", "openai/gpt-oss-120b") if ("120b" in m or "70b" in m or "reasoning" in m) else LLM_MODELS.get("groq_fast", "openai/gpt-oss-20b")
         return (lambda: _call_groq(messages, actual_model, max_tokens), f"Groq ({actual_model})")
     elif "claude" in m or "sonnet" in m or "haiku" in m or "opus" in m or "mix" in m:
-        # 1. Check if native ANTHROPIC_API_KEY is present
+        # 1. Check if official Claude Code CLI is available (Primary Subprocess with active login)
+        if _get_claude_cli_binary():
+            cli_model = None
+            if "opus" in m:
+                cli_model = "claude-3-opus-20240229"
+            elif "haiku" in m:
+                cli_model = "claude-3-5-haiku-20241022"
+            elif "sonnet" in m:
+                cli_model = "claude-3-7-sonnet-20250219"
+            return (lambda: _call_claude_cli(messages, cli_model, max_tokens), f"Claude Code CLI ({cli_model or 'Default'})")
+
+        # 2. Check if native ANTHROPIC_API_KEY is present
         if ANTHROPIC_KEY:
             actual_model = LLM_MODELS.get("anthropic_high", "claude-3-7-sonnet-20250219") if "sonnet" in m else LLM_MODELS.get("anthropic_fast", "claude-3-5-haiku-20241022")
             return (lambda: _call_anthropic(messages, actual_model, max_tokens), f"Claude API ({actual_model})")
-        
-        # 2. Use Claude Web Subscription Session with Native Mix
+
+        # 3. Fallback to Claude Web Session Cookie if configured
         if CLAUDE_COOKIE:
             full_prompt = " ".join([m.get("content", "") for m in messages])
-            if "opus" in m:
-                chosen_model = "claude-opus-5"
-            elif "haiku" in m:
-                chosen_model = "claude-3-5-haiku-20241022"
-            elif "sonnet" in m:
-                chosen_model = "claude-3-5-sonnet-20241022"
-            else:
-                # Dynamic Claude Mix Router
-                chosen_model = _resolve_claude_mix_model(full_prompt)
+            chosen_model = _resolve_claude_mix_model(full_prompt)
             return (lambda: _call_claude_session(messages, chosen_model, max_tokens), f"Claude Native Mix ({chosen_model})")
             
-        raise RuntimeError("Neither ANTHROPIC_API_KEY nor CLAUDE_COOKIE is configured in .env.")
+        raise RuntimeError("No Claude provider found: Claude Code CLI, ANTHROPIC_API_KEY, or CLAUDE_COOKIE required.")
     elif "gpt" in m or "openai" in m or "o3" in m:
         if not OPENAI_KEY:
             raise RuntimeError("OPENAI_API_KEY is not configured in .env.")
@@ -314,14 +377,17 @@ def _model_to_provider_call(model_id: str, messages: list, max_tokens: int):
 # ── Provider waterfall definitions ────────────────────────────────────────────
 
 def _high_complexity_providers(messages, max_tokens):
-    """Gemini 3.6 Flash → Claude Sonnet → GPT-4o → Groq 120B"""
+    """Claude Code CLI → Claude Sonnet → Gemini 3.6 Flash → GPT-4o → Groq 120B"""
     attempts = []
-    if GEMINI_KEY:
-        attempts.append((lambda: _call_gemini(messages, LLM_MODELS.get("gemini_standard", "gemini-3.6-flash"), max_tokens), "Gemini 3.6 Flash"))
-    if ANTHROPIC_KEY:
+    if _get_claude_cli_binary():
+        attempts.append((lambda: _call_claude_cli(messages, None, max_tokens), "Claude Code CLI (Subprocess)"))
+    elif ANTHROPIC_KEY:
         attempts.append((lambda: _call_anthropic(messages, LLM_MODELS.get("anthropic_high", "claude-3-7-sonnet-20250219"), max_tokens), "Claude Sonnet"))
     elif CLAUDE_COOKIE:
         attempts.append((lambda: _call_claude_session(messages, "claude-opus-5", max_tokens), "Claude Opus (Session)"))
+
+    if GEMINI_KEY:
+        attempts.append((lambda: _call_gemini(messages, LLM_MODELS.get("gemini_standard", "gemini-3.6-flash"), max_tokens), "Gemini 3.6 Flash"))
     if OPENAI_KEY:
         attempts.append((lambda: _call_openai(messages, LLM_MODELS.get("openai_high", "gpt-4o"), max_tokens), "GPT-4o"))
     if GROQ_KEYS:
@@ -330,10 +396,12 @@ def _high_complexity_providers(messages, max_tokens):
 
 
 def _standard_complexity_providers(messages, max_tokens):
-    """Gemini 3.6 Flash → Groq 20B → Groq 120B → Claude Haiku"""
+    """Gemini 3.6 Flash → Claude Code CLI → Groq 20B → Groq 120B → Claude Haiku"""
     attempts = []
     if GEMINI_KEY:
         attempts.append((lambda: _call_gemini(messages, LLM_MODELS.get("gemini_standard", "gemini-3.6-flash"), max_tokens), "Gemini 3.6 Flash"))
+    if _get_claude_cli_binary():
+        attempts.append((lambda: _call_claude_cli(messages, None, max_tokens), "Claude Code CLI (Subprocess)"))
     if GROQ_KEYS:
         attempts.append((lambda: _call_groq(messages, LLM_MODELS.get("groq_fast", "openai/gpt-oss-20b"), max_tokens), "Groq gpt-oss-20B"))
         attempts.append((lambda: _call_groq(messages, LLM_MODELS.get("groq_high", "openai/gpt-oss-120b"), max_tokens), "Groq gpt-oss-120B"))
