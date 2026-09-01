@@ -386,13 +386,74 @@ def save_custom_connector(connector_def: Dict[str, Any]) -> BaseConnector:
 
 def ai_synthesize_from_prompt(prompt_text: str) -> Dict[str, Any]:
     """
-    Intelligently analyzes a natural language prompt to generate a tailored connector definition:
-    - Extracts platform name, category, protocol, default port
-    - Formulates required parameter keys (Host, Port, DB, User, Secret/API Keys)
+    Autonomously researches and synthesizes a production connector definition from natural language.
+    Even with minimal prompts like "Shopify", "ClickHouse", "Stripe", "Workday", "NetSuite", or "Supabase",
+    it uses LLM reasoning to determine official connection parameters, driver specs, and auth keys.
     """
+    # 1. Autonomous LLM Research
+    try:
+        from app.llm_router import chat
+        sys_prompt = """You are an Enterprise Data Engineering Architect.
+Given a user's request for a data connector (e.g. "Shopify", "ClickHouse", "Stripe API", "Workday", "Kafka", "DynamoDB"), 
+perform research and output a JSON specification for connecting to this platform in Microsoft Fabric / PySpark.
+
+Respond ONLY with valid JSON in this exact structure without markdown or backticks:
+{
+  "source_id": "shopify",
+  "name": "Shopify Admin API",
+  "category": "Enterprise SaaS API",
+  "default_port": "443",
+  "driver_class": "generic_rest_oauth",
+  "jdbc_prefix": "https://",
+  "required_params": [
+    {
+      "key": "store_domain",
+      "label": "Store Domain URL",
+      "type": "text",
+      "placeholder": "your-store.myshopify.com"
+    },
+    {
+      "key": "admin_api_token",
+      "label": "Admin API Access Token",
+      "type": "password",
+      "placeholder": "shpat_xxxxxxxxxxxxxxxx"
+    },
+    {
+      "key": "api_version",
+      "label": "API Version",
+      "type": "text",
+      "placeholder": "2024-01",
+      "default": "2024-01"
+    }
+  ]
+}
+Categories can be: Relational Database, Cloud Data Warehouse, NoSQL Database, Enterprise SaaS API, Enterprise ERP, Streaming Broker, File Storage.
+Keys should be clean snake_case strings. Parameter types should be 'text' or 'password'."""
+
+        llm_resp = chat([
+            {"role": "system", "content": sys_prompt},
+            {"role": "user", "content": f"Create data connector specification for: {prompt_text}"}
+        ], complexity="fast")
+        
+        # Parse JSON
+        clean_json = llm_resp.strip()
+        if "```json" in clean_json:
+            clean_json = clean_json.split("```json")[1].split("```")[0].strip()
+        elif "```" in clean_json:
+            clean_json = clean_json.split("```")[1].split("```")[0].strip()
+            
+        parsed = json.loads(clean_json)
+        if parsed.get("name") and parsed.get("required_params"):
+            parsed["generated_from_prompt"] = prompt_text
+            if not parsed.get("source_id"):
+                parsed["source_id"] = re.sub(r'[^a-z0-9_]', '', parsed["name"].lower().replace(" ", "_"))
+            return parsed
+    except Exception as e:
+        print(f"[CONNECTOR RESEARCH FALLBACK] {e}")
+
     text_lower = prompt_text.lower()
     
-    # 1. Detect Category & Platform Name
+    # 2. Local Fallback Archetypes (if LLM is offline)
     if any(k in text_lower for k in ["sap", "hana", "s4hana", "ecc"]):
         source_id = "sap_hana"
         name = "SAP S/4HANA & ERP"

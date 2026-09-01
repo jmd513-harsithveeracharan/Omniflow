@@ -1,0 +1,101 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "Fabric AI Studio End-to-End System Architecture",
+    "animation": "trace",
+    "visual_preset": "signal-flow",
+    "quality_profile": "showcase",
+    "views": [
+      {
+        "id": "full-stack-flow",
+        "label": "End-to-End Ingestion Flow",
+        "focus": ["ui_dock", "meta_planner", "pyspark_worker", "plan_builder", "auditor_gate", "fabric_client", "onelake_target"],
+        "note": "Complete path from natural language prompt to live Microsoft Fabric Lakehouse & Pipeline deployment."
+      },
+      {
+        "id": "agentic-core",
+        "label": "4-Stage Multi-Agent & Transpilation",
+        "focus": ["meta_planner", "skill_engine", "sql_transpiler", "pyspark_worker", "auditor_gate"],
+        "note": "Detailed view of the 4-stage pipeline with SQLGlot AST transpilation and dynamically injected skills."
+      },
+      {
+        "id": "connector-security",
+        "label": "Connectors & Vault Security",
+        "focus": ["source_db", "connector_reg", "secure_vault", "jit_factory", "pyspark_worker"],
+        "note": "Metadata-only table discovery, network diagnostics, and zero-egress credential injection."
+      }
+    ]
+  },
+  "lanes": [
+    { "id": "ui_lane", "label": "1. User Interface & Studio Canvas" },
+    { "id": "agent_lane", "label": "2. 4-Stage Multi-Agent Pipeline" },
+    { "id": "intel_lane", "label": "3. Skills, AST Transpiler & Memory" },
+    { "id": "conn_lane", "label": "4. Source Connectors & Secure Vault" },
+    { "id": "fabric_lane", "label": "5. Microsoft Fabric & OneLake Target" }
+  ],
+  "phases": [
+    { "id": "phase_in", "label": "Planning & Discovery", "fromCol": 0, "toCol": 1 },
+    { "id": "phase_proc", "label": "Agent Synthesis & Transpilation", "fromCol": 2, "toCol": 3, "variant": "emphasis" },
+    { "id": "phase_out", "label": "Audit & Fabric Deployment", "fromCol": 4, "toCol": 5, "variant": "dashed" }
+  ],
+  "groups": [
+    { "id": "agent_grp", "label": "Multi-Agent Core", "lane": "agent_lane", "fromCol": 1, "toCol": 4, "variant": "emphasis" },
+    { "id": "intel_grp", "label": "Intelligence Engine", "lane": "intel_lane", "fromCol": 2, "toCol": 4, "variant": "emphasis" },
+    { "id": "conn_grp", "label": "Connector Subsystem", "lane": "conn_lane", "fromCol": 0, "toCol": 2, "variant": "security" },
+    { "id": "fabric_grp", "label": "OneLake Target", "lane": "fabric_lane", "fromCol": 4, "toCol": 5, "variant": "emphasis" }
+  ],
+  "mainPath": ["ui_dock", "meta_planner", "pyspark_worker", "plan_builder", "auditor_gate", "fabric_client", "onelake_target"],
+  "nodes": [
+    { "id": "ui_dock", "lane": "ui_lane", "col": 0, "type": "frontend", "label": "AI Exploration Dock", "sublabel": "Chat / Visual Split Canvas", "width": 170 },
+    { "id": "canvas_preview", "lane": "ui_lane", "col": 4, "type": "frontend", "label": "Interactive Blueprint", "sublabel": "DAG graph + PySpark viewer", "width": 170 },
+    { "id": "meta_planner", "lane": "agent_lane", "col": 1, "type": "backend", "label": "Stage 1: Meta-Planner", "sublabel": "Decomposes prompt to DAG", "tag": "Step DAG", "width": 170 },
+    { "id": "pyspark_worker", "lane": "agent_lane", "col": 2, "type": "backend", "label": "Stage 2: Worker Agents", "sublabel": "PySpark Delta Lake codegen", "tag": "Medallion", "width": 170 },
+    { "id": "plan_builder", "lane": "agent_lane", "col": 3, "type": "backend", "label": "Stage 3: Plan Builder", "sublabel": "Trident Base64 packaging", "width": 170 },
+    { "id": "auditor_gate", "lane": "agent_lane", "col": 4, "type": "security", "label": "Stage 4: Auditor Agent", "sublabel": "Validates schema & schedule", "tag": "Zero Missing", "width": 170 },
+    { "id": "skill_engine", "lane": "intel_lane", "col": 2, "type": "database", "label": "Skill Engine", "sublabel": ".agents/skills playbooks", "width": 170 },
+    { "id": "sql_transpiler", "lane": "intel_lane", "col": 3, "type": "backend", "label": "SQLGlot AST Transpiler", "sublabel": "T-SQL/SAP -> Spark SQL", "tag": "Lineage", "width": 170 },
+    { "id": "memory_db", "lane": "intel_lane", "col": 4, "type": "database", "label": "SQLite Memory", "sublabel": "fabric_ai_memory.db", "width": 170 },
+    { "id": "source_db", "lane": "conn_lane", "col": 0, "type": "database", "label": "Source Databases", "sublabel": "Azure SQL / SAP / ClickHouse", "width": 170 },
+    { "id": "connector_reg", "lane": "conn_lane", "col": 1, "type": "backend", "label": "Connector Registry", "sublabel": "Metadata-only discovery", "tag": "No Row Egress", "width": 170 },
+    { "id": "secure_vault", "lane": "conn_lane", "col": 2, "type": "security", "label": "Encrypted Vault", "sublabel": "app/vault.py secrets", "width": 170 },
+    { "id": "jit_factory", "lane": "conn_lane", "col": 3, "type": "backend", "label": "JIT Connector Factory", "sublabel": "Synthesize connectors on-the-fly", "width": 170 },
+    { "id": "fabric_client", "lane": "fabric_lane", "col": 4, "type": "cloud", "label": "Fabric REST Client", "sublabel": "app/fabric_client.py", "tag": "Direct API", "width": 170 },
+    { "id": "onelake_target", "lane": "fabric_lane", "col": 5, "type": "cloud", "label": "Microsoft Fabric OneLake", "sublabel": "Lakehouses, Notebooks, Pipelines", "tag": "Live Artifacts", "width": 170 }
+  ],
+  "edges": [
+    { "id": "e1_prompt_planner", "from": "ui_dock", "to": "meta_planner", "label": "user prompt", "variant": "emphasis" },
+    { "id": "e2_conn_inspect", "from": "source_db", "to": "connector_reg", "label": "sys.tables", "variant": "default" },
+    { "id": "e3_conn_planner", "from": "connector_reg", "to": "meta_planner", "label": "schema metadata", "variant": "default" },
+    { "id": "e4_planner_worker", "from": "meta_planner", "to": "pyspark_worker", "label": "Step DAG", "variant": "emphasis" },
+    { "id": "e5_skill_inject", "from": "skill_engine", "to": "pyspark_worker", "label": "inject rules", "variant": "dashed" },
+    { "id": "e6_transpile_worker", "from": "sql_transpiler", "to": "pyspark_worker", "label": "Spark SQL AST", "variant": "dashed" },
+    { "id": "e7_worker_builder", "from": "pyspark_worker", "to": "plan_builder", "label": "PySpark code", "variant": "emphasis" },
+    { "id": "e8_builder_auditor", "from": "plan_builder", "to": "auditor_gate", "label": "assemble plan", "variant": "emphasis" },
+    { "id": "e9_auditor_preview", "from": "auditor_gate", "to": "canvas_preview", "label": "verified card", "variant": "emphasis" },
+    { "id": "e10_auditor_deploy", "from": "auditor_gate", "to": "fabric_client", "label": "1-click deploy", "variant": "emphasis" },
+    { "id": "e11_deploy_onelake", "from": "fabric_client", "to": "onelake_target", "label": "provision assets", "variant": "emphasis", "width": 1.4 },
+    { "id": "e12_vault_secure", "from": "secure_vault", "to": "pyspark_worker", "label": "Key Vault refs", "variant": "security" },
+    { "id": "e13_memory_state", "from": "auditor_gate", "to": "memory_db", "label": "save run history", "variant": "dashed" }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "4-Stage Autonomous Multi-Agent Pipeline",
+      "items": [
+        "Stage 1 Meta-Planner: Decomposes prompts into dependency-aware Step DAGs",
+        "Stage 2 Worker: Writes Medallion (Bronze/Silver/Gold) Delta MERGE upserts",
+        "Stage 3 Builder: Serializes into Fabric Trident Base64 and Pipeline JSON",
+        "Stage 4 Auditor: Independent verification against original user prompt"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Zero-Egress Security & Dynamic Extensibility",
+      "items": [
+        "Connectors discover metadata only (no raw data rows ever leave your network)",
+        "JIT Connector Factory creates new custom source connectors on-the-fly"
+      ]
+    }
+  ]
+}

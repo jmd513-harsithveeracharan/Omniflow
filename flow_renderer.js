@@ -1,39 +1,35 @@
 /**
  * flow_renderer.js
  * ----------------
- * Pure-JS SVG DAG renderer for Fabric ingestion flow visualization.
- * No external dependencies — renders nodes and edges as inline SVG.
- *
- * Node types: source | folder | lakehouse | environment | notebook | pipeline
- * Node status: pending | deploying | live | error
+ * Pure-JS SVG Interactive DAG Visualizer for Microsoft Fabric Architecture.
+ * Renders node graphs with rich glassmorphic cards, gradient layer accents,
+ * smooth animated Bezier flow edges, and buttery smooth hover/touch interactions.
  */
 
 const FlowRenderer = (() => {
   // ── Design Tokens ──────────────────────────────────────────────────────────
-
-  const NODE_W = 195;
-  const NODE_H = 48;
-  const RADIUS = 10;
-  const CANVAS_PAD = 28;
+  const NODE_W = 250;
+  const NODE_H = 76;
+  const RADIUS = 12;
+  const CANVAS_PAD = 40;
 
   const TYPE_CONFIG = {
-    source:      { color: "#38bdf8", fill: "rgba(14, 23, 47, 0.95)", stroke: "#0284c7", icon: "M4 6h16M4 12h16M4 18h16",          label: "SOURCE"      },
-    folder:      { color: "#c084fc", fill: "rgba(28, 18, 54, 0.95)", stroke: "#7c3aed", icon: "M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V7z", label: "FOLDER" },
-    lakehouse:   { color: "#38bdf8", fill: "rgba(12, 34, 64, 0.95)", stroke: "#0284c7", icon: "M12 2a10 10 0 110 20A10 10 0 0112 2zm0 0v10m0 0l-4-4m4 4l4-4", label: "LAKEHOUSE" },
-    environment: { color: "#34d399", fill: "rgba(10, 42, 32, 0.95)", stroke: "#059669", icon: "M12 2v8l4 2-4 2v8M4 12h16",         label: "ENVIRONMENT" },
-    notebook:    { color: "#fbbf24", fill: "rgba(44, 30, 12, 0.95)", stroke: "#d97706", icon: "M4 4h16v12H4zm4 16h8M12 16v4",       label: "NOTEBOOK"    },
-    pipeline:    { color: "#f87171", fill: "rgba(48, 16, 24, 0.95)", stroke: "#dc2626", icon: "M13 2L3 14h9l-1 8 10-12h-9l1-8z",    label: "PIPELINE"    },
+    source:      { color: "#38bdf8", bgGradient: ["#0b1d3a", "#061325"], stroke: "#0284c7", icon: "M4 6h16M4 12h16M4 18h16",          label: "INGESTION SOURCE", tag: "SOURCE", sub: "JDBC / CDC Stream" },
+    folder:      { color: "#c084fc", bgGradient: ["#24123d", "#150924"], stroke: "#7c3aed", icon: "M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V7z", label: "WORKSPACE FOLDER", tag: "FOLDER", sub: "Workspace Container" },
+    lakehouse:   { color: "#0ea5e9", bgGradient: ["#092642", "#051627"], stroke: "#0284c7", icon: "M12 2a10 10 0 110 20A10 10 0 0112 2zm0 0v10m0 0l-4-4m4 4l4-4", label: "DELTA LAKEHOUSE", tag: "LAKEHOUSE", sub: "Delta Lake Tables" },
+    environment: { color: "#34d399", bgGradient: ["#082e21", "#041a13"], stroke: "#059669", icon: "M12 2v8l4 2-4 2v8M4 12h16",         label: "SPARK RUNTIME",    tag: "ENV", sub: "PySpark 3.4 Runtime" },
+    notebook:    { color: "#fbbf24", bgGradient: ["#33220b", "#1c1205"], stroke: "#d97706", icon: "M4 4h16v12H4zm4 16h8M12 16v4",       label: "PYSPARK NOTEBOOK", tag: "NOTEBOOK", sub: "Delta Merge & Upsert" },
+    pipeline:    { color: "#f43f5e", bgGradient: ["#3b0f1d", "#1f060d"], stroke: "#e11d48", icon: "M13 2L3 14h9l-1 8 10-12h-9l1-8z",    label: "DATA FACTORY PIPELINE", tag: "PIPELINE", sub: "Scheduled Trigger DAG" },
   };
 
   const STATUS_CONFIG = {
-    pending:   { stroke: "rgba(255,255,255,0.2)", dash: "6,4",  glow: false },
-    deploying: { stroke: "#38bdf8",              dash: "4,3",  glow: true  },
-    live:      { stroke: "#10b981",              dash: "none", glow: false },
-    error:     { stroke: "#ef4444",              dash: "none", glow: false },
+    pending:   { stroke: "rgba(255,255,255,0.14)", dash: "6,4",  dot: "#9ca3af", statusText: "Ready" },
+    deploying: { stroke: "#38bdf8",              dash: "5,3",  dot: "#38bdf8", statusText: "Deploying" },
+    live:      { stroke: "#10b981",              dash: "none", dot: "#10b981", statusText: "Live" },
+    error:     { stroke: "#ef4444",              dash: "none", dot: "#ef4444", statusText: "Error" },
   };
 
   // ── SVG Helpers ────────────────────────────────────────────────────────────
-
   function svgEl(tag, attrs = {}, ...children) {
     const el = document.createElementNS("http://www.w3.org/2000/svg", tag);
     for (const [k, v] of Object.entries(attrs)) {
@@ -49,145 +45,163 @@ const FlowRenderer = (() => {
     return svgEl("path", {
       d,
       stroke: color,
-      "stroke-width": "1.8",
+      "stroke-width": "2",
       "stroke-linecap": "round",
       "stroke-linejoin": "round",
       fill: "none",
     });
   }
 
-  // ── Node Renderer ──────────────────────────────────────────────────────────
-
+  // ── Node Card Renderer (Jitter-Free, Rich Details) ──────────────────────────
   function renderNode(node) {
     const cfg = TYPE_CONFIG[node.type] || TYPE_CONFIG.notebook;
     const sCfg = STATUS_CONFIG[node.status || "pending"];
     const x = node.x;
     const y = node.y;
+
     const g = svgEl("g", {
       id: `flow-node-${node.id}`,
       class: `flow-node flow-node-${node.status || "pending"}`,
       transform: `translate(${x},${y})`,
       "data-node-id": node.id,
-      style: "cursor: pointer;",
+      style: "cursor: pointer; pointer-events: all;",
     });
 
-    // Shadow/glow for deploying state
-    if (sCfg.glow) {
-      g.appendChild(svgEl("rect", {
-        x: -3, y: -3,
-        width: NODE_W + 6, height: NODE_H + 6,
-        rx: RADIUS + 2,
-        fill: "none",
-        stroke: "#38bdf8",
-        "stroke-width": "2",
-        opacity: "0.6",
-        class: "node-glow-ring",
-      }));
-    }
-
-    // Background card
+    // Outer Card Frame
     g.appendChild(svgEl("rect", {
       x: 0, y: 0,
       width: NODE_W, height: NODE_H,
       rx: RADIUS,
-      fill: cfg.fill,
+      fill: "url(#nodeGrad_" + node.type + ")",
       stroke: sCfg.stroke,
-      "stroke-width": "1.2",
+      "stroke-width": "1.3",
       "stroke-dasharray": sCfg.dash === "none" ? "" : sCfg.dash,
+      class: "flow-node-bg",
     }));
 
-    // Left Icon Box (22x22)
-    g.appendChild(svgEl("rect", {
-      x: 8, y: 13, width: 22, height: 22, rx: 5,
-      fill: "rgba(255, 255, 255, 0.06)",
+    // Top Accent Stripe (Layer color)
+    g.appendChild(svgEl("path", {
+      d: `M 0,${RADIUS} Q 0,0 ${RADIUS},0 L ${NODE_W - RADIUS},0 Q ${NODE_W},0 ${NODE_W},${RADIUS} L ${NODE_W},3.5 L 0,3.5 Z`,
+      fill: cfg.color,
+      opacity: "0.95",
     }));
-    const iconG = svgEl("g", { transform: `translate(11, 16)` });
+
+    // Left Icon Container (34x34 with frosted glass background)
+    g.appendChild(svgEl("rect", {
+      x: 12, y: 18, width: 34, height: 34, rx: 8,
+      fill: "rgba(255, 255, 255, 0.08)",
+      stroke: "rgba(255, 255, 255, 0.12)",
+      "stroke-width": "1",
+    }));
+
+    const iconG = svgEl("g", { transform: `translate(19, 25)` });
     const iconSvg = svgEl("svg", {
       viewBox: "0 0 24 24",
-      width: "15", height: "15",
+      width: "20", height: "20",
       fill: "none",
     });
     iconSvg.appendChild(pathIcon(cfg.icon, cfg.color));
     iconG.appendChild(iconSvg);
     g.appendChild(iconG);
 
-    // Main label (Activity Name)
+    // Primary Title Text (Item Name)
     const labelEl = svgEl("text", {
-      x: 36, y: 22,
-      "font-size": "11",
+      x: 54, y: 32,
+      "font-size": "13",
       "font-weight": "600",
-      "font-family": "Inter, -apple-system, sans-serif",
-      fill: "#ffffff",
+      "font-family": "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+      fill: "#f8fafc",
+      "letter-spacing": "-0.01em",
     });
-    labelEl.textContent = truncate(node.label || node.id, 20);
+    labelEl.textContent = truncate(node.label || node.id, 25);
     g.appendChild(labelEl);
 
-    // Type Badge (Bottom line)
-    const typeLabelEl = svgEl("text", {
-      x: 36, y: 35,
-      "font-size": "8.5",
+    // Secondary Category Pill
+    const tagEl = svgEl("text", {
+      x: 54, y: 48,
+      "font-size": "9.5",
       "font-weight": "700",
-      "font-family": "Inter, -apple-system, sans-serif",
-      "letter-spacing": "0.6",
+      "font-family": "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+      "letter-spacing": "0.06em",
       fill: cfg.color,
     });
-    typeLabelEl.textContent = cfg.label;
-    g.appendChild(typeLabelEl);
+    tagEl.textContent = node.tag || cfg.label;
+    g.appendChild(tagEl);
 
-    // Status dot (Right side)
-    const dotColors = { pending: "rgba(255,255,255,0.25)", deploying: "#38bdf8", live: "#10b981", error: "#ef4444" };
+    // Tertiary Sub-Detail Text
+    const subEl = svgEl("text", {
+      x: 54, y: 63,
+      "font-size": "10",
+      "font-weight": "400",
+      "font-family": "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+      fill: "#94a3b8",
+    });
+    subEl.textContent = truncate(node.sub || cfg.sub, 30);
+    g.appendChild(subEl);
+
+    // Status Indicator Dot with subtle border
     g.appendChild(svgEl("circle", {
-      cx: NODE_W - 12, cy: NODE_H / 2, r: 4,
-      fill: dotColors[node.status || "pending"],
+      cx: NODE_W - 16, cy: 22, r: 4.5,
+      fill: sCfg.dot,
+      stroke: "rgba(0,0,0,0.5)",
+      "stroke-width": "1",
     }));
 
     return g;
   }
 
-  // ── Edge Renderer ──────────────────────────────────────────────────────────
-
+  // ── Edge Renderer (Animated Glowing Flow Path) ─────────────────────────────
   function renderEdge(fromNode, toNode) {
     const x1 = fromNode.x + NODE_W;
     const y1 = fromNode.y + NODE_H / 2;
     const x2 = toNode.x;
     const y2 = toNode.y + NODE_H / 2;
-    const dx = Math.max((x2 - x1) * 0.45, 30);
+    const dx = Math.max((x2 - x1) * 0.5, 40);
     const cx1 = x1 + dx;
     const cx2 = x2 - dx;
 
-    const path = svgEl("path", {
+    // Outer glow / track path
+    const trackPath = svgEl("path", {
       d: `M${x1},${y1} C${cx1},${y1} ${cx2},${y2} ${x2},${y2}`,
       fill: "none",
-      stroke: "rgba(56, 189, 248, 0.4)",
-      "stroke-width": "1.6",
-      class: "flow-edge",
+      stroke: "rgba(14, 165, 233, 0.2)",
+      "stroke-width": "4",
+      class: "flow-edge-track",
     });
 
-    // Arrowhead
+    // Animated directional stream path
+    const flowPath = svgEl("path", {
+      d: `M${x1},${y1} C${cx1},${y1} ${cx2},${y2} ${x2},${y2}`,
+      fill: "none",
+      stroke: "url(#edgeGradient)",
+      "stroke-width": "2",
+      class: "flow-edge-line",
+    });
+
+    // Arrowhead pointer
     const arrow = svgEl("polygon", {
-      points: `${x2},${y2} ${x2 - 6},${y2 - 3.5} ${x2 - 6},${y2 + 3.5}`,
+      points: `${x2},${y2} ${x2 - 8},${y2 - 4.5} ${x2 - 8},${y2 + 4.5}`,
       fill: "#38bdf8",
     });
 
     const g = svgEl("g", { class: "flow-edge-group" });
-    g.appendChild(path);
+    g.appendChild(trackPath);
+    g.appendChild(flowPath);
     g.appendChild(arrow);
     return g;
   }
 
-  // ── Canvas Builder ────────────────────────────────────────────────────────
-
+  // ── Canvas Sizing ──────────────────────────────────────────────────────────
   function computeCanvasSize(nodes) {
-    let maxX = 0, maxY = 0;
+    let maxX = 900, maxY = 380;
     for (const n of nodes) {
-      maxX = Math.max(maxX, n.x + NODE_W + CANVAS_PAD);
-      maxY = Math.max(maxY, n.y + NODE_H + CANVAS_PAD);
+      maxX = Math.max(maxX, n.x + NODE_W + CANVAS_PAD * 2);
+      maxY = Math.max(maxY, n.y + NODE_H + CANVAS_PAD * 2);
     }
-    return { width: maxX + CANVAS_PAD, height: maxY + CANVAS_PAD };
+    return { width: maxX, height: maxY };
   }
 
   // ── Public: render ─────────────────────────────────────────────────────────
-
   function render(container, plan, onNodeClick = null) {
     container.innerHTML = "";
 
@@ -198,17 +212,56 @@ const FlowRenderer = (() => {
     const svg = svgEl("svg", {
       viewBox: `0 0 ${width} ${height}`,
       width: "100%",
-      style: `min-height: ${Math.max(height, 260)}px; overflow: visible;`,
+      height: "100%",
+      style: `min-height: ${Math.max(height, 340)}px; overflow: visible;`,
       class: "flow-svg",
     });
 
-    // Add CSS animation for deploying glow
+    // Definitions: Gradients & Keyframes
+    const defs = svgEl("defs");
+
+    // Edge Gradient
+    const edgeGrad = svgEl("linearGradient", { id: "edgeGradient", x1: "0%", y1: "0%", x2: "100%", y2: "0%" });
+    edgeGrad.appendChild(svgEl("stop", { offset: "0%", "stop-color": "#0ea5e9", "stop-opacity": "0.7" }));
+    edgeGrad.appendChild(svgEl("stop", { offset: "100%", "stop-color": "#38bdf8", "stop-opacity": "1" }));
+    defs.appendChild(edgeGrad);
+
+    // Node Card Gradients
+    for (const [key, cfg] of Object.entries(TYPE_CONFIG)) {
+      const grad = svgEl("linearGradient", { id: `nodeGrad_${key}`, x1: "0%", y1: "0%", x2: "100%", y2: "100%" });
+      grad.appendChild(svgEl("stop", { offset: "0%", "stop-color": cfg.bgGradient[0], "stop-opacity": "0.96" }));
+      grad.appendChild(svgEl("stop", { offset: "100%", "stop-color": cfg.bgGradient[1], "stop-opacity": "0.98" }));
+      defs.appendChild(grad);
+    }
+
+    svg.appendChild(defs);
+
+    // Pure CSS Styles (Zero Jitter, Smooth Stroke Glow on Hover)
     const style = document.createElementNS("http://www.w3.org/2000/svg", "style");
     style.textContent = `
-      .node-glow-ring { animation: glowPulse 1.2s ease-in-out infinite; }
-      @keyframes glowPulse { 0%,100% { opacity:0.3; } 50% { opacity:0.7; } }
-      .flow-node { cursor: pointer; transition: transform 0.15s, filter 0.15s; }
-      .flow-node:hover { filter: drop-shadow(0 4px 12px rgba(56, 189, 248, 0.25)); transform: translateY(-1px); }
+      @keyframes flowDashAnim {
+        from { stroke-dashoffset: 40; }
+        to { stroke-dashoffset: 0; }
+      }
+      .flow-edge-line {
+        stroke-dasharray: 7, 5;
+        animation: flowDashAnim 1.4s linear infinite;
+      }
+      .flow-node {
+        cursor: pointer;
+      }
+      .flow-node .flow-node-bg {
+        transition: stroke 0.15s ease, filter 0.15s ease;
+      }
+      .flow-node:hover .flow-node-bg {
+        stroke: #38bdf8 !important;
+        stroke-width: 1.8px !important;
+        filter: drop-shadow(0 0 12px rgba(56, 189, 248, 0.45));
+      }
+      .flow-edge-group:hover .flow-edge-line {
+        stroke: #38bdf8 !important;
+        stroke-width: 2.8px !important;
+      }
     `;
     svg.appendChild(style);
 
@@ -238,31 +291,24 @@ const FlowRenderer = (() => {
   }
 
   // ── Public: updateNodeStatus ───────────────────────────────────────────────
-
   function updateNodeStatus(container, nodeId, status) {
     const el = container.querySelector(`#flow-node-${nodeId}`);
     if (!el) return;
 
-    // Update class
-    el.className.baseVal = el.className.baseVal
-      .replace(/flow-node-\w+/, `flow-node-${status}`);
-
-    // Update status dot color
-    const dotColors = { pending: "#d1d5db", deploying: "#38bdf8", live: "#10b981", error: "#ef4444" };
-    const dot = el.querySelector("circle");
-    if (dot) dot.setAttribute("fill", dotColors[status] || "#d1d5db");
-
-    // Update border
+    el.className.baseVal = el.className.baseVal.replace(/flow-node-\w+/, `flow-node-${status}`);
     const sCfg = STATUS_CONFIG[status] || STATUS_CONFIG.pending;
-    const rect = el.querySelector("rect");
-    if (rect) {
-      rect.setAttribute("stroke", sCfg.stroke);
-      rect.setAttribute("stroke-dasharray", sCfg.dash === "none" ? "" : sCfg.dash);
+
+    const dot = el.querySelector("circle");
+    if (dot) dot.setAttribute("fill", sCfg.dot);
+
+    const bgRect = el.querySelector(".flow-node-bg");
+    if (bgRect) {
+      bgRect.setAttribute("stroke", sCfg.stroke);
+      bgRect.setAttribute("stroke-dasharray", sCfg.dash === "none" ? "" : sCfg.dash);
     }
   }
 
   // ── Util ──────────────────────────────────────────────────────────────────
-
   function truncate(str, max) {
     if (!str) return "";
     return str.length > max ? str.slice(0, max - 1) + "…" : str;

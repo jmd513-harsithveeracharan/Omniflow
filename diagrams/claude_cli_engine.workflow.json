@@ -1,0 +1,89 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "Claude Code CLI Subprocess Execution Workflow",
+    "animation": "trace",
+    "visual_preset": "signal-flow",
+    "quality_profile": "showcase",
+    "views": [
+      {
+        "id": "direct-execution",
+        "label": "Prompt to Response Flow",
+        "focus": ["ui_prompt", "server_api", "router_select", "cli_binary", "isolated_env", "claude_core", "response_out"],
+        "note": "Trace how a user prompt is routed directly into the local Claude CLI subprocess without browser cookie scraping."
+      },
+      {
+        "id": "security-isolation",
+        "label": "Environment Isolation",
+        "focus": ["isolated_env", "claude_core", "auth_token"],
+        "note": "Shows neutral temp cwd containment and tool blocking to guarantee pure LLM output without repo git inspection."
+      },
+      {
+        "id": "failover-safety",
+        "label": "Multi-Tier Fallback",
+        "focus": ["router_select", "fallback_api", "gemini_groq"],
+        "note": "Demonstrates automatic cascading to Anthropic API key, Groq 120B, or Gemini if CLI limits are reached."
+      }
+    ]
+  },
+  "lanes": [
+    { "id": "client_lane", "label": "Client & Frontend Surface" },
+    { "id": "server_lane", "label": "Server & LLM Routing Engine" },
+    { "id": "process_lane", "label": "Subprocess & Isolation Layer" },
+    { "id": "anthropic_lane", "label": "Claude Engine & Authentication" }
+  ],
+  "phases": [
+    { "id": "intake_phase", "label": "1. Request Intake", "fromCol": 0, "toCol": 1 },
+    { "id": "dispatch_phase", "label": "2. Route & Isolate", "fromCol": 2, "toCol": 3, "variant": "emphasis" },
+    { "id": "compute_phase", "label": "3. Execute & Return", "fromCol": 4, "toCol": 5, "variant": "dashed" }
+  ],
+  "groups": [
+    { "id": "routing_grp", "label": "Provider Router", "lane": "server_lane", "fromCol": 2, "toCol": 3, "variant": "emphasis" },
+    { "id": "isolation_grp", "label": "Sandbox & Flags", "lane": "process_lane", "fromCol": 3, "toCol": 4, "variant": "security" },
+    { "id": "claude_grp", "label": "Active Subscription", "lane": "anthropic_lane", "fromCol": 4, "toCol": 5, "variant": "emphasis" }
+  ],
+  "mainPath": ["ui_prompt", "server_api", "router_select", "cli_binary", "isolated_env", "claude_core", "response_out"],
+  "nodes": [
+    { "id": "ui_prompt", "lane": "client_lane", "col": 0, "type": "frontend", "label": "Chat / UI Client", "sublabel": "Prompt / Code task", "width": 140 },
+    { "id": "server_api", "lane": "server_lane", "col": 1, "type": "backend", "label": "POST /api/claude", "sublabel": "server.py REST route", "tag": "FastAPI/HTTP", "width": 140 },
+    { "id": "router_select", "lane": "server_lane", "col": 2, "type": "backend", "label": "LLM Router", "sublabel": "app/llm_router.py", "tag": "Priority 1", "width": 140 },
+    { "id": "fallback_api", "lane": "server_lane", "col": 3, "type": "cloud", "label": "Anthropic API Key", "sublabel": "Direct cloud REST", "width": 140 },
+    { "id": "gemini_groq", "lane": "server_lane", "col": 4, "type": "cloud", "label": "Groq / Gemini", "sublabel": "Emergency cascade", "width": 140 },
+    { "id": "cli_binary", "lane": "process_lane", "col": 2, "type": "backend", "label": "Native claude.exe", "sublabel": "Subprocess spawn", "tag": "v2.1.251", "width": 140 },
+    { "id": "isolated_env", "lane": "process_lane", "col": 3, "type": "security", "label": "Sandbox Isolation", "sublabel": "cwd=tempfile, tools=\"\"", "tag": "Zero Git Leak", "width": 140 },
+    { "id": "auth_token", "lane": "anthropic_lane", "col": 3, "type": "security", "label": "Terminal Auth", "sublabel": "claude login session", "width": 140 },
+    { "id": "claude_core", "lane": "anthropic_lane", "col": 4, "type": "cloud", "label": "Claude 3.7 / Sonnet", "sublabel": "Deep code reasoning", "tag": "Full Subscription", "width": 140 },
+    { "id": "response_out", "lane": "client_lane", "col": 5, "type": "frontend", "label": "Rich Response", "sublabel": "PySpark / JSON / Plan", "width": 140 }
+  ],
+  "edges": [
+    { "id": "e_ui_server", "from": "ui_prompt", "to": "server_api", "label": "send request", "variant": "emphasis" },
+    { "id": "e_server_router", "from": "server_api", "to": "router_select", "variant": "default" },
+    { "id": "e_router_cli", "from": "router_select", "to": "cli_binary", "label": "spawn proc", "variant": "emphasis" },
+    { "id": "e_router_fallback", "from": "router_select", "to": "fallback_api", "label": "on CLI fail", "variant": "dashed" },
+    { "id": "e_fallback_cascade", "from": "fallback_api", "to": "gemini_groq", "label": "on 429 rate limit", "variant": "dashed" },
+    { "id": "e_cli_sandbox", "from": "cli_binary", "to": "isolated_env", "label": "isolate env", "variant": "security" },
+    { "id": "e_auth_bind", "from": "auth_token", "to": "claude_core", "label": "verified token", "variant": "security" },
+    { "id": "e_sandbox_exec", "from": "isolated_env", "to": "claude_core", "label": "claude -p", "variant": "emphasis" },
+    { "id": "e_claude_reply", "from": "claude_core", "to": "response_out", "label": "streamed PySpark", "variant": "emphasis", "role": "return", "fromSide": "right", "toSide": "right", "route": "outside-right", "width": 1.4 },
+    { "id": "e_gemini_reply", "from": "gemini_groq", "to": "response_out", "variant": "dashed", "role": "return", "fromSide": "right", "toSide": "right", "route": "outside-right" }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Subprocess Engine Contract",
+      "items": [
+        "Spawns native claude.exe binary directly without cmd.exe batch newline corruption",
+        "Isolates working directory in tempfile.gettempdir() to block git status inspection"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Enterprise Reliability",
+      "items": [
+        "Uses your active claude login terminal session with zero cookie expiration",
+        "Resilient multi-tier fallback to Anthropic API key, Groq 120B, and Gemini"
+      ]
+    }
+  ]
+}
