@@ -55,11 +55,18 @@ def _load_all_connectors():
 
     # Load custom user-defined connectors from disk
     try:
-        from connectors.jit_connector_factory import load_custom_connectors, DynamicJITConnector
+        from connectors.jit_connector_factory import ARCHETYPE_TEMPLATES, DynamicJITConnector, load_custom_connectors
+
         custom_map = load_custom_connectors()
         for sid, cdef in custom_map.items():
             _REGISTRY[sid] = DynamicJITConnector(sid, cdef)
             print(f"[REGISTRY] Loaded custom connector: {sid} ({cdef.get('name')})")
+
+        # Also load standard enterprise archetypes (Postgres, Snowflake, Oracle, S3, etc.)
+        for sid, template in ARCHETYPE_TEMPLATES.items():
+            if sid not in _REGISTRY:
+                _REGISTRY[sid] = DynamicJITConnector(sid, template)
+                print(f"[REGISTRY] Loaded archetype connector: {sid} ({template.get('name')})")
     except Exception as e:
         print(f"[REGISTRY] Could not load custom connectors: {e}")
 
