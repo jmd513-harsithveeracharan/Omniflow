@@ -4,14 +4,15 @@ Tests MemoryManager conversation handling, fact extraction, and LLM prompt build
 Run with: python -m pytest app/tests/test_memory.py -v
 """
 
-import sys
 import os
+import sys
+
 import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
 from app import session_store as store
-from app.memory import MemoryManager, _extract_facts, _build_system_prompt
+from app.memory import MemoryManager, _extract_facts
 
 
 @pytest.fixture(autouse=True)

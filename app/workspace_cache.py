@@ -20,9 +20,10 @@ Why maintain a local cache?
     without having to wait for an API roundtrip on every message
 """
 
-import time
 import threading
-from datetime import datetime, timezone
+import time
+from datetime import UTC, datetime
+
 from app import session_store as store
 from app.config import ALLOWED_WORKSPACE_ID
 
@@ -39,7 +40,7 @@ _mem_cache: dict = {
 
 
 def _now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 def _is_stale() -> bool:
@@ -56,7 +57,7 @@ def refresh_cache(workspace_id: str = ALLOWED_WORKSPACE_ID) -> dict:
     Returns the cache dict: {items, folders, synced_at}
     """
     try:
-        from app.fabric_client import list_workspace_items, list_folders
+        from app.fabric_client import list_folders, list_workspace_items
         items_result = list_workspace_items(workspace_id)
         items   = items_result.get("items", []) if items_result.get("success") else []
         folders = list_folders(workspace_id)

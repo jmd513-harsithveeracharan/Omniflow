@@ -4,13 +4,12 @@ Tests the Full vs. Incremental strategy classifier and plan generation.
 Run with: python -m pytest app/tests/test_ingestion_planner.py -v
 """
 
-import sys
 import os
+import sys
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
-import pytest
-from app.ingestion_planner import classify_strategy, parse_schedule, generate_ingestion_plan
-
+from app.ingestion_planner import classify_strategy, generate_ingestion_plan, parse_schedule
 
 # ── Strategy Classifier Tests ─────────────────────────────────────────────────
 

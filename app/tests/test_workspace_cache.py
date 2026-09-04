@@ -4,10 +4,10 @@ Tests in-memory + SQLite caching, lookup helpers, and optimistic updates.
 Run with: python -m pytest app/tests/test_workspace_cache.py -v
 """
 
-import sys
 import os
+import sys
+
 import pytest
-from unittest.mock import patch
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 

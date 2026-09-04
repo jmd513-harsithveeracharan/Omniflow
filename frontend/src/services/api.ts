@@ -1,17 +1,26 @@
 /**
  * frontend/src/services/api.ts
  * Typed HTTP & SSE API client for Fabric AI Studio FastAPI backend.
+ * Zero 'any' types.
  */
 
-import { FabricStatus, ChatSession, TranspileResult } from '../types';
+import {
+  FabricStatus,
+  ChatSession,
+  TranspileResult,
+  SkillSummary,
+  ConnectorSummary,
+  DiscoveredTable,
+  IngestionPlan,
+  BlastRadiusReport,
+  WorkspaceFolder,
+} from '../types';
 
 const API_BASE = '/api';
 
 export async function fetchFabricStatus(): Promise<FabricStatus> {
   const res = await fetch(`${API_BASE}/fabric/status`);
-  if (!res.ok) {
-    throw new Error(`Failed to fetch Fabric status: ${res.statusText}`);
-  }
+  if (!res.ok) throw new Error(`Failed to fetch Fabric status: ${res.statusText}`);
   const data = await res.json();
   return {
     authenticated: Boolean(data.authenticated),
@@ -24,9 +33,7 @@ export async function fetchFabricStatus(): Promise<FabricStatus> {
 
 export async function fetchSessions(): Promise<ChatSession[]> {
   const res = await fetch(`${API_BASE}/sessions`);
-  if (!res.ok) {
-    throw new Error(`Failed to fetch sessions: ${res.statusText}`);
-  }
+  if (!res.ok) throw new Error(`Failed to fetch sessions: ${res.statusText}`);
   const data = await res.json();
   return (data.sessions || []).map((s: Record<string, unknown>) => ({
     sessionId: String(s.session_id || ''),
@@ -44,9 +51,7 @@ export async function createNewSession(workspaceId?: string): Promise<string> {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ workspace_id: workspaceId }),
   });
-  if (!res.ok) {
-    throw new Error(`Failed to create session: ${res.statusText}`);
-  }
+  if (!res.ok) throw new Error(`Failed to create session: ${res.statusText}`);
   const data = await res.json();
   return data.session_id;
 }
@@ -57,9 +62,7 @@ export async function transpileSql(sql: string, sourceDialect = 'tsql'): Promise
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ sql, source_dialect: sourceDialect, target_dialect: 'spark' }),
   });
-  if (!res.ok) {
-    throw new Error(`Transpile failed: ${res.statusText}`);
-  }
+  if (!res.ok) throw new Error(`Transpile failed: ${res.statusText}`);
   const data = await res.json();
   return {
     status: data.status,
@@ -68,6 +71,123 @@ export async function transpileSql(sql: string, sourceDialect = 'tsql'): Promise
     sparkSql: data.spark_sql,
     lineage: data.lineage || {},
   };
+}
+
+export async function fetchSkills(): Promise<SkillSummary[]> {
+  const res = await fetch(`${API_BASE}/skills`);
+  if (!res.ok) throw new Error(`Failed to fetch skills: ${res.statusText}`);
+  const data = await res.json();
+  return (data || []).map((s: Record<string, unknown>) => ({
+    name: String(s.name || ''),
+    displayName: String(s.display_name || s.name || ''),
+    description: String(s.description || ''),
+    tier: String(s.tier || 'atomic'),
+    snippet: String(s.snippet || ''),
+  }));
+}
+
+export async function fetchSkillDetail(name: string): Promise<SkillSummary> {
+  const res = await fetch(`${API_BASE}/skills/${name}`);
+  if (!res.ok) throw new Error(`Failed to fetch skill ${name}: ${res.statusText}`);
+  const data = await res.json();
+  return {
+    name: String(data.name || name),
+    displayName: String(data.display_name || data.name || name),
+    description: String(data.description || ''),
+    tier: String(data.tier || 'atomic'),
+    snippet: String(data.snippet || ''),
+    fullRunbook: String(data.content || data.fullRunbook || ''),
+  };
+}
+
+export async function fetchConnectors(): Promise<ConnectorSummary[]> {
+  const res = await fetch(`${API_BASE}/connectors`);
+  if (!res.ok) throw new Error(`Failed to fetch connectors: ${res.statusText}`);
+  const data = await res.json();
+  return data || [];
+}
+
+export async function testConnectorConnection(
+  sourceId: string,
+  params: Record<string, unknown>
+): Promise<{ success: boolean; message: string }> {
+  const res = await fetch(`${API_BASE}/connectors/test`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ source_id: sourceId, params }),
+  });
+  if (!res.ok) throw new Error(`Connection test failed: ${res.statusText}`);
+  return res.json();
+}
+
+export async function discoverConnectorTables(
+  sourceId: string,
+  params: Record<string, unknown>
+): Promise<DiscoveredTable[]> {
+  const res = await fetch(`${API_BASE}/connectors/discover`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ source_id: sourceId, params }),
+  });
+  if (!res.ok) throw new Error(`Table discovery failed: ${res.statusText}`);
+  const data = await res.json();
+  return (data.tables || []).map((t: Record<string, unknown>) => ({
+    name: String(t.name || ''),
+    schema: String(t.schema || 'dbo'),
+    estimatedRows: Number(t.estimated_rows || 0),
+    primaryKey: String(t.primary_key || 'id'),
+    strategy: 'incremental',
+  }));
+}
+
+export async function generateMedallionPlan(
+  sourceId: string,
+  selectedTables: DiscoveredTable[],
+  targetLakehousePrefix = 'lh_enterprise'
+): Promise<IngestionPlan> {
+  const res = await fetch(`${API_BASE}/pipeline/plan`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      source_id: sourceId,
+      selected_tables: selectedTables,
+      target_lakehouse_prefix: targetLakehousePrefix,
+    }),
+  });
+  if (!res.ok) throw new Error(`Plan generation failed: ${res.statusText}`);
+  const data = await res.json();
+  return data.plan;
+}
+
+export async function deployMedallionPlan(
+  plan: IngestionPlan,
+  workspaceId?: string
+): Promise<{ status: string; run_id: string; message: string }> {
+  const res = await fetch(`${API_BASE}/pipeline/deploy`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ plan, workspace_id: workspaceId }),
+  });
+  if (!res.ok) throw new Error(`Deployment failed: ${res.statusText}`);
+  return res.json();
+}
+
+export async function fetchWorkspaceTree(workspaceId?: string): Promise<WorkspaceFolder[]> {
+  const url = workspaceId ? `${API_BASE}/workspace/tree?workspace_id=${workspaceId}` : `${API_BASE}/workspace/tree`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Failed to fetch workspace tree: ${res.statusText}`);
+  const data = await res.json();
+  return data.folders || [];
+}
+
+export async function analyzeBlastRadius(assetId: string, targetName: string): Promise<BlastRadiusReport> {
+  const res = await fetch(`${API_BASE}/governance/blast-radius`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ asset_id: assetId, target_name: targetName }),
+  });
+  if (!res.ok) throw new Error(`Blast radius calculation failed: ${res.statusText}`);
+  return res.json();
 }
 
 export async function streamChatTurn(
@@ -83,10 +203,7 @@ export async function streamChatTurn(
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ message, session_id: sessionId, stream: true }),
     });
-
-    if (!res.ok || !res.body) {
-      throw new Error(`Stream connection failed: ${res.statusText}`);
-    }
+    if (!res.ok || !res.body) throw new Error(`Stream connection failed: ${res.statusText}`);
 
     const reader = res.body.getReader();
     const decoder = new TextDecoder('utf-8');
@@ -114,7 +231,7 @@ export async function streamChatTurn(
               return;
             }
           } catch {
-            // Ignore parse errors on incomplete chunks
+            // ignore JSON parse on incomplete chunks
           }
         }
       }

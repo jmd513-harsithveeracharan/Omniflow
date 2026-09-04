@@ -8,8 +8,8 @@ Replaces the FabricItemGenerator class in fabric_ai_engine.py with
 clean, testable, standalone functions.
 """
 
-import json
 import base64
+import json
 import uuid
 
 

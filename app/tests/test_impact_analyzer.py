@@ -4,14 +4,13 @@ Tests risk classification and the safe deletion protocol.
 Run with: python -m pytest app/tests/test_impact_analyzer.py -v
 """
 
-import sys
-import os
 import json
-import tempfile
+import os
+import sys
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
-import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 # Patch Fabric API calls before importing impact_analyzer
 with patch("app.fabric_client.get_auth_headers", return_value={"Authorization": "Bearer mock_token"}):

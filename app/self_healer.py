@@ -12,14 +12,14 @@ Provides:
 import json
 import logging
 from typing import Any
-from app.llm_router import chat_json, chat
-from app.skill_loader import load_skills
+
 from app.fabric_client import (
     get_item_definition,
     update_definition,
-    trigger_pipeline_run,
 )
 from app.fabric_compiler import compile_notebook_update
+from app.llm_router import chat_json
+from app.skill_loader import load_skills
 
 logger = logging.getLogger("fabric_ai.self_healer")
 
@@ -45,14 +45,14 @@ def diagnose_and_patch_code(code: str, error_trace: str, notebook_name: str = "n
     Diagnoses runtime failure and produces a patched PySpark script.
     """
     skills_context = load_skills(["pattern_error_handling_self_healing", "pattern_incremental_cdc_watermark"])
-    
+
     prompt = (
         f"Notebook Name: {notebook_name}\n\n"
         f"--- FAILING PYSPARK CODE ---\n{code}\n\n"
         f"--- SPARK RUNTIME ERROR / STACK TRACE ---\n{error_trace}\n\n"
         "Diagnose the error and provide the patched PySpark code."
     )
-    
+
     system_prompt = _HEALER_SYSTEM
     if skills_context:
         system_prompt += f"\n\n{skills_context}"
@@ -88,7 +88,7 @@ def auto_heal_notebook(notebook_id: str, error_trace: str, workspace_id: str, no
     """
     logger.info(f"[SELF-HEALER] Starting auto-remediation for notebook {notebook_id}...")
     import base64
-    
+
     # 1. Get current definition
     raw_def = get_item_definition(notebook_id, workspace_id)
     current_code = ""
@@ -134,7 +134,7 @@ def auto_heal_notebook(notebook_id: str, error_trace: str, workspace_id: str, no
     # 4. Push update to Microsoft Fabric
     update_res = update_definition(notebook_id, update_payload, workspace_id)
     is_success = bool(update_res)
-    
+
     return {
         "success": is_success,
         "notebook_id": notebook_id,

@@ -25,7 +25,7 @@ Usage:
 
 import re
 import uuid
-from datetime import datetime, timezone
+
 from app import session_store as store
 from app.config import ALLOWED_WORKSPACE_ID, ALLOWED_WORKSPACE_NAME
 
@@ -230,12 +230,11 @@ def _build_session_context_summary(messages: list[dict]) -> str:
     Used as the 'session_context' fact shown in the sidebar.
     """
     # Collect key nouns from assistant messages (plans, folder names, etc.)
-    folder_pat   = re.compile(r"\b([A-Z][A-Za-z0-9_]+)\b")
-    nb_pat       = re.compile(r"\bnb_[A-Za-z0-9_]+\b")
-    lh_pat       = re.compile(r"\blh_[A-Za-z0-9_]+\b")
-    pl_pat       = re.compile(r"\bpl_[A-Za-z0-9_]+\b")
+    nb_pat = re.compile(r"\bnb_[A-Za-z0-9_]+\b")
+    lh_pat = re.compile(r"\blh_[A-Za-z0-9_]+\b")
+    pl_pat = re.compile(r"\bpl_[A-Za-z0-9_]+\b")
 
-    folders, notebooks, lakehouses, pipelines = set(), set(), set(), set()
+    notebooks, lakehouses, pipelines = set(), set(), set()
     turn_count = 0
 
     for m in messages:

@@ -4,10 +4,9 @@ Tests SQLite CRUD for sessions, messages, runs, learned facts, and workspace cac
 Run with: python -m pytest app/tests/test_session_store.py -v
 """
 
-import sys
 import os
-import tempfile
-import sqlite3
+import sys
+
 import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
@@ -172,7 +171,7 @@ class TestConversationCRUD:
         assert len(convs) == 2
         assert any(c["session_id"] == sid1 and c["message_count"] == 2 for c in convs)
         assert any(c["session_id"] == sid2 and c["message_count"] == 1 for c in convs)
-        
+
         # Check auto-generated title
         conv1 = next(c for c in convs if c["session_id"] == sid1)
         assert "Medallion" in conv1["title"]

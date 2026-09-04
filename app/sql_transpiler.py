@@ -19,7 +19,6 @@ logger = logging.getLogger("fabric_ai.sql_transpiler")
 try:
     import sqlglot
     from sqlglot import exp
-    from sqlglot.lineage import lineage
     _SQLGLOT_AVAILABLE = True
 except ImportError:
     _SQLGLOT_AVAILABLE = False

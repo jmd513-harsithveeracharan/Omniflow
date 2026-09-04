@@ -19,11 +19,11 @@ Why SQLite and not plain JSON?
 Database file: <project_root>/fabric_ai_memory.db
 """
 
-import sqlite3
 import json
-import threading
 import os
-from datetime import datetime, timezone
+import sqlite3
+import threading
+from datetime import UTC, datetime
 
 _DB_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "fabric_ai_memory.db")
 _db_lock = threading.Lock()
@@ -123,7 +123,7 @@ def init_db():
 
 
 def _now() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 # ── Session CRUD ───────────────────────────────────────────────────────────────
@@ -599,8 +599,8 @@ def get_db_stats() -> dict:
 
 def prune_old_sessions(days: int = 30):
     """Deletes sessions (and cascaded messages/facts) older than N days."""
-    cutoff = datetime.now(timezone.utc).replace(
-        day=datetime.now(timezone.utc).day - days
+    cutoff = datetime.now(UTC).replace(
+        day=datetime.now(UTC).day - days
     ).isoformat()
     with _db_lock:
         conn = _get_conn()
@@ -666,7 +666,7 @@ def update_project(project_id: str, name: str | None = None, description: str | 
     if is_archived is not None:
         updates.append("is_archived = ?")
         params.append(1 if is_archived else 0)
-    
+
     params.append(project_id)
     with _db_lock:
         conn = _get_conn()

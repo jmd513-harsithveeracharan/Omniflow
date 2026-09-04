@@ -11,9 +11,10 @@ After Fabric items are deployed, this module:
   4. Returns error details for future self-healing analysis
 """
 
-import time
 import threading
-from app.fabric_client import trigger_pipeline_run, get_job_status
+import time
+
+from app.fabric_client import get_job_status, trigger_pipeline_run
 
 _POLL_INTERVAL_SECONDS = 5
 _MAX_POLLS = 120  # 10 minutes max monitoring window

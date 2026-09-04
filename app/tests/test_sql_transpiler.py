@@ -4,12 +4,11 @@ app/tests/test_sql_transpiler.py
 Unit tests for SQL transpilation, AST validation, and lineage extraction.
 """
 
-import pytest
 from app.sql_transpiler import (
-    transpile_to_spark,
     extract_sql_lineage,
-    validate_sql,
     generate_pyspark_delta_merge,
+    transpile_to_spark,
+    validate_sql,
 )
 
 

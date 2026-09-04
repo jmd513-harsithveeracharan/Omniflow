@@ -17,9 +17,7 @@ recording:
   - Stage 5: Live Microsoft Fabric Deployment Audit (Per-Step Timestamps & Status)
 """
 
-import os
-import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -36,7 +34,7 @@ def log_agent_execution(session_id: str, state: Any, deployment_result: dict | N
     safe_sid = "".join(c for c in session_id if c.isalnum() or c in ("-", "_"))[:32] or "default"
     log_file = TRACES_DIR / f"session_{safe_sid}.md"
 
-    now_utc = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S.%f")[:-3] + " UTC"
+    now_utc = datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S.%f")[:-3] + " UTC"
 
     plan = getattr(state, "fabric_plan", None) or {}
     dag = getattr(state, "dag", None)
@@ -55,7 +53,7 @@ def log_agent_execution(session_id: str, state: Any, deployment_result: dict | N
     md = []
     # If new file, add header
     if not log_file.exists():
-        md.append(f"# 🏛️ Fabric AI Studio — Agent Execution Trace & Reconciliation Log")
+        md.append("# 🏛️ Fabric AI Studio — Agent Execution Trace & Reconciliation Log")
         md.append(f"- **Session ID**: `{session_id}`")
         md.append(f"- **Log Created At**: `{now_utc}`\n")
         md.append("---\n")

@@ -4,24 +4,24 @@ app/safe_batch_delete.py
 Safely backs up and deletes specific target folders and their items.
 Complies with Blast-Radius Governance & Zero Hardcoding rules.
 """
+import json
 import os
 import sys
-import json
 import time
 from datetime import datetime
+
+from app.config import ALLOWED_WORKSPACE_ID, ALLOWED_WORKSPACE_NAME
+from app.fabric_client import (
+    delete_folder,
+    delete_item,
+    get_item_definition,
+    list_folders,
+    list_workspace_items,
+)
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if BASE_DIR not in sys.path:
     sys.path.insert(0, BASE_DIR)
-
-from app.config import ALLOWED_WORKSPACE_ID, ALLOWED_WORKSPACE_NAME
-from app.fabric_client import (
-    list_folders,
-    list_workspace_items,
-    get_item_definition,
-    delete_item,
-    delete_folder,
-)
 
 TARGET_FOLDERS = [
     "Enterprise_Retail_Medallion",
@@ -40,11 +40,11 @@ os.makedirs(ARCHIVE_DIR, exist_ok=True)
 def run_safe_batch_delete(target_folders: list[str] | None = None):
     targets = target_folders or (sys.argv[1:] if len(sys.argv) > 1 else TARGET_FOLDERS)
 
-    print(f"======================================================")
-    print(f"      Fabric AI Studio — Safe Batch Delete Protocol   ")
+    print("======================================================")
+    print("      Fabric AI Studio — Safe Batch Delete Protocol   ")
     print(f"  Workspace: {ALLOWED_WORKSPACE_NAME} ({ALLOWED_WORKSPACE_ID})")
     print(f"  Target Folders ({len(targets)}): {', '.join(targets)}")
-    print(f"======================================================")
+    print("======================================================")
 
     # 1. Match Folders
     folders = list_folders(ALLOWED_WORKSPACE_ID)
@@ -107,9 +107,9 @@ def run_safe_batch_delete(target_folders: list[str] | None = None):
             print(f"  [WARN] Snapshot warning for {item_name}: {e}")
 
     # 4. Delete Items (Lakehouses, Notebooks, Pipelines, Environments)
-    print(f"\n[DELETING ITEMS] Deleting items inside target folders...")
+    print("\n[DELETING ITEMS] Deleting items inside target folders...")
     deleted_items_count = 0
-    for it, folder_name in target_items:
+    for it, _folder_name in target_items:
         item_id = it.get("id")
         item_name = it.get("displayName")
         item_type = it.get("type")
@@ -128,7 +128,7 @@ def run_safe_batch_delete(target_folders: list[str] | None = None):
         time.sleep(0.5)
 
     # 5. Delete Folders
-    print(f"\n[DELETING FOLDERS] Deleting empty target folders...")
+    print("\n[DELETING FOLDERS] Deleting empty target folders...")
     deleted_folders_count = 0
     for fid, fname in matched_folders.items():
         print(f"  -> Deleting folder '{fname}' (ID: {fid})...")
@@ -140,12 +140,12 @@ def run_safe_batch_delete(target_folders: list[str] | None = None):
             print(f"    [FAIL] Failed to delete folder {fname}")
         time.sleep(0.5)
 
-    print(f"\n======================================================")
-    print(f"              CLEANUP COMPLETE REPORT                 ")
+    print("\n======================================================")
+    print("              CLEANUP COMPLETE REPORT                 ")
     print(f"  Items Deleted:   {deleted_items_count}")
     print(f"  Folders Deleted: {deleted_folders_count}")
     print(f"  Backup Archive:  {backup_folder}")
-    print(f"======================================================")
+    print("======================================================")
 
 
 if __name__ == "__main__":

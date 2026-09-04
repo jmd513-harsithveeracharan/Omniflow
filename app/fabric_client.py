@@ -10,9 +10,10 @@ Workspace security is enforced here — every write/delete operation asserts
 that the target workspace matches the allowed workspace in config.
 """
 
-import json
 import time
+
 import requests
+
 from app.auth import get_auth_headers
 from app.config import ALLOWED_WORKSPACE_ID, ALLOWED_WORKSPACE_NAME
 
@@ -416,7 +417,7 @@ def create_pipeline_schedule(
     _assert_workspace(workspace_id)
     headers = get_auth_headers()
 
-    now = datetime.datetime.now(datetime.timezone.utc)
+    now = datetime.datetime.now(datetime.UTC)
     start_dt = now.strftime("%Y-%m-%dT%H:%M:%S")
     end_dt = (now + datetime.timedelta(days=days_valid)).strftime("%Y-%m-%dT%H:%M:%S")
 

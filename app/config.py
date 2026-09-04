@@ -10,8 +10,8 @@ Load order (highest priority wins):
 All other modules import from here — never from os.getenv() directly.
 """
 
-import os
 import json
+import os
 
 # Load .env if present — graceful fallback if python-dotenv not installed
 try:
@@ -46,7 +46,7 @@ _CONFIG_FILE = os.path.join(os.path.dirname(os.path.dirname(__file__)), "config.
 
 def _load_config_json() -> dict:
     if os.path.exists(_CONFIG_FILE):
-        with open(_CONFIG_FILE, "r", encoding="utf-8") as f:
+        with open(_CONFIG_FILE, encoding="utf-8") as f:
             return json.load(f)
     return {}
 
@@ -64,7 +64,7 @@ ALLOWED_WORKSPACE_NAME: str = (
 
 # Startup validation — fail early with a clear message
 if not ALLOWED_WORKSPACE_ID:
-    raise EnvironmentError(
+    raise OSError(
         "CRITICAL: FABRIC_ALLOWED_WORKSPACE_ID is not set!\n"
         "Set it in .env or config.json before starting the server."
     )

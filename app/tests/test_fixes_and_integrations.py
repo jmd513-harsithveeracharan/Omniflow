@@ -9,20 +9,17 @@ Targeted tests for recent bug fixes and enhancements:
 """
 
 import base64
-import json
-import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
-from app.self_healer import diagnose_and_patch_code, auto_heal_notebook
 from app.fabric_compiler import compile_notebook_update
+from app.llm_router import _SESSION, _model_to_provider_call
+from app.self_healer import auto_heal_notebook
 from app.skill_loader import (
     discover_skills,
     get_skills_manifest,
-    get_skill_by_name,
-    match_relevant_skill,
     load_skills,
+    match_relevant_skill,
 )
-from app.llm_router import _model_to_provider_call, _SESSION
 
 
 class TestSelfHealerFixes:

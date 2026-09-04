@@ -4,11 +4,10 @@ app/tests/test_skills_loader.py
 Unit tests for the dynamic skills loader and progressive disclosure system.
 """
 
-import pytest
 from app.skills_loader import (
     discover_skills,
-    get_skills_manifest,
     get_skill_by_name,
+    get_skills_manifest,
     match_relevant_skill,
 )
 

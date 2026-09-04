@@ -15,14 +15,24 @@ Complexity is passed by the caller:
 """
 
 import json
+import os
+import shutil
+import subprocess
 import time
+
 import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util import Retry
 
 from app.config import (
-    ANTHROPIC_KEY, OPENAI_KEY, GEMINI_KEY, GROQ_KEYS, LLM_MODELS,
-    CLAUDE_ORG_UUID, CLAUDE_DEVICE_ID, CLAUDE_COOKIE, CLAUDE_MIX_MODE
+    ANTHROPIC_KEY,
+    CLAUDE_COOKIE,
+    CLAUDE_DEVICE_ID,
+    CLAUDE_ORG_UUID,
+    GEMINI_KEY,
+    GROQ_KEYS,
+    LLM_MODELS,
+    OPENAI_KEY,
 )
 
 # ── HTTP Session Pool ────────────────────────────────────────────────────────
@@ -45,7 +55,7 @@ def _call_anthropic(messages: list, model: str, max_tokens: int = 4096) -> str:
         raise RuntimeError("ANTHROPIC_API_KEY not set.")
     system_parts = [m["content"] for m in messages if m.get("role") == "system"]
     user_assistant_msgs = [m for m in messages if m.get("role") in ("user", "assistant")]
-    
+
     payload = {
         "model": model,
         "max_tokens": max_tokens,
@@ -145,9 +155,8 @@ def _call_groq(messages: list, model: str, max_tokens: int = 4096) -> str:
         except Exception as e:
             last_err = str(e)
             continue
-import os
-import subprocess
-import shutil
+    raise RuntimeError(f"All Groq keys failed. Last error: {last_err}")
+
 
 def _get_claude_cli_binary() -> str | None:
     """Finds the Claude Code CLI executable path on the system, preferring native executable binary to avoid cmd batch truncation."""
@@ -243,7 +252,7 @@ def _call_claude_session(messages: list, model: str = "claude-opus-5", max_token
     """Call Claude Web Session using user's active browser subscription cookies with real-time SSE parsing."""
     if not CLAUDE_COOKIE:
         raise RuntimeError("CLAUDE_COOKIE is not configured in .env.")
-    
+
     import uuid
     full_prompt = "\n\n".join([f"{m['role'].upper()}: {m['content']}" for m in messages])
     chat_uuid = str(uuid.uuid4())
@@ -288,7 +297,7 @@ def _call_claude_session(messages: list, model: str = "claude-opus-5", max_token
         stream=True,
         timeout=90
     )
-    
+
     full_text = []
     for line in resp.iter_lines():
         if line:
@@ -392,7 +401,7 @@ def _model_to_provider_call(model_id: str, messages: list, max_tokens: int, sess
             full_prompt = " ".join([m.get("content", "") for m in messages])
             chosen_model = _resolve_claude_mix_model(full_prompt)
             return (lambda: _call_claude_session(messages, chosen_model, max_tokens), f"Claude Native Mix ({chosen_model})")
-            
+
         raise RuntimeError("No Claude provider found: Claude Code CLI, ANTHROPIC_API_KEY, or CLAUDE_COOKIE required.")
     elif "gpt" in m or "openai" in m or "o3" in m:
         if not OPENAI_KEY:

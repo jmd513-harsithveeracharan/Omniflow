@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 app/vault.py — Zero-Leak Authenticated Encrypted Vault & Cipher Protection Engine
 ---------------------------------------------------------------------------------
@@ -9,14 +8,14 @@ Military-grade AES-like authenticated stream encryption using PBKDF2 HMAC-SHA256
 4. Zero-Token Boundary Guarantee: Secrets never leave local execution state.
 """
 
-import os
-import json
 import base64
 import hashlib
 import hmac
-import time
+import json
+import os
 import secrets
-from typing import Dict, Any, Optional, List
+import time
+from typing import Any
 
 VAULT_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "scratch", "vault")
 VAULT_FILE = os.path.join(VAULT_DIR, "secure_connectors_vault.enc")
@@ -34,37 +33,37 @@ def _encrypt_payload(data_str: str, password: str) -> str:
     """Encrypts payload with random salt and HMAC-SHA256 authentication tag."""
     salt = secrets.token_bytes(16)
     enc_key, auth_key = _derive_keys(password, salt)
-    
+
     raw_bytes = data_str.encode("utf-8")
     key_len = len(enc_key)
     cipher_bytes = bytes([b ^ enc_key[i % key_len] for i, b in enumerate(raw_bytes)])
-    
+
     # Calculate HMAC signature over salt + ciphertext
     tag = hmac.new(auth_key, salt + cipher_bytes, hashlib.sha256).digest()
-    
+
     # Envelope structure: [Salt 16B] + [Tag 32B] + [Ciphertext NB]
     envelope = salt + tag + cipher_bytes
     return base64.b64encode(envelope).decode("utf-8")
 
 
-def _decrypt_payload(b64_str: str, password: str) -> Optional[str]:
+def _decrypt_payload(b64_str: str, password: str) -> str | None:
     """Decrypts payload, verifying HMAC signature first to guarantee data integrity and PIN accuracy."""
     try:
         envelope = base64.b64decode(b64_str)
         if len(envelope) < 48:
             return None
-        
+
         salt = envelope[:16]
         tag = envelope[16:48]
         cipher_bytes = envelope[48:]
-        
+
         enc_key, auth_key = _derive_keys(password, salt)
-        
+
         # Verify HMAC tag in constant time to prevent timing attacks
         expected_tag = hmac.new(auth_key, salt + cipher_bytes, hashlib.sha256).digest()
         if not hmac.compare_digest(tag, expected_tag):
             return None  # Tampered or wrong password
-        
+
         key_len = len(enc_key)
         plain_bytes = bytes([b ^ enc_key[i % key_len] for i, b in enumerate(cipher_bytes)])
         return plain_bytes.decode("utf-8")
@@ -77,12 +76,12 @@ class SecureVault:
     Manages encrypted credentials for all data source connectors with master password protection.
     """
 
-    def __init__(self, master_password: Optional[str] = None):
+    def __init__(self, master_password: str | None = None):
         os.makedirs(VAULT_DIR, exist_ok=True)
         self.default_pin = os.environ.get("FABRIC_VAULT_PIN", "FabricDefaultPIN2026")
         self.master_password = master_password or self.default_pin
 
-    def set_master_password(self, new_password: str, current_password: Optional[str] = None) -> bool:
+    def set_master_password(self, new_password: str, current_password: str | None = None) -> bool:
         """Sets a new master PIN/password and re-encrypts the vault."""
         curr = current_password or self.master_password
         stored = self.get_all_decrypted(curr)
@@ -94,7 +93,7 @@ class SecureVault:
         if not os.path.exists(VAULT_FILE):
             return True
         try:
-            with open(VAULT_FILE, "r", encoding="utf-8") as f:
+            with open(VAULT_FILE, encoding="utf-8") as f:
                 raw_b64 = f.read().strip()
             if not raw_b64:
                 return True
@@ -103,11 +102,11 @@ class SecureVault:
         except Exception:
             return False
 
-    def save_connector_credentials(self, source_id: str, credentials: Dict[str, Any], master_password: Optional[str] = None) -> bool:
+    def save_connector_credentials(self, source_id: str, credentials: dict[str, Any], master_password: str | None = None) -> bool:
         """Saves credentials for a connector into the ciphered vault."""
         pwd = master_password or self.master_password
         all_data = self.get_all_decrypted(pwd)
-        
+
         all_data[source_id] = {
             "source_id": source_id,
             "credentials": credentials,
@@ -116,7 +115,7 @@ class SecureVault:
         }
         return self._save_vault(all_data, pwd)
 
-    def get_connector_credentials(self, source_id: str, master_password: Optional[str] = None) -> Optional[Dict[str, Any]]:
+    def get_connector_credentials(self, source_id: str, master_password: str | None = None) -> dict[str, Any] | None:
         """Retrieves decrypted credentials for a specific connector."""
         pwd = master_password or self.master_password
         all_data = self.get_all_decrypted(pwd)
@@ -125,14 +124,14 @@ class SecureVault:
             return entry.get("credentials", {})
         return None
 
-    def get_all_decrypted(self, master_password: Optional[str] = None) -> Dict[str, Any]:
+    def get_all_decrypted(self, master_password: str | None = None) -> dict[str, Any]:
         """Loads and decrypts all vault entries."""
         if not os.path.exists(VAULT_FILE):
             return {}
-        
+
         pwd = master_password or self.master_password
         try:
-            with open(VAULT_FILE, "r", encoding="utf-8") as f:
+            with open(VAULT_FILE, encoding="utf-8") as f:
                 raw_b64 = f.read().strip()
             if not raw_b64:
                 return {}
@@ -143,14 +142,14 @@ class SecureVault:
         except Exception:
             return {}
 
-    def _save_vault(self, data: Dict[str, Any], password: str) -> bool:
+    def _save_vault(self, data: dict[str, Any], password: str) -> bool:
         plain_json = json.dumps(data, ensure_ascii=False)
         encrypted_b64 = _encrypt_payload(plain_json, password)
         with open(VAULT_FILE, "w", encoding="utf-8") as f:
             f.write(encrypted_b64)
         return True
 
-    def list_connector_statuses(self, master_password: Optional[str] = None) -> List[Dict[str, Any]]:
+    def list_connector_statuses(self, master_password: str | None = None) -> list[dict[str, Any]]:
         """Returns safe summary of stored connectors (passwords masked)."""
         pwd = master_password or self.master_password
         decrypted = self.get_all_decrypted(pwd)

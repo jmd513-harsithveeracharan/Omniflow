@@ -9,7 +9,6 @@ Provides:
   3. auto_register_skill(skill_name: str, content: str, category: str = "patterns") -> Auto-saves newly synthesized skills.
 """
 
-import os
 import re
 from pathlib import Path
 from typing import Any
@@ -48,7 +47,7 @@ def _extract_preview_snippet(content: str, name: str) -> str:
     if code_match:
         lines = [l for l in code_match.group(1).strip().splitlines() if l.strip()]
         return "\n".join(lines[:5])
-    
+
     # Fallback to key instructions
     lines = [l.strip() for l in content.splitlines() if l.strip() and not l.startswith("#") and not l.startswith("---")]
     return "\n".join(lines[:4]) if lines else f"# Operational playbook for {name}"

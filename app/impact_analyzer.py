@@ -20,13 +20,12 @@ For HIGH risk deletions, safe_delete() orchestrates:
 
 import json
 import os
-import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+
 from app.fabric_client import (
-    list_workspace_items,
-    get_item_definition,
-    delete_item,
     ALLOWED_WORKSPACE_ID,
+    delete_item,
+    get_item_definition,
 )
 
 # ── Risk Classification Table ─────────────────────────────────────────────────
@@ -124,7 +123,7 @@ def take_definition_snapshot(item_id: str, item_name: str, workspace_id: str = A
         print(f"[IMPACT] Could not snapshot definition for '{item_name}' (ID: {item_id}).")
         return None
 
-    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+    timestamp = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
     archive_path = os.path.join(_ARCHIVE_DIR, f"{timestamp}_{item_name}")
     os.makedirs(archive_path, exist_ok=True)
 
@@ -132,7 +131,7 @@ def take_definition_snapshot(item_id: str, item_name: str, workspace_id: str = A
         "item_id":    item_id,
         "item_name":  item_name,
         "workspace_id": workspace_id,
-        "snapshotted_at": datetime.now(timezone.utc).isoformat(),
+        "snapshotted_at": datetime.now(UTC).isoformat(),
         "definition_parts": definition_parts,
     }
     snapshot_file = os.path.join(archive_path, "definition.json")
@@ -192,7 +191,7 @@ def safe_delete(
         "item_id":     item_id,
         "item_name":   item_name,
         "workspace_id": workspace_id,
-        "deleted_at":  datetime.now(timezone.utc).isoformat(),
+        "deleted_at":  datetime.now(UTC).isoformat(),
         "snapshot_path": snapshot_path,
         "confirmed_by_phrase": expected_phrase,
     }
@@ -211,7 +210,7 @@ def _log_audit(entry: dict):
     trail = []
     if os.path.exists(audit_file):
         try:
-            with open(audit_file, "r", encoding="utf-8") as f:
+            with open(audit_file, encoding="utf-8") as f:
                 trail = json.load(f)
         except Exception:
             trail = []

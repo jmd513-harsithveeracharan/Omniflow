@@ -14,22 +14,25 @@ Entry point: run_pipeline(prompt, session_id, history) -> (FabricPlan dict, audi
 
 from __future__ import annotations
 
+import concurrent.futures
 import json
 import re
-import uuid
-import time
-from datetime import datetime, timezone
-import concurrent.futures
 import threading
+import time
+import uuid
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 
+from app.ingestion_planner import parse_schedule
 from app.llm_router import chat
 from app.meta_skill import (
-    META_PLANNER_SYSTEM, CONTEXT_GATE_SYSTEM, AUDITOR_SYSTEM,
-    WORKER_CODE_ALGO_SYSTEM, WORKER_CODE_MEDALLION_SYSTEM
+    AUDITOR_SYSTEM,
+    CONTEXT_GATE_SYSTEM,
+    META_PLANNER_SYSTEM,
+    WORKER_CODE_ALGO_SYSTEM,
+    WORKER_CODE_MEDALLION_SYSTEM,
 )
 from app.skill_loader import load_skills
-from app.ingestion_planner import parse_schedule
 
 # ── Live Real-Time Multi-Agent Progress Store ────────────────────────────────
 _ACTIVE_PROGRESS: dict[str, list[dict]] = {}
@@ -44,7 +47,7 @@ def set_progress_step(session_id: str, title: str, detail: str = "", status: str
     """Emits or advances a real-time progress step for the frontend."""
     if not session_id:
         return
-    now_utc = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S.%f")[:-3] + " UTC"
+    now_utc = datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S.%f")[:-3] + " UTC"
     with _PROGRESS_LOCK:
         if session_id not in _ACTIVE_PROGRESS:
             _ACTIVE_PROGRESS[session_id] = []
@@ -69,7 +72,7 @@ def clear_progress(session_id: str):
 
 
 def _now_utc_str() -> str:
-    return datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S.%f")[:-3] + " UTC"
+    return datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S.%f")[:-3] + " UTC"
 
 
 # ---------------------------------------------------------------------------
@@ -199,7 +202,6 @@ def _run_context_gate(state: PipelineState) -> str:
             return parsed["mode"]
     except Exception:
         pass
-    plan_str = json.dumps(plan_summary).lower()
     prompt_lower = state.prompt.lower()
     names = (plan_summary.get("notebooks") or []) + [plan_summary.get("folder") or "", plan_summary.get("pipeline") or ""]
     overlap = any(n.lower() in prompt_lower for n in names if n)
@@ -625,7 +627,7 @@ def run_pipeline(prompt: str, session_id: str, history: list | None = None,
         f"Analyzing conversation context & requirements for prompt: '{prompt[:100]}...'. Determining workflow mode (independent vs follow-up)...",
         "in_progress"
     )
-    
+
     state = PipelineState(
         prompt=prompt,
         session_id=session_id,
@@ -680,7 +682,7 @@ def run_pipeline(prompt: str, session_id: str, history: list | None = None,
     folder_target = state.dag.folder if state.dag else "AI_Test_Folder"
     step_names = ', '.join([f"'{s.name}'" for s in state.dag.steps]) if state.dag else ""
     pl_sched = state.dag.pipeline.get("schedule", "Daily") if (state.dag and state.dag.pipeline) else "None"
-    
+
     set_progress_step(
         session_id,
         "Meta-Planner: Plan Created",

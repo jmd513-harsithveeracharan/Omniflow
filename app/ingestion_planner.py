@@ -9,10 +9,9 @@ Improvements over the original ingestion_planner.py:
   3. Strategy matrix included in the plan for HITL approval before deployment.
 """
 
-import uuid
 import re
-from datetime import datetime, timezone
-
+import uuid
+from datetime import UTC, datetime, timedelta
 
 # ── Watermark Detection ───────────────────────────────────────────────────────
 
@@ -40,7 +39,6 @@ def classify_strategy(table_meta: dict) -> dict:
     """
     columns = table_meta.get("columns", [])
     estimated_rows = table_meta.get("estimated_rows", 0)
-    table_name = table_meta.get("table", "unknown")
 
     pk_col = next((c for c in columns if c.get("is_primary_key")), None)
     watermark_col = next(
@@ -78,9 +76,6 @@ def classify_strategy(table_meta: dict) -> dict:
     }
 
 
-from datetime import datetime, timezone, timedelta
-
-
 # ── Schedule Parser ───────────────────────────────────────────────────────────
 
 def parse_schedule(prompt: str) -> dict:
@@ -90,7 +85,7 @@ def parse_schedule(prompt: str) -> dict:
     Falls back to daily 02:00 UTC if nothing is detected.
     """
     p = prompt.lower()
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     end_time_iso = None
     exp_desc = None
 
@@ -328,7 +323,7 @@ def generate_ingestion_plan(
 
     return {
         "run_id":          run_id,
-        "created_at":      datetime.now(timezone.utc).isoformat(),
+        "created_at":      datetime.now(UTC).isoformat(),
         "source_id":       source_id,
         "source_name":     source_name,
         "database":        database,

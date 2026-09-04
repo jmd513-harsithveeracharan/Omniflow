@@ -25,7 +25,6 @@ export interface ChatSession {
 }
 
 export type MedallionLayer = 'source' | 'bronze' | 'silver' | 'gold' | 'semantic' | 'report';
-
 export type AssetType = 'table' | 'lakehouse' | 'notebook' | 'pipeline' | 'semantic_model' | 'power_bi_report';
 
 export interface SchemaColumn {
@@ -68,4 +67,85 @@ export interface FabricStatus {
   targetFolder: string;
   workspacesCount: number;
   message: string;
+}
+
+export interface SkillSummary {
+  name: string;
+  displayName: string;
+  description: string;
+  tier: string;
+  snippet?: string;
+  tags?: string[];
+  triggers?: string[];
+  fullRunbook?: string;
+}
+
+export interface ConnectorField {
+  name: string;
+  label: string;
+  type: 'string' | 'password' | 'number' | 'boolean';
+  required: boolean;
+  default?: string | number | boolean;
+}
+
+export interface ConnectorSummary {
+  id: string;
+  name: string;
+  category: string;
+  description: string;
+  fields: ConnectorField[];
+}
+
+export interface DiscoveredTable {
+  name: string;
+  schema: string;
+  estimatedRows?: number;
+  selected?: boolean;
+  primaryKey?: string;
+  strategy?: 'full' | 'incremental' | 'scd2';
+}
+
+export interface IngestionPlanItem {
+  name: string;
+  layer: MedallionLayer;
+  type: AssetType;
+  sourceTable: string;
+  targetTable: string;
+  strategy: string;
+}
+
+export interface IngestionPlan {
+  sourceId: string;
+  sourceName: string;
+  database: string;
+  schedule: string;
+  items: IngestionPlanItem[];
+  notebooks: string[];
+  lakehouses: string[];
+}
+
+export type ThinkingStepStatus = 'pending' | 'running' | 'completed' | 'warning' | 'error';
+
+export interface ThinkingStep {
+  id: string;
+  title: string;
+  description: string;
+  status: ThinkingStepStatus;
+  latencyMs?: number;
+  details?: string;
+  badge?: string;
+}
+
+export interface WorkspaceItem {
+  id: string;
+  displayName: string;
+  type: string;
+  description?: string;
+  folderId?: string;
+}
+
+export interface WorkspaceFolder {
+  id: string;
+  displayName: string;
+  items: WorkspaceItem[];
 }

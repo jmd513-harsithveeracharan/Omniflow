@@ -7,13 +7,13 @@ Phase 2: Generate PySpark code for each notebook concurrently.
 Phase 3: Assemble plan dictionary.
 """
 
-import os
-import re
-import json
-import uuid
 import concurrent.futures
+import json
+import re
+import uuid
+
 from app.llm_router import chat
-from app.skill_loader import load_skills, get_skill_index
+from app.skill_loader import load_skills
 
 _INTENT_SYSTEM = """You are the Microsoft Fabric Architecture Agent.
 You are powered by enterprise data engineering runbooks and specialized Microsoft Fabric skills.
@@ -113,9 +113,12 @@ def _heuristic_intent_fallback(prompt: str) -> dict:
     if nb_lines:
         for nb_name, desc in nb_lines:
             layer = "Notebook"
-            if any(k in nb_name.lower() for k in ("bronze", "raw")): layer = "Bronze"
-            elif any(k in nb_name.lower() for k in ("silver", "clean", "merge")): layer = "Silver"
-            elif any(k in nb_name.lower() for k in ("gold", "star", "agg", "metric")): layer = "Gold"
+            if any(k in nb_name.lower() for k in ("bronze", "raw")):
+                layer = "Bronze"
+            elif any(k in nb_name.lower() for k in ("silver", "clean", "merge")):
+                layer = "Silver"
+            elif any(k in nb_name.lower() for k in ("gold", "star", "agg", "metric")):
+                layer = "Gold"
             notebooks.append({"name": nb_name.strip(), "layer": layer, "description": desc.strip()})
     else:
         # Fallback to any nb_ tokens

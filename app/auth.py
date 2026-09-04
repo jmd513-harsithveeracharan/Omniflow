@@ -12,11 +12,13 @@ Tokens are cached with thread-safety and refreshed before expiration.
 Includes get_auth_status() for UI health checks and user identity display.
 """
 
-import subprocess
 import json
-import time
+import subprocess
 import threading
+import time
+
 import requests
+
 import app.config as cfg
 
 _cache_lock = threading.Lock()
