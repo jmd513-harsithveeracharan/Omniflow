@@ -28,6 +28,7 @@ from pydantic import BaseModel, Field
 
 # Core app imports
 from app.config import ALLOWED_WORKSPACE_ID
+from app.domain.workflow.router import router as workflow_router
 from app.fabric_client import list_workspaces
 from app.llm_router import chat
 from app.session_store import (
@@ -58,6 +59,10 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Mount Routers
+app.include_router(workflow_router)
+
 
 
 # ── Pydantic Schemas ─────────────────────────────────────────────────────────
