@@ -1,0 +1,24 @@
+version: "3.8"
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: fabric_ai_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: fabric_ai
+    ports:
+      - "5432:5432"
+    volumes:
+      - fabric_ai_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d fabric_ai"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  fabric_ai_pgdata:
+    driver: local
