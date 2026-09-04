@@ -13,30 +13,33 @@ Provides:
 
 from __future__ import annotations
 
-import os
-import sys
-import json
-import uuid
 import asyncio
-from datetime import datetime, timezone
-from typing import Optional, List, Dict, Any
+import json
+import os
+import uuid
+from datetime import UTC, datetime
+from typing import Any
 
-from fastapi import FastAPI, HTTPException, Request, BackgroundTasks, Query
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, StreamingResponse, FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 # Core app imports
 from app.config import ALLOWED_WORKSPACE_ID
+from app.fabric_client import list_workspaces
+from app.llm_router import chat
 from app.session_store import (
-    init_db, create_session, get_session, touch_session,
-    list_sessions, list_conversations_with_metadata,
-    add_message, get_messages, get_facts, set_fact
+    add_message,
+    create_session,
+    get_facts,
+    get_session,
+    init_db,
+    list_conversations_with_metadata,
+    touch_session,
 )
-from app.llm_router import chat, chat_json
-from app.sql_transpiler import transpile_to_spark, extract_sql_lineage
-from app.fabric_client import list_workspaces, list_workspace_items, get_workspace_tree
+from app.sql_transpiler import extract_sql_lineage, transpile_to_spark
 
 # Initialize DB on server start
 init_db()
@@ -44,7 +47,7 @@ init_db()
 app = FastAPI(
     title="Fabric AI Studio API",
     description="Enterprise Data Engineering & Fabric Orchestration Engine with Native Multi-Turn Sessioning",
-    version="2.0.0"
+    version="2.0.0",
 )
 
 # Enable CORS for local React/Vite development
@@ -59,20 +62,21 @@ app.add_middleware(
 
 # ── Pydantic Schemas ─────────────────────────────────────────────────────────
 
+
 class ChatRequest(BaseModel):
     message: str = Field(..., description="User prompt or instruction")
-    session_id: Optional[str] = Field(None, description="Active chat thread / session UUID")
-    workspace_id: Optional[str] = Field(None, description="Microsoft Fabric Workspace ID")
-    model: Optional[str] = Field(None, description="Target LLM model override")
+    session_id: str | None = Field(None, description="Active chat thread / session UUID")
+    workspace_id: str | None = Field(None, description="Microsoft Fabric Workspace ID")
+    model: str | None = Field(None, description="Target LLM model override")
     complexity: str = Field("standard", description="standard | high | compress")
     effort: str = Field("medium", description="Thinking effort: low | medium | high")
     stream: bool = Field(False, description="Whether to stream response tokens via SSE")
 
 
 class SessionInitRequest(BaseModel):
-    session_id: Optional[str] = Field(None, description="Custom session UUID if provided by client")
-    workspace_id: Optional[str] = Field(None, description="Fabric Workspace ID")
-    metadata: Optional[Dict[str, Any]] = Field(default_factory=dict)
+    session_id: str | None = Field(None, description="Custom session UUID if provided by client")
+    workspace_id: str | None = Field(None, description="Fabric Workspace ID")
+    metadata: dict[str, Any] | None = Field(default_factory=dict)
 
 
 class TranspileRequest(BaseModel):
@@ -82,12 +86,13 @@ class TranspileRequest(BaseModel):
 
 
 class FabricDeployRequest(BaseModel):
-    plan: Dict[str, Any] = Field(..., description="Fabric execution plan with Medallion items")
-    session_id: Optional[str] = None
-    workspace_id: Optional[str] = None
+    plan: dict[str, Any] = Field(..., description="Fabric execution plan with Medallion items")
+    session_id: str | None = None
+    workspace_id: str | None = None
 
 
 # ── Endpoints ───────────────────────────────────────────────────────────────
+
 
 @app.get("/api/health", summary="Health Check")
 async def health_check():
@@ -95,7 +100,7 @@ async def health_check():
         "status": "online",
         "service": "Fabric AI Studio API",
         "version": "2.0.0",
-        "timestamp": datetime.now(timezone.utc).isoformat()
+        "timestamp": datetime.now(UTC).isoformat(),
     }
 
 
@@ -109,19 +114,19 @@ async def get_fabric_status():
             "workspace_id": ALLOWED_WORKSPACE_ID,
             "target_folder": "AI_Test_Folder",
             "workspaces_count": len(workspaces),
-            "message": "Fabric REST API connected." if workspaces else "Offline or zero workspaces found."
+            "message": "Fabric REST API connected." if workspaces else "Offline or zero workspaces found.",
         }
     except Exception as e:
         return {
             "authenticated": False,
             "workspace_id": ALLOWED_WORKSPACE_ID,
             "error": str(e),
-            "message": "Running in offline/mock mode or credentials not yet configured."
+            "message": "Running in offline/mock mode or credentials not yet configured.",
         }
 
 
 @app.get("/api/sessions", summary="List Chat Threads")
-async def get_sessions(workspace_id: Optional[str] = None):
+async def get_sessions(workspace_id: str | None = None):
     """Returns all active conversation threads with titles, run counts, and message counts."""
     convs = list_conversations_with_metadata(workspace_id or ALLOWED_WORKSPACE_ID)
     return {"sessions": convs, "count": len(convs)}
@@ -133,7 +138,7 @@ async def init_new_session(req: SessionInitRequest):
     sid = req.session_id or str(uuid.uuid4())
     wid = req.workspace_id or ALLOWED_WORKSPACE_ID
     create_session(sid, wid, req.metadata or {})
-    return {"session_id": sid, "workspace_id": wid, "created_at": datetime.now(timezone.utc).isoformat()}
+    return {"session_id": sid, "workspace_id": wid, "created_at": datetime.now(UTC).isoformat()}
 
 
 @app.post("/api/chat", summary="Session-Aware Chat Completion")
@@ -144,7 +149,7 @@ async def handle_chat(req: ChatRequest):
     """
     sid = req.session_id or str(uuid.uuid4())
     wid = req.workspace_id or ALLOWED_WORKSPACE_ID
-    
+
     # Ensure session exists in SQLite store
     session_data = get_session(sid)
     is_resuming = session_data is not None
@@ -167,7 +172,7 @@ async def handle_chat(req: ChatRequest):
             target_model=req.model,
             effort=req.effort,
             session_id=sid,
-            resume=is_resuming
+            resume=is_resuming,
         )
 
         # Persist assistant response
@@ -177,10 +182,10 @@ async def handle_chat(req: ChatRequest):
             "session_id": sid,
             "response": response_text,
             "model_used": req.model or "auto-routed",
-            "resumed_session": is_resuming
+            "resumed_session": is_resuming,
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"LLM execution failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"LLM execution failed: {str(e)}") from e
 
 
 @app.post("/api/chat/stream", summary="SSE Streaming Chat")
@@ -190,7 +195,7 @@ async def handle_chat_stream(req: ChatRequest):
     """
     sid = req.session_id or str(uuid.uuid4())
     wid = req.workspace_id or ALLOWED_WORKSPACE_ID
-    
+
     session_data = get_session(sid)
     is_resuming = session_data is not None
     if not is_resuming:
@@ -203,7 +208,7 @@ async def handle_chat_stream(req: ChatRequest):
     async def event_generator():
         # Emit initial session metadata
         yield f"data: {json.dumps({'type': 'init', 'session_id': sid, 'resuming': is_resuming})}\n\n"
-        
+
         try:
             # Run in worker thread to prevent blocking event loop
             loop = asyncio.get_event_loop()
@@ -216,8 +221,8 @@ async def handle_chat_stream(req: ChatRequest):
                     target_model=req.model,
                     effort=req.effort,
                     session_id=sid,
-                    resume=is_resuming
-                )
+                    resume=is_resuming,
+                ),
             )
 
             # Persist assistant turn
@@ -226,7 +231,7 @@ async def handle_chat_stream(req: ChatRequest):
             # Stream chunks for smooth UI typing
             chunk_size = 32
             for i in range(0, len(response_text), chunk_size):
-                chunk = response_text[i:i + chunk_size]
+                chunk = response_text[i : i + chunk_size]
                 yield f"data: {json.dumps({'type': 'chunk', 'text': chunk})}\n\n"
                 await asyncio.sleep(0.01)
 
@@ -248,10 +253,10 @@ async def transpile_sql(req: TranspileRequest):
             "source_dialect": req.source_dialect,
             "target_dialect": req.target_dialect,
             "spark_sql": spark_sql,
-            "lineage": lineage
+            "lineage": lineage,
         }
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Transpilation failed: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Transpilation failed: {str(e)}") from e
 
 
 @app.get("/api/memory/facts/{session_id}", summary="Learned Fact Capsule")
@@ -264,6 +269,7 @@ async def get_session_facts_endpoint(session_id: str):
 # ── Static File Serving (Legacy & Modern Frontends) ─────────────────────────
 STATIC_DIR = os.path.dirname(os.path.abspath(__file__))
 
+
 @app.get("/")
 async def serve_index():
     index_path = os.path.join(STATIC_DIR, "index.html")
@@ -271,9 +277,11 @@ async def serve_index():
         return FileResponse(index_path)
     return {"message": "Fabric AI Studio API Online. Access /docs for Swagger UI."}
 
+
 # Mount assets and static files if present
 if os.path.exists(os.path.join(STATIC_DIR, "assets")):
     app.mount("/assets", StaticFiles(directory=os.path.join(STATIC_DIR, "assets")), name="assets")
+
 
 @app.get("/{filename:path}")
 async def serve_static_root_files(filename: str):
@@ -285,5 +293,6 @@ async def serve_static_root_files(filename: str):
 
 if __name__ == "__main__":
     import uvicorn
+
     print("[API] Starting Fabric AI Studio FastAPI Server on http://127.0.0.1:8085")
     uvicorn.run("api_server:app", host="127.0.0.1", port=8085, reload=True)
