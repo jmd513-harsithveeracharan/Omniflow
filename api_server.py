@@ -26,9 +26,15 @@ from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-# Core app imports
+from app.api import (
+    connectors_router,
+    governance_router,
+    pipelines_router,
+    skills_router,
+    workflow_router,
+    workspaces_router,
+)
 from app.config import ALLOWED_WORKSPACE_ID
-from app.domain.workflow.router import router as workflow_router
 from app.fabric_client import list_workspaces
 from app.llm_router import chat
 from app.session_store import (
@@ -45,6 +51,7 @@ from app.sql_transpiler import extract_sql_lineage, transpile_to_spark
 # Initialize DB on server start
 init_db()
 
+
 app = FastAPI(
     title="Fabric AI Studio API",
     description="Enterprise Data Engineering & Fabric Orchestration Engine with Native Multi-Turn Sessioning",
@@ -60,8 +67,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Mount Routers
+# Mount Modular Domain Routers
 app.include_router(workflow_router)
+app.include_router(skills_router)
+app.include_router(connectors_router)
+app.include_router(workspaces_router)
+app.include_router(pipelines_router)
+app.include_router(governance_router)
+
 
 
 
