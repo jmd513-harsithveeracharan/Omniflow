@@ -1,0 +1,35 @@
+# ruff.toml — Enterprise Python Linter & Formatter Configuration
+target-version = "py312"
+line-length = 120
+
+[lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort (import sorting)
+    "B",   # flake8-bugbear (common bug traps)
+    "UP",  # pyupgrade (modern python idioms)
+]
+ignore = [
+    "E501",  # line-too-long (handled gracefully by formatter)
+    "B008",  # do not perform function calls in argument defaults (FastAPI Depends)
+]
+
+exclude = [
+    ".git",
+    ".pytest_cache",
+    ".agents",
+    "node_modules",
+    "scratch",
+    "legacy",
+    "_deleted_archive",
+    "_reference_repos",
+    "fabric-kit",
+    "ingest-one-feat-ai-driven-onboarding",
+]
+
+[format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "auto"

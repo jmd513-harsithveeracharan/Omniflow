@@ -34,6 +34,8 @@ _reference_repos/
 _deleted_archive/
 scratch/
 claude_response.txt
+ingest-one-feat-ai-driven-onboarding/
+diagrams/
 
 # Test artifacts
 .pytest_cache/

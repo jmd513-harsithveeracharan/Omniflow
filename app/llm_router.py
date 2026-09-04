@@ -163,34 +163,53 @@ def _get_claude_cli_binary() -> str | None:
     return None
 
 
-def _call_claude_cli(messages: list, model: str = None, max_tokens: int = 4096) -> str:
-    """Call official Claude Code CLI subprocess (claude -p) using user's active terminal authentication."""
+def _call_claude_cli(
+    messages: list,
+    model: str = None,
+    max_tokens: int = 4096,
+    session_id: str = None,
+    resume: bool = False
+) -> str:
+    """
+    Call official Claude Code CLI subprocess (claude -p) using user's active terminal authentication.
+    Supports native session resumption via --resume <session_id> and --session-id <session_id>.
+    """
     claude_bin = _get_claude_cli_binary()
     if not claude_bin:
         raise RuntimeError("Claude Code CLI is not installed or not found in PATH.")
 
-    # Format messages cleanly for CLI prompt
-    system_prompts = [m["content"] for m in messages if m.get("role") == "system"]
-    conversation_turns = [m for m in messages if m.get("role") != "system"]
+    # 1. If resuming an existing session, we only need to pass the latest turn
+    if session_id and resume:
+        latest_user_msgs = [m.get("content", "") for m in messages if m.get("role") == "user"]
+        latest_turn = latest_user_msgs[-1] if latest_user_msgs else "Continue"
+        cmd = [claude_bin, "-p", latest_turn, "--resume", session_id, "--tools", ""]
+        if model:
+            cmd.extend(["--model", model])
+    else:
+        # 2. Starting a new session or stateless run
+        system_prompts = [m["content"] for m in messages if m.get("role") == "system"]
+        conversation_turns = [m for m in messages if m.get("role") != "system"]
 
-    sys_text = "\n\n".join(system_prompts).strip() if system_prompts else ""
+        sys_text = "\n\n".join(system_prompts).strip() if system_prompts else ""
 
-    formatted_parts = []
-    if sys_text:
-        formatted_parts.append(sys_text)
+        formatted_parts = []
+        if sys_text:
+            formatted_parts.append(sys_text)
 
-    if conversation_turns:
-        if len(conversation_turns) == 1 and conversation_turns[0].get("role") == "user":
-            formatted_parts.append(f"USER REQUEST:\n{conversation_turns[0].get('content', '')}")
-        else:
-            for m in conversation_turns:
-                role = m.get("role", "user").upper()
-                formatted_parts.append(f"[{role}]:\n{m.get('content', '')}")
+        if conversation_turns:
+            if len(conversation_turns) == 1 and conversation_turns[0].get("role") == "user":
+                formatted_parts.append(f"USER REQUEST:\n{conversation_turns[0].get('content', '')}")
+            else:
+                for m in conversation_turns:
+                    role = m.get("role", "user").upper()
+                    formatted_parts.append(f"[{role}]:\n{m.get('content', '')}")
 
-    full_prompt = "\n\n---\n\n".join(formatted_parts) if formatted_parts else "Hello"
-    cmd = [claude_bin, "-p", full_prompt, "--tools", ""]
-    if model:
-        cmd.extend(["--model", model])
+        full_prompt = "\n\n---\n\n".join(formatted_parts) if formatted_parts else "Hello"
+        cmd = [claude_bin, "-p", full_prompt, "--tools", ""]
+        if session_id:
+            cmd.extend(["--session-id", session_id])
+        if model:
+            cmd.extend(["--model", model])
 
     try:
         import tempfile
@@ -326,7 +345,7 @@ def _call_lmstudio(messages: list, model: str, max_tokens: int = 4096) -> str:
     return resp.json()["choices"][0]["message"]["content"]
 
 
-def _model_to_provider_call(model_id: str, messages: list, max_tokens: int):
+def _model_to_provider_call(model_id: str, messages: list, max_tokens: int, session_id: str = None, resume: bool = False):
     """Maps any requested model ID to its native provider attempt (Cloud, CLI, or Local)."""
     if not model_id:
         return None
@@ -361,7 +380,7 @@ def _model_to_provider_call(model_id: str, messages: list, max_tokens: int):
                 cli_model = "claude-3-5-haiku-20241022"
             elif "sonnet" in m:
                 cli_model = "claude-3-7-sonnet-20250219"
-            return (lambda: _call_claude_cli(messages, cli_model, max_tokens), f"Claude Code CLI ({cli_model or 'Default'})")
+            return (lambda: _call_claude_cli(messages, cli_model, max_tokens, session_id=session_id, resume=resume), f"Claude Code CLI ({cli_model or 'Default'})")
 
         # 2. Check if native ANTHROPIC_API_KEY is present
         if ANTHROPIC_KEY:
@@ -386,11 +405,11 @@ def _model_to_provider_call(model_id: str, messages: list, max_tokens: int):
 
 # ── Provider waterfall definitions ────────────────────────────────────────────
 
-def _high_complexity_providers(messages, max_tokens):
+def _high_complexity_providers(messages, max_tokens, session_id: str = None, resume: bool = False):
     """Claude Code CLI → Claude Sonnet → Gemini 3.6 Flash → GPT-4o → Groq 120B"""
     attempts = []
     if _get_claude_cli_binary():
-        attempts.append((lambda: _call_claude_cli(messages, None, max_tokens), "Claude Code CLI (Subprocess)"))
+        attempts.append((lambda: _call_claude_cli(messages, None, max_tokens, session_id=session_id, resume=resume), "Claude Code CLI (Subprocess)"))
     elif ANTHROPIC_KEY:
         attempts.append((lambda: _call_anthropic(messages, LLM_MODELS.get("anthropic_high", "claude-3-7-sonnet-20250219"), max_tokens), "Claude Sonnet"))
     elif CLAUDE_COOKIE:
@@ -405,13 +424,13 @@ def _high_complexity_providers(messages, max_tokens):
     return attempts
 
 
-def _standard_complexity_providers(messages, max_tokens):
+def _standard_complexity_providers(messages, max_tokens, session_id: str = None, resume: bool = False):
     """Gemini 3.6 Flash → Claude Code CLI → Groq 20B → Groq 120B → Claude Haiku"""
     attempts = []
     if GEMINI_KEY:
         attempts.append((lambda: _call_gemini(messages, LLM_MODELS.get("gemini_standard", "gemini-3.6-flash"), max_tokens), "Gemini 3.6 Flash"))
     if _get_claude_cli_binary():
-        attempts.append((lambda: _call_claude_cli(messages, None, max_tokens), "Claude Code CLI (Subprocess)"))
+        attempts.append((lambda: _call_claude_cli(messages, None, max_tokens, session_id=session_id, resume=resume), "Claude Code CLI (Subprocess)"))
     if GROQ_KEYS:
         attempts.append((lambda: _call_groq(messages, LLM_MODELS.get("groq_fast", "openai/gpt-oss-20b"), max_tokens), "Groq gpt-oss-20B"))
         attempts.append((lambda: _call_groq(messages, LLM_MODELS.get("groq_high", "openai/gpt-oss-120b"), max_tokens), "Groq gpt-oss-120B"))
@@ -420,7 +439,7 @@ def _standard_complexity_providers(messages, max_tokens):
     return attempts
 
 
-def _compress_complexity_providers(messages, max_tokens):
+def _compress_complexity_providers(messages, max_tokens, session_id: str = None, resume: bool = False):
     """Squeeze Straw compressor: Groq 20B / 120B — fast, cheap, targeted."""
     attempts = []
     if GROQ_KEYS:
@@ -439,10 +458,12 @@ def chat(
     max_tokens: int = 4096,
     target_model: str = None,
     effort: str = "medium",
+    session_id: str = None,
+    resume: bool = False,
 ) -> str:
     """
     Send a chat completion request using the user-selected or best available LLM provider.
-    Supports thinking effort scaling (low, medium, high).
+    Supports thinking effort scaling (low, medium, high) and native session resumption.
     """
     # Scale token budget by effort
     if effort == "low":
@@ -451,15 +472,15 @@ def chat(
         max_tokens = max(max_tokens, 8192)
 
     if complexity == "high":
-        attempts = _high_complexity_providers(messages, max_tokens)
+        attempts = _high_complexity_providers(messages, max_tokens, session_id=session_id, resume=resume)
     elif complexity == "compress":
-        attempts = _compress_complexity_providers(messages, max_tokens)
+        attempts = _compress_complexity_providers(messages, max_tokens, session_id=session_id, resume=resume)
     else:
-        attempts = _standard_complexity_providers(messages, max_tokens)
+        attempts = _standard_complexity_providers(messages, max_tokens, session_id=session_id, resume=resume)
 
     # If user selected a specific model, prioritize it
     if target_model:
-        explicit_attempt = _model_to_provider_call(target_model, messages, max_tokens)
+        explicit_attempt = _model_to_provider_call(target_model, messages, max_tokens, session_id=session_id, resume=resume)
         if explicit_attempt:
             attempts = [explicit_attempt] + [a for a in attempts if a[1] != explicit_attempt[1]]
 
@@ -467,7 +488,7 @@ def chat(
     for fn, name in attempts:
         try:
             result = fn()
-            print(f"[LLM] Response from {name} ({complexity} complexity, {effort} effort).")
+            print(f"[LLM] Response from {name} ({complexity} complexity, {effort} effort, session={session_id or 'none'}).")
             return result
         except Exception as e:
             print(f"[LLM FALLBACK] {name} failed: {e}")
@@ -482,12 +503,22 @@ def chat_json(
     max_tokens: int = 4096,
     target_model: str = None,
     effort: str = "medium",
+    session_id: str = None,
+    resume: bool = False,
 ) -> dict:
     """
     Like chat(), but parses the response as JSON.
     Strips markdown code fences if present before parsing.
     """
-    raw = chat(messages, complexity, max_tokens, target_model=target_model, effort=effort)
+    raw = chat(
+        messages,
+        complexity,
+        max_tokens,
+        target_model=target_model,
+        effort=effort,
+        session_id=session_id,
+        resume=resume,
+    )
     cleaned = raw.strip()
     if cleaned.startswith("```"):
         lines = cleaned.splitlines()
