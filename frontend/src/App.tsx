@@ -1,24 +1,27 @@
 import React, { useState, useEffect } from 'react';
-import { Header } from './components/Header';
-import { ChatThread } from './components/ChatThread';
+import { Sidebar } from './components/Sidebar';
+import { TopBar } from './components/TopBar';
+import { PlaygroundHome } from './components/PlaygroundHome';
+import { ChatTimeline } from './components/ChatTimeline';
+import { PromptDock } from './components/PromptDock';
 import { MedallionFlowCanvas } from './components/MedallionFlowCanvas';
-import { TranspilerStudio } from './components/TranspilerStudio';
 import { DeploymentWorkbench } from './components/DeploymentWorkbench';
 import { SkillInspectorModal } from './components/SkillInspectorModal';
 import { ConnectorModal } from './components/ConnectorModal';
 import { GovernanceModal } from './components/GovernanceModal';
-import { ThinkingDrawer } from './components/ThinkingDrawer';
 import { fetchFabricStatus, createNewSession, streamChatTurn } from './services/api';
 import { FabricStatus, ChatMessage, IngestionPlan } from './types';
 
 export const App: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<string>('architect');
+  const [activeView, setActiveView] = useState<string>('chat');
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(false);
+  const [isWorkbenchOpen, setIsWorkbenchOpen] = useState<boolean>(false);
   const [status, setStatus] = useState<FabricStatus | null>(null);
   const [sessionId, setSessionId] = useState<string>('');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isStreaming, setIsStreaming] = useState<boolean>(false);
 
-  // Modal Dialog States
+  // Modals
   const [isSkillsOpen, setIsSkillsOpen] = useState<boolean>(false);
   const [isConnectorsOpen, setIsConnectorsOpen] = useState<boolean>(false);
   const [isGovernanceOpen, setIsGovernanceOpen] = useState<boolean>(false);
@@ -80,51 +83,69 @@ export const App: React.FC = () => {
     );
   };
 
+  const handleSelectView = (view: string) => {
+    setActiveView(view);
+    if (view === 'skills') setIsSkillsOpen(true);
+    if (view === 'apps') setIsConnectorsOpen(true);
+    if (view === 'governance') setIsGovernanceOpen(true);
+  };
+
   const handlePlanGenerated = (plan: IngestionPlan) => {
     setCurrentPlan(plan);
-    setActiveTab('deployment');
+    setIsWorkbenchOpen(true);
     const msg = `Generated Medallion Ingestion Plan for source: **${plan.sourceName}** (${plan.schedule}). Target Lakehouses: \`lh_enterprise_bronze\`, \`lh_enterprise_silver\`, \`lh_enterprise_gold\`.`;
     setMessages((prev) => [...prev, { role: 'assistant', content: msg }]);
   };
 
   return (
-    <div className="flex flex-col h-screen w-screen overflow-hidden bg-background">
-      {/* Header Bar */}
-      <Header
-        status={status}
-        activeTab={activeTab}
-        onSelectTab={setActiveTab}
-        onNewSession={handleNewSession}
-        onOpenSkills={() => setIsSkillsOpen(true)}
-        onOpenConnectors={() => setIsConnectorsOpen(true)}
-        onOpenGovernance={() => setIsGovernanceOpen(true)}
+    <div className="studio-app-container">
+      {/* 1. Left Sidebar with Claude Styling */}
+      <Sidebar
+        activeView={activeView}
+        onSelectView={handleSelectView}
+        onNewChat={handleNewSession}
+        isCollapsed={isSidebarCollapsed}
+        onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
       />
 
-      {/* Main Studio Workspace */}
-      <div className="flex-1 flex overflow-hidden">
-        {/* Left Pane: Real-Time Chat & Thinking Trace (400px) */}
-        <div className="w-[400px] shrink-0 h-full flex flex-col border-r border-border overflow-hidden">
-          <div className="flex-1 overflow-hidden">
-            <ChatThread
-              messages={messages}
-              isStreaming={isStreaming}
-              onSendMessage={handleSendMessage}
-            />
+      {/* 2. Main Studio Canvas */}
+      <main className="studio-main" id="mainCanvas">
+        {/* Google AI Studio TopBar */}
+        <TopBar
+          viewTitle={messages.length === 0 ? 'Playground' : 'Architect Orders Medallion Flow'}
+          isSidebarCollapsed={isSidebarCollapsed}
+          onToggleSidebar={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+          isWorkbenchOpen={isWorkbenchOpen}
+          onToggleWorkbench={() => setIsWorkbenchOpen(!isWorkbenchOpen)}
+          onNewSession={handleNewSession}
+          onRefreshWorkspace={() => fetchFabricStatus().then(setStatus)}
+          status={status}
+        />
+
+        {/* Workspace Split (Chat Timeline + Optional Interactive Workbench Canvas) */}
+        <div className="bolt-workspace-split">
+          {/* Left Chat / Landing Center */}
+          <div className={`bolt-chat-pane ${messages.length === 0 ? 'is-landing' : ''} ${isWorkbenchOpen ? 'with-workbench' : 'full-width'}`}>
+            {messages.length === 0 ? (
+              <PlaygroundHome onSelectPrompt={handleSendMessage} />
+            ) : (
+              <ChatTimeline messages={messages} isStreaming={isStreaming} />
+            )}
+
+            {/* Floating Prompt Input Dock */}
+            <PromptDock onSendMessage={handleSendMessage} isStreaming={isStreaming} />
           </div>
-          {/* AI Thinking Stream & Intermediate Reasoning */}
-          <ThinkingDrawer isThinking={isStreaming} />
-        </div>
 
-        {/* Right Stage: Interactive Canvas / Deployment / Transpiler */}
-        <div className="flex-1 h-full flex flex-col overflow-hidden">
-          {activeTab === 'architect' && <MedallionFlowCanvas />}
-          {activeTab === 'deployment' && <DeploymentWorkbench plan={currentPlan} />}
-          {activeTab === 'transpiler' && <TranspilerStudio />}
-          {activeTab === 'lineage' && <MedallionFlowCanvas />}
+          {/* Right Visual Workbench Pane (When toggled open) */}
+          {isWorkbenchOpen && (
+            <div className="bolt-workbench-pane">
+              {currentPlan ? <DeploymentWorkbench plan={currentPlan} /> : <MedallionFlowCanvas />}
+            </div>
+          )}
         </div>
-      </div>
+      </main>
 
-      {/* Interactive Feature Modals */}
+      {/* Domain Feature Modals */}
       <SkillInspectorModal
         isOpen={isSkillsOpen}
         onClose={() => setIsSkillsOpen(false)}
