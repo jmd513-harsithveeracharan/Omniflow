@@ -14,6 +14,7 @@ import {
   Edit3,
   Trash2,
   Pin,
+  Archive,
   ExternalLink,
   EyeOff,
   Layers,
@@ -21,7 +22,7 @@ import {
   ChevronRight,
   MessageSquare,
 } from 'lucide-react';
-import { ChatSession } from '../types';
+import { ChatSession, ProjectRecord } from '../types';
 
 interface SidebarProps {
   activeView: string;
@@ -37,6 +38,13 @@ interface SidebarProps {
   onSelectSession?: (sessionId: string) => void;
   onDeleteSession?: (sessionId: string) => void;
   onRenameSession?: (sessionId: string, newTitle: string) => void;
+  projects?: ProjectRecord[];
+  activeProjectId?: string | null;
+  onSelectProject?: (projectId: string) => void;
+  onTogglePinProject?: (projectId: string, currentPinned: number) => void;
+  onEditProject?: (project: ProjectRecord) => void;
+  onArchiveProject?: (projectId: string) => void;
+  onDeleteProject?: (projectId: string) => void;
 }
 
 const PLATFORMS = [
@@ -60,12 +68,25 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onSelectSession,
   onDeleteSession,
   onRenameSession,
+  projects = [],
+  activeProjectId = null,
+  onSelectProject,
+  onTogglePinProject,
+  onEditProject,
+  onArchiveProject,
+  onDeleteProject,
 }) => {
   const [selectedPlatform, setSelectedPlatform] = useState('fabric');
   const [isPlatformMenuOpen, setIsPlatformMenuOpen] = useState(false);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const [isProjectsOpen, setIsProjectsOpen] = useState(true);
   const [isChatsOpen, setIsChatsOpen] = useState(true);
+  const [isProjectsExpanded, setIsProjectsExpanded] = useState(false);
+
+  // Project Item Options Menu
+  const [projectMenuId, setProjectMenuId] = useState<string | null>(null);
+  const [projectMenuPos, setProjectMenuPos] = useState<{ top: number; left: number } | null>(null);
+  const projectMenuRef = useRef<HTMLDivElement>(null);
 
   // Chat Item Options Menu
   const [menuSessionId, setMenuSessionId] = useState<string | null>(null);
@@ -74,11 +95,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [renamingTitle, setRenamingTitle] = useState<string>('');
   const menuRef = useRef<HTMLDivElement>(null);
 
+  // Close menus on outside click
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+      const target = e.target as Node;
+      if (menuRef.current && !menuRef.current.contains(target)) {
         setMenuSessionId(null);
         setMenuPos(null);
+      }
+      if (projectMenuRef.current && !projectMenuRef.current.contains(target)) {
+        setProjectMenuId(null);
+        setProjectMenuPos(null);
       }
     };
     window.addEventListener('mousedown', handleClickOutside);
@@ -86,6 +113,37 @@ export const Sidebar: React.FC<SidebarProps> = ({
       window.removeEventListener('mousedown', handleClickOutside);
     };
   }, []);
+
+  // Filter & Sort Projects: non-archived, pinned first, then updated_at
+  const activeProjectsList = projects.filter((p) => !p.is_archived);
+  const sortedProjects = [...activeProjectsList].sort((a, b) => {
+    const pinA = a.is_pinned ? 1 : 0;
+    const pinB = b.is_pinned ? 1 : 0;
+    if (pinA !== pinB) return pinB - pinA;
+    const dateA = new Date(a.updated_at || a.created_at || 0).getTime();
+    const dateB = new Date(b.updated_at || b.created_at || 0).getTime();
+    return dateB - dateA;
+  });
+
+  const limit = 5;
+  const visibleProjects = isProjectsExpanded ? sortedProjects : sortedProjects.slice(0, limit);
+  const hasMoreProjects = sortedProjects.length > limit;
+
+  const handleOpenProjectMenu = (e: React.MouseEvent, pid: string) => {
+    e.stopPropagation();
+    e.preventDefault();
+    if (projectMenuId === pid) {
+      setProjectMenuId(null);
+      setProjectMenuPos(null);
+      return;
+    }
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    setProjectMenuPos({
+      top: Math.min(rect.bottom + 4, window.innerHeight - 200),
+      left: Math.min(rect.left, window.innerWidth - 180),
+    });
+    setProjectMenuId(pid);
+  };
 
   const handleOpenMenu = (e: React.MouseEvent, sid: string) => {
     e.stopPropagation();
@@ -274,12 +332,138 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
           {isProjectsOpen && (
             <div className="sidebar-projects-list">
-              <div className="sidebar-project-item active">
-                <span className="project-bullet" />
-                <span>Enterprise Retail Medallion</span>
-              </div>
+              {sortedProjects.length === 0 ? (
+                <div style={{ padding: '6px 8px', fontSize: '12px', color: '#71717a' }}>
+                  No projects yet
+                </div>
+              ) : (
+                <>
+                  {visibleProjects.map((p) => {
+                    const isPinned = Boolean(p.is_pinned);
+                    const isActive = activeProjectId === p.id;
+                    return (
+                      <div
+                        key={p.id}
+                        className={`sidebar-project-item ${isActive ? 'active' : ''} ${isPinned ? 'pinned' : ''} ${projectMenuId === p.id ? 'menu-open' : ''}`}
+                        onClick={() => {
+                          if (onSelectProject) {
+                            onSelectProject(p.id);
+                          } else {
+                            onSelectView('projects');
+                          }
+                        }}
+                        title={p.name}
+                      >
+                        <span className="sidebar-project-icon">
+                          {isPinned ? (
+                            <Pin width={13} height={13} style={{ color: '#10b981' }} />
+                          ) : (
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+                              <rect x="4" y="3" width="16" height="5" rx="1.5" />
+                              <path d="M4 8v10a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8" />
+                              <line x1="4" y1="13" x2="20" y2="13" />
+                            </svg>
+                          )}
+                        </span>
+                        <span className="sidebar-project-name">{p.name}</span>
+                        <button
+                          type="button"
+                          className="sidebar-project-more-btn"
+                          onClick={(e) => handleOpenProjectMenu(e, p.id)}
+                          title="More options"
+                        >
+                          <MoreVertical width={13} height={13} />
+                        </button>
+                      </div>
+                    );
+                  })}
+                  {hasMoreProjects && (
+                    <button
+                      className="sidebar-projects-show-more-btn"
+                      type="button"
+                      onClick={() => setIsProjectsExpanded(!isProjectsExpanded)}
+                    >
+                      <span>
+                        {isProjectsExpanded
+                          ? 'Show less'
+                          : `Show ${sortedProjects.length - limit} more`}
+                      </span>
+                    </button>
+                  )}
+                </>
+              )}
             </div>
           )}
+
+          {/* Floating Context Menu Popup for Project */}
+          {projectMenuId && projectMenuPos && (() => {
+            const targetProject = sortedProjects.find((p) => p.id === projectMenuId);
+            if (!targetProject) return null;
+            const isPinned = Boolean(targetProject.is_pinned);
+            return (
+              <div
+                ref={projectMenuRef}
+                className="sidebar-project-menu-popup"
+                style={{ top: `${projectMenuPos.top}px`, left: `${projectMenuPos.left}px` }}
+                onMouseDown={(e) => e.stopPropagation()}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <button
+                  type="button"
+                  className="sidebar-project-menu-item"
+                  onClick={() => {
+                    setProjectMenuId(null);
+                    setProjectMenuPos(null);
+                    onTogglePinProject?.(targetProject.id, targetProject.is_pinned || 0);
+                  }}
+                >
+                  <Pin width={13} height={13} style={isPinned ? { color: '#10b981' } : undefined} />
+                  <span>{isPinned ? 'Unpin' : 'Pin to top'}</span>
+                </button>
+
+                <button
+                  type="button"
+                  className="sidebar-project-menu-item"
+                  onClick={() => {
+                    setProjectMenuId(null);
+                    setProjectMenuPos(null);
+                    onEditProject?.(targetProject);
+                  }}
+                >
+                  <Edit3 width={13} height={13} />
+                  <span>Edit details</span>
+                </button>
+
+                <button
+                  type="button"
+                  className="sidebar-project-menu-item"
+                  onClick={() => {
+                    setProjectMenuId(null);
+                    setProjectMenuPos(null);
+                    onArchiveProject?.(targetProject.id);
+                  }}
+                >
+                  <Archive width={13} height={13} />
+                  <span>Archive</span>
+                </button>
+
+                <div className="chat-menu-divider" />
+
+                <button
+                  type="button"
+                  className="sidebar-project-menu-item item-danger"
+                  onClick={() => {
+                    setProjectMenuId(null);
+                    setProjectMenuPos(null);
+                    onDeleteProject?.(targetProject.id);
+                  }}
+                >
+                  <Trash2 width={13} height={13} />
+                  <span>Delete</span>
+                </button>
+              </div>
+            );
+          })()}
         </div>
 
         {/* Chats and Tasks Accordion */}
@@ -377,7 +561,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </div>
           )}
 
-          {/* Floating Context Menu Popup (Matching Image 2 without shortcut letters) */}
+          {/* Floating Context Menu Popup for Chat */}
           {menuSessionId && menuPos && (
             <div
               ref={menuRef}

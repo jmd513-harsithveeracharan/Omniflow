@@ -11,6 +11,7 @@ import { ConnectorModal } from './components/ConnectorModal';
 import { GovernanceModal } from './components/GovernanceModal';
 import { SettingsModal } from './components/SettingsModal';
 import { FabricConnectionModal } from './components/modals/FabricConnectionModal';
+import { ProjectEditModal } from './components/ProjectEditModal';
 import { SkillsView } from './components/SkillsView';
 import { ProjectsView } from './components/ProjectsView';
 import { WorkspaceExplorerView } from './components/WorkspaceExplorerView';
@@ -23,8 +24,11 @@ import {
   fetchSessionDetail,
   deleteSession,
   renameSession,
+  fetchProjects,
+  updateProject,
+  deleteProject,
 } from './services/api';
-import { FabricStatus, ChatMessage, IngestionPlan, WorkspaceItem, ChatSession } from './types';
+import { FabricStatus, ChatMessage, IngestionPlan, WorkspaceItem, ChatSession, ProjectRecord } from './types';
 
 export const App: React.FC = () => {
   const [activeView, setActiveView] = useState<string>('chat');
@@ -36,6 +40,11 @@ export const App: React.FC = () => {
   const [isLoadingSessions, setIsLoadingSessions] = useState<boolean>(true);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isStreaming, setIsStreaming] = useState<boolean>(false);
+
+  // Projects State
+  const [projects, setProjects] = useState<ProjectRecord[]>([]);
+  const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
+  const [editingProject, setEditingProject] = useState<ProjectRecord | null>(null);
 
   // Modals
   const [isSkillsModalOpen, setIsSkillsModalOpen] = useState<boolean>(false);
@@ -58,12 +67,24 @@ export const App: React.FC = () => {
     }
   };
 
+  const loadProjectsList = async () => {
+    try {
+      const projs = await fetchProjects();
+      if (projs && projs.length > 0) {
+        setProjects(projs);
+      }
+    } catch (e) {
+      console.error('Failed to load projects', e);
+    }
+  };
+
   useEffect(() => {
     fetchFabricStatus()
       .then(setStatus)
       .catch(() => setStatus(null));
 
     loadSessions();
+    loadProjectsList();
 
     createNewSession()
       .then((sid) => {
@@ -121,6 +142,75 @@ export const App: React.FC = () => {
     } catch (e) {
       console.error('Failed to rename session', e);
     }
+  };
+
+  // Projects Handlers
+  const handleSelectProject = (projectId: string) => {
+    setActiveProjectId(projectId);
+    const target = projects.find((p) => p.id === projectId);
+    if (target) {
+      setActiveView('chat');
+      if (messages.length === 0) {
+        handleSendMessage(`Focus on project: ${target.name}`);
+      }
+    }
+  };
+
+  const handleTogglePinProject = async (projectId: string, currentPinned: number) => {
+    const nextPinned = currentPinned ? 0 : 1;
+    setProjects((prev) =>
+      prev.map((p) => (p.id === projectId ? { ...p, is_pinned: nextPinned } : p))
+    );
+    try {
+      await updateProject(projectId, { is_pinned: nextPinned });
+    } catch (e) {
+      console.error('Failed to pin project', e);
+      loadProjectsList();
+    }
+  };
+
+  const handleArchiveProject = async (projectId: string) => {
+    setProjects((prev) =>
+      prev.map((p) => (p.id === projectId ? { ...p, is_archived: 1 } : p))
+    );
+    try {
+      await updateProject(projectId, { is_archived: 1 });
+    } catch (e) {
+      console.error('Failed to archive project', e);
+      loadProjectsList();
+    }
+  };
+
+  const handleDeleteProject = async (projectId: string) => {
+    const target = projects.find((p) => p.id === projectId);
+    const projName = target ? target.name : projectId;
+    if (window.confirm(`Delete project "${projName}"?`)) {
+      setProjects((prev) => prev.filter((p) => p.id !== projectId));
+      try {
+        await deleteProject(projectId);
+      } catch (e) {
+        console.error('Failed to delete project', e);
+        loadProjectsList();
+      }
+    }
+  };
+
+  const handleEditProject = (project: ProjectRecord) => {
+    setEditingProject(project);
+  };
+
+  const handleSaveEditedProject = async (
+    projectId: string,
+    updates: { name: string; description: string }
+  ) => {
+    await updateProject(projectId, updates);
+    setProjects((prev) =>
+      prev.map((p) =>
+        p.id === projectId
+          ? { ...p, name: updates.name, description: updates.description, updated_at: new Date().toISOString() }
+          : p
+      )
+    );
   };
 
   const handleSendMessage = async (text: string) => {
@@ -223,6 +313,13 @@ export const App: React.FC = () => {
         onSelectSession={handleSelectSession}
         onDeleteSession={handleDeleteSession}
         onRenameSession={handleRenameSession}
+        projects={projects}
+        activeProjectId={activeProjectId}
+        onSelectProject={handleSelectProject}
+        onTogglePinProject={handleTogglePinProject}
+        onEditProject={handleEditProject}
+        onArchiveProject={handleArchiveProject}
+        onDeleteProject={handleDeleteProject}
       />
 
       {/* 2. Main Studio Canvas */}
@@ -320,6 +417,13 @@ export const App: React.FC = () => {
       </main>
 
       {/* Domain Feature Modals */}
+      <ProjectEditModal
+        isOpen={editingProject !== null}
+        onClose={() => setEditingProject(null)}
+        project={editingProject}
+        onSave={handleSaveEditedProject}
+      />
+
       <SkillInspectorModal
         isOpen={isSkillsModalOpen}
         onClose={() => setIsSkillsModalOpen(false)}
