@@ -72,6 +72,25 @@ export async function createNewSession(workspaceId?: string): Promise<string> {
   return data.session_id;
 }
 
+export async function deleteSession(sessionId: string): Promise<boolean> {
+  const res = await fetch(`${API_BASE}/sessions/${sessionId}`, {
+    method: 'DELETE',
+  });
+  if (!res.ok) throw new Error(`Failed to delete session: ${res.statusText}`);
+  const data = await res.json();
+  return Boolean(data.deleted);
+}
+
+export async function renameSession(sessionId: string, newTitle: string): Promise<boolean> {
+  const res = await fetch(`${API_BASE}/sessions/${sessionId}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ title: newTitle }),
+  });
+  if (!res.ok) throw new Error(`Failed to rename session: ${res.statusText}`);
+  return true;
+}
+
 export async function transpileSql(sql: string, sourceDialect = 'tsql'): Promise<TranspileResult> {
   const res = await fetch(`${API_BASE}/transpile`, {
     method: 'POST',

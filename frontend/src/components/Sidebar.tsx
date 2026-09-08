@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Plus,
   FolderTree,
@@ -11,6 +11,10 @@ import {
   LogOut,
   Sliders,
   MessageSquare,
+  MoreHorizontal,
+  Edit3,
+  Trash2,
+  Pin,
 } from 'lucide-react';
 import { ChatSession } from '../types';
 
@@ -26,6 +30,8 @@ interface SidebarProps {
   activeSessionId?: string;
   isLoadingSessions?: boolean;
   onSelectSession?: (sessionId: string) => void;
+  onDeleteSession?: (sessionId: string) => void;
+  onRenameSession?: (sessionId: string, newTitle: string) => void;
 }
 
 const PLATFORMS = [
@@ -47,12 +53,71 @@ export const Sidebar: React.FC<SidebarProps> = ({
   activeSessionId = '',
   isLoadingSessions = false,
   onSelectSession,
+  onDeleteSession,
+  onRenameSession,
 }) => {
   const [selectedPlatform, setSelectedPlatform] = useState('fabric');
   const [isPlatformMenuOpen, setIsPlatformMenuOpen] = useState(false);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const [isProjectsOpen, setIsProjectsOpen] = useState(true);
   const [isChatsOpen, setIsChatsOpen] = useState(true);
+
+  // Chat Item Options Menu
+  const [menuSessionId, setMenuSessionId] = useState<string | null>(null);
+  const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(null);
+  const [renamingSessionId, setRenamingSessionId] = useState<string | null>(null);
+  const [renamingTitle, setRenamingTitle] = useState<string>('');
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuSessionId(null);
+        setMenuPos(null);
+      }
+    };
+    window.addEventListener('mousedown', handleClickOutside);
+    window.addEventListener('scroll', () => { setMenuSessionId(null); setMenuPos(null); }, true);
+    return () => {
+      window.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
+  const handleOpenMenu = (e: React.MouseEvent, sid: string) => {
+    e.stopPropagation();
+    e.preventDefault();
+    if (menuSessionId === sid) {
+      setMenuSessionId(null);
+      setMenuPos(null);
+      return;
+    }
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    setMenuPos({
+      top: Math.min(rect.bottom + 4, window.innerHeight - 180),
+      left: Math.min(rect.left, window.innerWidth - 220),
+    });
+    setMenuSessionId(sid);
+  };
+
+  const handleStartRename = (sid: string, currentTitle: string) => {
+    setMenuSessionId(null);
+    setRenamingSessionId(sid);
+    setRenamingTitle(currentTitle);
+  };
+
+  const handleSaveRename = (sid: string) => {
+    if (renamingTitle.trim() && onRenameSession) {
+      onRenameSession(sid, renamingTitle.trim());
+    }
+    setRenamingSessionId(null);
+  };
+
+  const handleDelete = (sid: string) => {
+    setMenuSessionId(null);
+    if (onDeleteSession) {
+      onDeleteSession(sid);
+    }
+  };
 
   const activePlatformObj = PLATFORMS.find((p) => p.id === selectedPlatform) || PLATFORMS[0];
 
@@ -243,17 +308,98 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 sessions.map((s) => (
                   <div
                     key={s.sessionId}
-                    className={`sidebar-chat-item ${activeSessionId === s.sessionId ? 'active' : ''}`}
+                    className={`sidebar-chat-item ${activeSessionId === s.sessionId ? 'active' : ''} ${menuSessionId === s.sessionId ? 'menu-open' : ''}`}
                     onClick={() => onSelectSession?.(s.sessionId)}
                     title={s.title}
                   >
                     <MessageSquare width={13} height={13} style={{ flexShrink: 0, opacity: 0.7 }} />
-                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {s.title}
-                    </span>
+                    {renamingSessionId === s.sessionId ? (
+                      <form
+                        onSubmit={(e) => {
+                          e.preventDefault();
+                          handleSaveRename(s.sessionId);
+                        }}
+                        style={{ flex: 1, display: 'flex', alignItems: 'center', minWidth: 0 }}
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <input
+                          type="text"
+                          value={renamingTitle}
+                          onChange={(e) => setRenamingTitle(e.target.value)}
+                          onBlur={() => handleSaveRename(s.sessionId)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Escape') setRenamingSessionId(null);
+                          }}
+                          autoFocus
+                          style={{
+                            width: '100%',
+                            background: '#131314',
+                            border: '1px solid #10b981',
+                            borderRadius: '4px',
+                            color: '#ffffff',
+                            fontSize: '12.5px',
+                            padding: '2px 6px',
+                            outline: 'none',
+                          }}
+                        />
+                      </form>
+                    ) : (
+                      <>
+                        <span className="chat-item-text" style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {s.title}
+                        </span>
+                        <button
+                          type="button"
+                          className="sidebar-chat-more-btn"
+                          onClick={(e) => handleOpenMenu(e, s.sessionId)}
+                          title="More options"
+                        >
+                          <MoreHorizontal width={13} height={13} />
+                        </button>
+                      </>
+                    )}
                   </div>
                 ))
               )}
+            </div>
+          )}
+
+          {/* Floating Context Menu Popup */}
+          {menuSessionId && menuPos && (
+            <div
+              ref={menuRef}
+              className="sidebar-chat-menu-popup"
+              style={{ top: `${menuPos.top}px`, left: `${menuPos.left}px` }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div
+                className="chat-menu-item"
+                onClick={() => {
+                  const target = sessions.find((x) => x.sessionId === menuSessionId);
+                  handleStartRename(menuSessionId, target ? target.title : '');
+                }}
+              >
+                <Edit3 width={14} height={14} />
+                <span className="menu-label">Rename</span>
+              </div>
+              <div
+                className="chat-menu-item"
+                onClick={() => {
+                  setMenuSessionId(null);
+                  setMenuPos(null);
+                }}
+              >
+                <Pin width={14} height={14} />
+                <span className="menu-label">Pin</span>
+              </div>
+              <div className="chat-menu-divider" />
+              <div
+                className="chat-menu-item item-danger"
+                onClick={() => handleDelete(menuSessionId)}
+              >
+                <Trash2 width={14} height={14} />
+                <span className="menu-label">Delete</span>
+              </div>
             </div>
           )}
         </div>

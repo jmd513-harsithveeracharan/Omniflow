@@ -21,6 +21,8 @@ import {
   streamChatTurn,
   fetchSessions,
   fetchSessionDetail,
+  deleteSession,
+  renameSession,
 } from './services/api';
 import { FabricStatus, ChatMessage, IngestionPlan, WorkspaceItem, ChatSession } from './types';
 
@@ -95,6 +97,29 @@ export const App: React.FC = () => {
       );
     } catch (e) {
       console.error('Failed to load session detail', e);
+    }
+  };
+
+  const handleDeleteSession = async (sid: string) => {
+    try {
+      await deleteSession(sid);
+      setSessions((prev) => prev.filter((s) => s.sessionId !== sid));
+      if (sessionId === sid) {
+        handleNewSession();
+      }
+    } catch (e) {
+      console.error('Failed to delete session', e);
+    }
+  };
+
+  const handleRenameSession = async (sid: string, newTitle: string) => {
+    try {
+      await renameSession(sid, newTitle);
+      setSessions((prev) =>
+        prev.map((s) => (s.sessionId === sid ? { ...s, title: newTitle } : s))
+      );
+    } catch (e) {
+      console.error('Failed to rename session', e);
     }
   };
 
@@ -196,6 +221,8 @@ export const App: React.FC = () => {
         activeSessionId={sessionId}
         isLoadingSessions={isLoadingSessions}
         onSelectSession={handleSelectSession}
+        onDeleteSession={handleDeleteSession}
+        onRenameSession={handleRenameSession}
       />
 
       {/* 2. Main Studio Canvas */}

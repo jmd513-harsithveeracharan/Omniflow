@@ -24,32 +24,45 @@ export const ChatTimeline: React.FC<ChatTimelineProps> = ({
 }) => {
   const threadRef = useRef<HTMLDivElement>(null);
   const prevCountRef = useRef<number>(messages.length);
+  const isUserScrolledUpRef = useRef<boolean>(false);
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
   const [speakingIdx, setSpeakingIdx] = useState<number | null>(null);
   const [likedIdxs, setLikedIdxs] = useState<Record<number, boolean>>({});
   const [dislikedIdxs, setDislikedIdxs] = useState<Record<number, boolean>>({});
 
+  const handleScroll = () => {
+    if (!threadRef.current) return;
+    const { scrollTop, scrollHeight, clientHeight } = threadRef.current;
+    const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
+    isUserScrolledUpRef.current = distanceFromBottom > 140;
+  };
+
   useEffect(() => {
     if (!threadRef.current) return;
+    const thread = threadRef.current;
 
-    // If a brand new message was appended (e.g. user sent a prompt)
     if (messages.length > prevCountRef.current) {
-      const thread = threadRef.current;
-      const bubbles = thread.querySelectorAll('.chat-bubble');
-      const lastBubble = bubbles[bubbles.length - 1] as HTMLElement;
-      if (lastBubble) {
-        const threadRect = thread.getBoundingClientRect();
-        const bubbleRect = lastBubble.getBoundingClientRect();
-        const offset = bubbleRect.top - threadRect.top + thread.scrollTop - 24;
-        thread.scrollTo({ top: Math.max(0, offset), behavior: 'smooth' });
+      const lastMsg = messages[messages.length - 1];
+      if (lastMsg && lastMsg.role === 'user') {
+        isUserScrolledUpRef.current = false;
+        setTimeout(() => {
+          const bubbles = thread.querySelectorAll('.chat-bubble.user');
+          const lastUserBubble = bubbles[bubbles.length - 1] as HTMLElement;
+          if (lastUserBubble) {
+            lastUserBubble.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }
+        }, 30);
+      } else if (!isUserScrolledUpRef.current) {
+        thread.scrollTo({ top: thread.scrollHeight, behavior: 'smooth' });
       }
+    } else if (isStreaming && !isUserScrolledUpRef.current) {
+      thread.scrollTop = thread.scrollHeight;
     } else if (messages.length > 0 && prevCountRef.current === 0) {
-      // Switching into a conversation from another view or loading history: start at top
-      threadRef.current.scrollTo({ top: 0, behavior: 'auto' });
+      thread.scrollTo({ top: 0, behavior: 'instant' });
     }
 
     prevCountRef.current = messages.length;
-  }, [messages.length]);
+  }, [messages, isStreaming]);
 
   const handleCopy = (text: string, idx: number) => {
     navigator.clipboard.writeText(text);
@@ -75,7 +88,7 @@ export const ChatTimeline: React.FC<ChatTimelineProps> = ({
 
   return (
     <div className="architect-chat-area" id="architectChatArea">
-      <div className="chat-thread-scroll" id="chatThread" ref={threadRef}>
+      <div className="chat-thread-scroll" id="chatThread" ref={threadRef} onScroll={handleScroll}>
         {messages.map((m, idx) => {
           const isUser = m.role === 'user';
           const { thoughtMeta, cleanContent } = parseThoughtMeta(m.content);
@@ -276,7 +289,7 @@ export const ChatTimeline: React.FC<ChatTimelineProps> = ({
           </div>
         )}
 
-        <div id="chatBottomSpacer" className="chat-thread-bottom-spacer" style={{ height: '140px', flexShrink: 0 }} />
+        <div id="chatBottomSpacer" className="chat-thread-bottom-spacer" style={{ height: '40px', flexShrink: 0 }} />
       </div>
     </div>
   );

@@ -148,19 +148,48 @@ async def get_fabric_status():
 
 
 @app.get("/api/sessions", summary="List Chat Threads")
+@app.get("/api/conversations", summary="List Chat Threads (Alias)")
 async def get_sessions(workspace_id: str | None = None):
     """Returns all active conversation threads with titles, run counts, and message counts."""
     convs = list_conversations_with_metadata(workspace_id or ALLOWED_WORKSPACE_ID)
-    return {"sessions": convs, "count": len(convs)}
+    return {"sessions": convs, "conversations": convs, "count": len(convs)}
 
 
 @app.get("/api/sessions/{session_id}", summary="Get Full Conversation Thread")
+@app.get("/api/conversation/{session_id}", summary="Get Full Conversation Thread (Alias)")
 async def get_session_detail(session_id: str):
     """Returns full conversation bundle with messages, metadata, and learned facts."""
     bundle = get_conversation_full(session_id)
     if not bundle:
         raise HTTPException(status_code=404, detail="Conversation session not found")
     return bundle
+
+
+class RenameSessionRequest(BaseModel):
+    title: str = Field(..., description="New display title for conversation thread")
+
+
+@app.delete("/api/sessions/{session_id}", summary="Delete Conversation Session")
+@app.delete("/api/conversation/{session_id}", summary="Delete Conversation Session (Alias)")
+async def handle_delete_session(session_id: str):
+    """Permanently deletes a chat conversation session and its message history."""
+    from app.session_store import delete_conversation
+    deleted = delete_conversation(session_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Conversation session not found or already deleted")
+    return {"status": "success", "session_id": session_id, "deleted": True}
+
+
+@app.patch("/api/sessions/{session_id}", summary="Rename Conversation Session")
+@app.post("/api/sessions/{session_id}/rename", summary="Rename Conversation Session (POST Alias)")
+@app.post("/api/conversation/{session_id}/rename", summary="Rename Conversation Session (Legacy Alias)")
+async def handle_rename_session(session_id: str, req: RenameSessionRequest):
+    """Updates the title of a conversation thread."""
+    from app.session_store import rename_conversation
+    renamed = rename_conversation(session_id, req.title)
+    if not renamed:
+        raise HTTPException(status_code=404, detail="Conversation session not found")
+    return {"status": "success", "session_id": session_id, "title": req.title}
 
 
 @app.get("/api/projects", summary="List Active Projects")
