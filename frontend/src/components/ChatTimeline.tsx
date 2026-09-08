@@ -34,7 +34,7 @@ export const ChatTimeline: React.FC<ChatTimelineProps> = ({
     if (!threadRef.current) return;
     const { scrollTop, scrollHeight, clientHeight } = threadRef.current;
     const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
-    isUserScrolledUpRef.current = distanceFromBottom > 140;
+    isUserScrolledUpRef.current = distanceFromBottom > 100;
   };
 
   useEffect(() => {
@@ -45,18 +45,28 @@ export const ChatTimeline: React.FC<ChatTimelineProps> = ({
       const lastMsg = messages[messages.length - 1];
       if (lastMsg && lastMsg.role === 'user') {
         isUserScrolledUpRef.current = false;
-        setTimeout(() => {
-          const bubbles = thread.querySelectorAll('.chat-bubble.user');
-          const lastUserBubble = bubbles[bubbles.length - 1] as HTMLElement;
-          if (lastUserBubble) {
-            lastUserBubble.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        if (messages.length <= 1) {
+          thread.scrollTo({ top: 0, behavior: 'instant' });
+        } else {
+          const isOverflowing = (thread.scrollHeight - 160) > thread.clientHeight;
+          if (isOverflowing) {
+            const target = Math.max(0, thread.scrollHeight - thread.clientHeight - 60);
+            thread.scrollTo({ top: target, behavior: 'smooth' });
+          } else {
+            thread.scrollTo({ top: 0, behavior: 'instant' });
           }
-        }, 30);
-      } else if (!isUserScrolledUpRef.current) {
-        thread.scrollTo({ top: thread.scrollHeight, behavior: 'smooth' });
+        }
       }
     } else if (isStreaming && !isUserScrolledUpRef.current) {
-      thread.scrollTop = thread.scrollHeight;
+      const isOverflowing = (thread.scrollHeight - 160) > thread.clientHeight;
+      if (isOverflowing) {
+        const target = Math.max(0, thread.scrollHeight - thread.clientHeight - 60);
+        if (thread.scrollTop < target) {
+          thread.scrollTop = target;
+        }
+      } else {
+        thread.scrollTop = 0;
+      }
     } else if (messages.length > 0 && prevCountRef.current === 0) {
       thread.scrollTo({ top: 0, behavior: 'instant' });
     }

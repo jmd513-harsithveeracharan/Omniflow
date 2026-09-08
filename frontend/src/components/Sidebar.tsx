@@ -10,11 +10,15 @@ import {
   PanelLeftClose,
   LogOut,
   Sliders,
-  MessageSquare,
-  MoreHorizontal,
+  MoreVertical,
   Edit3,
   Trash2,
   Pin,
+  ExternalLink,
+  EyeOff,
+  Layers,
+  Folder,
+  ChevronRight,
 } from 'lucide-react';
 import { ChatSession } from '../types';
 
@@ -312,7 +316,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     onClick={() => onSelectSession?.(s.sessionId)}
                     title={s.title}
                   >
-                    <MessageSquare width={13} height={13} style={{ flexShrink: 0, opacity: 0.7 }} />
+                    <span
+                      className="chat-bullet-circle"
+                      style={{
+                        width: '7px',
+                        height: '7px',
+                        borderRadius: '50%',
+                        border: '1.5px solid #10b981',
+                        flexShrink: 0,
+                        opacity: activeSessionId === s.sessionId ? 1 : 0.65,
+                      }}
+                    />
                     {renamingSessionId === s.sessionId ? (
                       <form
                         onSubmit={(e) => {
@@ -354,7 +368,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                           onClick={(e) => handleOpenMenu(e, s.sessionId)}
                           title="More options"
                         >
-                          <MoreHorizontal width={13} height={13} />
+                          <MoreVertical width={13} height={13} />
                         </button>
                       </>
                     )}
@@ -364,7 +378,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </div>
           )}
 
-          {/* Floating Context Menu Popup */}
+          {/* Floating Context Menu Popup (Matching Image 2 without shortcut letters) */}
           {menuSessionId && menuPos && (
             <div
               ref={menuRef}
@@ -372,6 +386,37 @@ export const Sidebar: React.FC<SidebarProps> = ({
               style={{ top: `${menuPos.top}px`, left: `${menuPos.left}px` }}
               onClick={(e) => e.stopPropagation()}
             >
+              <div
+                className="chat-menu-item"
+                onClick={() => {
+                  window.open(`/?session=${menuSessionId}`, '_blank');
+                  setMenuSessionId(null);
+                  setMenuPos(null);
+                }}
+              >
+                <ExternalLink width={14} height={14} />
+                <span className="menu-label">Open in new tab</span>
+              </div>
+              <div
+                className="chat-menu-item"
+                onClick={() => {
+                  setMenuSessionId(null);
+                  setMenuPos(null);
+                }}
+              >
+                <Pin width={14} height={14} />
+                <span className="menu-label">Pin</span>
+              </div>
+              <div
+                className="chat-menu-item"
+                onClick={() => {
+                  setMenuSessionId(null);
+                  setMenuPos(null);
+                }}
+              >
+                <EyeOff width={14} height={14} />
+                <span className="menu-label">Mark as unread</span>
+              </div>
               <div
                 className="chat-menu-item"
                 onClick={() => {
@@ -389,8 +434,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   setMenuPos(null);
                 }}
               >
-                <Pin width={14} height={14} />
-                <span className="menu-label">Pin</span>
+                <Layers width={14} height={14} />
+                <span className="menu-label">Add to project</span>
+                <ChevronRight width={12} height={12} className="menu-arrow" />
+              </div>
+              <div
+                className="chat-menu-item"
+                onClick={() => {
+                  setMenuSessionId(null);
+                  setMenuPos(null);
+                }}
+              >
+                <Folder width={14} height={14} />
+                <span className="menu-label">Move to group</span>
+                <ChevronRight width={12} height={12} className="menu-arrow" />
               </div>
               <div className="chat-menu-divider" />
               <div

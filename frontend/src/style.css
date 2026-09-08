@@ -7885,7 +7885,7 @@ ul.chat-md-list {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 14px 0;
+    padding: 12px 0;
     border-bottom: 1px solid rgba(255, 255, 255, 0.05);
     width: 100%;
 }
@@ -7893,83 +7893,97 @@ ul.chat-md-list {
 .settings-field-column {
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    padding: 14px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
     width: 100%;
 }
 
 .settings-field-label {
     font-size: 13.5px;
     font-weight: 500;
-    color: #f4f4f5;
+    color: #ffffff;
+    letter-spacing: -0.01em;
 }
 
 .settings-field-hint {
     font-size: 12px;
     color: #71717a;
+    margin-top: 2px;
 }
 
 .settings-field-input,
 .settings-field-select {
-    background: #141416;
-    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: #18181b;
+    border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 8px;
     padding: 8px 12px;
+    height: 38px;
     color: #ffffff;
     font-family: var(--font-sans);
     font-size: 13px;
     outline: none;
-    min-width: 260px;
+    width: 340px;
+    min-width: 280px;
+    max-width: 360px;
     box-sizing: border-box;
-    transition: border-color 0.15s ease;
+    transition: border-color 0.15s ease, background 0.15s ease;
 }
 
 .settings-field-input:focus,
 .settings-field-select:focus {
-    border-color: #10b981;
+    border-color: rgba(255, 255, 255, 0.28);
+    background: #1c1c20;
+}
+
+.settings-field-select option {
+    background: #18181b;
+    color: #ffffff;
 }
 
 .settings-field-textarea {
-    background: #141416;
-    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: #18181b;
+    border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 8px;
-    padding: 10px 12px;
+    padding: 10px 14px;
     color: #ffffff;
     font-family: var(--font-sans);
     font-size: 13px;
     outline: none;
-    min-height: 80px;
+    min-height: 90px;
     resize: vertical;
     box-sizing: border-box;
-    transition: border-color 0.15s ease;
+    transition: border-color 0.15s ease, background 0.15s ease;
     width: 100%;
+    margin-top: 8px;
 }
 
 .settings-field-textarea:focus {
-    border-color: #10b981;
+    border-color: rgba(255, 255, 255, 0.28);
+    background: #1c1c20;
 }
 
 .settings-avatar-circle {
-    width: 34px;
-    height: 34px;
+    width: 32px;
+    height: 32px;
     border-radius: 50%;
-    background: linear-gradient(135deg, #27272a, #1f1f23);
-    border: 1px solid rgba(255, 255, 255, 0.18);
+    background: #27272a;
+    border: 1px solid rgba(255, 255, 255, 0.16);
     display: flex;
     align-items: center;
     justify-content: center;
     font-weight: 600;
-    font-size: 14px;
+    font-size: 13.5px;
     color: #ffffff;
 }
 
 .theme-toggle-group {
     display: flex;
     align-items: center;
-    background: #141416;
+    background: #18181b;
     border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 8px;
     padding: 3px;
-    gap: 3px;
+    gap: 2px;
 }
 
 .theme-toggle-btn {
@@ -7977,7 +7991,7 @@ ul.chat-md-list {
     border: none;
     color: #71717a;
     border-radius: 6px;
-    padding: 6px 10px;
+    padding: 5px 10px;
     cursor: pointer;
     display: flex;
     align-items: center;
