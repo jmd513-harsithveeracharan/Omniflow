@@ -162,6 +162,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <span>Apps & Connectors</span>
         </button>
 
+        <button
+          className={`nav-item ${activeView === 'settings' ? 'active' : ''}`}
+          onClick={() => onSelectView('settings')}
+        >
+          <span className="nav-item-icon">
+            <Settings2 width={18} height={18} />
+          </span>
+          <span>Customize</span>
+        </button>
+
         {/* Projects Accordion Section */}
         <div className="sidebar-section sidebar-projects-section">
           <div className="sidebar-section-header">

@@ -17,6 +17,7 @@ interface TopBarProps {
   onNewSession: () => void;
   onRefreshWorkspace: () => void;
   status?: FabricStatus | null;
+  onOpenFabricConnection?: () => void;
 }
 
 export const TopBar: React.FC<TopBarProps> = ({
@@ -28,6 +29,7 @@ export const TopBar: React.FC<TopBarProps> = ({
   onNewSession,
   onRefreshWorkspace,
   status,
+  onOpenFabricConnection,
 }) => {
   return (
     <header className="studio-topbar">
@@ -59,7 +61,12 @@ export const TopBar: React.FC<TopBarProps> = ({
 
       <div className="topbar-right">
         {status?.authenticated && (
-          <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#1e1f20] border border-[#2d2e31] text-[11px] font-mono text-[#10b981] mr-2">
+          <div
+            onClick={onOpenFabricConnection}
+            style={{ cursor: 'pointer' }}
+            className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#1e1f20] border border-[#2d2e31] text-[11px] font-mono text-[#10b981] mr-2 hover:border-[#10b981]/50 transition-all"
+            title="Manage Microsoft Fabric Connection"
+          >
             <span className="w-2 h-2 rounded-full bg-[#10b981] animate-pulse" />
             <span>Fabric: {status.workspaceId.slice(0, 8)}...</span>
           </div>

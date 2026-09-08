@@ -10,6 +10,7 @@ import { SkillInspectorModal } from './components/SkillInspectorModal';
 import { ConnectorModal } from './components/ConnectorModal';
 import { GovernanceModal } from './components/GovernanceModal';
 import { SettingsModal } from './components/SettingsModal';
+import { FabricConnectionModal } from './components/modals/FabricConnectionModal';
 import { SkillsView } from './components/SkillsView';
 import { ProjectsView } from './components/ProjectsView';
 import { WorkspaceExplorerView } from './components/WorkspaceExplorerView';
@@ -39,6 +40,7 @@ export const App: React.FC = () => {
   const [isConnectorsModalOpen, setIsConnectorsModalOpen] = useState<boolean>(false);
   const [isGovernanceModalOpen, setIsGovernanceModalOpen] = useState<boolean>(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState<boolean>(false);
+  const [isFabricConnectionModalOpen, setIsFabricConnectionModalOpen] = useState<boolean>(false);
   const [currentPlan, setCurrentPlan] = useState<IngestionPlan | null>(null);
 
   const loadSessions = async () => {
@@ -94,7 +96,6 @@ export const App: React.FC = () => {
   const handleSendMessage = async (text: string) => {
     if (!text.trim() || isStreaming) return;
 
-    // Switch to chat view if currently in another tab
     if (activeView !== 'chat') {
       setActiveView('chat');
     }
@@ -179,7 +180,7 @@ export const App: React.FC = () => {
 
   return (
     <div className="studio-app-container">
-      {/* 1. Left Sidebar with Claude Styling */}
+      {/* 1. Left Sidebar */}
       <Sidebar
         activeView={activeView}
         onSelectView={handleSelectView}
@@ -193,7 +194,6 @@ export const App: React.FC = () => {
 
       {/* 2. Main Studio Canvas */}
       <main className="studio-main" id="mainCanvas">
-        {/* Google AI Studio TopBar */}
         <TopBar
           viewTitle={getViewTitle()}
           isSidebarCollapsed={isSidebarCollapsed}
@@ -203,6 +203,7 @@ export const App: React.FC = () => {
           onNewSession={handleNewSession}
           onRefreshWorkspace={() => fetchFabricStatus().then(setStatus)}
           status={status}
+          onOpenFabricConnection={() => setIsFabricConnectionModalOpen(true)}
         />
 
         {/* View Routing */}
@@ -242,7 +243,6 @@ export const App: React.FC = () => {
 
         {activeView === 'chat' && (
           <div className="bolt-workspace-split">
-            {/* Left Chat / Landing Center */}
             <div
               className={`bolt-chat-pane ${messages.length === 0 ? 'is-landing' : ''} ${
                 isWorkbenchOpen ? 'with-workbench' : 'full-width'
@@ -251,14 +251,25 @@ export const App: React.FC = () => {
               {messages.length === 0 ? (
                 <PlaygroundHome onSelectPrompt={handleSendMessage} />
               ) : (
-                <ChatTimeline messages={messages} isStreaming={isStreaming} />
+                <ChatTimeline
+                  messages={messages}
+                  isStreaming={isStreaming}
+                  onDeployPlan={() => {
+                    if (currentPlan) {
+                      setIsWorkbenchOpen(true);
+                    } else {
+                      handleSendMessage('deploy active plan');
+                    }
+                  }}
+                  onOpenCanvas={() => setIsWorkbenchOpen(true)}
+                  onOpenWorkspace={() => setActiveView('workspaces')}
+                  onRetryPrompt={handleSendMessage}
+                />
               )}
 
-              {/* Floating Prompt Input Dock */}
               <PromptDock onSendMessage={handleSendMessage} isStreaming={isStreaming} />
             </div>
 
-            {/* Right Visual Workbench Pane (When toggled open) */}
             {isWorkbenchOpen && (
               <div className="bolt-workbench-pane">
                 {currentPlan ? (
@@ -297,6 +308,15 @@ export const App: React.FC = () => {
       <SettingsModal
         isOpen={isSettingsModalOpen}
         onClose={() => setIsSettingsModalOpen(false)}
+        status={status}
+        onRefreshStatus={() => fetchFabricStatus().then(setStatus)}
+      />
+
+      <FabricConnectionModal
+        isOpen={isFabricConnectionModalOpen}
+        onClose={() => setIsFabricConnectionModalOpen(false)}
+        status={status}
+        onRefreshStatus={() => fetchFabricStatus().then(setStatus)}
       />
     </div>
   );

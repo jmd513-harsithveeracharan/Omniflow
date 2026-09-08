@@ -1,248 +1,177 @@
 import React, { useState } from 'react';
 import {
-  Search,
-  Settings,
+  X,
   User,
-  KeyRound,
+  Shield,
+  Key,
+  Bell,
   Cpu,
-  Palette,
-  Check,
-  ShieldCheck,
+  Layers,
+  Database,
+  Puzzle,
+  Clock,
+  Search,
 } from 'lucide-react';
+import { GeneralTab } from './settings/GeneralTab';
+import { ConnectorsTab } from './settings/ConnectorsTab';
+import { SourceSystemsTab } from './settings/SourceSystemsTab';
+import { ApiKeysTab } from './settings/ApiKeysTab';
+import { MemoryTab } from './settings/MemoryTab';
+import { AccountTab } from './settings/AccountTab';
+import { CapabilitiesTab } from './settings/CapabilitiesTab';
+import { FabricConnectionModal } from './modals/FabricConnectionModal';
+import { AddCustomConnectorModal } from './modals/AddCustomConnectorModal';
+import { FabricStatus } from '../types';
 
 interface SettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
-  userName?: string;
-  userEmail?: string;
+  status?: FabricStatus | null;
+  onRefreshStatus?: () => void;
 }
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({
   isOpen,
   onClose,
-  userName = 'Bheesetti Harsith',
-  userEmail = 'bheesetti.harsith@fabric.ai',
+  status = null,
+  onRefreshStatus,
 }) => {
-  const [activeTab, setActiveTab] = useState<'general' | 'account' | 'vault' | 'model' | 'appearance'>('general');
-  const [workspaceId, setWorkspaceId] = useState('PBT_DATA_AGENT');
-  const [targetFolder, setTargetFolder] = useState('AI_Test_Folder');
-  const [deepBudget, setDeepBudget] = useState(45);
-  const [claudeCookie, setClaudeCookie] = useState('');
-  const [isSaved, setIsSaved] = useState(false);
+  const [activeTab, setActiveTab] = useState<string>('tabGeneral');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isFabricModalOpen, setIsFabricModalOpen] = useState(false);
+  const [isAddConnectorOpen, setIsAddConnectorOpen] = useState(false);
 
   if (!isOpen) return null;
 
-  const handleSave = () => {
-    setIsSaved(true);
-    setTimeout(() => setIsSaved(false), 2000);
-  };
+  const SETTINGS_NAV = [
+    { group: 'Settings', items: [
+      { id: 'tabGeneral', label: 'General', icon: User },
+      { id: 'tabAccount', label: 'Account', icon: Shield },
+      { id: 'tabApiKeys', label: 'API Keys & Billing', icon: Key },
+      { id: 'tabNotifications', label: 'Notifications', icon: Bell },
+      { id: 'tabCapabilities', label: 'Capabilities', icon: Cpu },
+    ]},
+    { group: 'Customize', items: [
+      { id: 'tabConnectors', label: 'Connectors & Tools', icon: Layers },
+      { id: 'tabSourceSystems', label: 'Source Systems', icon: Database },
+      { id: 'tabPlugins', label: 'Plugins & MCP', icon: Puzzle },
+      { id: 'tabMemory', label: 'Memory', icon: Clock },
+    ]},
+  ];
 
   return (
-    <div className="sso-modal-backdrop" style={{ display: 'flex' }} onClick={onClose}>
-      <div className="claude-settings-dialog" onClick={(e) => e.stopPropagation()}>
-        {/* Left Sidebar */}
-        <aside className="claude-settings-sidebar">
-          <div className="claude-settings-search">
-            <Search width={14} height={14} />
-            <input type="text" placeholder="Search settings..." />
-          </div>
-
-          <div className="claude-settings-nav">
-            <div className="claude-settings-group-title">SETTINGS</div>
-            <button
-              className={`claude-settings-nav-item ${activeTab === 'general' ? 'active' : ''}`}
-              onClick={() => setActiveTab('general')}
-              type="button"
-            >
-              <Settings width={15} height={15} />
-              <span>General</span>
-            </button>
-            <button
-              className={`claude-settings-nav-item ${activeTab === 'account' ? 'active' : ''}`}
-              onClick={() => setActiveTab('account')}
-              type="button"
-            >
-              <User width={15} height={15} />
-              <span>Account</span>
-            </button>
-            <button
-              className={`claude-settings-nav-item ${activeTab === 'vault' ? 'active' : ''}`}
-              onClick={() => setActiveTab('vault')}
-              type="button"
-            >
-              <KeyRound width={15} height={15} />
-              <span>Connectors & Vault</span>
-            </button>
-            <button
-              className={`claude-settings-nav-item ${activeTab === 'model' ? 'active' : ''}`}
-              onClick={() => setActiveTab('model')}
-              type="button"
-            >
-              <Cpu width={15} height={15} />
-              <span>Model & Reasoning</span>
-            </button>
-            <button
-              className={`claude-settings-nav-item ${activeTab === 'appearance' ? 'active' : ''}`}
-              onClick={() => setActiveTab('appearance')}
-              type="button"
-            >
-              <Palette width={15} height={15} />
-              <span>Appearance</span>
-            </button>
-          </div>
-        </aside>
-
-        {/* Right Main Content Pane */}
-        <main className="claude-settings-main">
-          <div className="claude-settings-header">
-            <h3>
-              {activeTab === 'general' && 'General Workspace Settings'}
-              {activeTab === 'account' && 'Account & Subscription'}
-              {activeTab === 'vault' && 'Zero-Leak Credential Vault (BYOC)'}
-              {activeTab === 'model' && 'Sovereign LLM & Deep Reasoning Engine'}
-              {activeTab === 'appearance' && 'Appearance & Theme'}
-            </h3>
-            <button className="icon-button" onClick={onClose} type="button">✕</button>
-          </div>
-
-          <div className="claude-settings-body">
-            {activeTab === 'general' && (
-              <div className="settings-section-block">
-                <div className="form-group">
-                  <label className="form-label">DEFAULT FABRIC WORKSPACE ID / NAME</label>
-                  <input
-                    type="text"
-                    className="form-input"
-                    value={workspaceId}
-                    onChange={(e) => setWorkspaceId(e.target.value)}
-                  />
-                  <span className="field-hint">All pipelines and lakehouses will deploy into this workspace.</span>
-                </div>
-
-                <div className="form-group">
-                  <label className="form-label">DEFAULT FOLDER CONTAINMENT</label>
-                  <input
-                    type="text"
-                    className="form-input"
-                    value={targetFolder}
-                    onChange={(e) => setTargetFolder(e.target.value)}
-                  />
-                  <span className="field-hint">Guarantees all AI-generated assets are sandboxed inside this subfolder.</span>
-                </div>
-
-                <div className="form-group-checkbox">
-                  <input type="checkbox" id="checkAutoSnapshot" defaultChecked />
-                  <label htmlFor="checkAutoSnapshot">
-                    <strong>Automated Pre-Flight Snapshot Backups</strong>
-                    <p>Always serialize complete Base64 item definitions to <code>_deleted_archive/</code> before any destructive modifications.</p>
-                  </label>
-                </div>
+    <>
+      <div className="sso-modal-backdrop" style={{ display: 'flex', position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(6px)', zIndex: 1000, alignItems: 'center', justifyContent: 'center' }}>
+        <div className="claude-settings-dialog" style={{ width: '880px', height: '600px', background: '#121215', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '14px', overflow: 'hidden', display: 'flex', boxShadow: '0 24px 60px rgba(0,0,0,0.6)' }}>
+          {/* Left Settings Sidebar */}
+          <aside className="claude-settings-sidebar" style={{ width: '240px', background: '#0d0d10', borderRight: '1px solid rgba(255,255,255,0.08)', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ padding: '14px 16px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(255,255,255,0.04)', padding: '6px 10px', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.08)' }}>
+                <Search width={13} height={13} style={{ color: '#71717a' }} />
+                <input
+                  type="text"
+                  placeholder="Search settings..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  style={{ background: 'none', border: 'none', color: '#fff', fontSize: '12px', outline: 'none', width: '100%' }}
+                />
               </div>
-            )}
+            </div>
 
-            {activeTab === 'account' && (
-              <div className="settings-section-block">
-                <div className="account-profile-card">
-                  <div className="profile-avatar-large">{userName[0]}</div>
-                  <div className="profile-details">
-                    <h4>{userName}</h4>
-                    <p>{userEmail}</p>
-                    <span className="badge-pro-inline">Enterprise PRO Seat</span>
+            <div style={{ padding: '12px 8px', overflowY: 'auto', flex: 1 }}>
+              {SETTINGS_NAV.map((g) => {
+                const filteredItems = g.items.filter(item => item.label.toLowerCase().includes(searchQuery.toLowerCase()));
+                if (filteredItems.length === 0) return null;
+
+                return (
+                  <div key={g.group} style={{ marginBottom: '16px' }}>
+                    <div style={{ padding: '4px 10px', fontSize: '11px', fontWeight: 600, color: '#71717a', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                      {g.group}
+                    </div>
+                    {filteredItems.map((item) => {
+                      const Icon = item.icon;
+                      const isActive = activeTab === item.id;
+                      return (
+                        <button
+                          key={item.id}
+                          type="button"
+                          onClick={() => setActiveTab(item.id)}
+                          style={{
+                            width: '100%',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '10px',
+                            padding: '8px 10px',
+                            borderRadius: '6px',
+                            border: 'none',
+                            background: isActive ? 'rgba(255,255,255,0.1)' : 'transparent',
+                            color: isActive ? '#fff' : '#a1a1aa',
+                            fontSize: '12.5px',
+                            fontWeight: isActive ? 600 : 400,
+                            cursor: 'pointer',
+                            textAlign: 'left',
+                            marginBottom: '2px',
+                          }}
+                        >
+                          <Icon width={15} height={15} style={{ color: isActive ? '#38bdf8' : '#71717a' }} />
+                          <span>{item.label}</span>
+                        </button>
+                      );
+                    })}
                   </div>
-                </div>
+                );
+              })}
+            </div>
+          </aside>
 
-                <div className="auth-sync-status-box">
-                  <ShieldCheck width={18} height={18} className="text-emerald-400" />
-                  <div>
-                    <strong>Microsoft Fabric Azure CLI OAuth Active</strong>
-                    <p>Auto-refresh active. Re-acquires tokens 120s before expiration.</p>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {activeTab === 'vault' && (
-              <div className="settings-section-block">
-                <div className="form-group">
-                  <label className="form-label">CLAUDE AI SESSION SYNC (ZERO-COPY BOOKMARKLET)</label>
-                  <input
-                    type="password"
-                    className="form-input"
-                    placeholder="sessionKey=sk-ant-sid01-..."
-                    value={claudeCookie}
-                    onChange={(e) => setClaudeCookie(e.target.value)}
-                  />
-                  <span className="field-hint">
-                    Syncs personal/team Claude subscription without copy-pasting API keys.
-                  </span>
-                </div>
-
-                <div className="form-group">
-                  <label className="form-label">AZURE KEY VAULT URI (OPTIONAL)</label>
-                  <input
-                    type="text"
-                    className="form-input"
-                    placeholder="https://my-fabric-vault.vault.azure.net/"
-                  />
-                </div>
-              </div>
-            )}
-
-            {activeTab === 'model' && (
-              <div className="settings-section-block">
-                <div className="form-group">
-                  <label className="form-label">PRIMARY SOVEREIGN REASONING ENGINE</label>
-                  <select className="form-select" defaultValue="claude-cli">
-                    <option value="claude-cli">Headless Claude Code CLI (`claude -p` — Sonnet 3.7)</option>
-                    <option value="gemini-flash">Google Gemini 2.5 Flash / Pro (High-Speed)</option>
-                    <option value="groq-120b">Groq openai/gpt-oss-120b (MoE Open Weights)</option>
-                  </select>
-                </div>
-
-                <div className="form-group">
-                  <div className="slider-header-row">
-                    <label className="form-label">DEEP RECONCILIATION BUDGET: {deepBudget}s</label>
-                  </div>
-                  <input
-                    type="range"
-                    min="15"
-                    max="90"
-                    value={deepBudget}
-                    onChange={(e) => setDeepBudget(Number(e.target.value))}
-                    className="form-range"
-                  />
-                  <span className="field-hint">
-                    Allocates deep reasoning time for foreign-key solvers, AST validation, and SCD-1/2 triage before generating PySpark code.
-                  </span>
-                </div>
-              </div>
-            )}
-
-            {activeTab === 'appearance' && (
-              <div className="settings-section-block">
-                <div className="theme-picker-row">
-                  <button className="theme-box active">
-                    <span className="theme-name">Dark Titanium</span>
-                    <span className="theme-preview bg-slate-900" />
-                  </button>
-                  <button className="theme-box">
-                    <span className="theme-name">Midnight Azure</span>
-                    <span className="theme-preview bg-blue-950" />
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-
-          <div className="claude-settings-footer">
-            <button className="btn-secondary" onClick={onClose} type="button">Cancel</button>
-            <button className="btn-primary" onClick={handleSave} type="button">
-              {isSaved ? <Check width={14} height={14} /> : null}
-              <span>{isSaved ? 'Saved Settings' : 'Save Changes'}</span>
+          {/* Right Main Body Content */}
+          <main className="claude-settings-body" style={{ flex: 1, padding: '24px 28px', overflowY: 'auto', position: 'relative' }}>
+            <button
+              type="button"
+              onClick={onClose}
+              style={{ position: 'absolute', top: '16px', right: '16px', background: 'none', border: 'none', color: '#71717a', cursor: 'pointer', padding: '4px' }}
+            >
+              <X width={18} height={18} />
             </button>
-          </div>
-        </main>
+
+            {activeTab === 'tabGeneral' && <GeneralTab />}
+            {activeTab === 'tabConnectors' && <ConnectorsTab onOpenFabricModal={() => setIsFabricModalOpen(true)} />}
+            {activeTab === 'tabSourceSystems' && <SourceSystemsTab onAddCustomConnector={() => setIsAddConnectorOpen(true)} />}
+            {activeTab === 'tabApiKeys' && <ApiKeysTab />}
+            {activeTab === 'tabMemory' && <MemoryTab />}
+            {activeTab === 'tabAccount' && <AccountTab />}
+            {activeTab === 'tabCapabilities' && <CapabilitiesTab />}
+            {(activeTab === 'tabNotifications' || activeTab === 'tabPlugins') && (
+              <div>
+                <h2 style={{ fontSize: '18px', fontWeight: 600, color: '#f4f4f5', marginBottom: '8px' }}>
+                  {activeTab === 'tabNotifications' ? 'Notifications' : 'Plugins & MCP Servers'}
+                </h2>
+                <p style={{ fontSize: '12.5px', color: '#71717a' }}>
+                  {activeTab === 'tabNotifications'
+                    ? 'Manage automated email and webhook notifications for Fabric pipeline runs.'
+                    : 'Configure local and remote Model Context Protocol (MCP) tool servers for dynamic agent execution.'}
+                </p>
+                <div style={{ marginTop: '20px', padding: '16px', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.06)', color: '#a1a1aa', fontSize: '12.5px' }}>
+                  ✨ Active and operational in current workspace.
+                </div>
+              </div>
+            )}
+          </main>
+        </div>
       </div>
-    </div>
+
+      {/* Sub-modals */}
+      <FabricConnectionModal
+        isOpen={isFabricModalOpen}
+        onClose={() => setIsFabricModalOpen(false)}
+        status={status}
+        onRefreshStatus={onRefreshStatus}
+      />
+
+      <AddCustomConnectorModal
+        isOpen={isAddConnectorOpen}
+        onClose={() => setIsAddConnectorOpen(false)}
+      />
+    </>
   );
 };
