@@ -548,3 +548,204 @@ def commit_to_git(
 
     return {"success": False, "error": resp.text, "status_code": resp.status_code}
 
+
+# ── Universal Item Provisioning Flow ───────────────────────────────────────────
+
+def provision_item_with_definition(
+    display_name: str,
+    item_type: str,
+    parts: list[dict] | None = None,
+    folder_id: str | None = None,
+    workspace_id: str = ALLOWED_WORKSPACE_ID,
+    description: str = "",
+) -> dict:
+    """
+    Universal 2-phase provisioner for any Fabric item:
+    1. Creates item in target workspace/folder.
+    2. If definition parts provided, uploads Base64 definition.
+    """
+    _assert_workspace(workspace_id)
+    create_res = create_item(
+        display_name=display_name,
+        item_type=item_type,
+        workspace_id=workspace_id,
+        folder_id=folder_id,
+        description=description,
+    )
+    if not create_res.get("success"):
+        return create_res
+
+    item_id = create_res.get("item_id")
+    if parts and item_id:
+        update_ok = update_definition(item_id, parts, workspace_id)
+        if not update_ok:
+            return {
+                "success": False,
+                "item_id": item_id,
+                "error": f"Failed to upload definition for {item_type} '{display_name}'",
+            }
+
+    return {
+        "success": True,
+        "item_id": item_id,
+        "item_type": item_type,
+        "display_name": display_name,
+        "already_existed": create_res.get("already_existed", False),
+    }
+
+
+# ── OneLake Shortcuts (Priority 1) ────────────────────────────────────────────
+
+def create_onelake_shortcut(
+    item_id: str,
+    shortcut_payload: dict,
+    workspace_id: str = ALLOWED_WORKSPACE_ID,
+    conflict_policy: str = "GenerateUniqueName",
+) -> dict:
+    """
+    Creates a OneLake shortcut on an item (Lakehouse, etc.).
+    Official Spec: POST /v1/workspaces/{workspaceId}/items/{itemId}/shortcuts?shortcutConflictPolicy=...
+    """
+    _assert_workspace(workspace_id)
+    headers = get_auth_headers()
+    url = f"{_BASE}/workspaces/{workspace_id}/items/{item_id}/shortcuts"
+    params = {}
+    if conflict_policy:
+        params["shortcutConflictPolicy"] = conflict_policy
+
+    resp = requests.post(url, headers=headers, json=shortcut_payload, params=params, timeout=20)
+    if resp.status_code in (200, 201):
+        data = resp.json() if resp.text else {}
+        print(f"[FABRIC] Created shortcut '{shortcut_payload.get('name')}' on item {item_id}")
+        return {"success": True, "data": data, "shortcut": data}
+    if resp.status_code == 202:
+        location = resp.headers.get("Location")
+        if location:
+            success = _poll_lro(location, headers)
+            return {"success": success, "data": {"location": location}}
+        return {"success": True, "data": {}}
+
+    print(f"[FABRIC] create_onelake_shortcut failed: {resp.status_code} {resp.text[:250]}")
+    return {"success": False, "error": resp.text, "status_code": resp.status_code}
+
+
+def list_onelake_shortcuts(
+    item_id: str,
+    parent_path: str = "",
+    workspace_id: str = ALLOWED_WORKSPACE_ID,
+) -> dict:
+    """
+    Lists OneLake shortcuts under an item.
+    Official Spec: GET /v1/workspaces/{workspaceId}/items/{itemId}/shortcuts
+    """
+    _assert_workspace(workspace_id)
+    headers = get_auth_headers()
+    url = f"{_BASE}/workspaces/{workspace_id}/items/{item_id}/shortcuts"
+    params = {}
+    if parent_path:
+        params["parentPath"] = parent_path
+
+    resp = requests.get(url, headers=headers, params=params, timeout=15)
+    if resp.status_code == 200:
+        return {"success": True, "shortcuts": resp.json().get("value", [])}
+    return {"success": False, "error": resp.text, "shortcuts": []}
+
+
+def get_onelake_shortcut(
+    item_id: str,
+    shortcut_path: str,
+    shortcut_name: str,
+    workspace_id: str = ALLOWED_WORKSPACE_ID,
+) -> dict:
+    """
+    Gets shortcut details for a specific path and name.
+    Official Spec: GET /v1/workspaces/{workspaceId}/items/{itemId}/shortcuts/{shortcutPath}/{shortcutName}
+    """
+    _assert_workspace(workspace_id)
+    headers = get_auth_headers()
+    clean_path = shortcut_path.strip("/")
+    url = f"{_BASE}/workspaces/{workspace_id}/items/{item_id}/shortcuts/{clean_path}/{shortcut_name}"
+    resp = requests.get(url, headers=headers, timeout=15)
+    if resp.status_code == 200:
+        return {"success": True, "shortcut": resp.json()}
+    return {"success": False, "error": resp.text, "status_code": resp.status_code}
+
+
+def delete_onelake_shortcut(
+    item_id: str,
+    shortcut_path: str,
+    shortcut_name: str,
+    workspace_id: str = ALLOWED_WORKSPACE_ID,
+) -> bool:
+    """
+    Deletes a OneLake shortcut.
+    Official Spec: DELETE /v1/workspaces/{workspaceId}/items/{itemId}/shortcuts/{shortcutPath}/{shortcutName}
+    """
+    _assert_workspace(workspace_id)
+    headers = get_auth_headers()
+    clean_path = shortcut_path.strip("/")
+    url = f"{_BASE}/workspaces/{workspace_id}/items/{item_id}/shortcuts/{clean_path}/{shortcut_name}"
+    resp = requests.delete(url, headers=headers, timeout=15)
+    success = resp.status_code in (200, 204)
+    if success:
+        print(f"[FABRIC] Deleted shortcut {shortcut_name} from {clean_path} on item {item_id}")
+    else:
+        print(f"[FABRIC] delete_onelake_shortcut failed: {resp.status_code} {resp.text[:200]}")
+    return success
+
+
+# ── Item Execution & Refresh APIs ─────────────────────────────────────────────
+
+def run_notebook(
+    notebook_id: str,
+    parameters: dict | None = None,
+    workspace_id: str = ALLOWED_WORKSPACE_ID,
+) -> dict:
+    """
+    Triggers execution of a PySpark Notebook via Jobs API (jobType=RunNotebook).
+    Official Spec: POST /v1/workspaces/{workspaceId}/items/{itemId}/jobs/instances?jobType=RunNotebook
+    """
+    _assert_workspace(workspace_id)
+    headers = get_auth_headers()
+    payload = {}
+    if parameters:
+        payload["executionData"] = {"parameters": parameters}
+
+    resp = requests.post(
+        f"{_BASE}/workspaces/{workspace_id}/items/{notebook_id}/jobs/instances?jobType=RunNotebook",
+        headers=headers,
+        json=payload if parameters else None,
+        timeout=20,
+    )
+    if resp.status_code in (200, 201, 202):
+        location = resp.headers.get("Location", "")
+        job_id = location.split("/")[-1] if "/" in location else None
+        print(f"[FABRIC] Notebook {notebook_id} execution triggered. Job ID: {job_id}")
+        return {"success": True, "job_id": job_id, "location": location}
+    print(f"[FABRIC] Notebook run trigger failed: {resp.status_code} {resp.text[:250]}")
+    return {"success": False, "error": resp.text, "status_code": resp.status_code}
+
+
+def refresh_semantic_model(
+    semantic_model_id: str,
+    workspace_id: str = ALLOWED_WORKSPACE_ID,
+) -> dict:
+    """
+    Triggers refresh on a Power BI Semantic Model via Jobs API (jobType=Execute).
+    """
+    _assert_workspace(workspace_id)
+    headers = get_auth_headers()
+    resp = requests.post(
+        f"{_BASE}/workspaces/{workspace_id}/items/{semantic_model_id}/jobs/instances?jobType=Execute",
+        headers=headers,
+        timeout=20,
+    )
+    if resp.status_code in (200, 201, 202):
+        location = resp.headers.get("Location", "")
+        job_id = location.split("/")[-1] if "/" in location else None
+        print(f"[FABRIC] Semantic Model {semantic_model_id} refresh triggered. Job ID: {job_id}")
+        return {"success": True, "job_id": job_id, "location": location}
+    print(f"[FABRIC] Semantic Model refresh trigger failed: {resp.status_code} {resp.text[:250]}")
+    return {"success": False, "error": resp.text, "status_code": resp.status_code}
+
+
