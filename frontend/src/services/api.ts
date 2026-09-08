@@ -45,6 +45,22 @@ export async function fetchSessions(): Promise<ChatSession[]> {
   }));
 }
 
+export async function fetchSessionDetail(
+  sessionId: string
+): Promise<{ sessionId: string; title: string; messages: { role: 'user' | 'assistant' | 'system'; content: string }[] }> {
+  const res = await fetch(`${API_BASE}/sessions/${sessionId}`);
+  if (!res.ok) throw new Error(`Failed to fetch session detail: ${res.statusText}`);
+  const data = await res.json();
+  return {
+    sessionId: data.session_id,
+    title: data.title || 'Conversation',
+    messages: (data.messages || []).map((m: Record<string, unknown>) => ({
+      role: (m.role as 'user' | 'assistant' | 'system') || 'user',
+      content: String(m.content || ''),
+    })),
+  };
+}
+
 export async function createNewSession(workspaceId?: string): Promise<string> {
   const res = await fetch(`${API_BASE}/sessions/new`, {
     method: 'POST',

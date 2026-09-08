@@ -10,7 +10,9 @@ import {
   PanelLeftClose,
   LogOut,
   Sliders,
+  MessageSquare,
 } from 'lucide-react';
+import { ChatSession } from '../types';
 
 interface SidebarProps {
   activeView: string;
@@ -20,6 +22,9 @@ interface SidebarProps {
   onToggleCollapse: () => void;
   userName?: string;
   userEmail?: string;
+  sessions?: ChatSession[];
+  activeSessionId?: string;
+  onSelectSession?: (sessionId: string) => void;
 }
 
 const PLATFORMS = [
@@ -37,6 +42,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onToggleCollapse,
   userName = 'Bheesetti Harsith',
   userEmail = 'bheesetti.harsith@fabric.ai',
+  sessions = [],
+  activeSessionId = '',
+  onSelectSession,
 }) => {
   const [selectedPlatform, setSelectedPlatform] = useState('fabric');
   const [isPlatformMenuOpen, setIsPlatformMenuOpen] = useState(false);
@@ -200,9 +208,26 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
           {isChatsOpen && (
             <div className="chats-scroll-list">
-              <div className="sidebar-chat-item active">
-                <span>Architect Orders Medallion Flow</span>
-              </div>
+              {sessions.length === 0 ? (
+                <div className="sidebar-chat-item active">
+                  <MessageSquare width={13} height={13} style={{ flexShrink: 0, opacity: 0.7 }} />
+                  <span>Architect Orders Medallion Flow</span>
+                </div>
+              ) : (
+                sessions.map((s) => (
+                  <div
+                    key={s.sessionId}
+                    className={`sidebar-chat-item ${activeSessionId === s.sessionId ? 'active' : ''}`}
+                    onClick={() => onSelectSession?.(s.sessionId)}
+                    title={s.title}
+                  >
+                    <MessageSquare width={13} height={13} style={{ flexShrink: 0, opacity: 0.7 }} />
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {s.title}
+                    </span>
+                  </div>
+                ))
+              )}
             </div>
           )}
         </div>

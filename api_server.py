@@ -39,7 +39,10 @@ from app.fabric_client import list_workspaces
 from app.llm_router import chat
 from app.session_store import (
     add_message,
+    create_project,
     create_session,
+    get_all_projects,
+    get_conversation_full,
     get_facts,
     get_session,
     init_db,
@@ -149,6 +152,22 @@ async def get_sessions(workspace_id: str | None = None):
     """Returns all active conversation threads with titles, run counts, and message counts."""
     convs = list_conversations_with_metadata(workspace_id or ALLOWED_WORKSPACE_ID)
     return {"sessions": convs, "count": len(convs)}
+
+
+@app.get("/api/sessions/{session_id}", summary="Get Full Conversation Thread")
+async def get_session_detail(session_id: str):
+    """Returns full conversation bundle with messages, metadata, and learned facts."""
+    bundle = get_conversation_full(session_id)
+    if not bundle:
+        raise HTTPException(status_code=404, detail="Conversation session not found")
+    return bundle
+
+
+@app.get("/api/projects", summary="List Active Projects")
+async def get_projects():
+    """Returns all projects stored in the persistent database."""
+    projects = get_all_projects()
+    return {"projects": projects, "count": len(projects)}
 
 
 @app.post("/api/sessions/new", summary="Initialize New Session")

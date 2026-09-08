@@ -14,8 +14,14 @@ import { SkillsView } from './components/SkillsView';
 import { ProjectsView } from './components/ProjectsView';
 import { WorkspaceExplorerView } from './components/WorkspaceExplorerView';
 import { IngestionStudioView } from './components/IngestionStudioView';
-import { fetchFabricStatus, createNewSession, streamChatTurn } from './services/api';
-import { FabricStatus, ChatMessage, IngestionPlan, WorkspaceItem } from './types';
+import {
+  fetchFabricStatus,
+  createNewSession,
+  streamChatTurn,
+  fetchSessions,
+  fetchSessionDetail,
+} from './services/api';
+import { FabricStatus, ChatMessage, IngestionPlan, WorkspaceItem, ChatSession } from './types';
 
 export const App: React.FC = () => {
   const [activeView, setActiveView] = useState<string>('chat');
@@ -23,6 +29,7 @@ export const App: React.FC = () => {
   const [isWorkbenchOpen, setIsWorkbenchOpen] = useState<boolean>(false);
   const [status, setStatus] = useState<FabricStatus | null>(null);
   const [sessionId, setSessionId] = useState<string>('');
+  const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isStreaming, setIsStreaming] = useState<boolean>(false);
 
@@ -34,13 +41,25 @@ export const App: React.FC = () => {
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState<boolean>(false);
   const [currentPlan, setCurrentPlan] = useState<IngestionPlan | null>(null);
 
+  const loadSessions = async () => {
+    try {
+      const sessList = await fetchSessions();
+      setSessions(sessList);
+    } catch (e) {
+      console.error('Failed to load sessions', e);
+    }
+  };
+
   useEffect(() => {
     fetchFabricStatus()
       .then(setStatus)
       .catch(() => setStatus(null));
 
     createNewSession()
-      .then(setSessionId)
+      .then((sid) => {
+        setSessionId(sid);
+        loadSessions();
+      })
       .catch((e) => console.error('Failed to init session', e));
   }, []);
 
@@ -50,8 +69,25 @@ export const App: React.FC = () => {
       setSessionId(newSid);
       setMessages([]);
       setActiveView('chat');
+      loadSessions();
     } catch (e) {
       console.error(e);
+    }
+  };
+
+  const handleSelectSession = async (sid: string) => {
+    try {
+      setSessionId(sid);
+      setActiveView('chat');
+      const detail = await fetchSessionDetail(sid);
+      setMessages(
+        detail.messages.map((m) => ({
+          role: m.role,
+          content: m.content,
+        }))
+      );
+    } catch (e) {
+      console.error('Failed to load session detail', e);
     }
   };
 
@@ -150,6 +186,9 @@ export const App: React.FC = () => {
         onNewChat={handleNewSession}
         isCollapsed={isSidebarCollapsed}
         onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+        sessions={sessions}
+        activeSessionId={sessionId}
+        onSelectSession={handleSelectSession}
       />
 
       {/* 2. Main Studio Canvas */}
