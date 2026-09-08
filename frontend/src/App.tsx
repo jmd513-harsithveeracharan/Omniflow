@@ -9,8 +9,13 @@ import { DeploymentWorkbench } from './components/DeploymentWorkbench';
 import { SkillInspectorModal } from './components/SkillInspectorModal';
 import { ConnectorModal } from './components/ConnectorModal';
 import { GovernanceModal } from './components/GovernanceModal';
+import { SettingsModal } from './components/SettingsModal';
+import { SkillsView } from './components/SkillsView';
+import { ProjectsView } from './components/ProjectsView';
+import { WorkspaceExplorerView } from './components/WorkspaceExplorerView';
+import { IngestionStudioView } from './components/IngestionStudioView';
 import { fetchFabricStatus, createNewSession, streamChatTurn } from './services/api';
-import { FabricStatus, ChatMessage, IngestionPlan } from './types';
+import { FabricStatus, ChatMessage, IngestionPlan, WorkspaceItem } from './types';
 
 export const App: React.FC = () => {
   const [activeView, setActiveView] = useState<string>('chat');
@@ -22,9 +27,11 @@ export const App: React.FC = () => {
   const [isStreaming, setIsStreaming] = useState<boolean>(false);
 
   // Modals
-  const [isSkillsOpen, setIsSkillsOpen] = useState<boolean>(false);
-  const [isConnectorsOpen, setIsConnectorsOpen] = useState<boolean>(false);
-  const [isGovernanceOpen, setIsGovernanceOpen] = useState<boolean>(false);
+  const [isSkillsModalOpen, setIsSkillsModalOpen] = useState<boolean>(false);
+  const [inspectedSkillName, setInspectedSkillName] = useState<string>('using_fabric_skills');
+  const [isConnectorsModalOpen, setIsConnectorsModalOpen] = useState<boolean>(false);
+  const [isGovernanceModalOpen, setIsGovernanceModalOpen] = useState<boolean>(false);
+  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState<boolean>(false);
   const [currentPlan, setCurrentPlan] = useState<IngestionPlan | null>(null);
 
   useEffect(() => {
@@ -42,6 +49,7 @@ export const App: React.FC = () => {
       const newSid = await createNewSession(status?.workspaceId);
       setSessionId(newSid);
       setMessages([]);
+      setActiveView('chat');
     } catch (e) {
       console.error(e);
     }
@@ -49,6 +57,11 @@ export const App: React.FC = () => {
 
   const handleSendMessage = async (text: string) => {
     if (!text.trim() || isStreaming) return;
+
+    // Switch to chat view if currently in another tab
+    if (activeView !== 'chat') {
+      setActiveView('chat');
+    }
 
     const userMsg: ChatMessage = { role: 'user', content: text };
     setMessages((prev) => [...prev, userMsg]);
@@ -84,17 +97,48 @@ export const App: React.FC = () => {
   };
 
   const handleSelectView = (view: string) => {
-    setActiveView(view);
-    if (view === 'skills') setIsSkillsOpen(true);
-    if (view === 'apps') setIsConnectorsOpen(true);
-    if (view === 'governance') setIsGovernanceOpen(true);
+    if (view === 'settings') {
+      setIsSettingsModalOpen(true);
+    } else {
+      setActiveView(view);
+    }
   };
 
   const handlePlanGenerated = (plan: IngestionPlan) => {
     setCurrentPlan(plan);
+    setActiveView('chat');
     setIsWorkbenchOpen(true);
     const msg = `Generated Medallion Ingestion Plan for source: **${plan.sourceName}** (${plan.schedule}). Target Lakehouses: \`lh_enterprise_bronze\`, \`lh_enterprise_silver\`, \`lh_enterprise_gold\`.`;
     setMessages((prev) => [...prev, { role: 'assistant', content: msg }]);
+  };
+
+  const handleInspectSkill = (skillName: string) => {
+    setInspectedSkillName(skillName);
+    setIsSkillsModalOpen(true);
+  };
+
+  const handleInspectWorkspaceItem = (_item: WorkspaceItem) => {
+    setActiveView('chat');
+    setIsWorkbenchOpen(true);
+  };
+
+  const handleDeleteWorkspaceItem = (_item: WorkspaceItem) => {
+    setIsGovernanceModalOpen(true);
+  };
+
+  const getViewTitle = () => {
+    switch (activeView) {
+      case 'projects':
+        return 'Projects';
+      case 'skills':
+        return 'Skills & Grounding Engine';
+      case 'workspaces':
+        return 'Workspace Explorer';
+      case 'apps':
+        return 'Apps & Ingestion Studio';
+      default:
+        return messages.length === 0 ? 'Playground' : 'Architect Orders Medallion Flow';
+    }
   };
 
   return (
@@ -112,7 +156,7 @@ export const App: React.FC = () => {
       <main className="studio-main" id="mainCanvas">
         {/* Google AI Studio TopBar */}
         <TopBar
-          viewTitle={messages.length === 0 ? 'Playground' : 'Architect Orders Medallion Flow'}
+          viewTitle={getViewTitle()}
           isSidebarCollapsed={isSidebarCollapsed}
           onToggleSidebar={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
           isWorkbenchOpen={isWorkbenchOpen}
@@ -122,45 +166,98 @@ export const App: React.FC = () => {
           status={status}
         />
 
-        {/* Workspace Split (Chat Timeline + Optional Interactive Workbench Canvas) */}
-        <div className="bolt-workspace-split">
-          {/* Left Chat / Landing Center */}
-          <div className={`bolt-chat-pane ${messages.length === 0 ? 'is-landing' : ''} ${isWorkbenchOpen ? 'with-workbench' : 'full-width'}`}>
-            {messages.length === 0 ? (
-              <PlaygroundHome onSelectPrompt={handleSendMessage} />
-            ) : (
-              <ChatTimeline messages={messages} isStreaming={isStreaming} />
-            )}
+        {/* View Routing */}
+        {activeView === 'projects' && (
+          <ProjectsView
+            onOpenProject={(id) => {
+              setActiveView('chat');
+              handleSendMessage(`Load and focus on project context: ${id}`);
+            }}
+            onNewChatWithContext={(_name) => {
+              setActiveView('chat');
+              handleNewSession();
+            }}
+          />
+        )}
 
-            {/* Floating Prompt Input Dock */}
-            <PromptDock onSendMessage={handleSendMessage} isStreaming={isStreaming} />
-          </div>
+        {activeView === 'skills' && (
+          <SkillsView
+            onSelectSkillPrompt={handleSendMessage}
+            onInspectSkill={handleInspectSkill}
+          />
+        )}
 
-          {/* Right Visual Workbench Pane (When toggled open) */}
-          {isWorkbenchOpen && (
-            <div className="bolt-workbench-pane">
-              {currentPlan ? <DeploymentWorkbench plan={currentPlan} /> : <MedallionFlowCanvas />}
+        {activeView === 'workspaces' && (
+          <WorkspaceExplorerView
+            workspaceName={status?.workspaceId || 'PBT_DATA_AGENT'}
+            onInspectItem={handleInspectWorkspaceItem}
+            onDeleteItem={handleDeleteWorkspaceItem}
+          />
+        )}
+
+        {activeView === 'apps' && (
+          <IngestionStudioView
+            onPlanGenerated={handlePlanGenerated}
+          />
+        )}
+
+        {activeView === 'chat' && (
+          <div className="bolt-workspace-split">
+            {/* Left Chat / Landing Center */}
+            <div
+              className={`bolt-chat-pane ${messages.length === 0 ? 'is-landing' : ''} ${
+                isWorkbenchOpen ? 'with-workbench' : 'full-width'
+              }`}
+            >
+              {messages.length === 0 ? (
+                <PlaygroundHome onSelectPrompt={handleSendMessage} />
+              ) : (
+                <ChatTimeline messages={messages} isStreaming={isStreaming} />
+              )}
+
+              {/* Floating Prompt Input Dock */}
+              <PromptDock onSendMessage={handleSendMessage} isStreaming={isStreaming} />
             </div>
-          )}
-        </div>
+
+            {/* Right Visual Workbench Pane (When toggled open) */}
+            {isWorkbenchOpen && (
+              <div className="bolt-workbench-pane">
+                {currentPlan ? (
+                  <DeploymentWorkbench plan={currentPlan} />
+                ) : (
+                  <MedallionFlowCanvas
+                    plan={currentPlan}
+                    onClose={() => setIsWorkbenchOpen(false)}
+                  />
+                )}
+              </div>
+            )}
+          </div>
+        )}
       </main>
 
       {/* Domain Feature Modals */}
       <SkillInspectorModal
-        isOpen={isSkillsOpen}
-        onClose={() => setIsSkillsOpen(false)}
+        isOpen={isSkillsModalOpen}
+        onClose={() => setIsSkillsModalOpen(false)}
         onSelectSkillPrompt={handleSendMessage}
+        skillName={inspectedSkillName}
       />
 
       <ConnectorModal
-        isOpen={isConnectorsOpen}
-        onClose={() => setIsConnectorsOpen(false)}
+        isOpen={isConnectorsModalOpen}
+        onClose={() => setIsConnectorsModalOpen(false)}
         onPlanGenerated={handlePlanGenerated}
       />
 
       <GovernanceModal
-        isOpen={isGovernanceOpen}
-        onClose={() => setIsGovernanceOpen(false)}
+        isOpen={isGovernanceModalOpen}
+        onClose={() => setIsGovernanceModalOpen(false)}
+      />
+
+      <SettingsModal
+        isOpen={isSettingsModalOpen}
+        onClose={() => setIsSettingsModalOpen(false)}
       />
     </div>
   );

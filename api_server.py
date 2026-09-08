@@ -287,13 +287,18 @@ async def get_session_facts_endpoint(session_id: str):
 
 # ── Static File Serving (Studio UI & Assets) ──────────────────────────────────
 STATIC_ROOT = os.path.dirname(os.path.abspath(__file__))
+FRONTEND_DIST = os.path.join(STATIC_ROOT, "frontend", "dist")
 
-if os.path.exists(os.path.join(STATIC_ROOT, "assets")):
+if os.path.exists(os.path.join(FRONTEND_DIST, "assets")):
+    app.mount("/assets", StaticFiles(directory=os.path.join(FRONTEND_DIST, "assets")), name="react_assets")
+elif os.path.exists(os.path.join(STATIC_ROOT, "assets")):
     app.mount("/assets", StaticFiles(directory=os.path.join(STATIC_ROOT, "assets")), name="assets")
 
 
 @app.get("/")
 async def serve_index():
+    if os.path.exists(os.path.join(FRONTEND_DIST, "index.html")):
+        return FileResponse(os.path.join(FRONTEND_DIST, "index.html"))
     index_path = os.path.join(STATIC_ROOT, "index.html")
     if os.path.exists(index_path):
         return FileResponse(index_path)
@@ -304,9 +309,17 @@ async def serve_index():
 async def serve_static_root_files(filename: str):
     if filename.startswith("api/"):
         raise HTTPException(status_code=404, detail=f"API endpoint '/{filename}' not found")
+
+    dist_file = os.path.join(FRONTEND_DIST, filename)
+    if os.path.isfile(dist_file):
+        return FileResponse(dist_file)
+
     file_path = os.path.join(STATIC_ROOT, filename)
     if os.path.isfile(file_path):
         return FileResponse(file_path)
+
+    if os.path.exists(os.path.join(FRONTEND_DIST, "index.html")):
+        return FileResponse(os.path.join(FRONTEND_DIST, "index.html"))
     index_path = os.path.join(STATIC_ROOT, "index.html")
     if os.path.exists(index_path):
         return FileResponse(index_path)

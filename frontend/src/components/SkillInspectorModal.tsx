@@ -7,18 +7,26 @@ interface SkillInspectorModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSelectSkillPrompt?: (prompt: string) => void;
+  skillName?: string;
 }
 
 export const SkillInspectorModal: React.FC<SkillInspectorModalProps> = ({
   isOpen,
   onClose,
   onSelectSkillPrompt,
+  skillName,
 }) => {
   const [skills, setSkills] = useState<SkillSummary[]>([]);
-  const [selectedSkillName, setSelectedSkillName] = useState<string>('');
+  const [selectedSkillName, setSelectedSkillName] = useState<string>(skillName || '');
   const [activeSkillDetail, setActiveSkillDetail] = useState<SkillSummary | null>(null);
   const [copied, setCopied] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (skillName) {
+      setSelectedSkillName(skillName);
+    }
+  }, [skillName]);
 
   useEffect(() => {
     if (isOpen) {
@@ -26,12 +34,12 @@ export const SkillInspectorModal: React.FC<SkillInspectorModalProps> = ({
         .then((data) => {
           setSkills(data);
           if (data.length > 0 && !selectedSkillName) {
-            setSelectedSkillName(data[0].name);
+            setSelectedSkillName(skillName || data[0].name);
           }
         })
         .catch(console.error);
     }
-  }, [isOpen]);
+  }, [isOpen, skillName]);
 
   useEffect(() => {
     if (selectedSkillName) {
