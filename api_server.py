@@ -122,6 +122,7 @@ async def health_check():
     }
 
 
+@app.get("/api/status", summary="System & Fabric Status Alias")
 @app.get("/api/fabric/status", summary="Microsoft Fabric Connection Status")
 async def get_fabric_status():
     """Checks Microsoft Fabric REST API authentication and workspace connectivity."""
@@ -301,6 +302,8 @@ async def serve_index():
 
 @app.get("/{filename:path}")
 async def serve_static_root_files(filename: str):
+    if filename.startswith("api/"):
+        raise HTTPException(status_code=404, detail=f"API endpoint '/{filename}' not found")
     file_path = os.path.join(STATIC_ROOT, filename)
     if os.path.isfile(file_path):
         return FileResponse(file_path)
