@@ -32,6 +32,8 @@ logs/
 # Reference Repos & Archives
 _reference_repos/
 _deleted_archive/
+_legacy_archive/
+Previous Iteration/
 scratch/
 claude_response.txt
 ingest-one-feat-ai-driven-onboarding/

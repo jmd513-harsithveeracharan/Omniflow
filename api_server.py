@@ -284,16 +284,16 @@ async def get_session_facts_endpoint(session_id: str):
     return {"session_id": session_id, "facts": facts}
 
 
-# ── Static File Serving (React Production Frontend) ───────────────────────────
-FRONTEND_DIST = os.path.join(os.path.dirname(os.path.abspath(__file__)), "frontend", "dist")
+# ── Static File Serving (Studio UI & Assets) ──────────────────────────────────
+STATIC_ROOT = os.path.dirname(os.path.abspath(__file__))
 
-if os.path.exists(os.path.join(FRONTEND_DIST, "assets")):
-    app.mount("/assets", StaticFiles(directory=os.path.join(FRONTEND_DIST, "assets")), name="assets")
+if os.path.exists(os.path.join(STATIC_ROOT, "assets")):
+    app.mount("/assets", StaticFiles(directory=os.path.join(STATIC_ROOT, "assets")), name="assets")
 
 
 @app.get("/")
 async def serve_index():
-    index_path = os.path.join(FRONTEND_DIST, "index.html")
+    index_path = os.path.join(STATIC_ROOT, "index.html")
     if os.path.exists(index_path):
         return FileResponse(index_path)
     return {"message": "Fabric AI Studio API Online. Access /docs for Swagger UI."}
@@ -301,10 +301,10 @@ async def serve_index():
 
 @app.get("/{filename:path}")
 async def serve_static_root_files(filename: str):
-    file_path = os.path.join(FRONTEND_DIST, filename)
+    file_path = os.path.join(STATIC_ROOT, filename)
     if os.path.isfile(file_path):
         return FileResponse(file_path)
-    index_path = os.path.join(FRONTEND_DIST, "index.html")
+    index_path = os.path.join(STATIC_ROOT, "index.html")
     if os.path.exists(index_path):
         return FileResponse(index_path)
     raise HTTPException(status_code=404, detail="File not found")
