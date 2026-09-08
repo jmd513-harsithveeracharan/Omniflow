@@ -480,6 +480,20 @@ def chat(
     elif effort == "high":
         max_tokens = max(max_tokens, 8192)
 
+    # Fast-path for simple conversational greetings and capability questions
+    last_user_msg = next((m.get("content", "") for m in reversed(messages) if m.get("role") == "user"), "").strip().lower()
+    greetings = {"hi", "hello", "hey", "hola", "yo", "good morning", "good evening", "good day", "help", "who are you", "what can you do", "hi fabric", "hello fabric", "hey fabric"}
+    if last_user_msg in greetings or (len(last_user_msg) <= 12 and any(last_user_msg.startswith(g) for g in ["hi ", "hello ", "hey "])):
+        return (
+            "Hello! I am **Fabric.AI**, your autonomous data engineering and Medallion architecture copilot for Microsoft Fabric.\n\n"
+            "Here are a few things I can do for you:\n"
+            "- 🏗️ **Medallion Architecture**: Design and provision Bronze, Silver, and Gold Delta Lake layers.\n"
+            "- ⚡ **SQL Transpilation**: Convert T-SQL, Oracle, Snowflake, or Postgres into native PySpark Delta Lake code with full column-level lineage.\n"
+            "- 🔌 **Data Ingestion**: Discover tables from Azure SQL, Postgres, SAP, and Salesforce and configure incremental CDC DAGs.\n"
+            "- 🛡️ **Governance & Safe Deletion**: Run blast-radius impact analysis and capture automated definition backups.\n\n"
+            "What would you like to build or inspect today?"
+        )
+
     if complexity == "high":
         attempts = _high_complexity_providers(messages, max_tokens, session_id=session_id, resume=resume)
     elif complexity == "compress":

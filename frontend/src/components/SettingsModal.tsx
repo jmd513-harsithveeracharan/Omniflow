@@ -28,6 +28,7 @@ interface SettingsModalProps {
   onClose: () => void;
   status?: FabricStatus | null;
   onRefreshStatus?: () => void;
+  initialTab?: string;
 }
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({
@@ -35,11 +36,18 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onClose,
   status = null,
   onRefreshStatus,
+  initialTab = 'tabConnectors',
 }) => {
-  const [activeTab, setActiveTab] = useState<string>('tabGeneral');
+  const [activeTab, setActiveTab] = useState<string>(initialTab);
   const [searchQuery, setSearchQuery] = useState('');
   const [isFabricModalOpen, setIsFabricModalOpen] = useState(false);
   const [isAddConnectorOpen, setIsAddConnectorOpen] = useState(false);
+
+  React.useEffect(() => {
+    if (isOpen) {
+      setActiveTab(initialTab);
+    }
+  }, [isOpen, initialTab]);
 
   if (!isOpen) return null;
 

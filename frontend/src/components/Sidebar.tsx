@@ -24,6 +24,7 @@ interface SidebarProps {
   userEmail?: string;
   sessions?: ChatSession[];
   activeSessionId?: string;
+  isLoadingSessions?: boolean;
   onSelectSession?: (sessionId: string) => void;
 }
 
@@ -44,6 +45,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   userEmail = 'bheesetti.harsith@fabric.ai',
   sessions = [],
   activeSessionId = '',
+  isLoadingSessions = false,
   onSelectSession,
 }) => {
   const [selectedPlatform, setSelectedPlatform] = useState('fabric');
@@ -64,7 +66,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
             className="sidebar-brand"
             onClick={() => setIsPlatformMenuOpen(!isPlatformMenuOpen)}
           >
-            <img src={activePlatformObj.icon} alt="Brand" className="brand-logo-img" />
+            <div className="brand-logo-icon-wrap" style={{ width: '22px', height: '22px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              {selectedPlatform === 'fabric' ? (
+                <svg width="20" height="20" viewBox="0 0 32 32" fill="none">
+                  <path d="M16 3L3 10.5V21.5L16 29L29 21.5V10.5L16 3Z" fill="#008272"/>
+                  <path d="M16 3L29 10.5V21.5L16 29V3Z" fill="#00A88F"/>
+                  <path d="M16 3L29 10.5L16 18L3 10.5L16 3Z" fill="#00D2A0"/>
+                </svg>
+              ) : (
+                <img src={activePlatformObj.icon} alt={activePlatformObj.name} className="brand-logo-img" />
+              )}
+            </div>
             <div className="brand-text">
               <span className="brand-title">
                 {activePlatformObj.name.split('.')[0]}
@@ -218,10 +230,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
           {isChatsOpen && (
             <div className="chats-scroll-list">
-              {sessions.length === 0 ? (
-                <div className="sidebar-chat-item active">
-                  <MessageSquare width={13} height={13} style={{ flexShrink: 0, opacity: 0.7 }} />
-                  <span>Architect Orders Medallion Flow</span>
+              {isLoadingSessions ? (
+                <div style={{ padding: '8px 10px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <div style={{ height: '26px', background: 'rgba(255,255,255,0.05)', borderRadius: '6px', animation: 'pulse 1.5s infinite ease-in-out' }} />
+                  <div style={{ height: '26px', background: 'rgba(255,255,255,0.05)', borderRadius: '6px', animation: 'pulse 1.5s infinite ease-in-out', width: '75%' }} />
+                </div>
+              ) : sessions.length === 0 ? (
+                <div style={{ padding: '16px 12px', fontSize: '12px', color: '#71717a', textAlign: 'center' }}>
+                  No saved conversations
                 </div>
               ) : (
                 sessions.map((s) => (

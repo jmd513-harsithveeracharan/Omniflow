@@ -31,6 +31,7 @@ export const App: React.FC = () => {
   const [status, setStatus] = useState<FabricStatus | null>(null);
   const [sessionId, setSessionId] = useState<string>('');
   const [sessions, setSessions] = useState<ChatSession[]>([]);
+  const [isLoadingSessions, setIsLoadingSessions] = useState<boolean>(true);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isStreaming, setIsStreaming] = useState<boolean>(false);
 
@@ -45,10 +46,13 @@ export const App: React.FC = () => {
 
   const loadSessions = async () => {
     try {
+      setIsLoadingSessions(true);
       const sessList = await fetchSessions();
       setSessions(sessList);
     } catch (e) {
       console.error('Failed to load sessions', e);
+    } finally {
+      setIsLoadingSessions(false);
     }
   };
 
@@ -57,10 +61,11 @@ export const App: React.FC = () => {
       .then(setStatus)
       .catch(() => setStatus(null));
 
+    loadSessions();
+
     createNewSession()
       .then((sid) => {
         setSessionId(sid);
-        loadSessions();
       })
       .catch((e) => console.error('Failed to init session', e));
   }, []);
@@ -189,6 +194,7 @@ export const App: React.FC = () => {
         onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
         sessions={sessions}
         activeSessionId={sessionId}
+        isLoadingSessions={isLoadingSessions}
         onSelectSession={handleSelectSession}
       />
 
