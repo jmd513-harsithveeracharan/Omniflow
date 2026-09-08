@@ -8,6 +8,7 @@ import { parseThoughtMeta } from './chat/thoughtUtils';
 interface ChatTimelineProps {
   messages: ChatMessage[];
   isStreaming: boolean;
+  sessionId?: string;
   onDeployPlan?: () => void;
   onOpenCanvas?: () => void;
   onOpenWorkspace?: () => void;
@@ -17,6 +18,7 @@ interface ChatTimelineProps {
 export const ChatTimeline: React.FC<ChatTimelineProps> = ({
   messages,
   isStreaming,
+  sessionId,
   onDeployPlan,
   onOpenCanvas,
   onOpenWorkspace,
@@ -24,6 +26,7 @@ export const ChatTimeline: React.FC<ChatTimelineProps> = ({
 }) => {
   const threadRef = useRef<HTMLDivElement>(null);
   const prevCountRef = useRef<number>(messages.length);
+  const prevSessionIdRef = useRef<string>(sessionId || '');
   const isUserScrolledUpRef = useRef<boolean>(false);
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
   const [speakingIdx, setSpeakingIdx] = useState<number | null>(null);
@@ -32,13 +35,33 @@ export const ChatTimeline: React.FC<ChatTimelineProps> = ({
 
   const lastUserRef = useRef<HTMLDivElement | null>(null);
 
+  // User manual scroll detection
   const handleScroll = () => {
     if (!threadRef.current) return;
     const { scrollTop, scrollHeight, clientHeight } = threadRef.current;
     const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
-    isUserScrolledUpRef.current = distanceFromBottom > 120;
+    isUserScrolledUpRef.current = distanceFromBottom > 140;
   };
 
+  // Reset scroll to top on mount or session switch
+  useEffect(() => {
+    if (threadRef.current) {
+      threadRef.current.scrollTop = 0;
+    }
+  }, []);
+
+  useEffect(() => {
+    if (sessionId !== prevSessionIdRef.current) {
+      prevSessionIdRef.current = sessionId || '';
+      isUserScrolledUpRef.current = false;
+      prevCountRef.current = messages.length;
+      if (threadRef.current) {
+        threadRef.current.scrollTo({ top: 0, behavior: 'instant' });
+      }
+    }
+  }, [sessionId, messages.length]);
+
+  // Handle message changes & streaming autoscroll
   useEffect(() => {
     if (!threadRef.current) return;
     const thread = threadRef.current;
@@ -48,27 +71,26 @@ export const ChatTimeline: React.FC<ChatTimelineProps> = ({
       const lastMsg = messages[messages.length - 1];
       if (lastMsg && lastMsg.role === 'user') {
         isUserScrolledUpRef.current = false;
-        // Anchor the new user prompt neatly near top of viewport
         requestAnimationFrame(() => {
-          if (lastUserRef.current && thread) {
-            const topOffset = Math.max(0, lastUserRef.current.offsetTop - 24);
-            thread.scrollTo({ top: topOffset, behavior: 'smooth' });
+          if (thread) {
+            if (messages.length > 1 && lastUserRef.current) {
+              const topOffset = Math.max(0, lastUserRef.current.offsetTop - 20);
+              thread.scrollTo({ top: topOffset, behavior: 'smooth' });
+            } else {
+              thread.scrollTo({ top: 0, behavior: 'instant' });
+            }
           }
         });
       }
     }
-    // B. Assistant Streaming Progress
+    // B. Assistant Streaming Progress - only follow if content extends below visible viewport
     else if (isStreaming && !isUserScrolledUpRef.current) {
       const { scrollTop, clientHeight, scrollHeight } = thread;
-      const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
-      // Gently follow streaming only if content extends below viewport
-      if (distanceFromBottom > 0 && distanceFromBottom < 300) {
+      const dockReserved = 110;
+      const contentVisibleBottom = scrollTop + clientHeight - dockReserved;
+      if (scrollHeight - 90 > contentVisibleBottom) {
         thread.scrollTop = scrollHeight - clientHeight;
       }
-    }
-    // C. Initial load or session switch
-    else if (messages.length > 0 && prevCountRef.current === 0) {
-      thread.scrollTo({ top: 0, behavior: 'instant' });
     }
 
     prevCountRef.current = messages.length;
@@ -305,7 +327,7 @@ export const ChatTimeline: React.FC<ChatTimelineProps> = ({
           </div>
         )}
 
-        <div id="chatBottomSpacer" className="chat-thread-bottom-spacer" style={{ height: '40px', flexShrink: 0 }} />
+        <div id="chatBottomSpacer" className="chat-thread-bottom-spacer" style={{ height: '8px', flexShrink: 0 }} />
       </div>
     </div>
   );

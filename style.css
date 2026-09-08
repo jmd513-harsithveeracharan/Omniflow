@@ -1431,7 +1431,7 @@ nav.sidebar-nav {
     flex: 1;
     overflow-y: auto;
     overflow-x: hidden;
-    padding: 24px 0 160px 0 !important;
+    padding: 24px 0 100px 0 !important;
     display: flex;
     flex-direction: column;
     gap: 28px;

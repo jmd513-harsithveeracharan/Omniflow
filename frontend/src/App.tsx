@@ -384,6 +384,7 @@ export const App: React.FC = () => {
                 <ChatTimeline
                   messages={messages}
                   isStreaming={isStreaming}
+                  sessionId={sessionId}
                   onDeployPlan={() => {
                     if (currentPlan) {
                       setIsWorkbenchOpen(true);
