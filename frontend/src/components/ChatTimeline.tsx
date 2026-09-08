@@ -30,44 +30,44 @@ export const ChatTimeline: React.FC<ChatTimelineProps> = ({
   const [likedIdxs, setLikedIdxs] = useState<Record<number, boolean>>({});
   const [dislikedIdxs, setDislikedIdxs] = useState<Record<number, boolean>>({});
 
+  const lastUserRef = useRef<HTMLDivElement | null>(null);
+
   const handleScroll = () => {
     if (!threadRef.current) return;
     const { scrollTop, scrollHeight, clientHeight } = threadRef.current;
     const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
-    isUserScrolledUpRef.current = distanceFromBottom > 100;
+    isUserScrolledUpRef.current = distanceFromBottom > 120;
   };
 
   useEffect(() => {
     if (!threadRef.current) return;
     const thread = threadRef.current;
 
+    // A. New User Message Sent
     if (messages.length > prevCountRef.current) {
       const lastMsg = messages[messages.length - 1];
       if (lastMsg && lastMsg.role === 'user') {
         isUserScrolledUpRef.current = false;
-        if (messages.length <= 1) {
-          thread.scrollTo({ top: 0, behavior: 'instant' });
-        } else {
-          const isOverflowing = (thread.scrollHeight - 160) > thread.clientHeight;
-          if (isOverflowing) {
-            const target = Math.max(0, thread.scrollHeight - thread.clientHeight - 60);
-            thread.scrollTo({ top: target, behavior: 'smooth' });
-          } else {
-            thread.scrollTo({ top: 0, behavior: 'instant' });
+        // Anchor the new user prompt neatly near top of viewport
+        requestAnimationFrame(() => {
+          if (lastUserRef.current && thread) {
+            const topOffset = Math.max(0, lastUserRef.current.offsetTop - 24);
+            thread.scrollTo({ top: topOffset, behavior: 'smooth' });
           }
-        }
+        });
       }
-    } else if (isStreaming && !isUserScrolledUpRef.current) {
-      const isOverflowing = (thread.scrollHeight - 160) > thread.clientHeight;
-      if (isOverflowing) {
-        const target = Math.max(0, thread.scrollHeight - thread.clientHeight - 60);
-        if (thread.scrollTop < target) {
-          thread.scrollTop = target;
-        }
-      } else {
-        thread.scrollTop = 0;
+    }
+    // B. Assistant Streaming Progress
+    else if (isStreaming && !isUserScrolledUpRef.current) {
+      const { scrollTop, clientHeight, scrollHeight } = thread;
+      const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
+      // Gently follow streaming only if content extends below viewport
+      if (distanceFromBottom > 0 && distanceFromBottom < 300) {
+        thread.scrollTop = scrollHeight - clientHeight;
       }
-    } else if (messages.length > 0 && prevCountRef.current === 0) {
+    }
+    // C. Initial load or session switch
+    else if (messages.length > 0 && prevCountRef.current === 0) {
       thread.scrollTo({ top: 0, behavior: 'instant' });
     }
 
@@ -112,8 +112,14 @@ export const ChatTimeline: React.FC<ChatTimelineProps> = ({
             cleanContent.includes('Deployment Run ID');
 
           if (isUser) {
+            const isLatestUser = !messages.slice(idx + 1).some((x) => x.role === 'user');
             return (
-              <div key={idx} className="chat-bubble user" data-raw-content={cleanContent}>
+              <div
+                key={idx}
+                ref={isLatestUser ? lastUserRef : undefined}
+                className="chat-bubble user"
+                data-raw-content={cleanContent}
+              >
                 <div className="chat-content-card">
                   <div className="chat-card-text">{cleanContent}</div>
                 </div>

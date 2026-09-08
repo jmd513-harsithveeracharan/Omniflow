@@ -19,6 +19,7 @@ import {
   Layers,
   Folder,
   ChevronRight,
+  MessageSquare,
 } from 'lucide-react';
 import { ChatSession } from '../types';
 
@@ -81,7 +82,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
       }
     };
     window.addEventListener('mousedown', handleClickOutside);
-    window.addEventListener('scroll', () => { setMenuSessionId(null); setMenuPos(null); }, true);
     return () => {
       window.removeEventListener('mousedown', handleClickOutside);
     };
@@ -97,7 +97,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     }
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
     setMenuPos({
-      top: Math.min(rect.bottom + 4, window.innerHeight - 180),
+      top: Math.min(rect.bottom + 4, window.innerHeight - 240),
       left: Math.min(rect.left, window.innerWidth - 220),
     });
     setMenuSessionId(sid);
@@ -105,6 +105,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   const handleStartRename = (sid: string, currentTitle: string) => {
     setMenuSessionId(null);
+    setMenuPos(null);
     setRenamingSessionId(sid);
     setRenamingTitle(currentTitle);
   };
@@ -118,6 +119,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   const handleDelete = (sid: string) => {
     setMenuSessionId(null);
+    setMenuPos(null);
     if (onDeleteSession) {
       onDeleteSession(sid);
     }
@@ -316,15 +318,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     onClick={() => onSelectSession?.(s.sessionId)}
                     title={s.title}
                   >
-                    <span
-                      className="chat-bullet-circle"
+                    <MessageSquare
+                      width={14}
+                      height={14}
                       style={{
-                        width: '7px',
-                        height: '7px',
-                        borderRadius: '50%',
-                        border: '1.5px solid #10b981',
+                        color: activeSessionId === s.sessionId ? '#10b981' : '#71717a',
                         flexShrink: 0,
-                        opacity: activeSessionId === s.sessionId ? 1 : 0.65,
                       }}
                     />
                     {renamingSessionId === s.sessionId ? (
@@ -384,6 +383,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               ref={menuRef}
               className="sidebar-chat-menu-popup"
               style={{ top: `${menuPos.top}px`, left: `${menuPos.left}px` }}
+              onMouseDown={(e) => e.stopPropagation()}
               onClick={(e) => e.stopPropagation()}
             >
               <div

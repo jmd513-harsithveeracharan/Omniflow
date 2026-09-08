@@ -1,5 +1,14 @@
-import React, { useState } from 'react';
-import { Copy, Check, ChevronDown, ChevronUp } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { Copy, Check, ChevronDown, ChevronUp, Terminal } from 'lucide-react';
+import Prism from 'prismjs';
+import 'prismjs/components/prism-python';
+import 'prismjs/components/prism-sql';
+import 'prismjs/components/prism-json';
+import 'prismjs/components/prism-bash';
+import 'prismjs/components/prism-yaml';
+import 'prismjs/components/prism-javascript';
+import 'prismjs/components/prism-typescript';
+import 'prismjs/components/prism-markup';
 
 interface CodeCardProps {
   language: string;
@@ -8,11 +17,38 @@ interface CodeCardProps {
 
 export const CodeCard: React.FC<CodeCardProps> = ({ language, code }) => {
   const [copied, setCopied] = useState(false);
-  const [isCollapsed, setIsCollapsed] = useState(true);
+  const [isExpanded, setIsExpanded] = useState(false);
 
   const cleanCode = code.trim();
   const lineCount = cleanCode.split('\n').length;
-  const isLong = lineCount > 10;
+  const isLong = lineCount > 16;
+  const normalizedLang = (language || 'python').toLowerCase().trim();
+
+  const getGrammar = (lang: string) => {
+    if (lang === 'py' || lang === 'python' || lang === 'pyspark') return Prism.languages.python;
+    if (lang === 'sql' || lang === 'sparksql' || lang === 'tsql') return Prism.languages.sql;
+    if (lang === 'json') return Prism.languages.json;
+    if (lang === 'bash' || lang === 'sh' || lang === 'shell') return Prism.languages.bash;
+    if (lang === 'yaml' || lang === 'yml') return Prism.languages.yaml;
+    if (lang === 'js' || lang === 'javascript') return Prism.languages.javascript;
+    if (lang === 'ts' || lang === 'typescript') return Prism.languages.typescript;
+    return Prism.languages.python || Prism.languages.markup;
+  };
+
+  const highlightedHtml = useMemo(() => {
+    try {
+      const grammar = getGrammar(normalizedLang);
+      if (grammar) {
+        return Prism.highlight(cleanCode, grammar, normalizedLang);
+      }
+    } catch {
+      // fallback
+    }
+    return cleanCode
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+  }, [cleanCode, normalizedLang]);
 
   const handleCopy = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -22,9 +58,15 @@ export const CodeCard: React.FC<CodeCardProps> = ({ language, code }) => {
   };
 
   return (
-    <div className={`code-card ${isLong && isCollapsed ? 'is-collapsed' : ''}`}>
+    <div className={`code-card ${isLong && !isExpanded ? 'is-collapsed' : ''}`} style={{ margin: '12px 0' }}>
       <div className="code-card-header">
-        <span className="code-lang-label">{language || 'code'}</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <Terminal width={13} height={13} style={{ color: '#9ca3af' }} />
+          <span className="code-lang-label" style={{ textTransform: 'uppercase', letterSpacing: '0.04em', fontSize: '11px', fontWeight: 600 }}>
+            {normalizedLang || 'code'}
+          </span>
+          <span style={{ fontSize: '11px', color: '#71717a' }}>• {lineCount} lines</span>
+        </div>
         <button
           type="button"
           className="code-copy-btn"
@@ -45,26 +87,41 @@ export const CodeCard: React.FC<CodeCardProps> = ({ language, code }) => {
         </button>
       </div>
 
-      <pre className="code-card-body">
-        <code className={`language-${language}`}>{cleanCode}</code>
+      <pre
+        className="code-card-body"
+        style={{
+          maxHeight: isLong && !isExpanded ? '320px' : 'none',
+          overflow: 'hidden',
+          background: '#0d0d0f',
+          padding: '14px 16px',
+          margin: 0,
+          fontFamily: 'var(--font-mono, "JetBrains Mono", "Fira Code", monospace)',
+          fontSize: '12.5px',
+          lineHeight: '1.6',
+        }}
+      >
+        <code
+          className={`language-${normalizedLang}`}
+          dangerouslySetInnerHTML={{ __html: highlightedHtml }}
+        />
       </pre>
 
       {isLong && (
-        <div className="code-card-footer">
+        <div className="code-card-footer" style={{ borderTop: '1px solid rgba(255,255,255,0.06)', background: '#111113' }}>
           <button
             type="button"
             className="btn-code-show-more"
-            onClick={() => setIsCollapsed(!isCollapsed)}
+            onClick={() => setIsExpanded(!isExpanded)}
           >
-            {isCollapsed ? (
+            {!isExpanded ? (
               <>
                 <ChevronDown width={13} height={13} />
-                <span className="show-more-label">Show more ({lineCount} lines)</span>
+                <span className="show-more-label">Expand full snippet ({lineCount} lines)</span>
               </>
             ) : (
               <>
                 <ChevronUp width={13} height={13} />
-                <span className="show-more-label">Show less</span>
+                <span className="show-more-label">Collapse snippet</span>
               </>
             )}
           </button>
