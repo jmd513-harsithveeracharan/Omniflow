@@ -1,13 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import {
-  Sliders,
-  Wrench,
-  ChevronDown,
-  ArrowUp,
-  Loader2,
-  Check,
-  ChevronRight,
-} from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 
 interface PromptDockProps {
   onSendMessage: (text: string) => void;
@@ -19,20 +11,22 @@ export const PromptDock: React.FC<PromptDockProps> = ({
   isStreaming,
 }) => {
   const [input, setInput] = useState('');
-  const [selectedModel, setSelectedModel] = useState('Claude 3.5 Sonnet');
+  const [selectedModel, setSelectedModel] = useState('Gemini 3.6 Flash');
   const [selectedEffort, setSelectedEffort] = useState('Medium');
   const [isModelDropdownOpen, setIsModelDropdownOpen] = useState(false);
   const [activeSubmenu, setActiveSubmenu] = useState<'none' | 'effort' | 'models'>('none');
   const [isTuningOpen, setIsTuningOpen] = useState(false);
   const [isToolsOpen, setIsToolsOpen] = useState(false);
   const [temperature, setTemperature] = useState(0.2);
+  const [isListening, setIsListening] = useState(false);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
-      textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 180)}px`;
+      const newHeight = Math.min(textareaRef.current.scrollHeight, 180);
+      textareaRef.current.style.height = `${newHeight}px`;
     }
   }, [input]);
 
@@ -41,6 +35,9 @@ export const PromptDock: React.FC<PromptDockProps> = ({
     if (!input.trim() || isStreaming) return;
     onSendMessage(input.trim());
     setInput('');
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -50,19 +47,55 @@ export const PromptDock: React.FC<PromptDockProps> = ({
     }
   };
 
-  const MODELS = [
-    { id: 'claude-mix', name: 'Claude Mix', desc: 'Dynamic router: Opus for AST + Sonnet for speed', tag: 'Mix' },
-    { id: 'claude-opus-5', name: 'Claude Opus', desc: 'Deep reasoning & complex SQL transpilation', tag: 'Pro' },
-    { id: 'claude-3-5-sonnet', name: 'Claude 3.5 Sonnet', desc: 'High-precision schema mapping & PySpark', tag: 'Pro' },
-    { id: 'claude-3-5-haiku', name: 'Claude 3.5 Haiku', desc: 'Ultra-fast metadata discovery & intent', tag: 'Fast' },
-    { id: 'gemini-2-5-pro', name: 'Gemini 2.5 Pro', desc: '1M+ context window for complex DAGs', tag: 'Pro' },
-    { id: 'gemini-1-5-flash', name: 'Gemini 1.5 Flash', desc: 'Most efficient for everyday tasks', tag: 'Fast' },
-    { id: 'groq-120b', name: 'Groq OSS 120B', desc: 'Ultra-low latency streaming inference', tag: 'Open' },
+  const handleVoiceToggle = () => {
+    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+      alert('Speech recognition is not supported in this browser.');
+      return;
+    }
+
+    if (isListening) {
+      setIsListening(false);
+      return;
+    }
+
+    try {
+      // @ts-ignore
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      const recognition = new SpeechRecognition();
+      recognition.continuous = false;
+      recognition.interimResults = false;
+      recognition.lang = 'en-US';
+
+      recognition.onstart = () => setIsListening(true);
+      recognition.onend = () => setIsListening(false);
+      recognition.onerror = () => setIsListening(false);
+      recognition.onresult = (event: any) => {
+        const transcript = event.results[0][0].transcript;
+        if (transcript) {
+          setInput((prev) => (prev ? `${prev} ${transcript}` : transcript));
+        }
+      };
+      recognition.start();
+    } catch (err) {
+      console.error('Speech recognition error:', err);
+      setIsListening(false);
+    }
+  };
+
+  const ALL_MODELS = [
+    { id: 'gemini-3.6-flash', name: 'Gemini 3.6 Flash', desc: 'Most efficient for everyday tasks', tag: '' },
+    { id: 'gemini-1.5-pro', name: 'Gemini 1.5 Pro', desc: '1M+ context window for complex DAGs', tag: 'Pro' },
+    { id: 'groq-120b', name: 'Groq 120B', desc: '70B parameter open weights with deep reasoning', tag: 'Pro' },
+    { id: 'groq-20b', name: 'Groq 20B', desc: 'Ultra-low latency instant open weights', tag: '' },
+    { id: 'claude-mix', name: 'Claude Mix', desc: 'Dynamic router: Opus for PySpark/AST + Sonnet for speed', tag: 'Mix' },
+    { id: 'claude-opus-5', name: 'Claude Opus', desc: 'Deep reasoning & complex SQL AST transpilation', tag: 'Pro' },
+    { id: 'claude-3-5-sonnet', name: 'Claude Sonnet', desc: 'High-precision schema mapping & PySpark', tag: '' },
+    { id: 'claude-3-5-haiku', name: 'Claude Haiku', desc: 'Ultra-fast metadata discovery & intent', tag: '' },
     { id: 'gpt-4o', name: 'GPT-4o', desc: 'Advanced reasoning & SQL AST transpilation', tag: 'Pro' },
   ];
 
   return (
-    <div className="chat-dock-container">
+    <div className="chat-dock-container" id="chatDockContainer">
       <div className="google-prompt-dock">
         {/* Text Input Wrapper */}
         <div className="dock-textarea-wrapper">
@@ -85,13 +118,24 @@ export const PromptDock: React.FC<PromptDockProps> = ({
             <button
               type="button"
               className={`dock-tool-pill ${isTuningOpen ? 'active' : ''}`}
+              id="btnTuneModel"
               onClick={() => {
                 setIsTuningOpen(!isTuningOpen);
                 setIsToolsOpen(false);
               }}
               title="System Prompt & Model Tuning"
             >
-              <Sliders width={14} height={14} />
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="4" y1="21" x2="4" y2="14" />
+                <line x1="4" y1="10" x2="4" y2="3" />
+                <line x1="12" y1="21" x2="12" y2="12" />
+                <line x1="12" y1="8" x2="12" y2="3" />
+                <line x1="20" y1="21" x2="20" y2="16" />
+                <line x1="20" y1="12" x2="20" y2="3" />
+                <line x1="1" y1="14" x2="7" y2="14" />
+                <line x1="9" y1="8" x2="15" y2="8" />
+                <line x1="17" y1="16" x2="23" y2="16" />
+              </svg>
             </button>
 
             {/* Tuning Popover */}
@@ -99,18 +143,18 @@ export const PromptDock: React.FC<PromptDockProps> = ({
               <div
                 style={{
                   position: 'absolute',
-                  bottom: '40px',
+                  bottom: '44px',
                   left: 0,
                   width: '280px',
-                  background: '#18181b',
+                  background: '#1e1f20',
                   border: '1px solid rgba(255,255,255,0.12)',
-                  borderRadius: '10px',
+                  borderRadius: '12px',
                   padding: '14px',
-                  boxShadow: '0 16px 32px rgba(0,0,0,0.5)',
-                  zIndex: 200,
+                  boxShadow: '0 16px 36px rgba(0,0,0,0.65)',
+                  zIndex: 100,
                 }}
               >
-                <div style={{ fontSize: '12px', fontWeight: 600, color: '#fff', marginBottom: '8px' }}>
+                <div style={{ fontSize: '12.5px', fontWeight: 600, color: '#fff', marginBottom: '8px' }}>
                   Model Temperature: {temperature}
                 </div>
                 <input
@@ -122,7 +166,7 @@ export const PromptDock: React.FC<PromptDockProps> = ({
                   onChange={(e) => setTemperature(parseFloat(e.target.value))}
                   style={{ width: '100%', accentColor: '#38bdf8', marginBottom: '10px' }}
                 />
-                <div style={{ fontSize: '11px', color: '#71717a' }}>
+                <div style={{ fontSize: '11px', color: '#9ca3af', lineHeight: 1.4 }}>
                   Lower temperature produces deterministic, idempotent PySpark code. Higher values increase creative exploration.
                 </div>
               </div>
@@ -132,13 +176,19 @@ export const PromptDock: React.FC<PromptDockProps> = ({
             <button
               type="button"
               className={`dock-tool-pill ${isToolsOpen ? 'active' : ''}`}
+              id="btnToolsMenu"
               onClick={() => {
                 setIsToolsOpen(!isToolsOpen);
                 setIsTuningOpen(false);
               }}
               title="Active Model Tools"
             >
-              <Wrench width={14} height={14} />
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <rect x="3" y="3" width="7" height="7" rx="1.5" />
+                <rect x="14" y="3" width="7" height="7" rx="1.5" />
+                <rect x="14" y="14" width="7" height="7" rx="1.5" />
+                <rect x="3" y="14" width="7" height="7" rx="1.5" />
+              </svg>
               <span>Tools</span>
             </button>
 
@@ -147,18 +197,18 @@ export const PromptDock: React.FC<PromptDockProps> = ({
               <div
                 style={{
                   position: 'absolute',
-                  bottom: '40px',
-                  left: '40px',
+                  bottom: '44px',
+                  left: '42px',
                   width: '260px',
-                  background: '#18181b',
+                  background: '#1e1f20',
                   border: '1px solid rgba(255,255,255,0.12)',
-                  borderRadius: '10px',
+                  borderRadius: '12px',
                   padding: '12px',
-                  boxShadow: '0 16px 32px rgba(0,0,0,0.5)',
-                  zIndex: 200,
+                  boxShadow: '0 16px 36px rgba(0,0,0,0.65)',
+                  zIndex: 100,
                 }}
               >
-                <div style={{ fontSize: '12px', fontWeight: 600, color: '#fff', marginBottom: '8px' }}>Active Tools</div>
+                <div style={{ fontSize: '12.5px', fontWeight: 600, color: '#fff', marginBottom: '8px' }}>Active Tools</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                   {[
                     'Microsoft Fabric REST API',
@@ -168,7 +218,7 @@ export const PromptDock: React.FC<PromptDockProps> = ({
                     'OneLake ABFSS Storage',
                   ].map((tool, ti) => (
                     <div key={ti} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11.5px', color: '#d4d4d8' }}>
-                      <Check width={12} height={12} style={{ color: '#10b981' }} />
+                      <span style={{ color: '#10b981', fontWeight: 700 }}>✓</span>
                       <span>{tool}</span>
                     </div>
                   ))}
@@ -178,127 +228,201 @@ export const PromptDock: React.FC<PromptDockProps> = ({
           </div>
 
           <div className="dock-right-controls">
-            {/* Model & Effort Selector Pill */}
-            <div className="dock-model-pill-wrapper" style={{ position: 'relative' }}>
+            {/* Model & Effort Selector Pill (Exact Previous Iteration Layout) */}
+            <div className="dock-model-pill-wrapper">
               <button
                 type="button"
-                className="dock-model-pill"
+                className={`dock-model-pill ${isModelDropdownOpen ? 'dropdown-open' : ''}`}
+                id="btnDockModelSelect"
                 onClick={() => {
                   setIsModelDropdownOpen(!isModelDropdownOpen);
                   setActiveSubmenu('none');
                 }}
                 title="Select Model & Effort"
               >
-                <span className="model-pill-name">{selectedModel}</span>
-                <span className="model-pill-effort">{selectedEffort}</span>
-                <ChevronDown width={11} height={11} className="pill-chevron" />
+                <span className="model-pill-name" id="dockModelName">{selectedModel}</span>
+                <span className="model-pill-effort" id="dockModelEffort">{selectedEffort}</span>
+                <svg className="pill-chevron" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                  <polyline points="6 9 12 15 18 9" />
+                </svg>
               </button>
 
-              {/* Dropdown Menu */}
+              {/* Main Model Dropdown Menu */}
               {isModelDropdownOpen && (
-                <div className="dock-model-dropdown" style={{ position: 'absolute', bottom: '40px', right: 0, width: '280px', background: '#18181b', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '10px', padding: '6px', boxShadow: '0 16px 32px rgba(0,0,0,0.5)', zIndex: 200 }}>
+                <div className="dock-model-dropdown" id="dockModelDropdown">
                   <div
                     className="dock-model-primary-option"
+                    id="btnModelOptionPrimary"
                     onClick={() => {
-                      setSelectedModel('Claude 3.5 Sonnet');
+                      setSelectedModel('Gemini 3.6 Flash');
                       setIsModelDropdownOpen(false);
+                      setActiveSubmenu('none');
                     }}
-                    style={{ padding: '8px 10px', borderRadius: '6px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: selectedModel === 'Claude 3.5 Sonnet' ? 'rgba(255,255,255,0.06)' : 'none' }}
                   >
-                    <div>
-                      <div style={{ fontSize: '12.5px', fontWeight: 600, color: '#fff' }}>Claude 3.5 Sonnet</div>
-                      <div style={{ fontSize: '11px', color: '#71717a' }}>High precision & DAG synthesis</div>
+                    <div className="dock-model-info">
+                      <span className="dock-model-name" id="menuPrimaryModelName">Gemini 3.6 Flash</span>
+                      <span className="dock-model-desc" id="menuPrimaryModelDesc">Most efficient for everyday tasks</span>
                     </div>
-                    {selectedModel === 'Claude 3.5 Sonnet' && <Check width={14} height={14} style={{ color: '#38bdf8' }} />}
+                    {selectedModel === 'Gemini 3.6 Flash' && <span className="dock-model-check">✓</span>}
                   </div>
 
-                  <div style={{ height: '1px', background: 'rgba(255,255,255,0.08)', margin: '4px 0' }} />
+                  <div className="dock-model-divider" />
 
                   {/* Effort Row */}
                   <div
+                    className="dock-model-row-item"
+                    id="btnModelEffortRow"
                     onClick={() => setActiveSubmenu(activeSubmenu === 'effort' ? 'none' : 'effort')}
-                    style={{ padding: '8px 10px', borderRadius: '6px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '12px', color: '#e4e4e7' }}
                   >
                     <span>Effort</span>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#38bdf8' }}>
-                      <span>{selectedEffort}</span>
-                      <ChevronRight width={12} height={12} />
-                    </div>
+                    <span className="dock-row-val">
+                      <span id="menuEffortVal">{selectedEffort}</span>
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <polyline points="9 18 15 12 9 6" />
+                      </svg>
+                    </span>
                   </div>
 
+                  {/* Effort Attached Flyout Submenu */}
                   {activeSubmenu === 'effort' && (
-                    <div style={{ padding: '4px 8px', background: 'rgba(255,255,255,0.03)', borderRadius: '6px', margin: '2px 0' }}>
-                      {['High', 'Medium', 'Low'].map((eff) => (
-                        <div
-                          key={eff}
-                          onClick={() => {
-                            setSelectedEffort(eff);
-                            setActiveSubmenu('none');
-                          }}
-                          style={{ padding: '4px 8px', fontSize: '11.5px', color: selectedEffort === eff ? '#38bdf8' : '#a1a1aa', cursor: 'pointer', display: 'flex', justifyContent: 'space-between' }}
-                        >
-                          <span>{eff}</span>
-                          {selectedEffort === eff && <Check width={12} height={12} />}
-                        </div>
-                      ))}
+                    <div className="dock-model-submenu dock-effort-submenu" id="dockModelEffortSubmenu">
+                      <div className="submenu-model-list">
+                        {['High', 'Medium', 'Low'].map((eff) => (
+                          <div
+                            key={eff}
+                            className={`submenu-model-item ${selectedEffort === eff ? 'active' : ''}`}
+                            onClick={() => {
+                              setSelectedEffort(eff);
+                              setActiveSubmenu('none');
+                            }}
+                          >
+                            <div className="submenu-item-left">
+                              <span className="submenu-item-name">{eff}</span>
+                            </div>
+                            <span className="submenu-item-check">✓</span>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   )}
 
                   {/* More Models Row */}
                   <div
+                    className="dock-model-row-item"
+                    id="btnMoreModelsRow"
                     onClick={() => setActiveSubmenu(activeSubmenu === 'models' ? 'none' : 'models')}
-                    style={{ padding: '8px 10px', borderRadius: '6px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '12px', color: '#e4e4e7' }}
                   >
                     <span>More models</span>
-                    <ChevronRight width={12} height={12} />
+                    <span className="dock-row-val">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <polyline points="9 18 15 12 9 6" />
+                      </svg>
+                    </span>
                   </div>
 
+                  {/* More Models Attached Flyout Submenu */}
                   {activeSubmenu === 'models' && (
-                    <div style={{ maxHeight: '200px', overflowY: 'auto', padding: '4px', background: 'rgba(255,255,255,0.02)', borderRadius: '6px' }}>
-                      {MODELS.map((m) => (
-                        <div
-                          key={m.id}
-                          onClick={() => {
-                            setSelectedModel(m.name);
-                            setIsModelDropdownOpen(false);
-                          }}
-                          style={{ padding: '6px 8px', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
-                        >
-                          <div>
-                            <div style={{ fontSize: '12px', fontWeight: 500, color: '#fff' }}>{m.name}</div>
-                            <div style={{ fontSize: '10.5px', color: '#71717a' }}>{m.desc}</div>
+                    <div className="dock-model-submenu" id="dockModelSubmenu">
+                      <div className="submenu-model-list" id="submenuModelList">
+                        {ALL_MODELS.map((m) => (
+                          <div
+                            key={m.id}
+                            className={`submenu-model-item ${selectedModel === m.name ? 'active' : ''}`}
+                            onClick={() => {
+                              setSelectedModel(m.name);
+                              setIsModelDropdownOpen(false);
+                              setActiveSubmenu('none');
+                            }}
+                          >
+                            <div className="submenu-item-left">
+                              <span className="submenu-item-name">{m.name}</span>
+                              {m.tag && (
+                                <span
+                                  className="submenu-tag-pro"
+                                  style={
+                                    m.tag === 'Mix'
+                                      ? { background: 'rgba(139, 92, 246, 0.2)', color: '#c4b5fd', border: '1px solid rgba(139, 92, 246, 0.4)' }
+                                      : undefined
+                                  }
+                                >
+                                  {m.tag}
+                                </span>
+                              )}
+                            </div>
+                            <span className="submenu-item-check">✓</span>
                           </div>
-                          <span style={{ fontSize: '10px', background: 'rgba(255,255,255,0.08)', padding: '2px 5px', borderRadius: '3px', color: '#38bdf8' }}>
-                            {m.tag}
-                          </span>
-                        </div>
-                      ))}
+                        ))}
+                      </div>
                     </div>
                   )}
                 </div>
               )}
             </div>
 
-            {/* Send Button */}
+            {/* Voice Input Mic */}
             <button
               type="button"
-              onClick={() => handleSubmit()}
-              disabled={!input.trim() || isStreaming}
-              className="dock-send-btn"
-              title="Send Prompt (Enter)"
+              className={`dock-icon-btn ${isListening ? 'recording' : ''}`}
+              id="btnVoiceInput"
+              title="Voice Input"
+              onClick={handleVoiceToggle}
             >
-              {isStreaming ? (
-                <Loader2 width={14} height={14} className="animate-spin" />
-              ) : (
-                <ArrowUp width={14} height={14} />
-              )}
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
+                <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                <line x1="12" y1="19" x2="12" y2="23" />
+                <line x1="8" y1="23" x2="16" y2="23" />
+              </svg>
             </button>
+
+            {/* Send Button or Live Audio Waveform */}
+            {input.trim().length > 0 || isStreaming ? (
+              <button
+                type="button"
+                onClick={() => handleSubmit()}
+                disabled={!input.trim() || isStreaming}
+                className="dock-icon-btn btn-chat-send"
+                id="btnChatSend"
+                title="Send Prompt (Enter)"
+                style={{
+                  background: '#ffffff',
+                  color: '#09090b',
+                  borderRadius: '50%',
+                  width: '32px',
+                  height: '32px',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                {isStreaming ? (
+                  <Loader2 width={14} height={14} className="animate-spin" />
+                ) : (
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                    <polyline points="18 15 12 9 6 15" />
+                  </svg>
+                )}
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="dock-icon-btn"
+                id="btnAudioWave"
+                title="Live Audio Mode"
+              >
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <line x1="4" y1="9" x2="4" y2="15" />
+                  <line x1="8" y1="5" x2="8" y2="19" />
+                  <line x1="12" y1="2" x2="12" y2="22" />
+                  <line x1="16" y1="5" x2="16" y2="19" />
+                  <line x1="20" y1="9" x2="20" y2="15" />
+                </svg>
+              </button>
+            )}
           </div>
         </div>
       </div>
-      <div className="dock-disclaimer" style={{ textAlign: 'center', fontSize: '11px', color: '#52525b', marginTop: '6px' }}>
-        Fabric.AI can make mistakes. Please double-check responses.
-      </div>
+      <div className="dock-disclaimer">Fabric.AI can make mistakes. Please double-check responses.</div>
     </div>
   );
 };

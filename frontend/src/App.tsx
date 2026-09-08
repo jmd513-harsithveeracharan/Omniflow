@@ -250,7 +250,7 @@ export const App: React.FC = () => {
         {activeView === 'chat' && (
           <div className="bolt-workspace-split">
             <div
-              className={`bolt-chat-pane ${messages.length === 0 ? 'is-landing' : ''} ${
+              className={`bolt-chat-pane ${messages.length === 0 ? 'is-landing' : 'in-chat'} ${
                 isWorkbenchOpen ? 'with-workbench' : 'full-width'
               }`}
             >
