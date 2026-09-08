@@ -149,3 +149,17 @@ export interface WorkspaceFolder {
   displayName: string;
   items: WorkspaceItem[];
 }
+
+export interface ProjectRecord {
+  id: string;
+  name: string;
+  description: string;
+  is_pinned?: number;
+  is_archived?: number;
+  created_at?: string;
+  updated_at?: string;
+  metadata?: Record<string, unknown>;
+  itemsCount?: number;
+  badge?: string;
+}
+

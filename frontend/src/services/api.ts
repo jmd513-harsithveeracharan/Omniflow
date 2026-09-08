@@ -276,3 +276,56 @@ export async function streamChatTurn(
     onError(err instanceof Error ? err.message : String(err));
   }
 }
+
+export async function fetchProjects(): Promise<import('../types').ProjectRecord[]> {
+  const res = await fetch(`${API_BASE}/projects`);
+  if (!res.ok) throw new Error(`Failed to fetch projects: ${res.statusText}`);
+  const data = await res.json();
+  return (data.projects || []).map((p: Record<string, unknown>) => ({
+    id: String(p.id || ''),
+    name: String(p.name || ''),
+    description: String(p.description || ''),
+    is_pinned: Number(p.is_pinned || 0),
+    is_archived: Number(p.is_archived || 0),
+    created_at: String(p.created_at || ''),
+    updated_at: String(p.updated_at || p.created_at || ''),
+    metadata: (p.metadata as Record<string, unknown>) || {},
+  }));
+}
+
+export async function createProject(name: string, description = ''): Promise<import('../types').ProjectRecord> {
+  const res = await fetch(`${API_BASE}/projects/new`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, description }),
+  });
+  if (!res.ok) throw new Error(`Failed to create project: ${res.statusText}`);
+  const data = await res.json();
+  return data.project;
+}
+
+export async function updateProject(
+  id: string,
+  updates: { name?: string; description?: string; is_pinned?: number; is_archived?: number }
+): Promise<boolean> {
+  const res = await fetch(`${API_BASE}/projects/update`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id, ...updates }),
+  });
+  if (!res.ok) throw new Error(`Failed to update project: ${res.statusText}`);
+  const data = await res.json();
+  return Boolean(data.success);
+}
+
+export async function deleteProject(id: string): Promise<boolean> {
+  const res = await fetch(`${API_BASE}/projects/delete`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id }),
+  });
+  if (!res.ok) throw new Error(`Failed to delete project: ${res.statusText}`);
+  const data = await res.json();
+  return Boolean(data.success);
+}
+

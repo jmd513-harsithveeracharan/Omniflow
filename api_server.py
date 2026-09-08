@@ -199,6 +199,52 @@ async def get_projects():
     return {"projects": projects, "count": len(projects)}
 
 
+class CreateProjectRequest(BaseModel):
+    name: str = Field(..., description="Project name")
+    description: str = Field("", description="Project description")
+    metadata: dict[str, Any] | None = Field(default_factory=dict)
+
+
+class UpdateProjectRequest(BaseModel):
+    id: str = Field(..., description="Project UUID")
+    name: str | None = None
+    description: str | None = None
+    is_pinned: int | None = None
+    is_archived: int | None = None
+
+
+class DeleteProjectRequest(BaseModel):
+    id: str = Field(..., description="Project UUID")
+
+
+@app.post("/api/projects/new", summary="Create New Project")
+async def create_new_project_endpoint(req: CreateProjectRequest):
+    from app.session_store import create_project
+    proj = create_project(req.name, req.description, req.metadata)
+    return {"status": "success", "success": True, "project": proj}
+
+
+@app.post("/api/projects/update", summary="Update Project")
+async def update_project_endpoint(req: UpdateProjectRequest):
+    from app.session_store import update_project
+    updated = update_project(req.id, req.name, req.description, req.is_pinned, req.is_archived)
+    return {"status": "success", "success": updated, "id": req.id}
+
+
+@app.post("/api/projects/delete", summary="Delete Project")
+async def delete_project_post_endpoint(req: DeleteProjectRequest):
+    from app.session_store import delete_project
+    deleted = delete_project(req.id)
+    return {"status": "success", "success": deleted, "id": req.id}
+
+
+@app.delete("/api/projects/{project_id}", summary="Delete Project")
+async def delete_project_delete_endpoint(project_id: str):
+    from app.session_store import delete_project
+    deleted = delete_project(project_id)
+    return {"status": "success", "success": deleted, "id": project_id}
+
+
 @app.post("/api/sessions/new", summary="Initialize New Session")
 async def init_new_session(req: SessionInitRequest):
     """Creates a new persistent session paired with Claude CLI / provider sessions."""

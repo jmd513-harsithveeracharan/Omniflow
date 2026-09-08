@@ -92,22 +92,25 @@ export const CodeCard: React.FC<CodeCardProps> = ({ language, code }) => {
         style={{
           maxHeight: isLong && !isExpanded ? '320px' : 'none',
           overflow: 'hidden',
-          background: '#0d0d0f',
+          background: '#1e1f20',
           padding: '14px 16px',
           margin: 0,
-          fontFamily: 'var(--font-mono, "JetBrains Mono", "Fira Code", monospace)',
-          fontSize: '12.5px',
-          lineHeight: '1.6',
+          fontFamily: 'var(--font-mono, "JetBrains Mono", "Roboto Mono", monospace)',
+          fontSize: '13px',
+          fontWeight: 500,
+          lineHeight: '1.65',
+          letterSpacing: '0.01em',
         }}
       >
         <code
           className={`language-${normalizedLang}`}
+          style={{ fontWeight: 500 }}
           dangerouslySetInnerHTML={{ __html: highlightedHtml }}
         />
       </pre>
 
       {isLong && (
-        <div className="code-card-footer" style={{ borderTop: '1px solid rgba(255,255,255,0.06)', background: '#111113' }}>
+        <div className="code-card-footer" style={{ borderTop: '1px solid rgba(255,255,255,0.08)', background: '#242528' }}>
           <button
             type="button"
             className="btn-code-show-more"
