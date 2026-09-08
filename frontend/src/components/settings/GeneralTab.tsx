@@ -1,17 +1,19 @@
 import React, { useState } from 'react';
-import { Sun, Moon, Monitor } from 'lucide-react';
+import { X } from 'lucide-react';
 
-export const GeneralTab: React.FC = () => {
+interface GeneralTabProps {
+  onClose?: () => void;
+}
+
+export const GeneralTab: React.FC<GeneralTabProps> = ({ onClose }) => {
   const [name, setName] = useState('Harsith');
   const [callName, setCallName] = useState('Harsith');
-  const [role, setRole] = useState('Data Architect / Fabric Engineer');
-  const [instructions, setInstructions] = useState(
-    'Keep explanations brief, architect Medallion Delta Lake patterns with idempotent PySpark code, and prioritize zero AI slop.'
-  );
-  const [theme, setTheme] = useState<'dark' | 'light' | 'system'>('dark');
+  const [workDesc, setWorkDesc] = useState('Data Architect / Fabric Engineer');
+  const [instructions, setInstructions] = useState('');
+  const [theme, setTheme] = useState<'system' | 'light' | 'dark'>('dark');
   const [font, setFont] = useState('Anthropic Serif (Newsreader)');
 
-  const handleThemeChange = (newTheme: 'dark' | 'light' | 'system') => {
+  const handleThemeChange = (newTheme: 'system' | 'light' | 'dark') => {
     setTheme(newTheme);
     if (newTheme === 'light') {
       document.body.classList.remove('dark-theme');
@@ -23,47 +25,54 @@ export const GeneralTab: React.FC = () => {
   };
 
   return (
-    <div className="settings-tab-pane">
+    <div className="settings-tab-pane" id="paneGeneral">
       <div className="pane-header-row">
         <h2 className="pane-title">Profile</h2>
-      </div>
-
-      <div className="settings-field-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 0', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-        <span className="settings-field-label" style={{ fontSize: '13px', color: '#a1a1aa' }}>Avatar</span>
-        <div className="settings-avatar-circle" style={{ width: '36px', height: '36px', borderRadius: '50%', background: '#6366f1', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 600, color: '#fff' }}>
-          {name[0] || 'H'}
+        <div className="pane-header-actions">
+          {onClose && (
+            <button type="button" className="btn-subtle-icon btn-close-modal-icon" title="Close dialog" onClick={onClose}>
+              <X width={18} height={18} />
+            </button>
+          )}
         </div>
       </div>
 
-      <div className="settings-field-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 0', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-        <span className="settings-field-label" style={{ fontSize: '13px', color: '#a1a1aa' }}>Full name</span>
+      <div className="settings-field-row">
+        <span className="settings-field-label">Avatar</span>
+        <div className="settings-avatar-circle" id="settingsAvatarCircle">
+          {name.charAt(0).toUpperCase() || 'H'}
+        </div>
+      </div>
+
+      <div className="settings-field-row">
+        <span className="settings-field-label">Full name</span>
         <input
           type="text"
           className="settings-field-input"
+          id="inputProfileName"
           value={name}
           onChange={(e) => setName(e.target.value)}
-          style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', padding: '6px 10px', color: '#fff', fontSize: '13px', width: '220px' }}
         />
       </div>
 
-      <div className="settings-field-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 0', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-        <span className="settings-field-label" style={{ fontSize: '13px', color: '#a1a1aa' }}>What should Fabric.AI call you?</span>
+      <div className="settings-field-row">
+        <span className="settings-field-label">What should Fabric.AI call you?</span>
         <input
           type="text"
           className="settings-field-input"
+          id="inputProfileCallName"
           value={callName}
           onChange={(e) => setCallName(e.target.value)}
-          style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', padding: '6px 10px', color: '#fff', fontSize: '13px', width: '220px' }}
         />
       </div>
 
-      <div className="settings-field-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 0', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-        <span className="settings-field-label" style={{ fontSize: '13px', color: '#a1a1aa' }}>What best describes your work?</span>
+      <div className="settings-field-row">
+        <span className="settings-field-label">What best describes your work?</span>
         <select
           className="settings-field-select"
-          value={role}
-          onChange={(e) => setRole(e.target.value)}
-          style={{ background: '#18181b', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', padding: '6px 10px', color: '#fff', fontSize: '13px', width: '220px' }}
+          id="selectWorkDescription"
+          value={workDesc}
+          onChange={(e) => setWorkDesc(e.target.value)}
         >
           <option>Data Architect / Fabric Engineer</option>
           <option>Analytics Engineer</option>
@@ -73,58 +82,79 @@ export const GeneralTab: React.FC = () => {
       </div>
 
       <div className="settings-field-column" style={{ marginTop: '20px' }}>
-        <div style={{ marginBottom: '6px' }}>
-          <span className="settings-field-label" style={{ fontSize: '13px', fontWeight: 600, color: '#f4f4f5' }}>Instructions for Fabric.AI</span>
-          <p style={{ fontSize: '11.5px', color: '#71717a', margin: '2px 0 8px 0' }}>Fabric.AI will keep these in mind across chats.</p>
+        <div className="settings-field-header" style={{ marginBottom: '6px' }}>
+          <span className="settings-field-label" style={{ display: 'block' }}>Instructions for Fabric.AI</span>
+          <span className="settings-field-hint" style={{ fontSize: '11.5px', color: '#71717a' }}>
+            Fabric.AI will keep these in mind across chats.
+          </span>
         </div>
         <textarea
           className="settings-field-textarea"
-          rows={3}
+          id="inputSystemInstructions"
+          placeholder="e.g. keep explanations brief and to the point"
           value={instructions}
           onChange={(e) => setInstructions(e.target.value)}
-          style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', padding: '8px 12px', color: '#fff', fontSize: '12.5px' }}
         />
       </div>
 
-      <h2 className="pane-title" style={{ marginTop: '28px', marginBottom: '14px', fontSize: '15px', fontWeight: 600, color: '#f4f4f5' }}>Preferences</h2>
+      <h2 className="pane-title" style={{ marginTop: '32px', marginBottom: '20px' }}>Preferences</h2>
 
-      <div className="settings-field-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 0', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-        <span className="settings-field-label" style={{ fontSize: '13px', color: '#a1a1aa' }}>Appearance</span>
-        <div className="theme-toggle-group" style={{ display: 'flex', gap: '4px', background: 'rgba(255,255,255,0.06)', padding: '3px', borderRadius: '6px' }}>
+      <div className="settings-field-row">
+        <span className="settings-field-label">Appearance</span>
+        <div className="theme-toggle-group">
           <button
             type="button"
             className={`theme-toggle-btn ${theme === 'system' ? 'active' : ''}`}
+            data-theme="system"
+            title="System Theme"
             onClick={() => handleThemeChange('system')}
-            style={{ padding: '4px 8px', background: theme === 'system' ? 'rgba(255,255,255,0.15)' : 'none', border: 'none', color: '#fff', borderRadius: '4px', cursor: 'pointer' }}
           >
-            <Monitor width={14} height={14} />
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <rect x="2" y="3" width="20" height="14" rx="2" />
+              <line x1="8" y1="21" x2="16" y2="21" />
+              <line x1="12" y1="17" x2="12" y2="21" />
+            </svg>
           </button>
           <button
             type="button"
             className={`theme-toggle-btn ${theme === 'light' ? 'active' : ''}`}
+            data-theme="light"
+            title="Light Theme"
             onClick={() => handleThemeChange('light')}
-            style={{ padding: '4px 8px', background: theme === 'light' ? 'rgba(255,255,255,0.15)' : 'none', border: 'none', color: '#fff', borderRadius: '4px', cursor: 'pointer' }}
           >
-            <Sun width={14} height={14} />
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <circle cx="12" cy="12" r="5" />
+              <line x1="12" y1="1" x2="12" y2="3" />
+              <line x1="12" y1="21" x2="12" y2="23" />
+              <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
+              <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+              <line x1="1" y1="12" x2="3" y2="12" />
+              <line x1="21" y1="12" x2="23" y2="12" />
+              <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
+              <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+            </svg>
           </button>
           <button
             type="button"
             className={`theme-toggle-btn ${theme === 'dark' ? 'active' : ''}`}
+            data-theme="dark"
+            title="Dark Theme"
             onClick={() => handleThemeChange('dark')}
-            style={{ padding: '4px 8px', background: theme === 'dark' ? 'rgba(255,255,255,0.15)' : 'none', border: 'none', color: '#fff', borderRadius: '4px', cursor: 'pointer' }}
           >
-            <Moon width={14} height={14} />
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+            </svg>
           </button>
         </div>
       </div>
 
-      <div className="settings-field-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 0' }}>
-        <span className="settings-field-label" style={{ fontSize: '13px', color: '#a1a1aa' }}>Chat font</span>
+      <div className="settings-field-row">
+        <span className="settings-field-label">Chat font</span>
         <select
           className="settings-field-select"
+          id="selectChatFont"
           value={font}
           onChange={(e) => setFont(e.target.value)}
-          style={{ background: '#18181b', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', padding: '6px 10px', color: '#fff', fontSize: '13px', width: '220px' }}
         >
           <option>Anthropic Serif (Newsreader)</option>
           <option>Google Sans Text</option>
@@ -134,3 +164,5 @@ export const GeneralTab: React.FC = () => {
     </div>
   );
 };
+
+export default GeneralTab;

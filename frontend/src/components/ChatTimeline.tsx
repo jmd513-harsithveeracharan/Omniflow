@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { Copy, Check, Volume2, ThumbsUp, ThumbsDown, RotateCcw, Loader2, Play, LayoutGrid } from 'lucide-react';
+import { Copy, Check, Volume2, ThumbsUp, ThumbsDown, RotateCcw, Play, LayoutGrid } from 'lucide-react';
 import { ChatMessage } from '../types';
 import { MarkdownRenderer } from './chat/MarkdownRenderer';
 import { ThoughtTrace } from './chat/ThoughtTrace';
@@ -22,15 +22,34 @@ export const ChatTimeline: React.FC<ChatTimelineProps> = ({
   onOpenWorkspace,
   onRetryPrompt,
 }) => {
-  const bottomRef = useRef<HTMLDivElement>(null);
+  const threadRef = useRef<HTMLDivElement>(null);
+  const prevCountRef = useRef<number>(messages.length);
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
   const [speakingIdx, setSpeakingIdx] = useState<number | null>(null);
   const [likedIdxs, setLikedIdxs] = useState<Record<number, boolean>>({});
   const [dislikedIdxs, setDislikedIdxs] = useState<Record<number, boolean>>({});
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, isStreaming]);
+    if (!threadRef.current) return;
+
+    // If a brand new message was appended (e.g. user sent a prompt)
+    if (messages.length > prevCountRef.current) {
+      const thread = threadRef.current;
+      const bubbles = thread.querySelectorAll('.chat-bubble');
+      const lastBubble = bubbles[bubbles.length - 1] as HTMLElement;
+      if (lastBubble) {
+        const threadRect = thread.getBoundingClientRect();
+        const bubbleRect = lastBubble.getBoundingClientRect();
+        const offset = bubbleRect.top - threadRect.top + thread.scrollTop - 24;
+        thread.scrollTo({ top: Math.max(0, offset), behavior: 'smooth' });
+      }
+    } else if (messages.length > 0 && prevCountRef.current === 0) {
+      // Switching into a conversation from another view or loading history: start at top
+      threadRef.current.scrollTo({ top: 0, behavior: 'auto' });
+    }
+
+    prevCountRef.current = messages.length;
+  }, [messages.length]);
 
   const handleCopy = (text: string, idx: number) => {
     navigator.clipboard.writeText(text);
@@ -55,8 +74,8 @@ export const ChatTimeline: React.FC<ChatTimelineProps> = ({
   };
 
   return (
-    <div className="architect-chat-area">
-      <div className="chat-thread-scroll" style={{ paddingBottom: '160px' }}>
+    <div className="architect-chat-area" id="architectChatArea">
+      <div className="chat-thread-scroll" id="chatThread" ref={threadRef}>
         {messages.map((m, idx) => {
           const isUser = m.role === 'user';
           const { thoughtMeta, cleanContent } = parseThoughtMeta(m.content);
@@ -71,16 +90,16 @@ export const ChatTimeline: React.FC<ChatTimelineProps> = ({
 
           if (isUser) {
             return (
-              <div key={idx} className="chat-bubble user">
+              <div key={idx} className="chat-bubble user" data-raw-content={cleanContent}>
                 <div className="chat-content-card">
                   <div className="chat-card-text">{cleanContent}</div>
                 </div>
-                <div className="chat-bubble-actions">
+                <div className="chat-bubble-actions user-actions">
                   <button
                     type="button"
                     onClick={() => handleCopy(cleanContent, idx)}
-                    className="chat-action-btn"
-                    title="Copy message"
+                    className="chat-action-btn btn-copy-msg"
+                    title="Copy prompt"
                   >
                     {copiedIdx === idx ? (
                       <Check width={12} height={12} style={{ color: '#10b981' }} />
@@ -92,7 +111,7 @@ export const ChatTimeline: React.FC<ChatTimelineProps> = ({
                     <button
                       type="button"
                       onClick={() => onRetryPrompt(cleanContent)}
-                      className="chat-action-btn"
+                      className="chat-action-btn btn-retry-msg"
                       title="Edit / Resend"
                     >
                       <RotateCcw width={12} height={12} />
@@ -104,65 +123,17 @@ export const ChatTimeline: React.FC<ChatTimelineProps> = ({
           }
 
           return (
-            <div key={idx} className="chat-bubble assistant">
-              <div
-                className="assistant-header-row"
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  marginBottom: '8px',
-                }}
-              >
-                <div
-                  className="assistant-avatar"
-                  style={{
-                    width: '24px',
-                    height: '24px',
-                    borderRadius: '6px',
-                    background: '#1a1b1e',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    flexShrink: 0,
-                  }}
-                >
-                  <svg width="16" height="16" viewBox="0 0 32 32" fill="none">
-                    <path d="M16 3L3 10.5V21.5L16 29L29 21.5V10.5L16 3Z" fill="#008272" />
-                    <path d="M16 3L29 10.5V21.5L16 29V3Z" fill="#00A88F" />
-                    <path d="M16 3L29 10.5L16 18L3 10.5L16 3Z" fill="#00D2A0" />
-                  </svg>
-                </div>
-                <span
-                  style={{
-                    fontSize: '13px',
-                    fontWeight: 600,
-                    color: '#e3e3e3',
-                    letterSpacing: '-0.01em',
-                  }}
-                >
-                  Fabric.AI
-                </span>
-              </div>
+            <div key={idx} className="chat-bubble assistant" data-raw-content={cleanContent}>
+              {thoughtMeta && <ThoughtTrace meta={thoughtMeta} />}
 
               <div className="chat-content-card">
-                {thoughtMeta && <ThoughtTrace meta={thoughtMeta} />}
-
                 <div className="markdown-body">
                   <MarkdownRenderer content={cleanContent} />
                 </div>
 
                 {/* Plan Action Bar Buttons */}
                 {hasPlan && (
-                  <div
-                    className="plan-action-bar"
-                    style={{
-                      marginTop: '14px',
-                      display: 'flex',
-                      gap: '8px',
-                      flexWrap: 'wrap',
-                    }}
-                  >
+                  <div className="plan-action-bar" style={{ marginTop: '14px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                     {!isDeployed && onDeployPlan && (
                       <button
                         type="button"
@@ -172,12 +143,12 @@ export const ChatTimeline: React.FC<ChatTimelineProps> = ({
                           display: 'inline-flex',
                           alignItems: 'center',
                           gap: '6px',
-                          padding: '6px 14px',
+                          padding: '7px 14px',
                           background: '#0078d4',
                           color: '#fff',
                           border: 'none',
                           borderRadius: '6px',
-                          fontSize: '12px',
+                          fontSize: '12.5px',
                           fontWeight: 600,
                           cursor: 'pointer',
                         }}
@@ -196,12 +167,12 @@ export const ChatTimeline: React.FC<ChatTimelineProps> = ({
                           display: 'inline-flex',
                           alignItems: 'center',
                           gap: '6px',
-                          padding: '6px 14px',
+                          padding: '7px 14px',
                           background: 'rgba(56, 189, 248, 0.12)',
                           color: '#38bdf8',
                           border: '1px solid rgba(56, 189, 248, 0.3)',
                           borderRadius: '6px',
-                          fontSize: '12px',
+                          fontSize: '12.5px',
                           fontWeight: 500,
                           cursor: 'pointer',
                         }}
@@ -220,12 +191,12 @@ export const ChatTimeline: React.FC<ChatTimelineProps> = ({
                           display: 'inline-flex',
                           alignItems: 'center',
                           gap: '6px',
-                          padding: '6px 14px',
+                          padding: '7px 14px',
                           background: 'rgba(255, 255, 255, 0.08)',
                           color: '#e1e3e1',
                           border: '1px solid rgba(255, 255, 255, 0.15)',
                           borderRadius: '6px',
-                          fontSize: '12px',
+                          fontSize: '12.5px',
                           fontWeight: 500,
                           cursor: 'pointer',
                         }}
@@ -238,20 +209,11 @@ export const ChatTimeline: React.FC<ChatTimelineProps> = ({
               </div>
 
               {/* Assistant Message Actions Toolbar */}
-              <div
-                className="chat-bubble-actions assistant-actions"
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  marginTop: '6px',
-                  opacity: 0.85,
-                }}
-              >
+              <div className="chat-bubble-actions assistant-actions">
                 <button
                   type="button"
                   onClick={() => handleCopy(cleanContent, idx)}
-                  className="chat-action-btn"
+                  className="chat-action-btn btn-copy-msg"
                   title="Copy response"
                 >
                   {copiedIdx === idx ? (
@@ -264,7 +226,7 @@ export const ChatTimeline: React.FC<ChatTimelineProps> = ({
                 <button
                   type="button"
                   onClick={() => handleSpeak(cleanContent, idx)}
-                  className={`chat-action-btn ${speakingIdx === idx ? 'active' : ''}`}
+                  className={`chat-action-btn btn-speak-msg ${speakingIdx === idx ? 'speaking' : ''}`}
                   title="Read aloud"
                 >
                   <Volume2 width={12} height={12} />
@@ -273,7 +235,7 @@ export const ChatTimeline: React.FC<ChatTimelineProps> = ({
                 <button
                   type="button"
                   onClick={() => setLikedIdxs((p) => ({ ...p, [idx]: !p[idx] }))}
-                  className={`chat-action-btn ${likedIdxs[idx] ? 'active' : ''}`}
+                  className={`chat-action-btn btn-thumb-up ${likedIdxs[idx] ? 'active' : ''}`}
                   title="Good response"
                 >
                   <ThumbsUp width={12} height={12} />
@@ -282,7 +244,7 @@ export const ChatTimeline: React.FC<ChatTimelineProps> = ({
                 <button
                   type="button"
                   onClick={() => setDislikedIdxs((p) => ({ ...p, [idx]: !p[idx] }))}
-                  className={`chat-action-btn ${dislikedIdxs[idx] ? 'active' : ''}`}
+                  className={`chat-action-btn btn-thumb-down ${dislikedIdxs[idx] ? 'active' : ''}`}
                   title="Bad response"
                 >
                   <ThumbsDown width={12} height={12} />
@@ -292,7 +254,7 @@ export const ChatTimeline: React.FC<ChatTimelineProps> = ({
                   <button
                     type="button"
                     onClick={() => onRetryPrompt(messages[idx - 1].content)}
-                    className="chat-action-btn"
+                    className="chat-action-btn btn-retry-msg"
                     title="Regenerate response"
                   >
                     <RotateCcw width={12} height={12} />
@@ -304,60 +266,17 @@ export const ChatTimeline: React.FC<ChatTimelineProps> = ({
         })}
 
         {isStreaming && (
-          <div className="chat-bubble assistant">
-            <div
-              className="assistant-header-row"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                marginBottom: '8px',
-              }}
-            >
-              <div
-                className="assistant-avatar"
-                style={{
-                  width: '24px',
-                  height: '24px',
-                  borderRadius: '6px',
-                  background: '#1a1b1e',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  flexShrink: 0,
-                }}
-              >
-                <svg width="16" height="16" viewBox="0 0 32 32" fill="none">
-                  <path d="M16 3L3 10.5V21.5L16 29L29 21.5V10.5L16 3Z" fill="#008272" />
-                  <path d="M16 3L29 10.5V21.5L16 29V3Z" fill="#00A88F" />
-                  <path d="M16 3L29 10.5L16 18L3 10.5L16 3Z" fill="#00D2A0" />
-                </svg>
+          <div className="chat-bubble assistant chat-loading-bubble">
+            <div className="agent-working-card">
+              <div className="agent-working-header">
+                <div className="agent-working-spinner" />
+                <span className="agent-working-title">Working...</span>
               </div>
-              <span style={{ fontSize: '13px', fontWeight: 600, color: '#e3e3e3' }}>
-                Fabric.AI
-              </span>
-            </div>
-            <div
-              className="chat-content-card"
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '8px',
-                padding: '10px 14px',
-                background: 'rgba(255,255,255,0.04)',
-                borderRadius: '12px',
-                border: '1px solid rgba(255,255,255,0.06)',
-                width: 'fit-content',
-              }}
-            >
-              <Loader2 width={14} height={14} className="animate-spin" style={{ color: '#10b981' }} />
-              <span style={{ fontSize: '13px', color: '#10b981', fontFamily: 'var(--font-mono, monospace)' }}>
-                Fabric.AI synthesizing response...
-              </span>
             </div>
           </div>
         )}
-        <div ref={bottomRef} />
+
+        <div id="chatBottomSpacer" className="chat-thread-bottom-spacer" style={{ height: '140px', flexShrink: 0 }} />
       </div>
     </div>
   );

@@ -1,20 +1,34 @@
 import React, { useState } from 'react';
+import { X } from 'lucide-react';
 
-export const CapabilitiesTab: React.FC = () => {
+interface CapabilitiesTabProps {
+  onClose?: () => void;
+}
+
+export const CapabilitiesTab: React.FC<CapabilitiesTabProps> = ({ onClose }) => {
   const [effort, setEffort] = useState('Medium');
   const [safeDelete, setSafeDelete] = useState(true);
   const [autoFix, setAutoFix] = useState(true);
 
   return (
-    <div className="settings-tab-pane">
-      <div className="pane-header-row" style={{ marginBottom: '16px' }}>
-        <h2 className="pane-title" style={{ fontSize: '18px', fontWeight: 600, color: '#f4f4f5' }}>Capabilities & Engine Controls</h2>
-        <p style={{ fontSize: '12.5px', color: '#71717a', margin: '2px 0 0 0' }}>
-          Deep reasoning effort, safe blast-radius guardrails, and self-healing execution loops.
-        </p>
+    <div className="settings-tab-pane" id="paneCapabilities">
+      <div className="pane-header-row">
+        <div>
+          <h2 className="pane-title">Capabilities & Engine Controls</h2>
+          <p className="pane-desc" style={{ color: '#71717a', fontSize: '12.5px', marginTop: '4px' }}>
+            Deep reasoning effort, safe blast-radius guardrails, and self-healing execution loops.
+          </p>
+        </div>
+        <div className="pane-header-actions">
+          {onClose && (
+            <button type="button" className="btn-subtle-icon btn-close-modal-icon" title="Close dialog" onClick={onClose}>
+              <X width={18} height={18} />
+            </button>
+          )}
+        </div>
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginTop: '16px' }}>
         <div style={{ padding: '14px 0', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
             <span style={{ fontSize: '13px', fontWeight: 500, color: '#fff' }}>Deep Reasoning Effort</span>
@@ -59,8 +73,8 @@ export const CapabilitiesTab: React.FC = () => {
 
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 0' }}>
           <div>
-            <div style={{ fontSize: '13px', fontWeight: 500, color: '#fff' }}>Cyclic PySpark Self-Healing</div>
-            <div style={{ fontSize: '11.5px', color: '#71717a' }}>Auto-correct AST and schema syntax errors on notebook failure</div>
+            <div style={{ fontSize: '13px', fontWeight: 500, color: '#fff' }}>Self-Healing Syntax Transpiler</div>
+            <div style={{ fontSize: '11.5px', color: '#71717a' }}>Automatically repair PySpark and Delta syntax on execution failure</div>
           </div>
           <input
             type="checkbox"
@@ -73,3 +87,5 @@ export const CapabilitiesTab: React.FC = () => {
     </div>
   );
 };
+
+export default CapabilitiesTab;

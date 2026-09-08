@@ -1,9 +1,13 @@
 import React, { useState } from 'react';
-import { Trash2 } from 'lucide-react';
+import { X } from 'lucide-react';
 
-export const MemoryTab: React.FC = () => {
-  const [turns, setTurns] = useState(14);
-  const [tokens, setTokens] = useState(1280);
+interface MemoryTabProps {
+  onClose?: () => void;
+}
+
+export const MemoryTab: React.FC<MemoryTabProps> = ({ onClose }) => {
+  const [turns, setTurns] = useState(0);
+  const [tokens, setTokens] = useState(0);
   const [cleared, setCleared] = useState(false);
 
   const handleClear = () => {
@@ -14,38 +18,41 @@ export const MemoryTab: React.FC = () => {
   };
 
   return (
-    <div className="settings-tab-pane">
-      <div className="pane-header-row" style={{ marginBottom: '16px' }}>
-        <h2 className="pane-title" style={{ fontSize: '18px', fontWeight: 600, color: '#f4f4f5' }}>
-          Memory Store
-        </h2>
-        <p style={{ fontSize: '12.5px', color: '#71717a', margin: '2px 0 0 0' }}>
-          SQLite multi-turn conversation memory with rolling context and token budget enforcement.
-        </p>
-      </div>
-
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px', margin: '16px 0' }}>
-        <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '8px', padding: '16px' }}>
-          <div style={{ fontSize: '24px', fontWeight: 700, color: '#38bdf8' }}>{turns}</div>
-          <div style={{ fontSize: '12px', color: '#71717a', marginTop: '4px' }}>Active Conversation Turns</div>
+    <div className="settings-tab-pane" id="paneMemory">
+      <div className="pane-header-row">
+        <div>
+          <h2 className="pane-title">Memory Store</h2>
+          <p className="pane-desc" style={{ color: '#71717a', fontSize: '12.5px', marginTop: '4px' }}>
+            SQLite multi-turn conversation memory with 10-turn rolling window & 2,200 token budget cap.
+          </p>
         </div>
-
-        <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '8px', padding: '16px' }}>
-          <div style={{ fontSize: '24px', fontWeight: 700, color: '#10b981' }}>{tokens} / 2,200</div>
-          <div style={{ fontSize: '12px', color: '#71717a', marginTop: '4px' }}>Token Budget Used</div>
+        <div className="pane-header-actions">
+          {onClose && (
+            <button type="button" className="btn-subtle-icon btn-close-modal-icon" title="Close dialog" onClick={onClose}>
+              <X width={18} height={18} />
+            </button>
+          )}
         </div>
       </div>
 
-      <div style={{ marginTop: '24px' }}>
-        <button
-          type="button"
-          onClick={handleClear}
-          style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', color: '#ef4444', padding: '8px 14px', borderRadius: '6px', fontSize: '12.5px', fontWeight: 500, cursor: 'pointer' }}
-        >
-          <Trash2 width={13} height={13} />
-          <span>{cleared ? 'Memory Cleared!' : 'Clear Short-Term Memory'}</span>
+      <div className="memory-stats-grid" id="settingsMemoryStats" style={{ marginTop: '16px' }}>
+        <div className="memory-stat-card">
+          <span className="memory-stat-num" id="settingsMemTurns">{turns}</span>
+          <span className="memory-stat-label">Active Conversation Turns</span>
+        </div>
+        <div className="memory-stat-card">
+          <span className="memory-stat-num" id="settingsMemTokens">{tokens}</span>
+          <span className="memory-stat-label">Token Budget Used</span>
+        </div>
+      </div>
+
+      <div className="settings-form-actions" style={{ marginTop: '24px' }}>
+        <button type="button" className="settings-btn-secondary" id="btnClearMemoryBtn" onClick={handleClear}>
+          {cleared ? '✓ Memory Cleared' : 'Clear Short-Term Memory'}
         </button>
       </div>
     </div>
   );
 };
+
+export default MemoryTab;

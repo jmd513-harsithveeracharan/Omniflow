@@ -1,11 +1,22 @@
 import React from 'react';
-import { LogOut } from 'lucide-react';
+import { LogOut, X } from 'lucide-react';
 
-export const AccountTab: React.FC = () => {
+interface AccountTabProps {
+  onClose?: () => void;
+}
+
+export const AccountTab: React.FC<AccountTabProps> = ({ onClose }) => {
   return (
-    <div className="settings-tab-pane">
-      <div className="pane-header-row" style={{ marginBottom: '16px' }}>
-        <h2 className="pane-title" style={{ fontSize: '18px', fontWeight: 600, color: '#f4f4f5' }}>Account</h2>
+    <div className="settings-tab-pane" id="paneAccount">
+      <div className="pane-header-row">
+        <h2 className="pane-title">Account</h2>
+        <div className="pane-header-actions">
+          {onClose && (
+            <button type="button" className="btn-subtle-icon btn-close-modal-icon" title="Close dialog" onClick={onClose}>
+              <X width={18} height={18} />
+            </button>
+          )}
+        </div>
       </div>
 
       <div style={{ padding: '14px 0', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -40,3 +51,5 @@ export const AccountTab: React.FC = () => {
     </div>
   );
 };
+
+export default AccountTab;
