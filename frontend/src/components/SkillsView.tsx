@@ -172,47 +172,63 @@ export const SkillsView: React.FC<SkillsViewProps> = ({
           ) : filteredSkills.length === 0 ? (
             <div className="tree-empty-hint">No skills found matching &quot;{search}&quot;.</div>
           ) : (
-            filteredSkills.map((skill) => (
-              <div
-                key={skill.name}
-                className="skill-gallery-card"
-                onClick={() => onInspectSkill(skill.name)}
-              >
-                <div className="skill-card-top">
-                  <div className="skill-card-badge">
-                    <Sparkles width={13} height={13} className="text-cyan-400" />
-                    <span>{skill.tier.toUpperCase()}</span>
+            filteredSkills.map((skill) => {
+              const tierClass =
+                skill.tier === 'orchestrator'
+                  ? 'tier-orchestrator'
+                  : skill.tier === 'workflow'
+                  ? 'tier-workflow'
+                  : skill.tier === 'pattern'
+                  ? 'tier-pattern'
+                  : 'tier-atomic';
+
+              return (
+                <div
+                  key={skill.name}
+                  className="skill-gallery-card"
+                  onClick={() => onInspectSkill(skill.name)}
+                >
+                  <div className="skill-card-top">
+                    <div className={`skill-card-badge ${tierClass}`}>
+                      <Sparkles width={12} height={12} />
+                      <span>{skill.tier.toUpperCase()}</span>
+                    </div>
+                    <span className="skill-card-status">
+                      <span className="status-dot-green" />
+                      <span>Ready</span>
+                    </span>
                   </div>
-                  <span className="skill-card-status">Ready</span>
+                  <h4 className="skill-card-title">{skill.displayName}</h4>
+                  <p className="skill-card-desc">{skill.description}</p>
+                  <div className="skill-card-footer">
+                    <button
+                      type="button"
+                      className="skill-card-action-btn"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onInspectSkill(skill.name);
+                      }}
+                      title="Inspect skill runbook & rules"
+                    >
+                      <Eye width={13} height={13} />
+                      <span>Inspect Runbook</span>
+                    </button>
+                    <button
+                      type="button"
+                      className="skill-card-run-btn"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onSelectSkillPrompt(`Execute workflow using skill \`${skill.name}\`: `);
+                      }}
+                      title="Run workflow with this skill"
+                    >
+                      <Play width={12} height={12} />
+                      <span>Run</span>
+                    </button>
+                  </div>
                 </div>
-                <h4 className="skill-card-title">{skill.displayName}</h4>
-                <p className="skill-card-desc">{skill.description}</p>
-                <div className="skill-card-footer">
-                  <button
-                    type="button"
-                    className="skill-card-action-btn"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onInspectSkill(skill.name);
-                    }}
-                  >
-                    <Eye width={12} height={12} />
-                    <span>Inspect Runbook</span>
-                  </button>
-                  <button
-                    type="button"
-                    className="skill-card-run-btn"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onSelectSkillPrompt(`Execute workflow using skill \`${skill.name}\`: `);
-                    }}
-                  >
-                    <Play width={12} height={12} />
-                    <span>Run</span>
-                  </button>
-                </div>
-              </div>
-            ))
+              );
+            })
           )}
         </div>
       </div>

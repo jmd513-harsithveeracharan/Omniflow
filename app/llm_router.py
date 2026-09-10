@@ -459,6 +459,36 @@ def _compress_complexity_providers(messages, max_tokens, session_id: str = None,
     return attempts
 
 
+def _parse_provider_and_model(name: str, target_model: str | None = None) -> tuple[str, str]:
+    """Extracts clean provider name and model identifier from display string."""
+    n_lower = name.lower()
+    if "claude code cli" in n_lower or "cli" in n_lower:
+        prov = "Anthropic (CLI)"
+        mdl = target_model or "claude-code-cli"
+    elif "claude" in n_lower or "anthropic" in n_lower or "sonnet" in n_lower or "haiku" in n_lower or "opus" in n_lower:
+        prov = "Anthropic"
+        mdl = target_model or ("claude-3-7-sonnet" if "sonnet" in n_lower else ("claude-3-opus" if "opus" in n_lower else "claude-3-5-haiku"))
+    elif "gemini" in n_lower or "google" in n_lower:
+        prov = "Google Gemini"
+        mdl = target_model or ("gemini-2.5-pro" if "pro" in n_lower else "gemini-3.6-flash")
+    elif "openai" in n_lower or "gpt-4" in n_lower or "gpt-3" in n_lower:
+        prov = "OpenAI"
+        mdl = target_model or ("gpt-4o-mini" if "mini" in n_lower else "gpt-4o")
+    elif "groq" in n_lower or "oss" in n_lower:
+        prov = "Groq Cloud"
+        mdl = target_model or ("openai/gpt-oss-120b" if "120b" in n_lower else "openai/gpt-oss-20b")
+    elif "ollama" in n_lower:
+        prov = "Ollama (Local)"
+        mdl = target_model or "ollama"
+    elif "lmstudio" in n_lower:
+        prov = "LM Studio (Local)"
+        mdl = target_model or "lmstudio"
+    else:
+        prov = "LLM Engine"
+        mdl = target_model or name
+    return prov, mdl
+
+
 # ── Public interface ──────────────────────────────────────────────────────────
 
 def chat(
@@ -473,6 +503,7 @@ def chat(
     """
     Send a chat completion request using the user-selected or best available LLM provider.
     Supports thinking effort scaling (low, medium, high) and native session resumption.
+    Clocks and audits token consumption per provider and model.
     """
     # Scale token budget by effort
     if effort == "low":
@@ -495,12 +526,46 @@ def chat(
 
     last_err = None
     for fn, name in attempts:
+        t0 = time.perf_counter()
         try:
             result = fn()
+            dur_ms = (time.perf_counter() - t0) * 1000.0
             print(f"[LLM] Response from {name} ({complexity} complexity, {effort} effort, session={session_id or 'none'}).")
+            prov, mdl = _parse_provider_and_model(name, target_model)
+            try:
+                from app.token_tracker import record_token_usage
+                record_token_usage(
+                    provider=prov,
+                    model=mdl,
+                    prompt_text=messages,
+                    completion_text=result,
+                    duration_ms=dur_ms,
+                    session_id=session_id,
+                    complexity=complexity,
+                    status="success",
+                )
+            except Exception as tr_err:
+                print(f"[TOKEN_TRACKER] Log warning: {tr_err}")
             return result
         except Exception as e:
+            dur_ms = (time.perf_counter() - t0) * 1000.0
             print(f"[LLM FALLBACK] {name} failed: {e}")
+            prov, mdl = _parse_provider_and_model(name, target_model)
+            try:
+                from app.token_tracker import record_token_usage
+                record_token_usage(
+                    provider=prov,
+                    model=mdl,
+                    prompt_text=messages,
+                    completion_text="",
+                    duration_ms=dur_ms,
+                    session_id=session_id,
+                    complexity=complexity,
+                    status="failed",
+                    error_message=str(e),
+                )
+            except Exception:
+                pass
             last_err = str(e)
 
     raise RuntimeError(f"All LLM providers failed. Last error: {last_err}")

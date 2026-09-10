@@ -124,6 +124,9 @@ def test_governance_impact_analysis():
 
 def test_pipeline_planning_and_deploy():
     """Verifies Medallion ingestion plan creation and deployment."""
+    from unittest.mock import patch
+    from app.deployment_executor import DeploymentReport, DeploymentStepResult
+
     plan_payload = {
         "source_id": "postgres",
         "selected_tables": [
@@ -142,15 +145,26 @@ def test_pipeline_planning_and_deploy():
     assert plan_res.status_code == 200
     plan_data = plan_res.json()["plan"]
 
-    # Deploy plan
-    deploy_res = client.post("/api/pipeline/deploy", json={"plan": plan_data})
-    assert deploy_res.status_code == 200
-    run_id = deploy_res.json()["run_id"]
+    mock_report = DeploymentReport(
+        run_id="run_test_plan_01",
+        workspace_id="ws-mock",
+        folder_name="lh_crm",
+        status="completed",
+        deployed_items=[
+            DeploymentStepResult(step_id="fld_1", item_type="folder", name="lh_crm", status="success")
+        ],
+    )
 
-    # Check status
-    status_res = client.get(f"/api/pipeline/status/{run_id}")
-    assert status_res.status_code == 200
-    assert status_res.json()["status"] == "completed"
+    with patch("app.api.routers.pipelines.deploy_fabric_plan", return_value=mock_report):
+        # Deploy plan
+        deploy_res = client.post("/api/pipeline/deploy", json={"plan": plan_data})
+        assert deploy_res.status_code == 200
+        run_id = deploy_res.json()["run_id"]
+
+        # Check status
+        status_res = client.get(f"/api/pipeline/status/{run_id}")
+        assert status_res.status_code == 200
+        assert status_res.json()["status"] == "completed"
 
 
 def test_workflow_execute_standard():

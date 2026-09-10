@@ -21,6 +21,7 @@ Database file: <project_root>/fabric_ai_memory.db
 
 import json
 import os
+import re
 import sqlite3
 import threading
 from datetime import UTC, datetime
@@ -102,6 +103,26 @@ CREATE TABLE IF NOT EXISTS projects (
     updated_at  TEXT NOT NULL,
     metadata    TEXT DEFAULT '{}'
 );
+
+CREATE TABLE IF NOT EXISTS token_usage (
+    id                INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id        TEXT,
+    provider          TEXT NOT NULL,
+    model             TEXT NOT NULL,
+    prompt_tokens     INTEGER NOT NULL DEFAULT 0,
+    completion_tokens INTEGER NOT NULL DEFAULT 0,
+    total_tokens      INTEGER NOT NULL DEFAULT 0,
+    cost_usd          REAL NOT NULL DEFAULT 0.0,
+    duration_ms       REAL NOT NULL DEFAULT 0.0,
+    complexity        TEXT DEFAULT 'standard',
+    status            TEXT DEFAULT 'success',
+    error_message     TEXT,
+    created_at        TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_token_usage_session ON token_usage(session_id);
+CREATE INDEX IF NOT EXISTS idx_token_usage_provider ON token_usage(provider);
+CREATE INDEX IF NOT EXISTS idx_token_usage_model ON token_usage(model);
+CREATE INDEX IF NOT EXISTS idx_token_usage_created ON token_usage(created_at);
 """
 
 
@@ -206,9 +227,10 @@ def list_conversations_with_metadata(workspace_id: str | None = None) -> list[di
         if custom_title and not custom_title.startswith("Chat "):
             d["title"] = custom_title
         elif first_p:
-            # Clean first prompt for title
-            cleaned = " ".join(first_p.split())
-            d["title"] = (cleaned[:42] + "...") if len(cleaned) > 42 else cleaned
+            # Clean first prompt for title (strip markdown formatting/leading symbols)
+            cleaned = re.sub(r'^[#*"`\'\s\->]+', '', first_p).strip()
+            cleaned = " ".join(cleaned.split())
+            d["title"] = (cleaned[:42] + "...") if len(cleaned) > 42 else (cleaned or "New Conversation")
         else:
             d["title"] = "New Conversation"
 
@@ -302,8 +324,9 @@ def add_message(session_id: str, role: str, content: str) -> int:
                 except Exception:
                     meta = {}
                 if not meta.get("title"):
-                    cleaned = " ".join(content.strip().split())
-                    meta["title"] = (cleaned[:42] + "...") if len(cleaned) > 42 else cleaned
+                    cleaned = re.sub(r'^[#*"`\'\s\->]+', '', content.strip()).strip()
+                    cleaned = " ".join(cleaned.split())
+                    meta["title"] = (cleaned[:42] + "...") if len(cleaned) > 42 else (cleaned or "New Conversation")
                     conn.execute("UPDATE sessions SET metadata=? WHERE session_id=?", (json.dumps(meta), session_id))
 
         conn.commit()

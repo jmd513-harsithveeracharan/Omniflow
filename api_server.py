@@ -16,6 +16,7 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import time
 import uuid
 from datetime import UTC, datetime
 from typing import Any
@@ -35,6 +36,7 @@ from app.api import (
     workspaces_router,
 )
 from app.config import ALLOWED_WORKSPACE_ID
+from app.deployment_executor import deploy_fabric_plan
 from app.fabric_client import list_workspaces
 from app.llm_router import chat
 from app.session_store import (
@@ -125,19 +127,32 @@ async def health_check():
     }
 
 
+# ── Fabric Status Cache ───────────────────────────────────────────────────────
+_FABRIC_STATUS_CACHE: dict[str, Any] = {}
+_FABRIC_STATUS_CACHE_TIME: float = 0.0
+
+
 @app.get("/api/status", summary="System & Fabric Status Alias")
 @app.get("/api/fabric/status", summary="Microsoft Fabric Connection Status")
 async def get_fabric_status():
-    """Checks Microsoft Fabric REST API authentication and workspace connectivity."""
+    """Checks Microsoft Fabric REST API authentication and workspace connectivity with background caching."""
+    global _FABRIC_STATUS_CACHE, _FABRIC_STATUS_CACHE_TIME
+    now = time.time()
+    if _FABRIC_STATUS_CACHE and (now - _FABRIC_STATUS_CACHE_TIME < 60.0):
+        return _FABRIC_STATUS_CACHE
+
     try:
-        workspaces = list_workspaces()
-        return {
+        workspaces = await asyncio.to_thread(list_workspaces)
+        res = {
             "authenticated": len(workspaces) > 0,
             "workspace_id": ALLOWED_WORKSPACE_ID,
             "target_folder": "AI_Test_Folder",
             "workspaces_count": len(workspaces),
             "message": "Fabric REST API connected." if workspaces else "Offline or zero workspaces found.",
         }
+        _FABRIC_STATUS_CACHE = res
+        _FABRIC_STATUS_CACHE_TIME = now
+        return res
     except Exception as e:
         return {
             "authenticated": False,
@@ -149,7 +164,7 @@ async def get_fabric_status():
 
 @app.get("/api/sessions", summary="List Chat Threads")
 @app.get("/api/conversations", summary="List Chat Threads (Alias)")
-async def get_sessions(workspace_id: str | None = None):
+def get_sessions(workspace_id: str | None = None):
     """Returns all active conversation threads with titles, run counts, and message counts."""
     convs = list_conversations_with_metadata(workspace_id or ALLOWED_WORKSPACE_ID)
     return {"sessions": convs, "conversations": convs, "count": len(convs)}
@@ -157,7 +172,7 @@ async def get_sessions(workspace_id: str | None = None):
 
 @app.get("/api/sessions/{session_id}", summary="Get Full Conversation Thread")
 @app.get("/api/conversation/{session_id}", summary="Get Full Conversation Thread (Alias)")
-async def get_session_detail(session_id: str):
+def get_session_detail(session_id: str):
     """Returns full conversation bundle with messages, metadata, and learned facts."""
     bundle = get_conversation_full(session_id)
     if not bundle:
@@ -171,7 +186,7 @@ class RenameSessionRequest(BaseModel):
 
 @app.delete("/api/sessions/{session_id}", summary="Delete Conversation Session")
 @app.delete("/api/conversation/{session_id}", summary="Delete Conversation Session (Alias)")
-async def handle_delete_session(session_id: str):
+def handle_delete_session(session_id: str):
     """Permanently deletes a chat conversation session and its message history."""
     from app.session_store import delete_conversation
     deleted = delete_conversation(session_id)
@@ -183,7 +198,7 @@ async def handle_delete_session(session_id: str):
 @app.patch("/api/sessions/{session_id}", summary="Rename Conversation Session")
 @app.post("/api/sessions/{session_id}/rename", summary="Rename Conversation Session (POST Alias)")
 @app.post("/api/conversation/{session_id}/rename", summary="Rename Conversation Session (Legacy Alias)")
-async def handle_rename_session(session_id: str, req: RenameSessionRequest):
+def handle_rename_session(session_id: str, req: RenameSessionRequest):
     """Updates the title of a conversation thread."""
     from app.session_store import rename_conversation
     renamed = rename_conversation(session_id, req.title)
@@ -193,7 +208,7 @@ async def handle_rename_session(session_id: str, req: RenameSessionRequest):
 
 
 @app.get("/api/projects", summary="List Active Projects")
-async def get_projects():
+def get_projects():
     """Returns all projects stored in the persistent database."""
     projects = get_all_projects()
     return {"projects": projects, "count": len(projects)}
@@ -257,13 +272,12 @@ async def init_new_session(req: SessionInitRequest):
 @app.post("/api/chat", summary="Session-Aware Chat Completion")
 async def handle_chat(req: ChatRequest):
     """
-    Executes a chat completion turn using native session resumption (--resume).
-    Claude CLI maintains conversation memory on disk without requiring full transcript dumps.
+    Executes a chat completion turn using the grounded Fabric AI Studio engine
+    and 4-stage LangGraph multi-agent architecture synthesis.
     """
     sid = req.session_id or str(uuid.uuid4())
     wid = req.workspace_id or ALLOWED_WORKSPACE_ID
 
-    # Ensure session exists in SQLite store
     session_data = get_session(sid)
     is_resuming = session_data is not None
     if not is_resuming:
@@ -271,29 +285,25 @@ async def handle_chat(req: ChatRequest):
     else:
         touch_session(sid)
 
-    # Persist the incoming user message
     add_message(sid, "user", req.message)
 
-    # Prepare message turn
-    messages = [{"role": "user", "content": req.message}]
-
     try:
-        # Call LLM router with native session resumption flag
-        response_text = chat(
-            messages=messages,
-            complexity=req.complexity,
-            target_model=req.model,
-            effort=req.effort,
+        from app.chat_service import process_chat_turn
+        response_text, plan = process_chat_turn(
+            prompt=req.message,
             session_id=sid,
-            resume=is_resuming,
+            is_resuming=is_resuming,
+            target_model=req.model,
+            complexity=req.complexity,
+            effort=req.effort,
         )
 
-        # Persist assistant response
         add_message(sid, "assistant", response_text)
 
         return {
             "session_id": sid,
             "response": response_text,
+            "plan": plan,
             "model_used": req.model or "auto-routed",
             "resumed_session": is_resuming,
         }
@@ -304,7 +314,7 @@ async def handle_chat(req: ChatRequest):
 @app.post("/api/chat/stream", summary="SSE Streaming Chat")
 async def handle_chat_stream(req: ChatRequest):
     """
-    Server-Sent Events (SSE) endpoint streaming live response tokens and stage progress.
+    Server-Sent Events (SSE) endpoint streaming live response tokens, stage progress, and plan.
     """
     sid = req.session_id or str(uuid.uuid4())
     wid = req.workspace_id or ALLOWED_WORKSPACE_ID
@@ -319,36 +329,32 @@ async def handle_chat_stream(req: ChatRequest):
     add_message(sid, "user", req.message)
 
     async def event_generator():
-        # Emit initial session metadata
         yield f"data: {json.dumps({'type': 'init', 'session_id': sid, 'resuming': is_resuming})}\n\n"
 
         try:
-            # Run in worker thread to prevent blocking event loop
             loop = asyncio.get_event_loop()
-            messages = [{"role": "user", "content": req.message}]
-            response_text = await loop.run_in_executor(
+            from app.chat_service import process_chat_turn
+            response_text, plan = await loop.run_in_executor(
                 None,
-                lambda: chat(
-                    messages=messages,
-                    complexity=req.complexity,
-                    target_model=req.model,
-                    effort=req.effort,
+                lambda: process_chat_turn(
+                    prompt=req.message,
                     session_id=sid,
-                    resume=is_resuming,
+                    is_resuming=is_resuming,
+                    target_model=req.model,
+                    complexity=req.complexity,
+                    effort=req.effort,
                 ),
             )
 
-            # Persist assistant turn
             add_message(sid, "assistant", response_text)
 
-            # Stream chunks for smooth UI typing
             chunk_size = 32
             for i in range(0, len(response_text), chunk_size):
                 chunk = response_text[i : i + chunk_size]
                 yield f"data: {json.dumps({'type': 'chunk', 'text': chunk})}\n\n"
-                await asyncio.sleep(0.01)
+                await asyncio.sleep(0.005)
 
-            yield f"data: {json.dumps({'type': 'done', 'session_id': sid})}\n\n"
+            yield f"data: {json.dumps({'type': 'done', 'session_id': sid, 'plan': plan})}\n\n"
         except Exception as e:
             yield f"data: {json.dumps({'type': 'error', 'error': str(e)})}\n\n"
 
@@ -377,6 +383,43 @@ async def get_session_facts_endpoint(session_id: str):
     """Returns key preferences and facts stored in the session's fact capsule."""
     facts = get_facts(session_id)
     return {"session_id": session_id, "facts": facts}
+
+
+# ── Token Tracking & Auditing ──────────────────────────────────────────────────
+
+@app.get("/api/tokens/audit", summary="Token Usage & Cost Audit")
+async def get_token_audit_endpoint(session_id: str | None = None):
+    """Returns aggregated token usage, cost estimations, and provider/model granularity breakdown."""
+    from app.token_tracker import get_token_audit_summary
+    summary = get_token_audit_summary(session_id=session_id)
+    return summary.model_dump()
+
+
+@app.get("/api/tokens/history", summary="Recent Token Usage Call Logs")
+async def get_token_history_endpoint(limit: int = 50, session_id: str | None = None):
+    """Returns chronologically recent token call logs for auditing."""
+    from app.token_tracker import get_recent_token_history
+    history = get_recent_token_history(limit=limit, session_id=session_id)
+    return {"history": [h.model_dump() for h in history], "count": len(history)}
+
+
+@app.post("/api/fabric/deploy", summary="Deploy Architecture Plan to Microsoft Fabric")
+@app.post("/api/deploy", summary="Deploy Architecture Plan to Microsoft Fabric (Alias)")
+async def handle_fabric_deploy(req: FabricDeployRequest):
+    """Executes full multi-tier architecture plan to Microsoft Fabric with cyclic self-healing."""
+    wid = req.workspace_id or ALLOWED_WORKSPACE_ID
+    try:
+        report = deploy_fabric_plan(req.plan, workspace_id=wid, session_id=req.session_id)
+        return {
+            "status": "success" if report.status in ("completed", "partial") else "failed",
+            "run_id": report.run_id,
+            "deployment_status": report.status,
+            "duration_sec": report.duration_sec,
+            "deployed_items": [i.model_dump() for i in report.deployed_items],
+            "errors": report.errors,
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Fabric deployment failed: {str(e)}") from e
 
 
 # ── Static File Serving (Studio UI & Assets) ──────────────────────────────────

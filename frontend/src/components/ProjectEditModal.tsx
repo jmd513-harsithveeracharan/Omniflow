@@ -26,7 +26,14 @@ export const ProjectEditModal: React.FC<ProjectEditModalProps> = ({
       setDescription(project.description || '');
       setError(null);
     }
-  }, [project]);
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isOpen) {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [project, isOpen, onClose]);
 
   if (!isOpen || !project) return null;
 

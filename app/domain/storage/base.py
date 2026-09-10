@@ -15,6 +15,7 @@ from app.domain.models.session import (
     ArchitectureRecipe,
     LearnedFact,
     MessageRecord,
+    ProjectLedgerRecord,
     RunRecord,
     SessionRecord,
 )
@@ -81,4 +82,24 @@ class StorageAdapter(ABC):
     @abstractmethod
     def search_recipes(self, query_embedding: list[float], limit: int = 5) -> list[ArchitectureRecipe]:
         """Performs cosine vector similarity search across architecture recipes."""
+        pass
+
+    @abstractmethod
+    def commit_completed_project(self, project: ProjectLedgerRecord) -> None:
+        """Atomically commits a 100% completed project into the Master DB ledger."""
+        pass
+
+    @abstractmethod
+    def get_completed_project(self, project_id: str) -> ProjectLedgerRecord | None:
+        """Fetches a completed project blueprint by project_id."""
+        pass
+
+    @abstractmethod
+    def list_completed_projects(self, workspace_id: str | None = None) -> list[ProjectLedgerRecord]:
+        """Lists all completed projects from the Master DB."""
+        pass
+
+    @abstractmethod
+    def search_completed_projects(self, query_embedding: list[float], limit: int = 3) -> list[ProjectLedgerRecord]:
+        """Performs vector search across completed project blueprints."""
         pass

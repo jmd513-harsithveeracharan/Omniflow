@@ -2,7 +2,7 @@
 app/domain/models/session.py
 ----------------------------
 Pydantic v2 schemas for Sessions, Messages, Learned Facts, Deployment Runs,
-and 5-Star Semantic Architecture Recipes.
+Architecture Recipes, and the Master Completed Project Ledger.
 """
 
 from __future__ import annotations
@@ -69,3 +69,21 @@ class ArchitectureRecipe(BaseModel):
     tags: list[str] = Field(default_factory=list)
     rating: int = Field(5, ge=1, le=5)
     embedding: list[float] = Field(default_factory=list, description="Vector embedding for pgvector cosine search")
+
+
+class ProjectLedgerRecord(BaseModel):
+    """
+    Atomic Master DB record for 100% completed projects/workstreams.
+    Guarantees that intermediate conversation turns and retries do not pollute permanent memory.
+    """
+    project_id: str = Field(..., description="Unique project slug or UUID")
+    project_name: str
+    workspace_id: str
+    status: str = Field("COMPLETED", description="Enforces atomic commit only upon 100% completion")
+    summary: str = Field(..., description="High-level architecture summary (~150 tokens)")
+    workstreams: list[dict[str, Any]] = Field(default_factory=list, description="Completed sub-workstreams")
+    lineage_dag: dict[str, Any] = Field(default_factory=dict, description="Final NetworkX lineage graph")
+    table_catalog: list[dict[str, Any]] = Field(default_factory=list, description="Final schema dictionary")
+    architecture_decisions: list[dict[str, Any]] = Field(default_factory=list, description="Key ADRs")
+    embedding: list[float] = Field(default_factory=list, description="pgvector embedding for JIT retrieval")
+    committed_at: str = Field(default_factory=_now_utc)

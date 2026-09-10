@@ -128,7 +128,10 @@ export const ChatTimeline: React.FC<ChatTimelineProps> = ({
             !isUser &&
             (cleanContent.includes('Architecture Deployed') ||
               cleanContent.includes('Target Folder') ||
-              cleanContent.includes('Proposed Fabric Architecture'));
+              cleanContent.includes('Proposed Fabric Architecture') ||
+              cleanContent.includes('Microsoft Fabric Architecture Plan') ||
+              cleanContent.includes('Medallion Lakehouses') ||
+              cleanContent.includes('Architecture Plan:'));
           const isDeployed =
             cleanContent.includes('Architecture Deployed') ||
             cleanContent.includes('Deployment Run ID');
@@ -316,7 +319,7 @@ export const ChatTimeline: React.FC<ChatTimelineProps> = ({
           );
         })}
 
-        {isStreaming && (
+        {isStreaming && (!messages.length || messages[messages.length - 1]?.role === 'user') && (
           <div className="chat-bubble assistant chat-loading-bubble">
             <div className="agent-working-card">
               <div className="agent-working-header">

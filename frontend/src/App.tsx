@@ -5,7 +5,6 @@ import { PlaygroundHome } from './components/PlaygroundHome';
 import { ChatTimeline } from './components/ChatTimeline';
 import { PromptDock } from './components/PromptDock';
 import { MedallionFlowCanvas } from './components/MedallionFlowCanvas';
-import { DeploymentWorkbench } from './components/DeploymentWorkbench';
 import { SkillInspectorModal } from './components/SkillInspectorModal';
 import { ConnectorModal } from './components/ConnectorModal';
 import { GovernanceModal } from './components/GovernanceModal';
@@ -95,6 +94,7 @@ export const App: React.FC = () => {
 
   const handleNewSession = async () => {
     try {
+      setIsStreaming(false);
       const newSid = await createNewSession(status?.workspaceId);
       setSessionId(newSid);
       setMessages([]);
@@ -107,6 +107,7 @@ export const App: React.FC = () => {
 
   const handleSelectSession = async (sid: string) => {
     try {
+      setIsStreaming(false);
       setSessionId(sid);
       setActiveView('chat');
       const detail = await fetchSessionDetail(sid);
@@ -150,9 +151,6 @@ export const App: React.FC = () => {
     const target = projects.find((p) => p.id === projectId);
     if (target) {
       setActiveView('chat');
-      if (messages.length === 0) {
-        handleSendMessage(`Focus on project: ${target.name}`);
-      }
     }
   };
 
@@ -239,8 +237,12 @@ export const App: React.FC = () => {
           return [...prev, { role: 'assistant', content: assistantContent, isStreaming: true }];
         });
       },
-      () => {
+      (plan) => {
         setIsStreaming(false);
+        if (plan) {
+          setCurrentPlan(plan as unknown as IngestionPlan);
+          setIsWorkbenchOpen(true);
+        }
       },
       (err) => {
         console.error('Stream error:', err);
@@ -347,6 +349,7 @@ export const App: React.FC = () => {
               setActiveView('chat');
               handleNewSession();
             }}
+            onProjectsChanged={loadProjectsList}
           />
         )}
 
@@ -372,7 +375,7 @@ export const App: React.FC = () => {
         )}
 
         {activeView === 'chat' && (
-          <div className="bolt-workspace-split">
+          <div className={`bolt-workspace-split ${isWorkbenchOpen ? 'split-active' : ''}`}>
             <div
               className={`bolt-chat-pane ${messages.length === 0 ? 'is-landing' : 'in-chat'} ${
                 isWorkbenchOpen ? 'with-workbench' : 'full-width'
@@ -386,11 +389,8 @@ export const App: React.FC = () => {
                   isStreaming={isStreaming}
                   sessionId={sessionId}
                   onDeployPlan={() => {
-                    if (currentPlan) {
-                      setIsWorkbenchOpen(true);
-                    } else {
-                      handleSendMessage('deploy active plan');
-                    }
+                    setIsWorkbenchOpen(true);
+                    handleSendMessage('deploy active plan');
                   }}
                   onOpenCanvas={() => setIsWorkbenchOpen(true)}
                   onOpenWorkspace={() => setActiveView('workspaces')}
@@ -403,14 +403,13 @@ export const App: React.FC = () => {
 
             {isWorkbenchOpen && (
               <div className="bolt-workbench-pane">
-                {currentPlan ? (
-                  <DeploymentWorkbench plan={currentPlan} />
-                ) : (
-                  <MedallionFlowCanvas
-                    plan={currentPlan}
-                    onClose={() => setIsWorkbenchOpen(false)}
-                  />
-                )}
+                <MedallionFlowCanvas
+                  plan={currentPlan}
+                  onDeploy={() => {
+                    handleSendMessage('deploy active plan');
+                  }}
+                  onClose={() => setIsWorkbenchOpen(false)}
+                />
               </div>
             )}
           </div>

@@ -104,13 +104,14 @@ def list_folders(workspace_id: str = ALLOWED_WORKSPACE_ID) -> list[dict]:
 def get_workspace_tree(workspace_id: str = ALLOWED_WORKSPACE_ID) -> dict:
     """
     Fetches workspace folders and items from the Fabric REST API and returns a
-    nested hierarchical tree structure.
+    nested hierarchical tree structure including subfolders under parent folders.
 
     Returns:
         {
           "workspace_id": str,
-          "folders": [{"id", "name", "items": [...]}],
-          "root_items": [{"id", "name", "type", "description"}],  # items not in any folder
+          "folders": [{"id", "name", "items": [...], "subfolders": [...]}],
+          "all_folders": [{"id", "name", "items": [...]}],
+          "root_items": [{"id", "name", "type", "description"}],
           "error": str | None
         }
     """
@@ -122,10 +123,13 @@ def get_workspace_tree(workspace_id: str = ALLOWED_WORKSPACE_ID) -> dict:
         # Build folder lookup
         folder_map: dict[str, dict] = {}
         for folder in folders:
-            folder_map[folder.get("id", "")] = {
-                "id": folder.get("id"),
+            fid = folder.get("id", "")
+            folder_map[fid] = {
+                "id": fid,
                 "name": folder.get("displayName", "Unnamed Folder"),
+                "parentFolderId": folder.get("parentFolderId"),
                 "items": [],
+                "subfolders": [],
             }
 
         root_items = []
@@ -135,16 +139,27 @@ def get_workspace_tree(workspace_id: str = ALLOWED_WORKSPACE_ID) -> dict:
                 "name":        item.get("displayName", "Unnamed"),
                 "type":        item.get("type", "Unknown"),
                 "description": item.get("description", ""),
+                "folderId":    item.get("parentFolderId") or item.get("folderId"),
             }
-            parent_id = item.get("parentFolderId") or item.get("folderId")
+            parent_id = item_entry["folderId"]
             if parent_id and parent_id in folder_map:
                 folder_map[parent_id]["items"].append(item_entry)
             else:
                 root_items.append(item_entry)
 
+        # Assemble nested folder hierarchy
+        top_level_folders = []
+        for fid, f_data in folder_map.items():
+            pid = f_data.get("parentFolderId")
+            if pid and pid in folder_map:
+                folder_map[pid]["subfolders"].append(f_data)
+            else:
+                top_level_folders.append(f_data)
+
         return {
             "workspace_id": workspace_id,
-            "folders": list(folder_map.values()),
+            "folders": top_level_folders,
+            "all_folders": list(folder_map.values()),
             "root_items": root_items,
             "error": None,
         }
@@ -153,36 +168,88 @@ def get_workspace_tree(workspace_id: str = ALLOWED_WORKSPACE_ID) -> dict:
         return {
             "workspace_id": workspace_id,
             "folders": [],
+            "all_folders": [],
             "root_items": [],
             "error": str(e),
         }
 
 
+def _get_or_create_single_folder(
+    folder_name: str,
+    workspace_id: str,
+    parent_folder_id: str | None,
+    headers: dict,
+) -> str | None:
+    """Helper to find or create a single folder."""
+    # Check if folder already exists in workspace
+    for folder in list_folders(workspace_id):
+        if folder.get("displayName") == folder_name:
+            if parent_folder_id is None or folder.get("parentFolderId") == parent_folder_id:
+                return folder.get("id")
 
-def get_or_create_folder(folder_name: str, workspace_id: str = ALLOWED_WORKSPACE_ID) -> str | None:
+    # Create new folder
+    payload: dict = {"displayName": folder_name}
+    if parent_folder_id:
+        payload["parentFolderId"] = parent_folder_id
+
+    resp = requests.post(
+        f"{_BASE}/workspaces/{workspace_id}/folders",
+        headers=headers,
+        json=payload,
+        timeout=15,
+    )
+    if resp.status_code in (200, 201):
+        return resp.json().get("id")
+
+    # If failed with parentFolderId, try fallback creation without it
+    if parent_folder_id:
+        fallback_resp = requests.post(
+            f"{_BASE}/workspaces/{workspace_id}/folders",
+            headers=headers,
+            json={"displayName": folder_name},
+            timeout=15,
+        )
+        if fallback_resp.status_code in (200, 201):
+            return fallback_resp.json().get("id")
+
+    print(f"[FABRIC] Failed to create folder '{folder_name}': {resp.status_code} {resp.text[:200]}")
+    return None
+
+
+def get_or_create_folder(
+    folder_name: str,
+    workspace_id: str = ALLOWED_WORKSPACE_ID,
+    parent_folder_id: str | None = None,
+) -> str | None:
     """
     Returns the folder ID for the given name, creating it if it doesn't exist.
+    Supports nested paths (e.g. 'AI_Test_Folder/SalesPipeline').
+    Enforces containment inside AI_Test_Folder if a single custom folder name is given.
     Idempotent — safe to call multiple times.
     """
     _assert_workspace(workspace_id)
     headers = get_auth_headers()
 
-    # Check if folder already exists
-    for folder in list_folders(workspace_id):
-        if folder.get("displayName") == folder_name:
-            return folder.get("id")
+    if not folder_name or not folder_name.strip():
+        return None
 
-    # Create new folder
-    resp = requests.post(
-        f"{_BASE}/workspaces/{workspace_id}/folders",
-        headers=headers,
-        json={"displayName": folder_name},
-        timeout=15,
-    )
-    if resp.status_code in (200, 201):
-        return resp.json().get("id")
-    print(f"[FABRIC] Failed to create folder '{folder_name}': {resp.status_code} {resp.text[:200]}")
-    return None
+    clean_name = folder_name.strip().strip("/")
+    # Handle multi-level paths e.g. "AI_Test_Folder/SalesPipeline"
+    if "/" in clean_name:
+        parts = [p.strip() for p in clean_name.split("/") if p.strip()]
+        current_parent = parent_folder_id
+        for part in parts:
+            current_parent = _get_or_create_single_folder(part, workspace_id, current_parent, headers)
+            if not current_parent:
+                break
+        return current_parent
+
+    # If it's a single custom folder and parent_folder_id is None, ensure AI_Test_Folder root first
+    if clean_name != "AI_Test_Folder" and parent_folder_id is None:
+        root_id = _get_or_create_single_folder("AI_Test_Folder", workspace_id, None, headers)
+        return _get_or_create_single_folder(clean_name, workspace_id, root_id, headers)
+
+    return _get_or_create_single_folder(clean_name, workspace_id, parent_folder_id, headers)
 
 
 def delete_folder(folder_id: str, workspace_id: str = ALLOWED_WORKSPACE_ID) -> bool:

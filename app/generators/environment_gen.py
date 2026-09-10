@@ -12,10 +12,13 @@ def generate_environment_conda_yaml(
     pip_packages: list[str] | None = None,
     conda_channels: list[str] | None = None,
     environment_name: str = "custom_spark_env",
+    extra_pip_packages: list[str] | None = None,
+    python_version: str = "3.10",
 ) -> str:
     """Generates standard conda environment.yml for Fabric Spark custom runtimes."""
     channels = conda_channels or ["conda-forge", "default"]
-    packages = pip_packages or ["delta-spark>=3.0.0", "sqlglot>=25.0.0", "pandas>=2.0.0", "pyarrow>=14.0.0"]
+    base_packages = ["delta-spark>=3.0.0", "sqlglot>=25.0.0", "pandas>=2.0.0", "pyarrow>=14.0.0"]
+    packages = (pip_packages if pip_packages is not None else base_packages) + (extra_pip_packages or [])
 
     channels_str = "\n".join([f"  - {c}" for c in channels])
     pip_str = "\n".join([f"      - {p}" for p in packages])
@@ -24,7 +27,7 @@ def generate_environment_conda_yaml(
 channels:
 {channels_str}
 dependencies:
-  - python=3.10
+  - python={python_version}
   - pip
   - pip:
 {pip_str}

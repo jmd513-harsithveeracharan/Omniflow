@@ -11,31 +11,29 @@ from typing import Any
 
 
 def generate_pipeline_activity_dag(
-    activities_spec: list[dict[str, Any]],
+    activities_spec: list[dict[str, Any]] | list[str],
     pipeline_name: str = "Medallion_Ingestion_Pipeline",
     parameters: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """
     Constructs an official Microsoft Fabric Data Factory Pipeline JSON definition structure.
-    
-    activities_spec: list of dicts:
-      [
-        {
-          "name": "Ingest_Bronze_Orders",
-          "type": "TridentNotebook", # or "SynapseNotebook", "CopyActivity"
-          "notebook_id": "...",
-          "depends_on": [] # list of prior activity names
-        },
-        ...
-      ]
     """
     pipeline_activities = []
+    prev_activity_name: str | None = None
 
-    for act in activities_spec:
-        act_name = act.get("name", "Execute_Step").replace(" ", "_")
-        act_type = act.get("type", "TridentNotebook")
-        notebook_id = act.get("notebook_id", "")
-        depends_on = act.get("depends_on", [])
+    for i, act in enumerate(activities_spec):
+        if isinstance(act, str):
+            act_name = f"Execute_Notebook_{i+1}"
+            act_type = "TridentNotebook"
+            notebook_id = act
+            depends_on = [prev_activity_name] if prev_activity_name else []
+            prev_activity_name = act_name
+        else:
+            act_name = act.get("name", f"Execute_Step_{i+1}").replace(" ", "_")
+            act_type = act.get("type", "TridentNotebook")
+            notebook_id = act.get("notebook_id", "")
+            depends_on = act.get("depends_on", [])
+            prev_activity_name = act_name
 
         dependencies = [
             {
@@ -58,7 +56,7 @@ def generate_pipeline_activity_dag(
             },
             "typeProperties": {
                 "notebookId": notebook_id,
-                "parameters": act.get("parameters", {}),
+                "parameters": act.get("parameters", {}) if isinstance(act, dict) else {},
             },
         }
         pipeline_activities.append(activity_def)
@@ -73,11 +71,12 @@ def generate_pipeline_activity_dag(
     }
 
 
-def package_pipeline_definition_parts(pipeline_json: dict[str, Any]) -> list[dict[str, Any]]:
+def package_pipeline_definition_parts(
+    pipeline_json: dict[str, Any],
+    schedule_cron: str | None = None,
+) -> list[dict[str, Any]]:
     """
     Packages a pipeline JSON structure into Base64 inline definition parts format.
-    Format matching official spec:
-    [{"path": "pipeline-content.json", "payload": "<b64>", "payloadType": "InlineBase64"}]
     """
     raw_str = json.dumps(pipeline_json, indent=2)
     encoded_payload = base64.b64encode(raw_str.encode("utf-8")).decode("utf-8")

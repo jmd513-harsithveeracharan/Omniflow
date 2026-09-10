@@ -10,7 +10,12 @@ export const parseThoughtMeta = (content: string): { thoughtMeta: ThoughtMeta | 
     } catch (_) {}
   }
 
-  if (content.includes('Architecture Deployed') || content.includes('Proposed Fabric Architecture')) {
+  if (
+    content.includes('Proposed Fabric Architecture') ||
+    content.includes('Microsoft Fabric Architecture Plan') ||
+    content.includes('Architecture Deployed') ||
+    content.includes('Architecture Plan:')
+  ) {
     const syntheticMeta: ThoughtMeta = {
       elapsed: '24.2',
       steps: [

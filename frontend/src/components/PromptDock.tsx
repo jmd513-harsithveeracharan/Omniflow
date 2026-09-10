@@ -21,6 +21,8 @@ export const PromptDock: React.FC<PromptDockProps> = ({
   const [isListening, setIsListening] = useState(false);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const leftControlsRef = useRef<HTMLDivElement>(null);
+  const modelPillWrapperRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (textareaRef.current) {
@@ -29,6 +31,34 @@ export const PromptDock: React.FC<PromptDockProps> = ({
       textareaRef.current.style.height = `${newHeight}px`;
     }
   }, [input]);
+
+  useEffect(() => {
+    const handleOutsideClick = (e: MouseEvent) => {
+      const target = e.target as Node;
+      if (leftControlsRef.current && !leftControlsRef.current.contains(target)) {
+        setIsTuningOpen(false);
+        setIsToolsOpen(false);
+      }
+      if (modelPillWrapperRef.current && !modelPillWrapperRef.current.contains(target)) {
+        setIsModelDropdownOpen(false);
+        setActiveSubmenu('none');
+      }
+    };
+    const handleKeyDownGlobal = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setIsTuningOpen(false);
+        setIsToolsOpen(false);
+        setIsModelDropdownOpen(false);
+        setActiveSubmenu('none');
+      }
+    };
+    window.addEventListener('mousedown', handleOutsideClick);
+    window.addEventListener('keydown', handleKeyDownGlobal);
+    return () => {
+      window.removeEventListener('mousedown', handleOutsideClick);
+      window.removeEventListener('keydown', handleKeyDownGlobal);
+    };
+  }, []);
 
   const handleSubmit = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -48,7 +78,34 @@ export const PromptDock: React.FC<PromptDockProps> = ({
   };
 
   const handleVoiceToggle = () => {
-    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+    // Type definition for speech recognition API
+    type WebkitWindow = Window & {
+      webkitSpeechRecognition?: new () => {
+        continuous: boolean;
+        interimResults: boolean;
+        lang: string;
+        onstart: () => void;
+        onend: () => void;
+        onerror: () => void;
+        onresult: (event: { results: Array<Array<{ transcript: string }>> }) => void;
+        start: () => void;
+      };
+      SpeechRecognition?: new () => {
+        continuous: boolean;
+        interimResults: boolean;
+        lang: string;
+        onstart: () => void;
+        onend: () => void;
+        onerror: () => void;
+        onresult: (event: { results: Array<Array<{ transcript: string }>> }) => void;
+        start: () => void;
+      };
+    };
+
+    const w = window as unknown as WebkitWindow;
+    const SpeechRecognitionClass = w.SpeechRecognition || w.webkitSpeechRecognition;
+
+    if (!SpeechRecognitionClass) {
       alert('Speech recognition is not supported in this browser.');
       return;
     }
@@ -59,9 +116,7 @@ export const PromptDock: React.FC<PromptDockProps> = ({
     }
 
     try {
-      // @ts-ignore
-      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-      const recognition = new SpeechRecognition();
+      const recognition = new SpeechRecognitionClass();
       recognition.continuous = false;
       recognition.interimResults = false;
       recognition.lang = 'en-US';
@@ -69,8 +124,8 @@ export const PromptDock: React.FC<PromptDockProps> = ({
       recognition.onstart = () => setIsListening(true);
       recognition.onend = () => setIsListening(false);
       recognition.onerror = () => setIsListening(false);
-      recognition.onresult = (event: any) => {
-        const transcript = event.results[0][0].transcript;
+      recognition.onresult = (event: { results: Array<Array<{ transcript: string }>> }) => {
+        const transcript = event.results[0]?.[0]?.transcript;
         if (transcript) {
           setInput((prev) => (prev ? `${prev} ${transcript}` : transcript));
         }
@@ -113,7 +168,7 @@ export const PromptDock: React.FC<PromptDockProps> = ({
 
         {/* Dock Controls Row */}
         <div className="dock-controls-row">
-          <div className="dock-left-controls" style={{ position: 'relative' }}>
+          <div className="dock-left-controls" ref={leftControlsRef} style={{ position: 'relative' }}>
             {/* Model Tuning Button */}
             <button
               type="button"
@@ -229,7 +284,7 @@ export const PromptDock: React.FC<PromptDockProps> = ({
 
           <div className="dock-right-controls">
             {/* Model & Effort Selector Pill (Exact Previous Iteration Layout) */}
-            <div className="dock-model-pill-wrapper">
+            <div className="dock-model-pill-wrapper" ref={modelPillWrapperRef}>
               <button
                 type="button"
                 className={`dock-model-pill ${isModelDropdownOpen ? 'dropdown-open' : ''}`}

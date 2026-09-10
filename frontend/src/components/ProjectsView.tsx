@@ -24,6 +24,7 @@ import {
 interface ProjectsViewProps {
   onOpenProject: (projectId: string) => void;
   onNewChatWithContext?: (projectName: string) => void;
+  onProjectsChanged?: () => void;
 }
 
 const SEED_PROJECTS: ProjectRecord[] = [
@@ -84,6 +85,7 @@ function formatRelativeTime(dateStr?: string): string {
 export const ProjectsView: React.FC<ProjectsViewProps> = ({
   onOpenProject,
   onNewChatWithContext: _onNewChatWithContext,
+  onProjectsChanged,
 }) => {
   const [projects, setProjects] = useState<ProjectRecord[]>(SEED_PROJECTS);
   const [_isLoading, setIsLoading] = useState<boolean>(false);
@@ -104,6 +106,7 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
   const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+  const sortRef = useRef<HTMLDivElement>(null);
 
   const loadAllProjects = async () => {
     try {
@@ -127,13 +130,29 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({
 
   useEffect(() => {
     const handleOutsideClick = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+      const target = e.target as Node;
+      if (menuRef.current && !menuRef.current.contains(target)) {
         setActiveMenuId(null);
         setMenuPos(null);
       }
+      if (sortRef.current && !sortRef.current.contains(target)) {
+        setIsSortOpen(false);
+      }
+    };
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setActiveMenuId(null);
+        setMenuPos(null);
+        setIsSortOpen(false);
+        setIsModalOpen(false);
+      }
     };
     window.addEventListener('mousedown', handleOutsideClick);
-    return () => window.removeEventListener('mousedown', handleOutsideClick);
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('mousedown', handleOutsideClick);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
   }, []);
 
   const handleOpenCreateModal = () => {
@@ -188,6 +207,7 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({
         }
       }
       setIsModalOpen(false);
+      onProjectsChanged?.();
     } catch (err) {
       console.error('Failed to save project', err);
     } finally {
@@ -203,6 +223,7 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({
     );
     try {
       await updateProject(p.id, { is_pinned: nextPin });
+      onProjectsChanged?.();
     } catch (err) {
       console.error('Failed to update pin', err);
     }
@@ -216,6 +237,7 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({
     setProjects((prev) => prev.filter((p) => p.id !== id));
     try {
       await deleteProject(id);
+      onProjectsChanged?.();
     } catch (err) {
       console.error('Failed to delete project', err);
     }
@@ -227,6 +249,7 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({
     setProjects((prev) => prev.filter((p) => p.id !== id));
     try {
       await updateProject(id, { is_archived: 1 });
+      onProjectsChanged?.();
     } catch (err) {
       console.error('Failed to archive project', err);
     }
@@ -250,6 +273,7 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({
   // Filter & Sort
   const filtered = projects
     .filter((p) => {
+      if (p.is_archived) return false;
       const q = search.toLowerCase().trim();
       if (!q) return true;
       return (
@@ -258,13 +282,17 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({
       );
     })
     .sort((a, b) => {
-      if ((a.is_pinned || 0) !== (b.is_pinned || 0)) {
-        return (b.is_pinned || 0) - (a.is_pinned || 0);
-      }
+      const pinA = a.is_pinned ? 1 : 0;
+      const pinB = b.is_pinned ? 1 : 0;
+      if (pinA !== pinB) return pinB - pinA;
+
       if (sortBy === 'name') {
         return a.name.localeCompare(b.name);
       } else if (sortBy === 'created') {
-        return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
+        return (
+          new Date(b.created_at || 0).getTime() -
+          new Date(a.created_at || 0).getTime()
+        );
       } else {
         return (
           new Date(b.updated_at || b.created_at || 0).getTime() -
@@ -331,7 +359,7 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({
             </button>
 
             {/* Sort Dropdown */}
-            <div className="projects-sort-dropdown" style={{ position: 'relative' }}>
+            <div className="projects-sort-dropdown" ref={sortRef} style={{ position: 'relative' }}>
               <button
                 className="projects-sort-btn"
                 type="button"

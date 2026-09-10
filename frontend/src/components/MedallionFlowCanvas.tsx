@@ -16,7 +16,7 @@ import {
 import { IngestionPlan } from '../types';
 
 interface MedallionFlowCanvasProps {
-  plan?: IngestionPlan | null;
+  plan?: IngestionPlan | Record<string, unknown> | null;
   onDeploy?: () => void;
   onClose?: () => void;
 }
@@ -30,6 +30,7 @@ interface DagNode {
   status: 'pending' | 'deploying' | 'live' | 'error';
   x: number;
   y: number;
+  code?: string;
 }
 
 const DEFAULT_NODES: DagNode[] = [
@@ -45,7 +46,7 @@ const DEFAULT_NODES: DagNode[] = [
   },
   {
     id: 'node_bronze',
-    label: 'lh_enterprise_bronze',
+    label: 'lh_bronze',
     type: 'lakehouse',
     layer: 'BRONZE',
     sub: 'Raw Append Only Delta',
@@ -55,7 +56,7 @@ const DEFAULT_NODES: DagNode[] = [
   },
   {
     id: 'node_nb_bronze',
-    label: 'nb_raw_ingest_cdc',
+    label: 'nb_bronze_ingest',
     type: 'notebook',
     layer: 'PYSPARK',
     sub: 'Batch Streaming Ingest',
@@ -65,7 +66,7 @@ const DEFAULT_NODES: DagNode[] = [
   },
   {
     id: 'node_silver',
-    label: 'lh_enterprise_silver',
+    label: 'lh_silver',
     type: 'lakehouse',
     layer: 'SILVER',
     sub: 'Delta MERGE Deduplication',
@@ -75,7 +76,7 @@ const DEFAULT_NODES: DagNode[] = [
   },
   {
     id: 'node_nb_silver',
-    label: 'nb_silver_merge_upsert',
+    label: 'nb_silver_merge',
     type: 'notebook',
     layer: 'PYSPARK',
     sub: 'SCD Type-1 / Type-2 Triage',
@@ -85,7 +86,7 @@ const DEFAULT_NODES: DagNode[] = [
   },
   {
     id: 'node_gold',
-    label: 'lh_enterprise_gold',
+    label: 'lh_gold',
     type: 'lakehouse',
     layer: 'GOLD',
     sub: 'Kimball Star Schema',
@@ -94,14 +95,24 @@ const DEFAULT_NODES: DagNode[] = [
     y: 50,
   },
   {
+    id: 'node_nb_gold',
+    label: 'nb_gold_star',
+    type: 'notebook',
+    layer: 'PYSPARK',
+    sub: 'Gold Star Aggregations',
+    status: 'live',
+    x: 880,
+    y: 180,
+  },
+  {
     id: 'node_pipeline',
-    label: 'pl_daily_enterprise_etl',
+    label: 'pl_daily_sales',
     type: 'pipeline',
     layer: 'PIPELINE',
     sub: 'Recurrence: 02:00 UTC',
     status: 'live',
-    x: 880,
-    y: 180,
+    x: 1120,
+    y: 120,
   },
 ];
 
@@ -111,12 +122,12 @@ const DEFAULT_EDGES = [
   { from: 'node_bronze', to: 'node_silver' },
   { from: 'node_nb_bronze', to: 'node_nb_silver' },
   { from: 'node_silver', to: 'node_gold' },
-  { from: 'node_nb_silver', to: 'node_pipeline' },
-  { from: 'node_gold', to: 'node_pipeline' },
+  { from: 'node_nb_silver', to: 'node_nb_gold' },
+  { from: 'node_nb_gold', to: 'node_pipeline' },
 ];
 
 export const MedallionFlowCanvas: React.FC<MedallionFlowCanvasProps> = ({
-  plan: _plan,
+  plan,
   onDeploy,
   onClose,
 }) => {
@@ -125,59 +136,237 @@ export const MedallionFlowCanvas: React.FC<MedallionFlowCanvasProps> = ({
   const [copied, setCopied] = useState(false);
   const [selectedNode, setSelectedNode] = useState<DagNode | null>(null);
 
-  const samplePySpark = `# Fabric AI Studio — Production Medallion MERGE Upsert
+  // Dynamic DAG Computation from plan
+  const { dagNodes, dagEdges, treeItems, pysparkCode, jsonSpec } = React.useMemo(() => {
+    if (!plan || typeof plan !== 'object') {
+      return {
+        dagNodes: DEFAULT_NODES,
+        dagEdges: DEFAULT_EDGES,
+        treeItems: [
+          '📁 AI_Test_Folder/',
+          '└── 📁 SalesPipeline/',
+          '    ├── 🏢 lh_bronze (Delta Lakehouse)',
+          '    ├── 🏢 lh_silver (Delta Lakehouse)',
+          '    ├── 🏢 lh_gold (Star Schema Lakehouse)',
+          '    ├── 🏬 wh_sales_analytics (Synapse Warehouse)',
+          '    ├── 📜 nb_bronze_ingest (PySpark Ingest)',
+          '    ├── 📜 nb_silver_merge (PySpark MERGE)',
+          '    ├── 📜 nb_gold_star (PySpark Star Schema)',
+          '    └── ⚡ pl_daily_sales (Data Factory Pipeline)',
+        ],
+        pysparkCode: `# Fabric AI Studio — Production Medallion MERGE Upsert
 from delta.tables import DeltaTable
 from pyspark.sql.functions import col, current_timestamp, sha2
 
 # 1. Load Raw Bronze Delta Lake
-df_bronze = spark.read.format("delta").table("lh_enterprise_bronze.sales_orders")
+df_bronze = spark.read.format("delta").table("lh_bronze.raw_sales")
 
-# 2. Add System Audit Metadata & SHA-256 Surrogate Key
+# 2. Cleanse and Add Audit Metadata
 df_silver = df_bronze \\
-    .withColumn("order_sk", sha2(col("order_id").cast("string"), 256)) \\
+    .filter(col("TransactionID").isNotNull()) \\
     .withColumn("_ingested_at", current_timestamp())
 
 # 3. Target Silver Delta MERGE Upsert
-target_table = DeltaTable.forName(spark, "lh_enterprise_silver.sales_orders")
+target_table = DeltaTable.forName(spark, "lh_silver.cleansed_sales")
 
 target_table.alias("tgt").merge(
     df_silver.alias("src"),
-    "tgt.order_id = src.order_id"
+    "tgt.TransactionID = src.TransactionID"
 ).whenMatchedUpdateAll() \\
  .whenNotMatchedInsertAll() \\
  .execute()
 
-print("✅ Delta MERGE completed successfully into lh_enterprise_silver.")
-`;
+print("✅ Delta MERGE completed successfully into lh_silver.")
+`,
+        jsonSpec: JSON.stringify(
+          {
+            name: 'pl_daily_sales',
+            properties: {
+              activities: [
+                { name: 'nb_bronze_ingest', type: 'FabricNotebook' },
+                { name: 'nb_silver_merge', type: 'FabricNotebook', dependsOn: [{ activity: 'nb_bronze_ingest' }] },
+                { name: 'nb_gold_star', type: 'FabricNotebook', dependsOn: [{ activity: 'nb_silver_merge' }] },
+              ],
+              triggers: [{ recurrence: { frequency: 'Day', schedule: { hours: [2], minutes: [0] } } }],
+            },
+          },
+          null,
+          2
+        ),
+      };
+    }
 
-  const sampleJson = `{
-  "name": "pl_daily_enterprise_etl",
-  "properties": {
-    "activities": [
-      {
-        "name": "Run_Bronze_Ingest",
-        "type": "FabricNotebook",
-        "dependsOn": []
-      },
-      {
-        "name": "Run_Silver_Delta_Merge",
-        "type": "FabricNotebook",
-        "dependsOn": [{ "activity": "Run_Bronze_Ingest", "dependencyConditions": ["Succeeded"] }]
-      },
-      {
-        "name": "Run_Gold_Star_Schema",
-        "type": "FabricNotebook",
-        "dependsOn": [{ "activity": "Run_Silver_Delta_Merge", "dependencyConditions": ["Succeeded"] }]
+    const p = plan as Record<string, unknown>;
+    const folder = (p.folder as string) || 'AI_Test_Folder';
+    const lakehouses = (p.lakehouses as string[]) || [];
+    const notebooks = (p.notebooks as Array<Record<string, unknown>>) || [];
+    const pipeline = p.pipeline as Record<string, unknown> | string | undefined;
+
+    const nodes: DagNode[] = [];
+    const edges: Array<{ from: string; to: string }> = [];
+
+    // Source Node
+    nodes.push({
+      id: 'node_source',
+      label: `${folder} (Source Stream)`,
+      type: 'source',
+      layer: 'SOURCE',
+      sub: 'OneLake Landing Zone',
+      status: 'live',
+      x: 40,
+      y: 120,
+    });
+
+    // Lakehouses & Notebooks
+    const lhBronze = lakehouses.find((l) => l.toLowerCase().includes('bronze')) || lakehouses[0] || 'lh_bronze';
+    const lhSilver = lakehouses.find((l) => l.toLowerCase().includes('silver')) || lakehouses[1] || 'lh_silver';
+    const lhGold = lakehouses.find((l) => l.toLowerCase().includes('gold')) || lakehouses[2] || 'lh_gold';
+
+    const nbBronze = notebooks.find((n) => String(n.layer || n.name).toLowerCase().includes('bronze')) || notebooks[0];
+    const nbSilver = notebooks.find((n) => String(n.layer || n.name).toLowerCase().includes('silver')) || notebooks[1];
+    const nbGold = notebooks.find((n) => String(n.layer || n.name).toLowerCase().includes('gold')) || notebooks[2];
+
+    nodes.push({
+      id: 'node_bronze',
+      label: lhBronze,
+      type: 'lakehouse',
+      layer: 'BRONZE',
+      sub: 'Raw Ingestion Zone',
+      status: 'live',
+      x: 320,
+      y: 50,
+    });
+
+    if (nbBronze) {
+      nodes.push({
+        id: 'node_nb_bronze',
+        label: String(nbBronze.name || 'nb_bronze_ingest'),
+        type: 'notebook',
+        layer: 'PYSPARK',
+        sub: String(nbBronze.description || 'Source -> Bronze Ingest'),
+        status: 'live',
+        x: 320,
+        y: 180,
+        code: (nbBronze.pyspark_code as string) || (nbBronze.pyspark as string) || '',
+      });
+      edges.push({ from: 'node_source', to: 'node_bronze' });
+      edges.push({ from: 'node_source', to: 'node_nb_bronze' });
+    }
+
+    nodes.push({
+      id: 'node_silver',
+      label: lhSilver,
+      type: 'lakehouse',
+      layer: 'SILVER',
+      sub: 'Delta MERGE Deduplication',
+      status: 'live',
+      x: 600,
+      y: 50,
+    });
+
+    if (nbSilver) {
+      nodes.push({
+        id: 'node_nb_silver',
+        label: String(nbSilver.name || 'nb_silver_merge'),
+        type: 'notebook',
+        layer: 'PYSPARK',
+        sub: String(nbSilver.description || 'Bronze -> Silver MERGE'),
+        status: 'live',
+        x: 600,
+        y: 180,
+        code: (nbSilver.pyspark_code as string) || (nbSilver.pyspark as string) || '',
+      });
+      edges.push({ from: 'node_bronze', to: 'node_silver' });
+      if (nbBronze) edges.push({ from: 'node_nb_bronze', to: 'node_nb_silver' });
+    }
+
+    nodes.push({
+      id: 'node_gold',
+      label: lhGold,
+      type: 'lakehouse',
+      layer: 'GOLD',
+      sub: 'Star Schema & Direct Lake',
+      status: 'live',
+      x: 880,
+      y: 50,
+    });
+
+    if (nbGold) {
+      nodes.push({
+        id: 'node_nb_gold',
+        label: String(nbGold.name || 'nb_gold_star'),
+        type: 'notebook',
+        layer: 'PYSPARK',
+        sub: String(nbGold.description || 'Silver -> Gold Dimensional Modeling'),
+        status: 'live',
+        x: 880,
+        y: 180,
+        code: (nbGold.pyspark_code as string) || (nbGold.pyspark as string) || '',
+      });
+      edges.push({ from: 'node_silver', to: 'node_gold' });
+      if (nbSilver) edges.push({ from: 'node_nb_silver', to: 'node_nb_gold' });
+    }
+
+    if (pipeline) {
+      const plName = typeof pipeline === 'object' ? String(pipeline.name || 'pl_daily_sales') : String(pipeline);
+      const schedStr =
+        typeof pipeline === 'object' && typeof pipeline.schedule === 'object'
+          ? String((pipeline.schedule as Record<string, unknown>).human || 'Daily at 02:00 UTC')
+          : 'Daily at 02:00 UTC';
+
+      nodes.push({
+        id: 'node_pipeline',
+        label: plName,
+        type: 'pipeline',
+        layer: 'PIPELINE',
+        sub: schedStr,
+        status: 'live',
+        x: 1140,
+        y: 120,
+      });
+
+      if (nbGold) {
+        edges.push({ from: 'node_nb_gold', to: 'node_pipeline' });
+      } else if (nbSilver) {
+        edges.push({ from: 'node_nb_silver', to: 'node_pipeline' });
       }
-    ],
-    "triggers": [
-      {
-        "type": "ScheduleTrigger",
-        "recurrence": { "frequency": "Day", "interval": 1, "schedule": { "hours": [2], "minutes": [0] } }
+    }
+
+    // Build tree
+    const folderClean = folder.replace('AI_Test_Folder/', '').trim();
+    const tree: string[] = ['📁 AI_Test_Folder/'];
+    if (folderClean && folderClean !== 'AI_Test_Folder') {
+      tree.push(`└── 📁 ${folderClean}/`);
+      const prefix = '    ';
+      lakehouses.forEach((lh) => tree.push(`${prefix}├── 🏢 ${lh} (Delta Lakehouse)`));
+      notebooks.forEach((nb) => tree.push(`${prefix}├── 📜 ${nb.name} [${nb.layer || 'PySpark'}]`));
+      if (pipeline) {
+        const plName = typeof pipeline === 'object' ? String(pipeline.name || 'pl_pipeline') : String(pipeline);
+        tree.push(`${prefix}└── ⚡ ${plName} (Data Factory Pipeline)`);
       }
-    ]
-  }
-}`;
+    } else {
+      lakehouses.forEach((lh) => tree.push(`├── 🏢 ${lh} (Delta Lakehouse)`));
+      notebooks.forEach((nb) => tree.push(`├── 📜 ${nb.name} [${nb.layer || 'PySpark'}]`));
+      if (pipeline) {
+        const plName = typeof pipeline === 'object' ? String(pipeline.name || 'pl_pipeline') : String(pipeline);
+        tree.push(`└── ⚡ ${plName} (Data Factory Pipeline)`);
+      }
+    }
+
+    // Code sample
+    const primaryCode =
+      (notebooks[0]?.pyspark_code as string) ||
+      (notebooks[0]?.pyspark as string) ||
+      '# PySpark code synthesized by Worker Agent';
+
+    return {
+      dagNodes: nodes.length > 0 ? nodes : DEFAULT_NODES,
+      dagEdges: edges.length > 0 ? edges : DEFAULT_EDGES,
+      treeItems: tree,
+      pysparkCode: primaryCode,
+      jsonSpec: JSON.stringify(plan, null, 2),
+    };
+  }, [plan]);
 
   const handleCopy = (text: string) => {
     navigator.clipboard.writeText(text);
@@ -186,7 +375,9 @@ print("✅ Delta MERGE completed successfully into lh_enterprise_silver.")
   };
 
   const nodeMap = new Map<string, DagNode>();
-  DEFAULT_NODES.forEach((n) => nodeMap.set(n.id, n));
+  dagNodes.forEach((n) => nodeMap.set(n.id, n));
+
+  const activeCode = selectedNode?.code || pysparkCode;
 
   return (
     <div className={`bolt-workbench-pane-inner ${isFullscreen ? 'fullscreen-mode' : ''}`}>
@@ -305,7 +496,7 @@ print("✅ Delta MERGE completed successfully into lh_enterprise_silver.")
                 </defs>
 
                 {/* Edges */}
-                {DEFAULT_EDGES.map((e, idx) => {
+                {dagEdges.map((e, idx) => {
                   const fromNode = nodeMap.get(e.from);
                   const toNode = nodeMap.get(e.to);
                   if (!fromNode || !toNode) return null;
@@ -342,7 +533,7 @@ print("✅ Delta MERGE completed successfully into lh_enterprise_silver.")
                 })}
 
                 {/* Nodes */}
-                {DEFAULT_NODES.map((n) => {
+                {dagNodes.map((n) => {
                   const isLake = n.type === 'lakehouse';
                   const isNote = n.type === 'notebook';
                   const isPipe = n.type === 'pipeline';
@@ -353,7 +544,12 @@ print("✅ Delta MERGE completed successfully into lh_enterprise_silver.")
                       key={n.id}
                       className={`flow-node ${selectedNode?.id === n.id ? 'active' : ''}`}
                       transform={`translate(${n.x},${n.y})`}
-                      onClick={() => setSelectedNode(n)}
+                      onClick={() => {
+                        setSelectedNode(n);
+                        if (n.type === 'notebook') {
+                          setActiveTab('wbCode');
+                        }
+                      }}
                       style={{ cursor: 'pointer' }}
                     >
                       <rect
@@ -406,12 +602,20 @@ print("✅ Delta MERGE completed successfully into lh_enterprise_silver.")
               </button>
             </div>
             <div className="tree-container">
-              <div className="tree-node-item">📁 AI_Test_Folder/</div>
-              <div className="tree-node-item pl-4">├── 🏢 lh_enterprise_bronze (Delta Lakehouse)</div>
-              <div className="tree-node-item pl-4">├── 🏢 lh_enterprise_silver (Delta Lakehouse)</div>
-              <div className="tree-node-item pl-4">├── 🏢 lh_enterprise_gold (Direct Lake Lakehouse)</div>
-              <div className="tree-node-item pl-4">├── 📜 nb_sales_silver_merge (PySpark Notebook)</div>
-              <div className="tree-node-item pl-4">└── ⚡ pl_daily_enterprise_etl (Data Factory Pipeline)</div>
+              {treeItems.map((item, idx) => {
+                const isNested = item.startsWith('    ');
+                const isChild = item.startsWith('├──') || item.startsWith('└──');
+                const padClass = isNested ? 'pl-8' : (isChild ? 'pl-4' : '');
+                return (
+                  <div
+                    key={idx}
+                    className={`tree-node-item ${padClass}`}
+                    style={{ whiteSpace: 'pre', fontFamily: 'var(--font-mono, "JetBrains Mono", monospace)' }}
+                  >
+                    {item}
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}
@@ -421,15 +625,15 @@ print("✅ Delta MERGE completed successfully into lh_enterprise_silver.")
           <div className="wb-view-pane active">
             <div className="code-editor-header">
               <div className="code-header-left">
-                <span className="wb-code-file-badge">nb_sales_silver_merge.py</span>
-                <span className="wb-layer-pill">PySpark 3.4</span>
+                <span className="wb-code-file-badge">{selectedNode ? `${selectedNode.label}.py` : 'nb_notebook.py'}</span>
+                <span className="wb-layer-pill">{selectedNode?.layer || 'PySpark 3.4'}</span>
               </div>
               <div className="code-header-right">
-                <span className="wb-code-stat-badge">22 lines</span>
+                <span className="wb-code-stat-badge">{activeCode.split('\n').length} lines</span>
                 <button
                   className="btn-copy-code"
                   type="button"
-                  onClick={() => handleCopy(samplePySpark)}
+                  onClick={() => handleCopy(activeCode)}
                 >
                   {copied ? <Check width={12} height={12} /> : <Copy width={12} height={12} />}
                   <span>{copied ? 'Copied' : 'Copy Code'}</span>
@@ -438,7 +642,7 @@ print("✅ Delta MERGE completed successfully into lh_enterprise_silver.")
             </div>
             <div className="code-editor-view-container">
               <pre className="code-editor-view">
-                <code>{samplePySpark}</code>
+                <code>{activeCode}</code>
               </pre>
             </div>
           </div>
@@ -450,7 +654,7 @@ print("✅ Delta MERGE completed successfully into lh_enterprise_silver.")
             <div className="schema-view-wrapper">
               <div className="schema-view-header">
                 <div className="schema-header-left">
-                  <h4>lh_enterprise_silver.sales_orders</h4>
+                  <h4>lh_silver.cleansed_sales</h4>
                   <span className="schema-pill">Silver Delta Table</span>
                 </div>
               </div>
@@ -467,29 +671,29 @@ print("✅ Delta MERGE completed successfully into lh_enterprise_silver.")
                   </thead>
                   <tbody>
                     <tr>
-                      <td><strong>order_sk</strong></td>
+                      <td><strong>TransactionID</strong></td>
                       <td><code>string (SHA-256)</code></td>
                       <td>No</td>
-                      <td>Yes (Surrogate)</td>
+                      <td>Yes (Business PK)</td>
                       <td>Silver</td>
                     </tr>
                     <tr>
-                      <td>order_id</td>
-                      <td><code>bigint</code></td>
-                      <td>No</td>
-                      <td>Yes (Business Key)</td>
-                      <td>Bronze $\to$ Silver</td>
-                    </tr>
-                    <tr>
-                      <td>customer_id</td>
-                      <td><code>int</code></td>
+                      <td>CustomerID</td>
+                      <td><code>string</code></td>
                       <td>No</td>
                       <td>FK $\to$ dim_customer</td>
                       <td>Bronze $\to$ Silver</td>
                     </tr>
                     <tr>
-                      <td>order_amount</td>
-                      <td><code>decimal(18,2)</code></td>
+                      <td>ProductID</td>
+                      <td><code>string</code></td>
+                      <td>No</td>
+                      <td>FK $\to$ dim_product</td>
+                      <td>Bronze $\to$ Silver</td>
+                    </tr>
+                    <tr>
+                      <td>SalesAmount</td>
+                      <td><code>decimal(10,2)</code></td>
                       <td>Yes</td>
                       <td>No</td>
                       <td>Bronze $\to$ Silver</td>
@@ -513,15 +717,15 @@ print("✅ Delta MERGE completed successfully into lh_enterprise_silver.")
           <div className="wb-view-pane active">
             <div className="code-editor-header">
               <div className="code-header-left">
-                <span className="wb-code-file-badge">pipeline-definition.json</span>
+                <span className="wb-code-file-badge">fabric-plan.json</span>
                 <span className="wb-layer-pill">Trident Payload</span>
               </div>
               <div className="code-header-right">
-                <span className="wb-code-stat-badge">26 lines</span>
+                <span className="wb-code-stat-badge">{jsonSpec.split('\n').length} lines</span>
                 <button
                   className="btn-copy-code"
                   type="button"
-                  onClick={() => handleCopy(sampleJson)}
+                  onClick={() => handleCopy(jsonSpec)}
                 >
                   {copied ? <Check width={12} height={12} /> : <Copy width={12} height={12} />}
                   <span>{copied ? 'Copied' : 'Copy JSON'}</span>
@@ -530,7 +734,7 @@ print("✅ Delta MERGE completed successfully into lh_enterprise_silver.")
             </div>
             <div className="code-editor-view-container">
               <pre className="code-editor-view">
-                <code>{sampleJson}</code>
+                <code>{jsonSpec}</code>
               </pre>
             </div>
           </div>

@@ -12,6 +12,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
 from app.config import ALLOWED_WORKSPACE_ID
+from app.deployment_executor import deploy_fabric_plan
 from app.fabric_client import (
     create_pipeline_schedule,
     get_job_status,
@@ -73,37 +74,28 @@ async def create_ingestion_plan(req: IngestionPlanRequest):
 
 @router.post("/deploy", summary="Deploy Plan Items to Microsoft Fabric")
 async def deploy_plan(req: DeployPlanRequest):
-    """Deploys lakehouses, notebooks, and pipelines to the Microsoft Fabric workspace."""
+    """Deploys all granular items (lakehouses, notebooks, models, pipelines) to Microsoft Fabric."""
     wid = req.workspace_id or ALLOWED_WORKSPACE_ID
-    run_id = f"run_{uuid.uuid4().hex[:10]}"
+    run_id = req.plan.get("run_id") or f"run_{uuid.uuid4().hex[:10]}"
 
-    # Register run
-    _RUN_STORE[run_id] = {
-        "run_id": run_id,
-        "status": "in_progress",
-        "workspace_id": wid,
-        "plan": req.plan,
-        "deployed_items": [],
-        "errors": [],
-    }
-
-    # Simulate / execute deployment steps
     try:
-        items = req.plan.get("lakehouses", []) + req.plan.get("notebooks", [])
-        for item in items:
-            name = item.get("name") if isinstance(item, dict) else item
-            _RUN_STORE[run_id]["deployed_items"].append({"name": name, "status": "deployed"})
-
-        _RUN_STORE[run_id]["status"] = "completed"
+        report = deploy_fabric_plan(req.plan, workspace_id=wid, session_id=req.session_id)
+        _RUN_STORE[report.run_id] = report.model_dump()
         return {
-            "status": "success",
-            "run_id": run_id,
-            "message": "Deployment executed successfully.",
-            "deployed_items": _RUN_STORE[run_id]["deployed_items"],
+            "status": "success" if report.status in ("completed", "partial") else "failed",
+            "run_id": report.run_id,
+            "deployment_status": report.status,
+            "duration_sec": report.duration_sec,
+            "deployed_items": [i.model_dump() for i in report.deployed_items],
+            "errors": report.errors,
         }
     except Exception as e:
-        _RUN_STORE[run_id]["status"] = "failed"
-        _RUN_STORE[run_id]["errors"].append(str(e))
+        _RUN_STORE[run_id] = {
+            "run_id": run_id,
+            "status": "failed",
+            "workspace_id": wid,
+            "errors": [str(e)],
+        }
         raise HTTPException(status_code=500, detail=f"Deployment failed: {str(e)}") from e
 
 

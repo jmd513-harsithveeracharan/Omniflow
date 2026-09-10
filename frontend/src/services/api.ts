@@ -97,7 +97,10 @@ export async function transpileSql(sql: string, sourceDialect = 'tsql'): Promise
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ sql, source_dialect: sourceDialect, target_dialect: 'spark' }),
   });
-  if (!res.ok) throw new Error(`Transpile failed: ${res.statusText}`);
+  if (!res.ok) {
+    const errData = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new Error(errData.detail || `Transpile failed: ${res.statusText}`);
+  }
   const data = await res.json();
   return {
     status: data.status,
@@ -229,7 +232,7 @@ export async function streamChatTurn(
   message: string,
   sessionId: string,
   onChunk: (text: string) => void,
-  onDone: () => void,
+  onDone: (plan?: IngestionPlan | Record<string, unknown> | null) => void,
   onError: (err: string) => void
 ): Promise<void> {
   try {
@@ -259,7 +262,7 @@ export async function streamChatTurn(
             if (payload.type === 'chunk' && payload.text) {
               onChunk(payload.text);
             } else if (payload.type === 'done') {
-              onDone();
+              onDone(payload.plan || null);
               return;
             } else if (payload.type === 'error') {
               onError(payload.error);
@@ -271,7 +274,7 @@ export async function streamChatTurn(
         }
       }
     }
-    onDone();
+    onDone(null);
   } catch (err) {
     onError(err instanceof Error ? err.message : String(err));
   }

@@ -22,7 +22,7 @@ Return ONLY valid JSON:
   "steps": [
     {
       "step_id": string,
-      "type": "folder" | "lakehouse" | "notebook" | "pipeline",
+      "type": "folder" | "lakehouse" | "notebook" | "pipeline" | "semantic_model" | "shortcut" | "environment" | "warehouse" | "report" | "eventstream" | "graphql_api" | "kql_database" | "kql_queryset" | "dataflow" | "reflex" | "spark_job" | "mirrored_db" | "ml_experiment" | "ml_model",
       "name": string,
       "layer": "Bronze" | "Silver" | "Gold" | "Notebook" | null,
       "description": string,
@@ -48,15 +48,16 @@ Return ONLY valid JSON:
     They run simultaneously in a ThreadPool.
 - A pipeline step always depends_on ALL notebook step_ids.
 
-### Rule 2: Folder & Lakehouse Steps
-- Always create a "folder" type step first with depends_on = [].
-- Lakehouse steps depend on the folder step.
-- Notebook steps depend on their respective lakehouse (Medallion) or just folder (standalone).
+### Rule 2: Folder Containment & Hierarchy
+- All provisioned items and subfolders MUST be contained inside the root sandbox `AI_Test_Folder`.
+- If the user specifies a project/folder name (e.g., 'SalesPipeline', 'RetailAnalytics'), set folder = "SalesPipeline" (nested under AI_Test_Folder) and create a "folder" step.
+- Storage & Compute steps (Lakehouse, Warehouse, Environment, MirroredDB) depend on the folder step.
+- Real-time steps (KQLDatabase, Eventstream, Dataflow) depend on folder or respective storage.
+- Downstream steps (KQLQueryset, Reflex, SemanticModel, Report, GraphQLApi) depend on their respective upstream datasets.
 
 ### Rule 3: Exact Name Extraction
-- Extract EXACT item names from the user prompt (e.g. "nb_page_rank", "pl_graph_compute_job").
+- Extract EXACT item names from the user prompt (e.g. "nb_page_rank", "wh_sales_edw", "pl_graph_compute_job").
 - NEVER rename or substitute user-specified names.
-- If the user lists N notebooks explicitly, create exactly N notebook steps.
 
 ### Rule 4: Context Mode
 - "independent": Completely new folder/project, no relation to previous session.
@@ -65,16 +66,6 @@ Return ONLY valid JSON:
 ### Rule 5: Token Efficiency
 - "follow_up": Forward only relevant existing plan fields as context (folder, notebook names, pipeline).
 - "independent": Clean slate. Do NOT forward old conversation history to workers.
-
-## Examples
-
-### Medallion (Sequential)
-User: "Create ecom_sales with Bronze/Silver/Gold notebooks, pipeline pl_etl daily 6AM"
-Steps order: folder -> lh_bronze -> lh_silver -> lh_gold -> nb_bronze(depends:lh_bronze) -> nb_silver(depends:nb_bronze) -> nb_gold(depends:nb_silver) -> pipeline(depends:all nbs)
-
-### Independent Algorithms (Parallel)
-User: "Create graph_algos with nb_page_rank and nb_dijkstra, pipeline pl_graph_job at 11PM"
-Steps: folder -> [nb_page_rank(parallel,depends:folder), nb_dijkstra(parallel,depends:folder)] -> pipeline(depends:both nbs)
 
 Return ONLY valid JSON. No explanation text.
 """
@@ -99,8 +90,8 @@ AUDITOR_SYSTEM = """You are the Fabric AI Studio Auditor Agent.
 Compare the user's original request against the assembled Fabric plan.
 
 Check:
-1. Are ALL notebooks the user requested present in the plan?
-2. Are ALL lakehouses present?
+1. Are ALL notebooks and requested items present in the plan?
+2. Are ALL lakehouses, warehouses, and storage items present?
 3. Is the pipeline name exactly what the user specified?
 4. Is the schedule correct?
 5. Any EXTRA items in the plan the user did NOT request?

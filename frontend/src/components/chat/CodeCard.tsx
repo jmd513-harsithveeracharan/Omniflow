@@ -58,11 +58,11 @@ export const CodeCard: React.FC<CodeCardProps> = ({ language, code }) => {
   };
 
   return (
-    <div className={`code-card ${isLong && !isExpanded ? 'is-collapsed' : ''}`} style={{ margin: '12px 0' }}>
+    <div className={`code-card ${isLong && !isExpanded ? 'is-collapsed' : ''}`}>
       <div className="code-card-header">
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
           <Terminal width={13} height={13} style={{ color: '#9ca3af' }} />
-          <span className="code-lang-label" style={{ textTransform: 'uppercase', letterSpacing: '0.04em', fontSize: '11px', fontWeight: 600 }}>
+          <span className="code-lang-label">
             {normalizedLang || 'code'}
           </span>
           <span style={{ fontSize: '11px', color: '#71717a' }}>• {lineCount} lines</span>
@@ -91,26 +91,17 @@ export const CodeCard: React.FC<CodeCardProps> = ({ language, code }) => {
         className="code-card-body"
         style={{
           maxHeight: isLong && !isExpanded ? '320px' : 'none',
-          overflow: 'hidden',
-          background: '#1e1f20',
-          padding: '14px 16px',
-          margin: 0,
-          fontFamily: 'var(--font-mono, "JetBrains Mono", "Roboto Mono", monospace)',
-          fontSize: '13px',
-          fontWeight: 500,
-          lineHeight: '1.65',
-          letterSpacing: '0.01em',
+          overflow: isLong && !isExpanded ? 'hidden' : 'auto',
         }}
       >
         <code
           className={`language-${normalizedLang}`}
-          style={{ fontWeight: 500 }}
           dangerouslySetInnerHTML={{ __html: highlightedHtml }}
         />
       </pre>
 
       {isLong && (
-        <div className="code-card-footer" style={{ borderTop: '1px solid rgba(255,255,255,0.08)', background: '#242528' }}>
+        <div className="code-card-footer">
           <button
             type="button"
             className="btn-code-show-more"

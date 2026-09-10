@@ -95,7 +95,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [renamingTitle, setRenamingTitle] = useState<string>('');
   const menuRef = useRef<HTMLDivElement>(null);
 
-  // Close menus on outside click
+  // Menus Refs
+  const platformMenuRef = useRef<HTMLDivElement>(null);
+  const profileMenuRef = useRef<HTMLDivElement>(null);
+
+  // Close menus on outside click or Escape
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       const target = e.target as Node;
@@ -107,10 +111,31 @@ export const Sidebar: React.FC<SidebarProps> = ({
         setProjectMenuId(null);
         setProjectMenuPos(null);
       }
+      if (platformMenuRef.current && !platformMenuRef.current.contains(target)) {
+        setIsPlatformMenuOpen(false);
+      }
+      if (profileMenuRef.current && !profileMenuRef.current.contains(target)) {
+        setIsProfileMenuOpen(false);
+      }
     };
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setMenuSessionId(null);
+        setMenuPos(null);
+        setProjectMenuId(null);
+        setProjectMenuPos(null);
+        setIsPlatformMenuOpen(false);
+        setIsProfileMenuOpen(false);
+        setRenamingSessionId(null);
+      }
+    };
+
     window.addEventListener('mousedown', handleClickOutside);
+    window.addEventListener('keydown', handleKeyDown);
     return () => {
       window.removeEventListener('mousedown', handleClickOutside);
+      window.removeEventListener('keydown', handleKeyDown);
     };
   }, []);
 
@@ -189,7 +214,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     <aside className={`studio-sidebar ${isCollapsed ? 'collapsed' : ''}`}>
       {/* Brand Header */}
       <div className="sidebar-header">
-        <div className="sidebar-brand-wrapper">
+        <div className="sidebar-brand-wrapper" ref={platformMenuRef}>
           <button
             type="button"
             className="sidebar-brand"
@@ -648,7 +673,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
       {/* Footer User Profile Pill */}
       <div className="sidebar-footer">
-        <div className="auth-card-wrapper" style={{ position: 'relative', width: '100%' }}>
+        <div className="auth-card-wrapper" ref={profileMenuRef} style={{ position: 'relative', width: '100%' }}>
           <div
             className="auth-card"
             onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)}

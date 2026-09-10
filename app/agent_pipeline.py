@@ -255,19 +255,46 @@ def _run_meta_planner(state: PipelineState) -> StepDAG:
 def _heuristic_dag(prompt: str) -> StepDAG:
     """Regex-based fallback StepDAG if LLM JSON is malformed."""
     folder = "AI_Test_Folder"
-    fm = re.search(r"\b(?:project\s+folder|folder|project)\s+(?:named\s+|called\s+)?['\"]?([A-Za-z0-9_\-]+)", prompt, re.IGNORECASE)
-    if fm and fm.group(1).lower() not in ("named", "called", "folder"):
+    fm = re.search(r"\b(?:project\s+folder|folder|project)\s+(?:like|named|called|for)?\s*['\"]?([A-Za-z0-9_\-]+)", prompt, re.IGNORECASE)
+    if fm and fm.group(1).lower() not in ("named", "called", "folder", "like", "for"):
         folder = fm.group(1).strip()
     else:
-        nm = re.search(r"\bnamed\s+['\"]?([A-Za-z0-9_\-]+)", prompt, re.IGNORECASE)
-        if nm:
+        nm = re.search(r"\b(?:named|called|like)\s+['\"]?([A-Za-z0-9_\-]+)", prompt, re.IGNORECASE)
+        if nm and nm.group(1).lower() not in ("named", "called", "folder", "like"):
             folder = nm.group(1).strip()
 
     nb_lines = re.findall(r"[-*\u2022]?\s*(nb_[a-zA-Z0-9_\-]+)\s*[:\-]\s*([^\n\r]+)", prompt, re.IGNORECASE)
     nb_tokens = list(dict.fromkeys(re.findall(r"\b(nb_[a-zA-Z0-9_\-]+)\b", prompt, re.IGNORECASE)))
 
-    steps = [PipelineStep(step_id="step_folder", type="folder", name=folder, layer=None,
-                          description=f"Create folder {folder}", depends_on=[], can_parallel=False)]
+    # Detect numeric notebook counts e.g. "3 nb", "3 notebooks"
+    if not nb_lines and not nb_tokens:
+        count_m = re.search(r"\b(\d+)\s*(?:nb|notebooks?|pyspark)\b", prompt, re.IGNORECASE)
+        if count_m:
+            cnt = int(count_m.group(1))
+            prefix = folder.lower() if folder != "AI_Test_Folder" else "medallion"
+            if cnt == 3:
+                nb_lines = [
+                    (f"nb_{prefix}_bronze_ingest", "Raw data ingestion and schema validation"),
+                    (f"nb_{prefix}_silver_merge", "Delta Lake MERGE deduplication and SCD upsert"),
+                    (f"nb_{prefix}_gold_star", "Kimball dimensional modeling and star schema aggregations"),
+                ]
+            else:
+                nb_lines = [
+                    (f"nb_{prefix}_stage_{i+1}", f"PySpark data processing activity {i+1}")
+                    for i in range(cnt)
+                ]
+
+    # Structure folder steps with containment inside AI_Test_Folder
+    if folder != "AI_Test_Folder":
+        steps = [
+            PipelineStep(step_id="step_root_folder", type="folder", name="AI_Test_Folder", layer=None,
+                         description="Workspace containment sandbox root", depends_on=[], can_parallel=False),
+            PipelineStep(step_id="step_folder", type="folder", name=f"AI_Test_Folder/{folder}", layer=None,
+                         description=f"Project folder {folder} inside AI_Test_Folder", depends_on=["step_root_folder"], can_parallel=False),
+        ]
+    else:
+        steps = [PipelineStep(step_id="step_folder", type="folder", name=folder, layer=None,
+                              description=f"Create folder {folder}", depends_on=[], can_parallel=False)]
     nb_step_ids = []
 
     if nb_lines:
@@ -294,9 +321,93 @@ def _heuristic_dag(prompt: str) -> StepDAG:
         nb_step_ids.append(sid)
 
     lh_tokens = list(dict.fromkeys(re.findall(r"\b(lh_[a-zA-Z0-9_\-]+)\b", prompt, re.IGNORECASE)))
+    if not lh_tokens and "lakehouse" in prompt.lower():
+        prefix = folder.lower() if folder != "AI_Test_Folder" else "enterprise"
+        lh_tokens = [f"lh_{prefix}_bronze", f"lh_{prefix}_silver", f"lh_{prefix}_gold"]
     for lh in lh_tokens:
         steps.append(PipelineStep(step_id=f"step_{lh}", type="lakehouse", name=lh, layer=None,
                                   description=f"Create lakehouse {lh}", depends_on=["step_folder"], can_parallel=True))
+
+    wh_tokens = list(dict.fromkeys(re.findall(r"\b(wh_[a-zA-Z0-9_\-]+)\b", prompt, re.IGNORECASE)))
+    if not wh_tokens and "warehouse" in prompt.lower():
+        prefix = folder.lower() if folder != "AI_Test_Folder" else "enterprise"
+        wh_tokens = [f"wh_{prefix}_analytics"]
+    for wh in wh_tokens:
+        steps.append(PipelineStep(step_id=f"step_{wh}", type="warehouse", name=wh, layer=None,
+                                  description=f"Synapse Warehouse {wh}", depends_on=["step_folder"], can_parallel=True))
+
+    mir_tokens = list(dict.fromkeys(re.findall(r"\b(mir_[a-zA-Z0-9_\-]+)\b", prompt, re.IGNORECASE)))
+    for mir in mir_tokens:
+        steps.append(PipelineStep(step_id=f"step_{mir}", type="mirrored_db", name=mir, layer=None,
+                                  description=f"Mirrored Database {mir}", depends_on=["step_folder"], can_parallel=True))
+
+    env_tokens = list(dict.fromkeys(re.findall(r"\b(env_[a-zA-Z0-9_\-]+)\b", prompt, re.IGNORECASE)))
+    if not env_tokens and "environment" in prompt.lower():
+        env_tokens = [f"env_{folder.lower()}_runtime"]
+    for env in env_tokens:
+        steps.append(PipelineStep(step_id=f"step_{env}", type="environment", name=env, layer=None,
+                                  description=f"Fabric Environment {env}", depends_on=["step_folder"], can_parallel=True))
+
+    kql_tokens = list(dict.fromkeys(re.findall(r"\b(kql_[a-zA-Z0-9_\-]+)\b", prompt, re.IGNORECASE)))
+    for kql in kql_tokens:
+        steps.append(PipelineStep(step_id=f"step_{kql}", type="kql_database", name=kql, layer=None,
+                                  description=f"KQL Database {kql}", depends_on=["step_folder"], can_parallel=True))
+
+    kq_tokens = list(dict.fromkeys(re.findall(r"\b(kq_[a-zA-Z0-9_\-]+)\b", prompt, re.IGNORECASE)))
+    for kq in kq_tokens:
+        steps.append(PipelineStep(step_id=f"step_{kq}", type="kql_queryset", name=kq, layer=None,
+                                  description=f"KQL Queryset {kq}", depends_on=["step_folder"], can_parallel=True))
+
+    es_tokens = list(dict.fromkeys(re.findall(r"\b(es_[a-zA-Z0-9_\-]+)\b", prompt, re.IGNORECASE)))
+    for es in es_tokens:
+        steps.append(PipelineStep(step_id=f"step_{es}", type="eventstream", name=es, layer=None,
+                                  description=f"Real-Time Eventstream {es}", depends_on=["step_folder"], can_parallel=True))
+
+    df_tokens = list(dict.fromkeys(re.findall(r"\b(df_[a-zA-Z0-9_\-]+)\b", prompt, re.IGNORECASE)))
+    for df in df_tokens:
+        steps.append(PipelineStep(step_id=f"step_{df}", type="dataflow", name=df, layer=None,
+                                  description=f"Dataflow Gen2 {df}", depends_on=["step_folder"], can_parallel=True))
+
+    sjd_tokens = list(dict.fromkeys(re.findall(r"\b(sjd_[a-zA-Z0-9_\-]+)\b", prompt, re.IGNORECASE)))
+    for sjd in sjd_tokens:
+        steps.append(PipelineStep(step_id=f"step_{sjd}", type="spark_job", name=sjd, layer=None,
+                                  description=f"Spark Job Definition {sjd}", depends_on=["step_folder"], can_parallel=True))
+
+    rfx_tokens = list(dict.fromkeys(re.findall(r"\b(rfx_[a-zA-Z0-9_\-]+)\b", prompt, re.IGNORECASE)))
+    for rfx in rfx_tokens:
+        steps.append(PipelineStep(step_id=f"step_{rfx}", type="reflex", name=rfx, layer=None,
+                                  description=f"Data Activator Reflex {rfx}", depends_on=["step_folder"], can_parallel=True))
+
+    # Semantic Models (Direct Lake)
+    sm_tokens = list(dict.fromkeys(re.findall(r"\b(sm_[a-zA-Z0-9_\-]+|sem_[a-zA-Z0-9_\-]+)\b", prompt, re.IGNORECASE)))
+    if not sm_tokens and "semantic model" in prompt.lower():
+        sm_tokens = [f"sm_{folder.lower()}_gold"]
+    for sm in sm_tokens:
+        steps.append(PipelineStep(step_id=f"step_{sm}", type="semantic_model", name=sm, layer="Gold",
+                                  description=f"Direct Lake Semantic Model {sm}", depends_on=nb_step_ids or ["step_folder"], can_parallel=True))
+
+    rpt_tokens = list(dict.fromkeys(re.findall(r"\b(rpt_[a-zA-Z0-9_\-]+)\b", prompt, re.IGNORECASE)))
+    for rpt in rpt_tokens:
+        steps.append(PipelineStep(step_id=f"step_{rpt}", type="report", name=rpt, layer=None,
+                                  description=f"Power BI Report {rpt}", depends_on=nb_step_ids or ["step_folder"], can_parallel=True))
+
+    gql_tokens = list(dict.fromkeys(re.findall(r"\b(gql_[a-zA-Z0-9_\-]+)\b", prompt, re.IGNORECASE)))
+    for gql in gql_tokens:
+        steps.append(PipelineStep(step_id=f"step_{gql}", type="graphql_api", name=gql, layer=None,
+                                  description=f"GraphQL API {gql}", depends_on=nb_step_ids or ["step_folder"], can_parallel=True))
+
+    exp_tokens = list(dict.fromkeys(re.findall(r"\b(mlexp_[a-zA-Z0-9_\-]+|exp_[a-zA-Z0-9_\-]+)\b", prompt, re.IGNORECASE)))
+    for exp in exp_tokens:
+        steps.append(PipelineStep(step_id=f"step_{exp}", type="ml_experiment", name=exp, layer=None,
+                                  description=f"ML Experiment {exp}", depends_on=["step_folder"], can_parallel=True))
+
+    # OneLake Shortcuts
+    sc_tokens = list(dict.fromkeys(re.findall(r"\b(sc_[a-zA-Z0-9_\-]+)\b", prompt, re.IGNORECASE)))
+    if not sc_tokens and "shortcut" in prompt.lower():
+        sc_tokens = [f"sc_{folder.lower()}_raw"]
+    for sc in sc_tokens:
+        steps.append(PipelineStep(step_id=f"step_{sc}", type="shortcut", name=sc, layer=None,
+                                  description=f"OneLake Shortcut {sc}", depends_on=["step_folder"], can_parallel=True))
 
     pl_match = re.search(r"\b(pl_[a-zA-Z0-9_\-]+)\b", prompt, re.IGNORECASE)
     pl_name = pl_match.group(1) if pl_match else f"pl_{folder.lower()}_etl"
@@ -437,6 +548,20 @@ def _run_builder(dag: StepDAG, worker_results: dict, run_id: str) -> dict:
         })
 
     lakehouses = [s.name for s in dag.steps if s.type == "lakehouse"]
+    warehouses = [s.name for s in dag.steps if s.type == "warehouse"]
+    mirrored_databases = [s.name for s in dag.steps if s.type in ("mirrored_database", "mirrored_db")]
+    kql_databases = [s.name for s in dag.steps if s.type == "kql_database"]
+    kql_querysets = [s.name for s in dag.steps if s.type == "kql_queryset"]
+    eventstreams = [s.name for s in dag.steps if s.type == "eventstream"]
+    dataflows = [s.name for s in dag.steps if s.type == "dataflow"]
+    spark_job_definitions = [s.name for s in dag.steps if s.type in ("spark_job_definition", "spark_job")]
+    reflexes = [s.name for s in dag.steps if s.type == "reflex"]
+    semantic_models = [s.name for s in dag.steps if s.type == "semantic_model"]
+    reports = [s.name for s in dag.steps if s.type == "report"]
+    graphql_apis = [s.name for s in dag.steps if s.type == "graphql_api"]
+    ml_experiments = [s.name for s in dag.steps if s.type == "ml_experiment"]
+    shortcuts = [s.name for s in dag.steps if s.type == "shortcut"]
+    environments = [s.name for s in dag.steps if s.type == "environment"]
 
     pipeline = None
     if dag.pipeline:
@@ -470,29 +595,52 @@ def _run_builder(dag: StepDAG, worker_results: dict, run_id: str) -> dict:
     })
     col_idx += 1
 
-    # 2. Lakehouses
-    lh_ids = []
-    for i, lh_name in enumerate(lakehouses):
-        lh_id = f"lh_{i}"
-        lh_tag = "BRONZE LAKEHOUSE" if "bronze" in lh_name.lower() else ("SILVER LAKEHOUSE" if "silver" in lh_name.lower() else ("GOLD LAKEHOUSE" if "gold" in lh_name.lower() else "DELTA LAKEHOUSE"))
-        lh_sub = "Raw Delta Store" if "bronze" in lh_name.lower() else ("Cleansed Delta Tables" if "silver" in lh_name.lower() else ("DirectLake Semantic Store" if "gold" in lh_name.lower() else "Managed Delta Lake"))
+    # 2. Storage Tier (Lakehouses, Warehouses, Mirrored DBs)
+    storage_ids = []
+    storage_items = [(lh, "lakehouse", "LAKEHOUSE", "Managed Delta Store") for lh in lakehouses] + \
+                    [(wh, "warehouse", "SYNAPSE WAREHOUSE", "T-SQL DDL & Direct Lake") for wh in warehouses] + \
+                    [(mir, "mirrored_db", "MIRRORED DATABASE", "CDC Zero-ETL Sync") for mir in mirrored_databases]
+    for i, (name, itype, tag, sub) in enumerate(storage_items):
+        s_id = f"{itype}_{i}"
         flow_nodes.append({
-            "id": lh_id,
-            "label": lh_name,
-            "type": "lakehouse",
-            "tag": lh_tag,
-            "sub": lh_sub,
+            "id": s_id,
+            "label": name,
+            "type": itype,
+            "tag": tag,
+            "sub": sub,
             "status": "pending",
             "x": 30 + col_idx * COL_WIDTH,
             "y": 30 + i * ROW_HEIGHT
         })
-        flow_edges.append({"from": "fld_root", "to": lh_id})
-        lh_ids.append(lh_id)
-    if lakehouses:
+        flow_edges.append({"from": "fld_root", "to": s_id})
+        storage_ids.append(s_id)
+    if storage_items:
         col_idx += 1
 
-    # 3. Notebooks
-    nb_ids = []
+    # 3. Real-Time & Ingestion (Eventstreams, KQL DBs, Dataflows)
+    ingest_ids = []
+    ingest_items = [(es, "eventstream", "REAL-TIME EVENTSTREAM", "Streaming Pipeline") for es in eventstreams] + \
+                   [(kql, "kql_database", "KQL DATABASE", "Kusto Telemetry Store") for kql in kql_databases] + \
+                   [(df, "dataflow", "DATAFLOW GEN2", "Power Query M Mashup") for df in dataflows]
+    for i, (name, itype, tag, sub) in enumerate(ingest_items):
+        i_id = f"{itype}_{i}"
+        flow_nodes.append({
+            "id": i_id,
+            "label": name,
+            "type": itype,
+            "tag": tag,
+            "sub": sub,
+            "status": "pending",
+            "x": 30 + col_idx * COL_WIDTH,
+            "y": 30 + i * ROW_HEIGHT
+        })
+        flow_edges.append({"from": "fld_root", "to": i_id})
+        ingest_ids.append(i_id)
+    if ingest_items:
+        col_idx += 1
+
+    # 4. Compute & Notebooks (PySpark Notebooks, Spark Job Definitions)
+    compute_ids = []
     for i, nb in enumerate(notebooks):
         nb_id = f"nb_{i}"
         nb_layer = nb.get("layer", "PySpark")
@@ -506,20 +654,67 @@ def _run_builder(dag: StepDAG, worker_results: dict, run_id: str) -> dict:
             "x": 30 + col_idx * COL_WIDTH,
             "y": 30 + i * ROW_HEIGHT
         })
-        nb_ids.append(nb_id)
-        if lh_ids:
-            target_lh = lh_ids[min(i, len(lh_ids) - 1)]
-            flow_edges.append({"from": target_lh, "to": nb_id})
+        compute_ids.append(nb_id)
+        if storage_ids:
+            target_store = storage_ids[min(i, len(storage_ids) - 1)]
+            flow_edges.append({"from": target_store, "to": nb_id})
         elif i == 0:
             flow_edges.append({"from": "fld_root", "to": nb_id})
-    if notebooks:
+
+    for i, sjd_name in enumerate(spark_job_definitions):
+        sjd_id = f"sjd_{i}"
+        flow_nodes.append({
+            "id": sjd_id,
+            "label": sjd_name,
+            "type": "spark_job",
+            "tag": "SPARK JOB DEFINITION",
+            "sub": "Batch PySpark Executable",
+            "status": "pending",
+            "x": 30 + col_idx * COL_WIDTH,
+            "y": 30 + (len(notebooks) + i) * ROW_HEIGHT
+        })
+        compute_ids.append(sjd_id)
+        flow_edges.append({"from": storage_ids[-1] if storage_ids else "fld_root", "to": sjd_id})
+
+    if notebooks or spark_job_definitions:
         col_idx += 1
 
-    # 4. Pipeline
+    # 5. Serving & Analytics (Semantic Models, Reports, KQL Querysets, Reflex, GraphQL, ML)
+    serving_ids = []
+    serving_items = [(sm, "semantic_model", "DIRECT LAKE MODEL", "Power BI Direct Lake TMDL") for sm in semantic_models] + \
+                    [(rpt, "report", "POWER BI REPORT", "PBIR Visual Model") for rpt in reports] + \
+                    [(kq, "kql_queryset", "KQL QUERYSET", "Kusto Anomaly Queries") for kq in kql_querysets] + \
+                    [(rfx, "reflex", "DATA ACTIVATOR", "Real-Time Triggers & Webhooks") for rfx in reflexes] + \
+                    [(gql, "graphql_api", "GRAPHQL API", "GraphQL Schema & Resolvers") for gql in graphql_apis] + \
+                    [(exp, "ml_experiment", "ML EXPERIMENT", "MLflow Run Tracking") for exp in ml_experiments]
+
+    for i, (name, itype, tag, sub) in enumerate(serving_items):
+        srv_id = f"{itype}_{i}"
+        flow_nodes.append({
+            "id": srv_id,
+            "label": name,
+            "type": itype,
+            "tag": tag,
+            "sub": sub,
+            "status": "pending",
+            "x": 30 + col_idx * COL_WIDTH,
+            "y": 30 + i * ROW_HEIGHT
+        })
+        serving_ids.append(srv_id)
+        if compute_ids:
+            flow_edges.append({"from": compute_ids[-1], "to": srv_id})
+        elif storage_ids:
+            flow_edges.append({"from": storage_ids[-1], "to": srv_id})
+        else:
+            flow_edges.append({"from": "fld_root", "to": srv_id})
+    if serving_items:
+        col_idx += 1
+
+    # 6. Pipeline Orchestration
     if pipeline:
         pl_name = pipeline.get("name", f"pl_{dag.folder.lower()}_job")
         pl_sched = pipeline.get("schedule", "Scheduled Trigger DAG")
-        max_rows = max(len(notebooks), len(lakehouses), 1)
+        max_rows = max(len(notebooks), len(storage_ids), len(serving_items), 1)
         pl_y = max(30, int((max_rows * ROW_HEIGHT) / 2) - 38)
         flow_nodes.append({
             "id": "pl_root",
@@ -531,11 +726,14 @@ def _run_builder(dag: StepDAG, worker_results: dict, run_id: str) -> dict:
             "x": 30 + col_idx * COL_WIDTH,
             "y": pl_y
         })
-        if nb_ids:
-            for nid in nb_ids:
-                flow_edges.append({"from": nid, "to": "pl_root"})
-        elif lh_ids:
-            for lid in lh_ids:
+        if serving_ids:
+            for sid in serving_ids:
+                flow_edges.append({"from": sid, "to": "pl_root"})
+        elif compute_ids:
+            for cid in compute_ids:
+                flow_edges.append({"from": cid, "to": "pl_root"})
+        elif storage_ids:
+            for lid in storage_ids:
                 flow_edges.append({"from": lid, "to": "pl_root"})
         else:
             flow_edges.append({"from": "fld_root", "to": "pl_root"})
@@ -545,7 +743,21 @@ def _run_builder(dag: StepDAG, worker_results: dict, run_id: str) -> dict:
         "run_id": run_id,
         "folder": dag.folder,
         "lakehouses": lakehouses,
-        "environment": None,
+        "warehouses": warehouses,
+        "mirrored_databases": mirrored_databases,
+        "kql_databases": kql_databases,
+        "kql_querysets": kql_querysets,
+        "eventstreams": eventstreams,
+        "dataflows": dataflows,
+        "spark_job_definitions": spark_job_definitions,
+        "reflexes": reflexes,
+        "semantic_models": semantic_models,
+        "reports": reports,
+        "graphql_apis": graphql_apis,
+        "ml_experiments": ml_experiments,
+        "shortcuts": shortcuts,
+        "environment": environments[0] if environments else None,
+        "environments": environments,
         "notebooks": notebooks,
         "notebooks_preview": [{"name": nb["name"], "pyspark_code": nb["pyspark_code"]} for nb in notebooks],
         "pipeline": pipeline,
