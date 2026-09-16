@@ -176,159 +176,166 @@ export const ChatTimeline: React.FC<ChatTimelineProps> = ({
             );
           }
 
+          const liveThoughtMeta: import('../types').ThoughtMeta | null =
+            m.thoughtSteps && m.thoughtSteps.length > 0
+              ? { steps: m.thoughtSteps, elapsed: m.thoughtElapsed }
+              : thoughtMeta;
+
+          const isCurrentlyStreaming = Boolean(m.isStreaming || (isStreaming && idx === messages.length - 1));
+
           return (
             <div key={idx} className="chat-bubble assistant" data-raw-content={cleanContent}>
-              {thoughtMeta && <ThoughtTrace meta={thoughtMeta} />}
+              {liveThoughtMeta && <ThoughtTrace meta={liveThoughtMeta} isStreaming={isCurrentlyStreaming} />}
 
-              <div className="chat-content-card">
-                <div className="markdown-body">
-                  <MarkdownRenderer content={cleanContent} />
-                </div>
-
-                {/* Plan Action Bar Buttons */}
-                {hasPlan && (
-                  <div className="plan-action-bar" style={{ marginTop: '14px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                    {!isDeployed && onDeployPlan && (
-                      <button
-                        type="button"
-                        className="btn-plan-action btn-deploy-plan"
-                        onClick={onDeployPlan}
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '6px',
-                          padding: '7px 14px',
-                          background: '#0078d4',
-                          color: '#fff',
-                          border: 'none',
-                          borderRadius: '6px',
-                          fontSize: '12.5px',
-                          fontWeight: 600,
-                          cursor: 'pointer',
-                        }}
-                      >
-                        <Play width={12} height={12} fill="currentColor" />
-                        <span>Deploy to Fabric</span>
-                      </button>
-                    )}
-
-                    {onOpenCanvas && (
-                      <button
-                        type="button"
-                        className="btn-plan-action btn-view-canvas"
-                        onClick={onOpenCanvas}
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '6px',
-                          padding: '7px 14px',
-                          background: 'rgba(56, 189, 248, 0.12)',
-                          color: '#38bdf8',
-                          border: '1px solid rgba(56, 189, 248, 0.3)',
-                          borderRadius: '6px',
-                          fontSize: '12.5px',
-                          fontWeight: 500,
-                          cursor: 'pointer',
-                        }}
-                      >
-                        <LayoutGrid width={12} height={12} />
-                        <span>{isDeployed ? 'Inspect in Canvas' : 'Visual Canvas'}</span>
-                      </button>
-                    )}
-
-                    {isDeployed && onOpenWorkspace && (
-                      <button
-                        type="button"
-                        className="btn-plan-action btn-view-explorer"
-                        onClick={onOpenWorkspace}
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '6px',
-                          padding: '7px 14px',
-                          background: 'rgba(255, 255, 255, 0.08)',
-                          color: '#e1e3e1',
-                          border: '1px solid rgba(255, 255, 255, 0.15)',
-                          borderRadius: '6px',
-                          fontSize: '12.5px',
-                          fontWeight: 500,
-                          cursor: 'pointer',
-                        }}
-                      >
-                        <span>Workspace Explorer →</span>
-                      </button>
-                    )}
+              {cleanContent ? (
+                <div className="chat-content-card">
+                  <div className="markdown-body">
+                    <MarkdownRenderer content={cleanContent} />
                   </div>
-                )}
-              </div>
+
+                  {/* Plan Action Bar Buttons */}
+                  {hasPlan && (
+                    <div className="plan-action-bar" style={{ marginTop: '14px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                      {!isDeployed && onDeployPlan && (
+                        <button
+                          type="button"
+                          className="btn-plan-action btn-deploy-plan"
+                          onClick={onDeployPlan}
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            padding: '7px 14px',
+                            background: '#0078d4',
+                            color: '#fff',
+                            border: 'none',
+                            borderRadius: '6px',
+                            fontSize: '12.5px',
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                          }}
+                        >
+                          <Play width={12} height={12} fill="currentColor" />
+                          <span>Deploy to Fabric</span>
+                        </button>
+                      )}
+
+                      {onOpenCanvas && (
+                        <button
+                          type="button"
+                          className="btn-plan-action btn-view-canvas"
+                          onClick={onOpenCanvas}
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            padding: '7px 14px',
+                            background: 'rgba(56, 189, 248, 0.12)',
+                            color: '#38bdf8',
+                            border: '1px solid rgba(56, 189, 248, 0.3)',
+                            borderRadius: '6px',
+                            fontSize: '12.5px',
+                            fontWeight: 500,
+                            cursor: 'pointer',
+                          }}
+                        >
+                          <LayoutGrid width={12} height={12} />
+                          <span>{isDeployed ? 'Inspect in Canvas' : 'Visual Canvas'}</span>
+                        </button>
+                      )}
+
+                      {isDeployed && onOpenWorkspace && (
+                        <button
+                          type="button"
+                          className="btn-plan-action btn-view-explorer"
+                          onClick={onOpenWorkspace}
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            padding: '7px 14px',
+                            background: 'rgba(255, 255, 255, 0.08)',
+                            color: '#e1e3e1',
+                            border: '1px solid rgba(255, 255, 255, 0.15)',
+                            borderRadius: '6px',
+                            fontSize: '12.5px',
+                            fontWeight: 500,
+                            cursor: 'pointer',
+                          }}
+                        >
+                          <span>Workspace Explorer →</span>
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ) : isCurrentlyStreaming && !liveThoughtMeta ? (
+                <div className="agent-working-card" style={{ padding: '12px 16px', background: 'rgba(255,255,255,0.03)', borderRadius: '8px' }}>
+                  <div className="agent-working-header" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div className="agent-working-spinner" style={{ width: '14px', height: '14px', border: '2px solid rgba(56,189,248,0.2)', borderTopColor: '#38bdf8', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+                    <span className="agent-working-title" style={{ fontSize: '12px', color: '#38bdf8', fontWeight: 600 }}>Synthesizing architecture...</span>
+                  </div>
+                </div>
+              ) : null}
 
               {/* Assistant Message Actions Toolbar */}
-              <div className="chat-bubble-actions assistant-actions">
-                <button
-                  type="button"
-                  onClick={() => handleCopy(cleanContent, idx)}
-                  className="chat-action-btn btn-copy-msg"
-                  title="Copy response"
-                >
-                  {copiedIdx === idx ? (
-                    <Check width={12} height={12} style={{ color: '#10b981' }} />
-                  ) : (
-                    <Copy width={12} height={12} />
-                  )}
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => handleSpeak(cleanContent, idx)}
-                  className={`chat-action-btn btn-speak-msg ${speakingIdx === idx ? 'speaking' : ''}`}
-                  title="Read aloud"
-                >
-                  <Volume2 width={12} height={12} />
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setLikedIdxs((p) => ({ ...p, [idx]: !p[idx] }))}
-                  className={`chat-action-btn btn-thumb-up ${likedIdxs[idx] ? 'active' : ''}`}
-                  title="Good response"
-                >
-                  <ThumbsUp width={12} height={12} />
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setDislikedIdxs((p) => ({ ...p, [idx]: !p[idx] }))}
-                  className={`chat-action-btn btn-thumb-down ${dislikedIdxs[idx] ? 'active' : ''}`}
-                  title="Bad response"
-                >
-                  <ThumbsDown width={12} height={12} />
-                </button>
-
-                {onRetryPrompt && idx > 0 && messages[idx - 1]?.role === 'user' && (
+              {cleanContent && (
+                <div className="chat-bubble-actions assistant-actions">
                   <button
                     type="button"
-                    onClick={() => onRetryPrompt(messages[idx - 1].content)}
-                    className="chat-action-btn btn-retry-msg"
-                    title="Regenerate response"
+                    onClick={() => handleCopy(cleanContent, idx)}
+                    className="chat-action-btn btn-copy-msg"
+                    title="Copy response"
                   >
-                    <RotateCcw width={12} height={12} />
+                    {copiedIdx === idx ? (
+                      <Check width={12} height={12} style={{ color: '#10b981' }} />
+                    ) : (
+                      <Copy width={12} height={12} />
+                    )}
                   </button>
-                )}
-              </div>
+
+                  <button
+                    type="button"
+                    onClick={() => handleSpeak(cleanContent, idx)}
+                    className={`chat-action-btn btn-speak-msg ${speakingIdx === idx ? 'speaking' : ''}`}
+                    title="Read aloud"
+                  >
+                    <Volume2 width={12} height={12} />
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setLikedIdxs((p) => ({ ...p, [idx]: !p[idx] }))}
+                    className={`chat-action-btn btn-thumb-up ${likedIdxs[idx] ? 'active' : ''}`}
+                    title="Good response"
+                  >
+                    <ThumbsUp width={12} height={12} />
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setDislikedIdxs((p) => ({ ...p, [idx]: !p[idx] }))}
+                    className={`chat-action-btn btn-thumb-down ${dislikedIdxs[idx] ? 'active' : ''}`}
+                    title="Bad response"
+                  >
+                    <ThumbsDown width={12} height={12} />
+                  </button>
+
+                  {onRetryPrompt && idx > 0 && messages[idx - 1]?.role === 'user' && (
+                    <button
+                      type="button"
+                      onClick={() => onRetryPrompt(messages[idx - 1].content)}
+                      className="chat-action-btn btn-retry-msg"
+                      title="Regenerate response"
+                    >
+                      <RotateCcw width={12} height={12} />
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
           );
         })}
-
-        {isStreaming && (!messages.length || messages[messages.length - 1]?.role === 'user') && (
-          <div className="chat-bubble assistant chat-loading-bubble">
-            <div className="agent-working-card">
-              <div className="agent-working-header">
-                <div className="agent-working-spinner" />
-                <span className="agent-working-title">Working...</span>
-              </div>
-            </div>
-          </div>
-        )}
 
         <div id="chatBottomSpacer" className="chat-thread-bottom-spacer" style={{ height: '8px', flexShrink: 0 }} />
       </div>

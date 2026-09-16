@@ -240,7 +240,8 @@ export async function streamChatTurn(
   onError: (err: string) => void,
   model?: string,
   effort?: string,
-  onStage?: (stage: string) => void
+  onStage?: (stage: string) => void,
+  onThoughtStep?: (step: import('../types').ThoughtStep) => void
 ): Promise<void> {
   try {
     const res = await fetch(`${API_BASE}/chat/stream`, {
@@ -272,7 +273,9 @@ export async function streamChatTurn(
         if (line.startsWith('data: ')) {
           try {
             const payload = JSON.parse(line.slice(6));
-            if (payload.type === 'stage' && payload.text) {
+            if (payload.type === 'thought_step' && payload.step) {
+              if (onThoughtStep) onThoughtStep(payload.step);
+            } else if (payload.type === 'stage' && payload.text) {
               if (onStage) onStage(payload.text);
             } else if (payload.type === 'chunk' && payload.text) {
               onChunk(payload.text);

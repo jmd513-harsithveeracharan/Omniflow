@@ -34,20 +34,54 @@ from app.meta_skill import (
 )
 from app.skill_loader import load_skills
 
-# ── Live Real-Time Multi-Agent Progress Store ────────────────────────────────
+# ── Live Real-Time Multi-Agent Progress Store & Event Listeners ──────────────
 _ACTIVE_PROGRESS: dict[str, list[dict]] = {}
 _PROGRESS_LOCK = threading.Lock()
+_STEP_LISTENERS: dict[str, list] = {}
+_LISTENERS_LOCK = threading.Lock()
+
+
+def add_step_listener(session_id: str, callback) -> None:
+    """Registers a real-time listener callback for pipeline step events."""
+    if not session_id:
+        return
+    with _LISTENERS_LOCK:
+        if session_id not in _STEP_LISTENERS:
+            _STEP_LISTENERS[session_id] = []
+        _STEP_LISTENERS[session_id].append(callback)
+
+
+def remove_step_listener(session_id: str, callback) -> None:
+    """Unregisters a real-time listener callback."""
+    if not session_id:
+        return
+    with _LISTENERS_LOCK:
+        if session_id in _STEP_LISTENERS:
+            try:
+                _STEP_LISTENERS[session_id].remove(callback)
+            except ValueError:
+                pass
+            if not _STEP_LISTENERS[session_id]:
+                _STEP_LISTENERS.pop(session_id, None)
+
 
 def get_progress(session_id: str) -> list[dict]:
     """Returns a copy of the live intermediate steps for an active session."""
     with _PROGRESS_LOCK:
         return list(_ACTIVE_PROGRESS.get(session_id, []))
 
-def set_progress_step(session_id: str, title: str, detail: str = "", status: str = "in_progress"):
-    """Emits or advances a real-time progress step for the frontend."""
+
+def set_progress_step(session_id: str, title: str, detail: str = "", status: str = "in_progress") -> None:
+    """Emits or advances a real-time progress step for the frontend and triggers active listeners."""
     if not session_id:
         return
     now_utc = datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S.%f")[:-3] + " UTC"
+    step_data = {
+        "title": title,
+        "detail": detail,
+        "status": status,
+        "timestamp": now_utc,
+    }
     with _PROGRESS_LOCK:
         if session_id not in _ACTIVE_PROGRESS:
             _ACTIVE_PROGRESS[session_id] = []
@@ -56,19 +90,26 @@ def set_progress_step(session_id: str, title: str, detail: str = "", status: str
         for s in steps:
             if s.get("status") == "in_progress":
                 s["status"] = "completed"
-        steps.append({
-            "title": title,
-            "detail": detail,
-            "status": status,
-            "timestamp": now_utc
-        })
+        steps.append(step_data)
 
-def clear_progress(session_id: str):
+    # Notify all active real-time listeners for this session
+    with _LISTENERS_LOCK:
+        listeners = list(_STEP_LISTENERS.get(session_id, []))
+    for listener in listeners:
+        try:
+            listener(step_data)
+        except Exception:
+            pass
+
+
+def clear_progress(session_id: str) -> None:
     """Cleans up memory for a completed session."""
     if not session_id:
         return
     with _PROGRESS_LOCK:
         _ACTIVE_PROGRESS.pop(session_id, None)
+    with _LISTENERS_LOCK:
+        _STEP_LISTENERS.pop(session_id, None)
 
 
 def _now_utc_str() -> str:

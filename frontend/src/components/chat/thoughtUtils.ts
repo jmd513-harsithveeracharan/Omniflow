@@ -1,4 +1,4 @@
-import { ThoughtMeta } from './ThoughtTrace';
+import { ThoughtMeta } from '../../types';
 
 export const parseThoughtMeta = (content: string): { thoughtMeta: ThoughtMeta | null; cleanContent: string } => {
   const thoughtMatch = content.match(/<!--\s*THOUGHT:\s*([\s\S]*?)\s*-->/i);

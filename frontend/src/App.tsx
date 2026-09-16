@@ -219,7 +219,13 @@ export const App: React.FC = () => {
     }
 
     const userMsg: ChatMessage = { role: 'user', content: text };
-    setMessages((prev) => [...prev, userMsg]);
+    const placeholderAssistantMsg: ChatMessage = {
+      role: 'assistant',
+      content: '',
+      isStreaming: true,
+      thoughtSteps: [],
+    };
+    setMessages((prev) => [...prev, userMsg, placeholderAssistantMsg]);
     setIsStreaming(true);
 
     let assistantContent = '';
@@ -232,13 +238,20 @@ export const App: React.FC = () => {
         setMessages((prev) => {
           const last = prev[prev.length - 1];
           if (last && last.role === 'assistant') {
-            return [...prev.slice(0, -1), { ...last, content: assistantContent }];
+            return [...prev.slice(0, -1), { ...last, content: assistantContent, isStreaming: true }];
           }
-          return [...prev, { role: 'assistant', content: assistantContent, isStreaming: true }];
+          return prev;
         });
       },
       (plan) => {
         setIsStreaming(false);
+        setMessages((prev) => {
+          const last = prev[prev.length - 1];
+          if (last && last.role === 'assistant') {
+            return [...prev.slice(0, -1), { ...last, isStreaming: false }];
+          }
+          return prev;
+        });
         if (plan) {
           setCurrentPlan(plan as unknown as IngestionPlan);
           setIsWorkbenchOpen(true);
@@ -246,14 +259,42 @@ export const App: React.FC = () => {
       },
       (err) => {
         console.error('Stream error:', err);
-        setMessages((prev) => [
-          ...prev,
-          { role: 'assistant', content: `⚠️ Error communicating with agent: ${err}` },
-        ]);
+        setMessages((prev) => {
+          const last = prev[prev.length - 1];
+          const errMsg = `⚠️ Error communicating with agent: ${err}`;
+          if (last && last.role === 'assistant') {
+            return [...prev.slice(0, -1), { ...last, content: errMsg, isStreaming: false }];
+          }
+          return [...prev, { role: 'assistant', content: errMsg }];
+        });
         setIsStreaming(false);
       },
       model,
-      effort
+      effort,
+      (stage) => {
+        console.log('[STAGE]', stage);
+      },
+      (thoughtStep) => {
+        setMessages((prev) => {
+          const last = prev[prev.length - 1];
+          if (last && last.role === 'assistant') {
+            const existing = last.thoughtSteps || [];
+            const idx = existing.findIndex((s) => s.title === thoughtStep.title);
+            let updated: typeof existing;
+            if (idx >= 0) {
+              updated = [...existing];
+              updated[idx] = thoughtStep;
+            } else {
+              const closedPrev = existing.map((s) =>
+                s.status === 'in_progress' ? { ...s, status: 'completed' as const } : s
+              );
+              updated = [...closedPrev, thoughtStep];
+            }
+            return [...prev.slice(0, -1), { ...last, thoughtSteps: updated }];
+          }
+          return prev;
+        });
+      }
     );
   };
 

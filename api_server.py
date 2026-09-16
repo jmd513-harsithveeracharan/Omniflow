@@ -373,7 +373,10 @@ async def handle_chat_stream(req: ChatRequest):
             if item is None:
                 break
             ev_type, text_payload, plan_payload = item
-            if ev_type == "stage":
+            if ev_type == "thought_step":
+                step_obj = json.loads(text_payload) if isinstance(text_payload, str) else text_payload
+                yield f"data: {json.dumps({'type': 'thought_step', 'step': step_obj})}\n\n"
+            elif ev_type == "stage":
                 yield f"data: {json.dumps({'type': 'stage', 'text': text_payload})}\n\n"
             elif ev_type == "chunk":
                 full_response_text += text_payload

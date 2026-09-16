@@ -223,22 +223,63 @@ def process_chat_turn_stream(
 ) -> Generator[tuple[str, str, dict[str, Any] | None], None, None]:
     """
     Real-time streaming chat generator.
-    Yields (event_type, chunk_text_or_stage_info, optional_plan).
-    Event types: 'stage', 'chunk', 'done'
+    Yields (event_type, payload_str, optional_plan).
+    Event types: 'thought_step', 'chunk', 'stage', 'done'
     """
     if is_architecture_request(prompt):
-        yield ("stage", "⚡ Context Gate: Analyzing Fabric architectural requirements...", None)
-        plan, audit_messages = run_pipeline(
-            prompt,
-            session_id=session_id,
-            target_model=target_model,
-            effort=effort,
-        )
-        yield ("stage", "🧠 Meta-Planner: Decomposing Medallion Lakehouses & Notebooks...", None)
+        import queue
+        import threading
+        from app.agent_pipeline import add_step_listener, remove_step_listener
+
+        step_q: queue.Queue[dict | None] = queue.Queue()
+
+        def on_step_event(step_dict: dict) -> None:
+            step_q.put(step_dict)
+
+        add_step_listener(session_id, on_step_event)
+
+        pipeline_res: list[Any] = [None, None, None]
+
+        def run_worker() -> None:
+            try:
+                p, a = run_pipeline(
+                    prompt,
+                    session_id=session_id,
+                    target_model=target_model,
+                    effort=effort,
+                )
+                pipeline_res[0] = p
+                pipeline_res[1] = a
+            except Exception as ex:
+                pipeline_res[2] = ex
+            finally:
+                step_q.put(None)
+
+        worker_th = threading.Thread(target=run_worker, daemon=True)
+        worker_th.start()
+
+        # Stream thought steps in real time as each agent node fires
+        while True:
+            try:
+                step_item = step_q.get(timeout=0.1)
+                if step_item is None:
+                    break
+                yield ("thought_step", json.dumps(step_item), None)
+            except queue.Empty:
+                if not worker_th.is_alive():
+                    break
+
+        remove_step_listener(session_id, on_step_event)
+
+        if pipeline_res[2] is not None:
+            raise pipeline_res[2]
+
+        plan = pipeline_res[0] or {}
+        audit_messages = pipeline_res[1] or []
         thought_tag = build_thought_meta(plan)
         full_resp = thought_tag + format_architecture_response(plan, audit_messages)
 
-        # Stream the synthesized architecture summary in smooth chunks
+        # Stream synthesized architecture summary in smooth chunks
         chunk_sz = 32
         for i in range(0, len(full_resp), chunk_sz):
             yield ("chunk", full_resp[i : i + chunk_sz], None)

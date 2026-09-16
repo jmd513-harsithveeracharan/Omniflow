@@ -6,6 +6,18 @@
 
 export type RoleType = 'user' | 'assistant' | 'system' | 'tool';
 
+export interface ThoughtStep {
+  title: string;
+  detail?: string;
+  status: 'completed' | 'in_progress' | 'pending' | 'failed';
+  timestamp?: string;
+}
+
+export interface ThoughtMeta {
+  elapsed?: string;
+  steps: ThoughtStep[];
+}
+
 export interface ChatMessage {
   id?: number;
   role: RoleType;
@@ -13,6 +25,8 @@ export interface ChatMessage {
   tokenEst?: number;
   createdAt?: string;
   isStreaming?: boolean;
+  thoughtSteps?: ThoughtStep[];
+  thoughtElapsed?: string;
 }
 
 export interface ChatSession {
