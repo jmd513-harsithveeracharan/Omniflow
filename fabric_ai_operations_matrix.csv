@@ -1,0 +1,65 @@
+Category,Item Type,Operation Type,Operation Name,API Endpoint / Command,Current Status,Fabric AI Studio Implementation
+Storage & Lakehouse,Lakehouse,Create,Create Lakehouse,POST /v1/workspaces/{id}/items (type=Lakehouse),Active & Tested,create_item() with dynamic folder assignment & collision handling
+Storage & Lakehouse,Lakehouse,Read,Get Lakehouse Definition,POST /v1/workspaces/{id}/items/{id}/getDefinition,Active & Tested,get_item_definition() with LRO polling & snapshot backup
+Storage & Lakehouse,Lakehouse,Update,Move Lakehouse to Folder,POST /v1/workspaces/{id}/items/{id}/move,Active & Tested,move_item() to target folder (e.g. AI_Test_Folder)
+Storage & Lakehouse,Lakehouse,Delete,Safe Delete Lakehouse,DELETE /v1/workspaces/{id}/items/{id},Active & Tested,Safe Deletion Protocol with backup snapshot & blast radius check
+Storage & Lakehouse,Lakehouse,List,List Workspace Lakehouses,GET /v1/workspaces/{id}/items?type=Lakehouse,Active & Tested,list_workspace_items() with type filtering & cache
+Storage & Lakehouse,Lakehouse,Medallion Tiering,Auto Medallion Provisioning,Internal Engine (Bronze/Silver/Gold),Active & Tested,Automated naming: lh_<name>_bronze/silver/gold
+Compute & Logic,Notebook,Create,Create PySpark Notebook,POST /v1/workspaces/{id}/items (type=Notebook),Active & Tested,create_item() with Base64 payload packaging
+Compute & Logic,Notebook,Update,Deploy/Update Code Definition,POST /v1/workspaces/{id}/items/{id}/updateDefinition,Active & Tested,update_definition() with notebook-content.py Base64 packaging
+Compute & Logic,Notebook,Read,Get Notebook Definition,POST /v1/workspaces/{id}/items/{id}/getDefinition,Active & Tested,get_item_definition() for backup & code self-healing
+Compute & Logic,Notebook,Move,Move Notebook to Folder,POST /v1/workspaces/{id}/items/{id}/move,Active & Tested,move_item() into AI_Test_Folder / custom folder
+Compute & Logic,Notebook,Delete,Safe Delete Notebook,DELETE /v1/workspaces/{id}/items/{id},Active & Tested,delete_item() gated by governance blast radius analysis
+Compute & Logic,Notebook,Code Generation,PySpark Delta Ingestion Gen,AST Code Generator,Active & Tested,Auto-generates Delta Lake MERGE SCD-1/2 & deduplication
+Compute & Logic,Notebook,Code Generation,PySpark Business Aggregations,AST Code Generator,Active & Tested,Generates Gold layer star-schema PySpark aggregations
+Orchestration,DataPipeline,Create,Create Data Factory Pipeline,POST /v1/workspaces/{id}/items (type=DataPipeline),Active & Tested,create_item() with pipeline JSON activity definition
+Orchestration,DataPipeline,Update,Update Pipeline Definition,POST /v1/workspaces/{id}/items/{id}/updateDefinition,Active & Tested,update_definition() with activity DAG dependencies
+Orchestration,DataPipeline,Execute,Trigger Pipeline Run,POST /v1/workspaces/{id}/items/{id}/jobs/instances?jobType=Pipeline,Active & Tested,trigger_pipeline_run() with Job ID capture
+Orchestration,DataPipeline,Schedule,Create Pipeline Schedule,POST /v1/workspaces/{id}/items/{id}/jobs/Execute/schedules,Active & Tested,create_pipeline_schedule() supporting Daily/Weekly/Cron
+Orchestration,DataPipeline,Monitor,Get Job Run Status,GET /v1/workspaces/{id}/items/{id}/jobs/instances/{job_id},Active & Tested,get_job_status() with InProgress/Completed/Failed polling
+Orchestration,DataPipeline,Delete,Safe Delete Pipeline,DELETE /v1/workspaces/{id}/items/{id},Active & Tested,delete_item() with pre-delete snapshot
+Compute Environment,Environment,Create,Create Spark Environment,POST /v1/workspaces/{id}/items (type=Environment),Active & Tested,create_item() for custom Spark runtimes & conda packages
+Compute Environment,Environment,Read,Get Environment Definition,POST /v1/workspaces/{id}/items/{id}/getDefinition,Active & Tested,get_item_definition() for Spark settings inspection
+Compute Environment,Environment,Move,Move Environment to Folder,POST /v1/workspaces/{id}/items/{id}/move,Active & Tested,move_item() into target workspace folder
+Compute Environment,Environment,Delete,Delete Spark Environment,DELETE /v1/workspaces/{id}/items/{id},Active & Tested,delete_item() with confirmation gate
+Hierarchy & Organization,Folder,Create,Create Workspace Folder,POST /v1/workspaces/{id}/folders,Active & Tested,get_or_create_folder() idempotent creation
+Hierarchy & Organization,Folder,List,List All Folders,GET /v1/workspaces/{id}/folders,Active & Tested,list_folders() & get_workspace_tree() hierarchy builder
+Hierarchy & Organization,Folder,Read,Get Hierarchical Tree,Internal Tree Resolver,Active & Tested,get_workspace_tree() nesting items under parent folders
+Hierarchy & Organization,Folder,Delete,Delete Workspace Folder,DELETE /v1/workspaces/{id}/folders/{folder_id},Active & Tested,delete_folder() with item reassignment protection
+Workspace Management,Workspace,List,List User Workspaces,GET /v1/workspaces,Active & Tested,list_workspaces() for dynamic workspace picker
+Workspace Management,Workspace,Status,Check Connection & Auth Status,GET /api/fabric/status,Active & Tested,get_fabric_status() with Azure CLI / MSI token validation
+Workspace Management,Workspace,Switch,Dynamic Context Switching,Config / Session State,Active & Tested,ALLOWED_WORKSPACE_ID runtime resolution
+CI/CD & Git,Git Integration,Read,Get Workspace Git Status,POST /v1/workspaces/{id}/git/getGitStatus,Active & Tested,get_git_status() checking branch & commit sync
+CI/CD & Git,Git Integration,Commit,Commit Workspace to Git Branch,POST /v1/workspaces/{id}/git/commitToGit,Active & Tested,commit_to_git() with multi-file commit mode & LRO polling
+SQL Transpilation,SQL Dialect,Transpile,T-SQL to Spark SQL,POST /api/transpile (SQLGlot AST),Active & Tested,transpile_to_spark() with AST dialect conversion
+SQL Transpilation,SQL Dialect,Transpile,Oracle PL/SQL to Spark SQL,POST /api/transpile (SQLGlot AST),Active & Tested,transpile_to_spark() with NVL/DECODE/SYSDATE mapping
+SQL Transpilation,SQL Dialect,Transpile,Snowflake SQL to Spark SQL,POST /api/transpile (SQLGlot AST),Active & Tested,transpile_to_spark() with variant/date function mapping
+SQL Transpilation,SQL Dialect,Transpile,Postgres SQL to Spark SQL,POST /api/transpile (SQLGlot AST),Active & Tested,transpile_to_spark() with Postgres cast dialect rewrite
+SQL Transpilation,Lineage,Extract,Column & Table Lineage Extraction,SQLGlot AST Expression Walker,Active & Tested,extract_sql_lineage() extracting inputs/outputs/transforms
+Data Ingestion,Source Connectors,Discovery,Introspect Database Tables,POST /api/connectors/tables,Active & Tested,Dynamic table discovery from SQL Server/Postgres/Snowflake
+Data Ingestion,Source Connectors,Strategy,Auto Classify Ingestion Strategy,Ingestion Studio Classifier,Active & Tested,Full Snapshot vs Incremental Watermark vs SCD-2 detection
+Data Ingestion,Source Connectors,Plan,Generate Medallion Ingestion Plan,POST /api/ingestion/plan,Active & Tested,Generates multi-table DAG, lakehouse refs & schedule
+Governance,Lineage & Impact,Analysis,1-Hop/2-Hop Blast Radius Analysis,NetworkX Lineage DAG Engine,Active & Tested,analyze_blast_radius() identifying impacted downstream models
+Governance,Safe Delete,Backup,Soft-Delete Definition Snapshot,SQLite / Local Snapshot Engine,Active & Tested,Takes Base64 snapshot before destructive operations
+Governance,Gatekeeper,Verification,Human-in-the-Loop Approval Gate,Modal Confirmation Gate,Active & Tested,Prevents unintended overwrite or deletion of active assets
+Analytics & BI,SemanticModel,Create,Create Power BI Semantic Model,POST /v1/workspaces/{id}/items (type=SemanticModel),Generic API Supported,create_item() supports Direct Lake semantic models
+Analytics & BI,SemanticModel,Read,Get Semantic Model Definition,POST /v1/workspaces/{id}/items/{id}/getDefinition,Generic API Supported,get_item_definition() retrieves BIM/TMDL schema parts
+Analytics & BI,SemanticModel,Update,Update TMDL / BIM Definition,POST /v1/workspaces/{id}/items/{id}/updateDefinition,Generic API Supported,update_definition() pushes Direct Lake TMDL schema
+Analytics & BI,SemanticModel,Delete,Delete Semantic Model,DELETE /v1/workspaces/{id}/items/{id},Active & Tested,delete_item() with lineage impact warning
+Analytics & BI,Report,Create,Create Power BI Report,POST /v1/workspaces/{id}/items (type=Report),Generic API Supported,create_item() supports PBIR report deployment
+Analytics & BI,Report,Read,Get Report Definition,POST /v1/workspaces/{id}/items/{id}/getDefinition,Generic API Supported,get_item_definition() reads report.json definition
+Analytics & BI,Report,Update,Update PBIR Report Definition,POST /v1/workspaces/{id}/items/{id}/updateDefinition,Generic API Supported,update_definition() pushes report layout & visual parts
+Analytics & BI,Report,Delete,Delete Power BI Report,DELETE /v1/workspaces/{id}/items/{id},Active & Tested,delete_item() with workspace cleanup
+Data Warehousing,Warehouse,Create,Create Fabric Synapse Warehouse,POST /v1/workspaces/{id}/items (type=Warehouse),Generic API Supported,create_item() creates native T-SQL Data Warehouse
+Data Warehousing,Warehouse,Read,Get Warehouse Metadata,GET /v1/workspaces/{id}/items/{id},Generic API Supported,list_workspace_items() & get item details
+Data Warehousing,Warehouse,Delete,Delete Synapse Warehouse,DELETE /v1/workspaces/{id}/items/{id},Active & Tested,delete_item() with blast radius verification
+Real-Time Analytics,Eventstream,Create,Create Real-Time Eventstream,POST /v1/workspaces/{id}/items (type=Eventstream),Generic API Supported,create_item() provisions streaming ingestion endpoint
+Real-Time Analytics,KQLDatabase,Create,Create KQL / Real-Time Database,POST /v1/workspaces/{id}/items (type=KQLDatabase),Generic API Supported,create_item() creates Azure Data Explorer KQL database
+Real-Time Analytics,KQLDatabase,Delete,Delete KQL Database,DELETE /v1/workspaces/{id}/items/{id},Active & Tested,delete_item() with governance check
+Data Science & ML,MLModel,Create,Create Fabric Machine Learning Model,POST /v1/workspaces/{id}/items (type=MLModel),Generic API Supported,create_item() for MLflow experiments & models
+Data Science & ML,MLExperiment,Create,Create MLflow Experiment,POST /v1/workspaces/{id}/items (type=MLExperiment),Generic API Supported,create_item() tracks ML runs & metric artifacts
+Data Science & ML,SparkJobDefinition,Create,Create Spark Job Definition (SJD),POST /v1/workspaces/{id}/items (type=SparkJobDefinition),Generic API Supported,create_item() compiles batch Spark JAR/Python jobs
+Data Science & ML,SparkJobDefinition,Execute,Run Spark Job Definition,POST /v1/workspaces/{id}/items/{id}/jobs/instances?jobType=SparkJobDefinition,Generic API Supported,trigger_pipeline_run() pattern for batch Spark jobs
+Actions & Trigger,Reflex / Activator,Create,Create Data Activator Reflex,POST /v1/workspaces/{id}/items (type=Reflex),Generic API Supported,create_item() for real-time alerting & automated actions
+Database,SQLDatabase,Create,Create Fabric SQL Database (Preview),POST /v1/workspaces/{id}/items (type=SQLDatabase),Generic API Supported,create_item() creates transactional SQL DB with OneLake mirror
+Database,MirroredDatabase,Create,Create Mirrored Database (Cosmos/Snowflake),POST /v1/workspaces/{id}/items (type=MirroredDatabase),Generic API Supported,create_item() sets up continuous CDC mirroring to OneLake
