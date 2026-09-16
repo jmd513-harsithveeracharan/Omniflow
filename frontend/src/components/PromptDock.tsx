@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Loader2 } from 'lucide-react';
 
 interface PromptDockProps {
-  onSendMessage: (text: string) => void;
+  onSendMessage: (text: string, model?: string, effort?: string) => void;
   isStreaming: boolean;
 }
 
@@ -63,7 +63,7 @@ export const PromptDock: React.FC<PromptDockProps> = ({
   const handleSubmit = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!input.trim() || isStreaming) return;
-    onSendMessage(input.trim());
+    onSendMessage(input.trim(), selectedModel, selectedEffort.toLowerCase());
     setInput('');
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';

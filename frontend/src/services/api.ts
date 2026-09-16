@@ -28,6 +28,10 @@ export async function fetchFabricStatus(): Promise<FabricStatus> {
     targetFolder: data.target_folder || 'AI_Test_Folder',
     workspacesCount: data.workspaces_count || 0,
     message: data.message || '',
+    userIdentity: data.user_identity || '',
+    authMethod: data.auth_method || '',
+    tenantId: data.tenant_id || '',
+    expiresInMinutes: data.expires_in_minutes || 0,
   };
 }
 
@@ -233,13 +237,21 @@ export async function streamChatTurn(
   sessionId: string,
   onChunk: (text: string) => void,
   onDone: (plan?: IngestionPlan | Record<string, unknown> | null) => void,
-  onError: (err: string) => void
+  onError: (err: string) => void,
+  model?: string,
+  effort?: string
 ): Promise<void> {
   try {
     const res = await fetch(`${API_BASE}/chat/stream`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message, session_id: sessionId, stream: true }),
+      body: JSON.stringify({
+        message,
+        session_id: sessionId,
+        stream: true,
+        model: model || undefined,
+        effort: effort || undefined,
+      }),
     });
     if (!res.ok || !res.body) throw new Error(`Stream connection failed: ${res.statusText}`);
 

@@ -211,7 +211,7 @@ export const App: React.FC = () => {
     );
   };
 
-  const handleSendMessage = async (text: string) => {
+  const handleSendMessage = async (text: string, model?: string, effort?: string) => {
     if (!text.trim() || isStreaming) return;
 
     if (activeView !== 'chat') {
@@ -251,7 +251,9 @@ export const App: React.FC = () => {
           { role: 'assistant', content: `⚠️ Error communicating with agent: ${err}` },
         ]);
         setIsStreaming(false);
-      }
+      },
+      model,
+      effort
     );
   };
 
@@ -315,6 +317,8 @@ export const App: React.FC = () => {
         onSelectSession={handleSelectSession}
         onDeleteSession={handleDeleteSession}
         onRenameSession={handleRenameSession}
+        userName={status?.userIdentity ? status.userIdentity.split('@')[0].replace('.', ' ') : 'Harsith Veer'}
+        userEmail={status?.userIdentity || 'Bheesetti.Harsith@Pelibiothermal.com'}
         projects={projects}
         activeProjectId={activeProjectId}
         onSelectProject={handleSelectProject}

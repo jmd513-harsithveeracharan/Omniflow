@@ -67,6 +67,10 @@ export interface FabricStatus {
   targetFolder: string;
   workspacesCount: number;
   message: string;
+  userIdentity?: string;
+  authMethod?: string;
+  tenantId?: string;
+  expiresInMinutes?: number;
 }
 
 export interface SkillSummary {
