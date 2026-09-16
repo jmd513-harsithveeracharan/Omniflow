@@ -183,9 +183,25 @@ export const ChatTimeline: React.FC<ChatTimelineProps> = ({
 
           const isCurrentlyStreaming = Boolean(m.isStreaming || (isStreaming && idx === messages.length - 1));
 
+          const activeMeta: import('../types').ThoughtMeta = liveThoughtMeta || {
+            elapsed: '0.0',
+            steps: [
+              {
+                title: 'Explored Context & Intent',
+                action: 'Explored',
+                badge: 'DAG',
+                target: 'Active Context & Workspace Schema',
+                detail: 'Analyzing request intent, workspace parameters, and Medallion requirements...',
+                status: 'in_progress',
+              },
+            ],
+          };
+
           return (
             <div key={idx} className="chat-bubble assistant" data-raw-content={cleanContent}>
-              {liveThoughtMeta && <ThoughtTrace meta={liveThoughtMeta} isStreaming={isCurrentlyStreaming} />}
+              {(liveThoughtMeta || isCurrentlyStreaming) && (
+                <ThoughtTrace meta={activeMeta} isStreaming={isCurrentlyStreaming} />
+              )}
 
               {cleanContent ? (
                 <div className="chat-content-card">
@@ -268,13 +284,6 @@ export const ChatTimeline: React.FC<ChatTimelineProps> = ({
                       )}
                     </div>
                   )}
-                </div>
-              ) : isCurrentlyStreaming && !liveThoughtMeta ? (
-                <div className="agent-working-card" style={{ padding: '12px 16px', background: 'rgba(255,255,255,0.03)', borderRadius: '8px' }}>
-                  <div className="agent-working-header" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <div className="agent-working-spinner" style={{ width: '14px', height: '14px', border: '2px solid rgba(56,189,248,0.2)', borderTopColor: '#38bdf8', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
-                    <span className="agent-working-title" style={{ fontSize: '12px', color: '#38bdf8', fontWeight: 600 }}>Synthesizing architecture...</span>
-                  </div>
                 </div>
               ) : null}
 

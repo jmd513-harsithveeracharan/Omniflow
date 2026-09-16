@@ -223,7 +223,17 @@ export const App: React.FC = () => {
       role: 'assistant',
       content: '',
       isStreaming: true,
-      thoughtSteps: [],
+      thoughtSteps: [
+        {
+          title: 'Explored Context & Intent',
+          action: 'Explored',
+          badge: 'DAG',
+          target: 'Active Context & Workspace Schema',
+          detail: 'Analyzing request intent, workspace parameters, and Medallion requirements...',
+          status: 'in_progress',
+        },
+      ],
+      thoughtElapsed: '0.0',
     };
     setMessages((prev) => [...prev, userMsg, placeholderAssistantMsg]);
     setIsStreaming(true);
@@ -279,11 +289,15 @@ export const App: React.FC = () => {
           const last = prev[prev.length - 1];
           if (last && last.role === 'assistant') {
             const existing = last.thoughtSteps || [];
-            const idx = existing.findIndex((s) => s.title === thoughtStep.title);
+            const idx = existing.findIndex(
+              (s) =>
+                (thoughtStep.target && s.target === thoughtStep.target) ||
+                s.title === thoughtStep.title
+            );
             let updated: typeof existing;
             if (idx >= 0) {
               updated = [...existing];
-              updated[idx] = thoughtStep;
+              updated[idx] = { ...updated[idx], ...thoughtStep };
             } else {
               const closedPrev = existing.map((s) =>
                 s.status === 'in_progress' ? { ...s, status: 'completed' as const } : s

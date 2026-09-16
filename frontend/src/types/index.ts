@@ -9,6 +9,11 @@ export type RoleType = 'user' | 'assistant' | 'system' | 'tool';
 export interface ThoughtStep {
   title: string;
   detail?: string;
+  action?: string;
+  badge?: string;
+  target?: string;
+  diff?: string;
+  output?: string;
   status: 'completed' | 'in_progress' | 'pending' | 'failed';
   timestamp?: string;
 }

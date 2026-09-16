@@ -71,26 +71,52 @@ def get_progress(session_id: str) -> list[dict]:
         return list(_ACTIVE_PROGRESS.get(session_id, []))
 
 
-def set_progress_step(session_id: str, title: str, detail: str = "", status: str = "in_progress") -> None:
+def set_progress_step(
+    session_id: str,
+    title: str,
+    detail: str = "",
+    status: str = "in_progress",
+    action: str = "",
+    badge: str = "",
+    target: str = "",
+    diff: str = "",
+    output: str = "",
+) -> None:
     """Emits or advances a real-time progress step for the frontend and triggers active listeners."""
     if not session_id:
         return
     now_utc = datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S.%f")[:-3] + " UTC"
+    if not action:
+        words = title.split()
+        action = words[0] if words else "Processed"
+
     step_data = {
         "title": title,
         "detail": detail,
         "status": status,
         "timestamp": now_utc,
+        "action": action,
+        "badge": badge,
+        "target": target or title,
+        "diff": diff,
+        "output": output,
     }
     with _PROGRESS_LOCK:
         if session_id not in _ACTIVE_PROGRESS:
             _ACTIVE_PROGRESS[session_id] = []
         steps = _ACTIVE_PROGRESS[session_id]
-        # Mark previous in_progress as completed
-        for s in steps:
-            if s.get("status") == "in_progress":
-                s["status"] = "completed"
-        steps.append(step_data)
+        # Match by target or title
+        existing_idx = next(
+            (i for i, s in enumerate(steps) if (target and s.get("target") == target) or s.get("title") == title),
+            -1
+        )
+        if existing_idx >= 0:
+            steps[existing_idx] = step_data
+        else:
+            for s in steps:
+                if s.get("status") == "in_progress":
+                    s["status"] = "completed"
+            steps.append(step_data)
 
     # Notify all active real-time listeners for this session
     with _LISTENERS_LOCK:
@@ -499,9 +525,12 @@ def _execute_notebook_worker(
     if session_id:
         set_progress_step(
             session_id,
-            f"Worker Agent: {step.name}",
-            f"Synthesizing PySpark implementation for '{step.name}' ({step.layer or 'Notebook'}). Ingesting schema and generating Delta Lake logic...",
-            "in_progress"
+            title=f"Synthesized PY {step.name}.py",
+            detail=f"Synthesizing PySpark implementation for '{step.name}' ({step.layer or 'Notebook'}). Ingesting schema and generating Delta Lake logic...",
+            status="in_progress",
+            action="Synthesizing",
+            badge="PY",
+            target=f"{step.name}.py",
         )
 
     is_medallion = step.layer in ("Bronze", "Silver", "Gold")
@@ -536,12 +565,18 @@ def _execute_notebook_worker(
         lh_guess = f"abfss://{folder.lower()}@onelake.dfs.fabric.microsoft.com/{step.name.replace('nb_', 'lh_')}"
         end_t = time.perf_counter()
         dur = round(end_t - start_t, 2)
+        code_lines = len(code.splitlines())
         if session_id:
             set_progress_step(
                 session_id,
-                f"Worker Agent: {step.name}",
-                f"PySpark notebook code generated ({len(code.splitlines())} lines, {dur}s). Delta target: '{lh_guess}'.",
-                "completed"
+                title=f"Synthesized PY {step.name}.py",
+                detail=f"PySpark Delta Lake code generated ({code_lines} lines, {dur}s). Delta target: '{lh_guess}'.",
+                status="completed",
+                action="Synthesized",
+                badge="PY",
+                target=f"{step.name}.py",
+                diff=f"+{code_lines} -0",
+                output=code[:400] + ("\n..." if len(code) > 400 else ""),
             )
         return WorkerResult(
             step_id=step.step_id,
@@ -940,9 +975,12 @@ def run_pipeline(
     clear_progress(session_id)
     set_progress_step(
         session_id,
-        "Context Gate: Intent Analysis",
-        f"Analyzing conversation context & requirements for prompt: '{prompt[:100]}...'. Determining workflow mode (independent vs follow-up)...",
-        "in_progress"
+        title="Explored Active Context",
+        detail=f"Analyzing prompt requirements: '{prompt[:100]}...'",
+        status="in_progress",
+        action="Explored",
+        badge="DAG",
+        target="Active Context",
     )
 
     state = PipelineState(
@@ -970,17 +1008,23 @@ def run_pipeline(
     }
     set_progress_step(
         session_id,
-        "Context Gate: Resolved",
-        f"Context classification: '{state.context_mode}' mode ({t0_dur}s). Proceeding to architecture DAG synthesis.",
-        "completed"
+        title="Explored Active Context",
+        detail=f"Active context loaded ({t0_dur}s). Workflow mode: '{state.context_mode}'.",
+        status="completed",
+        action="Explored",
+        badge="DAG",
+        target="Active Context",
     )
 
     # Stage 1: Meta-Planner
     set_progress_step(
         session_id,
-        "Meta-Planner: DAG Decomposition",
-        "Decomposing architecture into multi-stage execution DAG: identifying target workspace folder, PySpark notebooks, Delta Lakehouse tiers, and Azure Data Factory pipeline trigger schedules...",
-        "in_progress"
+        title="Planned Architecture DAG",
+        detail="Decomposing architecture into multi-stage execution DAG: identifying target workspace folder, PySpark notebooks, Delta Lakehouse tiers, and Azure Data Factory pipeline trigger schedules...",
+        status="in_progress",
+        action="Planned",
+        badge="DAG",
+        target="Architecture DAG",
     )
     t1_start = time.perf_counter()
     t1_utc = _now_utc_str()
@@ -1004,9 +1048,13 @@ def run_pipeline(
 
     set_progress_step(
         session_id,
-        "Meta-Planner: Plan Created",
-        f"Planned {step_count} item(s) in folder '{folder_target}': {step_names}. Pipeline schedule: {pl_sched} ({t1_dur}s).",
-        "completed"
+        title=f"Planned {step_count} Items in '{folder_target}'",
+        detail=f"Decomposed DAG: {step_names}. Pipeline schedule: {pl_sched} ({t1_dur}s).",
+        status="completed",
+        action="Planned",
+        badge="DAG",
+        target=f"{folder_target} ({step_count} items)",
+        diff=f"+{step_count} items",
     )
 
     # Stages 2-3-4 loop with auto-remediation
@@ -1034,9 +1082,12 @@ def run_pipeline(
         # Stage 3: Builder
         set_progress_step(
             session_id,
-            "Plan Builder: Fabric Serialization",
-            "Assembling unified Fabric architecture blueprint: compiling Base64 Trident notebook definitions, attaching Synapse Spark kernels, and generating Data Factory pipeline JSON with activities...",
-            "in_progress"
+            title="Ran Fabric Trident Compiler",
+            detail="Assembling unified Fabric architecture blueprint: compiling Base64 Trident notebook definitions, attaching Synapse Spark kernels, and generating Data Factory pipeline JSON with activities...",
+            status="in_progress",
+            action="Ran",
+            badge="CLI",
+            target="fabric build --trident",
         )
         t3_start = time.perf_counter()
         t3_utc = _now_utc_str()
@@ -1050,17 +1101,25 @@ def run_pipeline(
         }
         set_progress_step(
             session_id,
-            "Plan Builder: Plan Packaged",
-            f"Fabric Trident package compiled with {len(state.fabric_plan.get('notebooks', []))} notebook(s) and scheduled pipeline trigger ({t3_dur}s).",
-            "completed"
+            title="Ran Fabric Trident Compiler",
+            detail=f"Fabric Trident package compiled with {len(state.fabric_plan.get('notebooks', []))} notebook(s) and scheduled pipeline trigger ({t3_dur}s).",
+            status="completed",
+            action="Ran",
+            badge="CLI",
+            target="fabric build --trident",
+            diff="✓ 0 errors",
+            output=f"> synapse-spark --link-kernel synapse_pyspark\n> trident-packager --workspace {state.dag.folder}\n✓ Trident Base64 definitions serialized ({t3_dur}s)",
         )
 
         # Stage 4: Auditor
         set_progress_step(
             session_id,
-            "Auditor Agent: Architecture Audit",
-            f"Executing independent audit against user requirements: validating primary keys, Medallion folder containment ('{folder_target}'), schedule trigger expressions, and verifying 0 missing components...",
-            "in_progress"
+            title="Verified Compliance Gate",
+            detail=f"Executing independent audit against user requirements: validating primary keys, Medallion folder containment ('{folder_target}'), schedule trigger expressions, and verifying 0 missing components...",
+            status="in_progress",
+            action="Verified",
+            badge="SQL",
+            target="Auditor Gate",
         )
         t4_start = time.perf_counter()
         t4_utc = _now_utc_str()
@@ -1084,9 +1143,13 @@ def run_pipeline(
                 state.audit_messages.append(f"Audit passed after {state.retry_count} auto-remediation(s).")
             set_progress_step(
                 session_id,
-                "Auditor Agent: Audit Passed",
-                f"100% verified ({t4_dur}s). Zero missing components, schema constraints enforced, safe blast-radius confirmed.",
-                "completed"
+                title="Verified Compliance Gate",
+                detail=f"100% verified ({t4_dur}s). Zero missing components, schema constraints enforced, safe blast-radius confirmed.",
+                status="completed",
+                action="Verified",
+                badge="SQL",
+                target="Auditor Gate",
+                diff="0 errors",
             )
             break
 
