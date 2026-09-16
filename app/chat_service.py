@@ -12,7 +12,9 @@ import json
 import re
 from typing import Any
 
+from collections.abc import Generator
 from app.agent_pipeline import run_pipeline
+from app.domain.llm.streaming_router import chat_stream
 from app.llm_router import chat
 
 FABRIC_STUDIO_SYSTEM = """You are Microsoft Fabric AI Studio — an autonomous enterprise data platform engineer.
@@ -183,10 +185,7 @@ def process_chat_turn(
     complexity: str = "standard",
     effort: str = "medium",
 ) -> tuple[str, dict[str, Any] | None]:
-    """
-    Executes a chat turn. If the request is an architecture request, runs the multi-agent
-    pipeline and returns the formatted response plus the full FabricPlan dict.
-    """
+    """Executes a chat turn synchronously."""
     if is_architecture_request(prompt):
         plan, audit_messages = run_pipeline(
             prompt,
@@ -198,7 +197,6 @@ def process_chat_turn(
         response_text = thought_tag + format_architecture_response(plan, audit_messages)
         return response_text, plan
 
-    # Conversational turn with system grounding
     messages = [
         {"role": "system", "content": FABRIC_STUDIO_SYSTEM},
         {"role": "user", "content": prompt},
@@ -212,5 +210,59 @@ def process_chat_turn(
         session_id=session_id,
         resume=is_resuming,
     )
-
     return response_text, None
+
+
+def process_chat_turn_stream(
+    prompt: str,
+    session_id: str,
+    is_resuming: bool = False,
+    target_model: str | None = None,
+    complexity: str = "standard",
+    effort: str = "medium",
+) -> Generator[tuple[str, str, dict[str, Any] | None], None, None]:
+    """
+    Real-time streaming chat generator.
+    Yields (event_type, chunk_text_or_stage_info, optional_plan).
+    Event types: 'stage', 'chunk', 'done'
+    """
+    if is_architecture_request(prompt):
+        yield ("stage", "⚡ Context Gate: Analyzing Fabric architectural requirements...", None)
+        plan, audit_messages = run_pipeline(
+            prompt,
+            session_id=session_id,
+            target_model=target_model,
+            effort=effort,
+        )
+        yield ("stage", "🧠 Meta-Planner: Decomposing Medallion Lakehouses & Notebooks...", None)
+        thought_tag = build_thought_meta(plan)
+        full_resp = thought_tag + format_architecture_response(plan, audit_messages)
+
+        # Stream the synthesized architecture summary in smooth chunks
+        chunk_sz = 32
+        for i in range(0, len(full_resp), chunk_sz):
+            yield ("chunk", full_resp[i : i + chunk_sz], None)
+
+        yield ("done", full_resp, plan)
+        return
+
+    # Direct conversational / query streaming via multi-provider waterfall
+    messages = [
+        {"role": "system", "content": FABRIC_STUDIO_SYSTEM},
+        {"role": "user", "content": prompt},
+    ]
+
+    accumulated: list[str] = []
+    for token in chat_stream(
+        messages=messages,
+        complexity=complexity,
+        target_model=target_model,
+        effort=effort,
+        session_id=session_id,
+        resume=is_resuming,
+    ):
+        accumulated.append(token)
+        yield ("chunk", token, None)
+
+    yield ("done", "".join(accumulated), None)
+

@@ -345,32 +345,45 @@ async def handle_chat_stream(req: ChatRequest):
     async def event_generator():
         yield f"data: {json.dumps({'type': 'init', 'session_id': sid, 'resuming': is_resuming})}\n\n"
 
-        try:
-            loop = asyncio.get_event_loop()
-            from app.chat_service import process_chat_turn
-            response_text, plan = await loop.run_in_executor(
-                None,
-                lambda: process_chat_turn(
+        queue: asyncio.Queue[tuple[str, str, Any] | None] = asyncio.Queue()
+        loop = asyncio.get_running_loop()
+
+        def producer():
+            try:
+                from app.chat_service import process_chat_turn_stream
+                for item in process_chat_turn_stream(
                     prompt=req.message,
                     session_id=sid,
                     is_resuming=is_resuming,
                     target_model=req.model,
                     complexity=req.complexity,
                     effort=req.effort,
-                ),
-            )
+                ):
+                    loop.call_soon_threadsafe(queue.put_nowait, item)
+            except Exception as ex:
+                loop.call_soon_threadsafe(queue.put_nowait, ("error", str(ex), None))
+            finally:
+                loop.call_soon_threadsafe(queue.put_nowait, None)
 
-            add_message(sid, "assistant", response_text)
+        loop.run_in_executor(None, producer)
 
-            chunk_size = 32
-            for i in range(0, len(response_text), chunk_size):
-                chunk = response_text[i : i + chunk_size]
-                yield f"data: {json.dumps({'type': 'chunk', 'text': chunk})}\n\n"
-                await asyncio.sleep(0.005)
-
-            yield f"data: {json.dumps({'type': 'done', 'session_id': sid, 'plan': plan})}\n\n"
-        except Exception as e:
-            yield f"data: {json.dumps({'type': 'error', 'error': str(e)})}\n\n"
+        full_response_text = ""
+        while True:
+            item = await queue.get()
+            if item is None:
+                break
+            ev_type, text_payload, plan_payload = item
+            if ev_type == "stage":
+                yield f"data: {json.dumps({'type': 'stage', 'text': text_payload})}\n\n"
+            elif ev_type == "chunk":
+                full_response_text += text_payload
+                yield f"data: {json.dumps({'type': 'chunk', 'text': text_payload})}\n\n"
+            elif ev_type == "done":
+                final_text = text_payload or full_response_text
+                add_message(sid, "assistant", final_text)
+                yield f"data: {json.dumps({'type': 'done', 'session_id': sid, 'plan': plan_payload})}\n\n"
+            elif ev_type == "error":
+                yield f"data: {json.dumps({'type': 'error', 'error': text_payload})}\n\n"
 
     return StreamingResponse(event_generator(), media_type="text/event-stream")
 

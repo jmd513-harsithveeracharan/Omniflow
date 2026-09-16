@@ -239,7 +239,8 @@ export async function streamChatTurn(
   onDone: (plan?: IngestionPlan | Record<string, unknown> | null) => void,
   onError: (err: string) => void,
   model?: string,
-  effort?: string
+  effort?: string,
+  onStage?: (stage: string) => void
 ): Promise<void> {
   try {
     const res = await fetch(`${API_BASE}/chat/stream`, {
@@ -271,7 +272,9 @@ export async function streamChatTurn(
         if (line.startsWith('data: ')) {
           try {
             const payload = JSON.parse(line.slice(6));
-            if (payload.type === 'chunk' && payload.text) {
+            if (payload.type === 'stage' && payload.text) {
+              if (onStage) onStage(payload.text);
+            } else if (payload.type === 'chunk' && payload.text) {
               onChunk(payload.text);
             } else if (payload.type === 'done') {
               onDone(payload.plan || null);
