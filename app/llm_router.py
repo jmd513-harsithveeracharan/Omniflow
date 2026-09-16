@@ -187,11 +187,20 @@ def _call_claude_cli(
     if not claude_bin:
         raise RuntimeError("Claude Code CLI is not installed or not found in PATH.")
 
+    valid_uuid_session = None
+    if session_id:
+        try:
+            import uuid
+            valid_uuid_session = str(uuid.UUID(session_id))
+        except Exception:
+            import uuid
+            valid_uuid_session = str(uuid.uuid5(uuid.NAMESPACE_DNS, session_id))
+
     # 1. If resuming an existing session, we only need to pass the latest turn
-    if session_id and resume:
+    if valid_uuid_session and resume:
         latest_user_msgs = [m.get("content", "") for m in messages if m.get("role") == "user"]
         latest_turn = latest_user_msgs[-1] if latest_user_msgs else "Continue"
-        cmd = [claude_bin, "-p", latest_turn, "--resume", session_id, "--tools", ""]
+        cmd = [claude_bin, "-p", latest_turn, "--resume", valid_uuid_session, "--tools", ""]
         if model:
             cmd.extend(["--model", model])
     else:
@@ -215,8 +224,8 @@ def _call_claude_cli(
 
         full_prompt = "\n\n---\n\n".join(formatted_parts) if formatted_parts else "Hello"
         cmd = [claude_bin, "-p", full_prompt, "--tools", ""]
-        if session_id:
-            cmd.extend(["--session-id", session_id])
+        if valid_uuid_session:
+            cmd.extend(["--session-id", valid_uuid_session])
         if model:
             cmd.extend(["--model", model])
 
@@ -582,8 +591,10 @@ def chat_json(
 ) -> dict:
     """
     Like chat(), but parses the response as JSON.
-    Strips markdown code fences if present before parsing.
+    Strips markdown code fences and handles embedded JSON substrings robustly.
     """
+    import re
+
     raw = chat(
         messages,
         complexity,
@@ -603,5 +614,29 @@ def chat_json(
         cleaned = "\n".join(lines).strip()
     try:
         return json.loads(cleaned)
-    except json.JSONDecodeError as e:
-        raise ValueError(f"LLM returned invalid JSON: {e}\nRaw response:\n{raw[:500]}")
+    except Exception:
+        pass
+
+    # Regex fence extraction
+    m = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", raw, re.IGNORECASE)
+    if m:
+        try:
+            return json.loads(m.group(1).strip())
+        except Exception:
+            pass
+
+    # Outer curly bracket slice
+    s, e = raw.find("{"), raw.rfind("}")
+    if s != -1 and e > s:
+        candidate = raw[s : e + 1]
+        try:
+            return json.loads(candidate)
+        except Exception:
+            cleaned_sub = re.sub(r",\s*([}\]])", r"\1", candidate)
+            try:
+                return json.loads(cleaned_sub)
+            except Exception:
+                pass
+
+    raise ValueError(f"LLM returned invalid JSON. Raw response:\n{raw[:500]}")
+

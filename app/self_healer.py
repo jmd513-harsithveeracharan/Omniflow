@@ -40,7 +40,14 @@ Output EXACTLY this JSON schema:
 }"""
 
 
-def diagnose_and_patch_code(code: str, error_trace: str, notebook_name: str = "notebook") -> dict[str, Any]:
+def diagnose_and_patch_code(
+    code: str,
+    error_trace: str,
+    notebook_name: str = "notebook",
+    target_model: str | None = None,
+    effort: str = "medium",
+    session_id: str | None = None,
+) -> dict[str, Any]:
     """
     Diagnoses runtime failure and produces a patched PySpark script.
     """
@@ -63,7 +70,14 @@ def diagnose_and_patch_code(code: str, error_trace: str, notebook_name: str = "n
     ]
 
     try:
-        diagnosis = chat_json(messages, complexity="high", max_tokens=4096)
+        diagnosis = chat_json(
+            messages,
+            complexity="high",
+            max_tokens=4096,
+            target_model=target_model,
+            effort=effort,
+            session_id=session_id,
+        )
         return {
             "success": True,
             "diagnosis": diagnosis,
@@ -78,7 +92,15 @@ def diagnose_and_patch_code(code: str, error_trace: str, notebook_name: str = "n
         }
 
 
-def auto_heal_notebook(notebook_id: str, error_trace: str, workspace_id: str, notebook_name: str = "nb_notebook") -> dict[str, Any]:
+def auto_heal_notebook(
+    notebook_id: str,
+    error_trace: str,
+    workspace_id: str,
+    notebook_name: str = "nb_notebook",
+    target_model: str | None = None,
+    effort: str = "medium",
+    session_id: str | None = None,
+) -> dict[str, Any]:
     """
     Complete closed-loop self-healing execution:
     1. Fetches current notebook definition.
@@ -122,7 +144,14 @@ def auto_heal_notebook(notebook_id: str, error_trace: str, workspace_id: str, no
         current_code = f"# PySpark code for {notebook_name}\nfrom pyspark.sql import SparkSession\nspark = SparkSession.builder.getOrCreate()\n"
 
     # 2. Diagnose & patch
-    patch_result = diagnose_and_patch_code(current_code, error_trace, notebook_name)
+    patch_result = diagnose_and_patch_code(
+        current_code,
+        error_trace,
+        notebook_name,
+        target_model=target_model,
+        effort=effort,
+        session_id=session_id,
+    )
     if not patch_result.get("success"):
         return {"success": False, "message": "Failed to synthesize patch", "error": patch_result.get("error")}
 

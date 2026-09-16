@@ -142,21 +142,35 @@ async def get_fabric_status():
         return _FABRIC_STATUS_CACHE
 
     try:
+        from app.auth import get_auth_status
+        auth_info = get_auth_status()
         workspaces = await asyncio.to_thread(list_workspaces)
         res = {
-            "authenticated": len(workspaces) > 0,
+            "authenticated": len(workspaces) > 0 or auth_info.get("authenticated", False),
             "workspace_id": ALLOWED_WORKSPACE_ID,
             "target_folder": "AI_Test_Folder",
             "workspaces_count": len(workspaces),
+            "user_identity": auth_info.get("user_identity", "Bheesetti.Harsith@Pelibiothermal.com"),
+            "auth_method": auth_info.get("auth_method", "azure_cli"),
+            "tenant_id": auth_info.get("tenant_id", "None"),
+            "expires_in_minutes": auth_info.get("expires_in_minutes", 0),
             "message": "Fabric REST API connected." if workspaces else "Offline or zero workspaces found.",
         }
         _FABRIC_STATUS_CACHE = res
         _FABRIC_STATUS_CACHE_TIME = now
         return res
     except Exception as e:
+        from app.auth import get_auth_status
+        auth_info = get_auth_status()
         return {
-            "authenticated": False,
+            "authenticated": auth_info.get("authenticated", False),
             "workspace_id": ALLOWED_WORKSPACE_ID,
+            "target_folder": "AI_Test_Folder",
+            "workspaces_count": 0,
+            "user_identity": auth_info.get("user_identity", "Bheesetti.Harsith@Pelibiothermal.com"),
+            "auth_method": auth_info.get("auth_method", "none"),
+            "tenant_id": auth_info.get("tenant_id", "None"),
+            "expires_in_minutes": 0,
             "error": str(e),
             "message": "Running in offline/mock mode or credentials not yet configured.",
         }

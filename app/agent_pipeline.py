@@ -142,6 +142,8 @@ class PipelineState:
     completed_at: str = ""
     total_duration_sec: float = 0.0
     stage_timings: dict = field(default_factory=dict)
+    target_model: str | None = None
+    effort: str = "medium"
 
 
 MAX_AUDIT_RETRIES = 2
@@ -196,7 +198,14 @@ def _run_context_gate(state: PipelineState) -> str:
         {"role": "user", "content": f"Current plan: {json.dumps(plan_summary)}\n\nNew user prompt: {state.prompt}"}
     ]
     try:
-        raw = chat(msgs, complexity="standard", max_tokens=256)
+        raw = chat(
+            msgs,
+            complexity="standard",
+            max_tokens=256,
+            target_model=state.target_model,
+            effort=state.effort,
+            session_id=state.session_id,
+        )
         parsed = _extract_json(raw)
         if parsed and parsed.get("mode") in ("follow_up", "independent"):
             return parsed["mode"]
@@ -225,7 +234,14 @@ def _run_meta_planner(state: PipelineState) -> StepDAG:
         {"role": "system", "content": META_PLANNER_SYSTEM},
         {"role": "user", "content": state.prompt + context_hint}
     ]
-    raw = chat(msgs, complexity="standard", max_tokens=2048)
+    raw = chat(
+        msgs,
+        complexity="standard",
+        max_tokens=2048,
+        target_model=state.target_model,
+        effort=state.effort,
+        session_id=state.session_id,
+    )
     parsed = _extract_json(raw)
 
     if not parsed or not parsed.get("steps"):
@@ -428,7 +444,14 @@ def _heuristic_dag(prompt: str) -> StepDAG:
 # Stage 2: Worker Agents
 # ---------------------------------------------------------------------------
 
-def _execute_notebook_worker(step: PipelineStep, folder: str, upstream: WorkerResult | None = None, session_id: str | None = None) -> WorkerResult:
+def _execute_notebook_worker(
+    step: PipelineStep,
+    folder: str,
+    upstream: WorkerResult | None = None,
+    session_id: str | None = None,
+    target_model: str | None = None,
+    effort: str = "medium",
+) -> WorkerResult:
     start_t = time.perf_counter()
     start_utc = _now_utc_str()
 
@@ -455,7 +478,14 @@ def _execute_notebook_worker(step: PipelineStep, folder: str, upstream: WorkerRe
 
     try:
         msgs = [{"role": "system", "content": sys_prompt}, {"role": "user", "content": user_prompt}]
-        raw_code = chat(msgs, complexity="high", max_tokens=3000)
+        raw_code = chat(
+            msgs,
+            complexity="high",
+            max_tokens=3000,
+            target_model=target_model,
+            effort=effort,
+            session_id=session_id,
+        )
         code = raw_code.strip()
         if code.startswith("```"):
             lines = code.split("\n")
@@ -497,7 +527,13 @@ def _execute_notebook_worker(step: PipelineStep, folder: str, upstream: WorkerRe
         )
 
 
-def _run_workers(dag: StepDAG, only_steps: list | None = None, session_id: str | None = None) -> dict:
+def _run_workers(
+    dag: StepDAG,
+    only_steps: list | None = None,
+    session_id: str | None = None,
+    target_model: str | None = None,
+    effort: str = "medium",
+) -> dict:
     notebook_steps = [s for s in dag.steps if s.type == "notebook"]
     if only_steps:
         notebook_steps = [s for s in notebook_steps if s.name in only_steps]
@@ -510,14 +546,23 @@ def _run_workers(dag: StepDAG, only_steps: list | None = None, session_id: str |
     results = {}
     last_result = None
     for step in medallion_steps:
-        res = _execute_notebook_worker(step, dag.folder, upstream=last_result, session_id=session_id)
+        res = _execute_notebook_worker(
+            step,
+            dag.folder,
+            upstream=last_result,
+            session_id=session_id,
+            target_model=target_model,
+            effort=effort,
+        )
         results[step.step_id] = res
         last_result = res
 
     if parallel_steps:
         with concurrent.futures.ThreadPoolExecutor(max_workers=min(len(parallel_steps), 6)) as pool:
-            future_map = {pool.submit(_execute_notebook_worker, s, dag.folder, None, session_id): s.step_id
-                          for s in parallel_steps}
+            future_map = {
+                pool.submit(_execute_notebook_worker, s, dag.folder, None, session_id, target_model, effort): s.step_id
+                for s in parallel_steps
+            }
             for future in concurrent.futures.as_completed(future_map):
                 sid = future_map[future]
                 try:
@@ -774,7 +819,13 @@ def _run_builder(dag: StepDAG, worker_results: dict, run_id: str) -> dict:
 # Stage 4: Auditor
 # ---------------------------------------------------------------------------
 
-def _run_auditor(prompt: str, plan: dict) -> AuditResult:
+def _run_auditor(
+    prompt: str,
+    plan: dict,
+    target_model: str | None = None,
+    effort: str = "medium",
+    session_id: str | None = None,
+) -> AuditResult:
     start_t = time.perf_counter()
     start_utc = _now_utc_str()
 
@@ -790,7 +841,14 @@ def _run_auditor(prompt: str, plan: dict) -> AuditResult:
         {"role": "user", "content": f"User original request:\n{prompt}\n\nAssembled plan:\n{json.dumps(plan_summary, indent=2)}"}
     ]
     try:
-        raw = chat(msgs, complexity="standard", max_tokens=512)
+        raw = chat(
+            msgs,
+            complexity="standard",
+            max_tokens=512,
+            target_model=target_model,
+            effort=effort,
+            session_id=session_id,
+        )
         parsed = _extract_json(raw)
         end_t = time.perf_counter()
         if parsed:
@@ -825,8 +883,14 @@ def _run_auditor(prompt: str, plan: dict) -> AuditResult:
 # Top-Level Entry Point
 # ---------------------------------------------------------------------------
 
-def run_pipeline(prompt: str, session_id: str, history: list | None = None,
-                 current_plan: dict | None = None) -> tuple:
+def run_pipeline(
+    prompt: str,
+    session_id: str,
+    history: list | None = None,
+    current_plan: dict | None = None,
+    target_model: str | None = None,
+    effort: str = "medium",
+) -> tuple:
     """
     Main entry point for the 4-stage multi-agent pipeline.
     Returns: (FabricPlan dict, list of audit chat messages)
@@ -844,7 +908,9 @@ def run_pipeline(prompt: str, session_id: str, history: list | None = None,
         prompt=prompt,
         session_id=session_id,
         history=history or [],
-        current_plan=current_plan
+        current_plan=current_plan,
+        target_model=target_model,
+        effort=effort,
     )
 
     # Stage 0: Context Gate
@@ -908,7 +974,12 @@ def run_pipeline(prompt: str, session_id: str, history: list | None = None,
         t2_start = time.perf_counter()
         t2_utc = _now_utc_str()
         try:
-            new_results = _run_workers(state.dag, session_id=session_id)
+            new_results = _run_workers(
+                state.dag,
+                session_id=session_id,
+                target_model=state.target_model,
+                effort=state.effort,
+            )
             state.worker_results.update(new_results)
         except Exception as e:
             raise RuntimeError(f"Worker execution failed: {e}")
@@ -952,7 +1023,13 @@ def run_pipeline(prompt: str, session_id: str, history: list | None = None,
         )
         t4_start = time.perf_counter()
         t4_utc = _now_utc_str()
-        state.audit = _run_auditor(prompt, state.fabric_plan)
+        state.audit = _run_auditor(
+            prompt,
+            state.fabric_plan,
+            target_model=state.target_model,
+            effort=state.effort,
+            session_id=session_id,
+        )
         t4_end = time.perf_counter()
         t4_dur = round(t4_end - t4_start, 2)
         state.stage_timings[f"Stage 4 (Auditor - Attempt {state.retry_count + 1})"] = {

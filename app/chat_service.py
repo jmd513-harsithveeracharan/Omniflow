@@ -8,6 +8,7 @@ and answers conversational queries using grounded Fabric AI Studio context.
 
 from __future__ import annotations
 
+import json
 import re
 from typing import Any
 
@@ -187,7 +188,12 @@ def process_chat_turn(
     pipeline and returns the formatted response plus the full FabricPlan dict.
     """
     if is_architecture_request(prompt):
-        plan, audit_messages = run_pipeline(prompt, session_id=session_id)
+        plan, audit_messages = run_pipeline(
+            prompt,
+            session_id=session_id,
+            target_model=target_model,
+            effort=effort,
+        )
         thought_tag = build_thought_meta(plan)
         response_text = thought_tag + format_architecture_response(plan, audit_messages)
         return response_text, plan

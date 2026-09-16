@@ -251,3 +251,49 @@ def test_api_fabric_deploy_endpoint(mock_auth):
         assert data["status"] == "success"
         assert data["run_id"] == "run_api_test"
         assert len(data["deployed_items"]) >= 3  # folder, lakehouse, notebook
+
+
+def test_pipeline_model_and_effort_propagation():
+    """Verifies that target_model and effort propagate to all LLM chat calls in run_pipeline."""
+    from app.agent_pipeline import run_pipeline
+    from app.chat_service import process_chat_turn
+
+    captured_chat_calls = []
+
+    def mock_chat(messages, complexity="standard", max_tokens=4096, target_model=None, effort="medium", session_id=None, resume=False):
+        captured_chat_calls.append({
+            "complexity": complexity,
+            "target_model": target_model,
+            "effort": effort,
+            "session_id": session_id,
+        })
+        # If worker code call
+        if complexity == "high":
+            return "# PySpark sample code\ndf = spark.read.format('delta')\n"
+        # Meta-planner or auditor JSON response
+        if "meta_planner" in str(messages).lower() or "planner" in str(messages).lower():
+            return '{"folder": "AI_Test_Folder", "steps": [{"step_id": "s1", "type": "notebook", "name": "nb_test_bronze", "layer": "Bronze", "description": "Bronze ingest"}], "pipeline": null}'
+        if "auditor" in str(messages).lower():
+            return '{"passed": true, "missing_items": [], "extra_items": [], "chat_message": "Audit passed."}'
+        return '{"mode": "independent"}'
+
+    with patch("app.agent_pipeline.chat", side_effect=mock_chat), \
+         patch("app.chat_service.chat", side_effect=mock_chat):
+        
+        response_text, plan = process_chat_turn(
+            prompt="Create project folder Sales with nb_test_bronze and lh_bronze",
+            session_id="test-session-model-routing",
+            target_model="Gemini 3.6 Flash",
+            effort="high",
+        )
+
+        assert plan is not None
+        assert response_text.startswith("<!-- THOUGHT:")
+        assert len(captured_chat_calls) >= 3
+
+        # Every LLM chat call during pipeline execution must preserve target_model and effort
+        for call in captured_chat_calls:
+            assert call["target_model"] == "Gemini 3.6 Flash"
+            assert call["effort"] == "high"
+            assert call["session_id"] == "test-session-model-routing"
+

@@ -159,7 +159,13 @@ def _heuristic_intent_fallback(prompt: str) -> dict:
     }
 
 
-def parse_intent(prompt: str, history: list[dict] | None = None) -> dict:
+def parse_intent(
+    prompt: str,
+    history: list[dict] | None = None,
+    target_model: str | None = None,
+    effort: str = "medium",
+    session_id: str | None = None,
+) -> dict:
     """Extracts structured intent from user prompt using LLM grounded with specialized Fabric skills."""
     # Dynamically select and load relevant grounded skills
     selected_skills = ["using_fabric_skills"]
@@ -183,7 +189,14 @@ def parse_intent(prompt: str, history: list[dict] | None = None) -> dict:
         messages.extend(history[-6:])
     messages.append({"role": "user", "content": prompt})
 
-    raw = chat(messages, complexity="standard", max_tokens=2048)
+    raw = chat(
+        messages,
+        complexity="standard",
+        max_tokens=2048,
+        target_model=target_model,
+        effort=effort,
+        session_id=session_id,
+    )
 
     # Fast regex match for direct deploy
     deploy_match = re.search(r"\b(?:deploy|launch|provision|execute)\s+(?:this|the|current|active)?\s*(?:plan|architecture|pipeline|items)?\b", prompt, re.IGNORECASE)
@@ -198,7 +211,13 @@ def parse_intent(prompt: str, history: list[dict] | None = None) -> dict:
     return _heuristic_intent_fallback(prompt)
 
 
-def _generate_single_notebook_code(nb: dict, folder: str) -> str:
+def _generate_single_notebook_code(
+    nb: dict,
+    folder: str,
+    target_model: str | None = None,
+    effort: str = "medium",
+    session_id: str | None = None,
+) -> str:
     """Generates PySpark/Python code for a single notebook."""
     nb_name = nb.get("name", "nb_transform")
     desc = nb.get("description", "PySpark data transformation")
@@ -230,7 +249,14 @@ def _generate_single_notebook_code(nb: dict, folder: str) -> str:
 
     user_prompt = f"Write PySpark code for notebook '{nb_name}' in project folder '{folder}'. Description: {desc}"
     msgs = [{"role": "system", "content": sys_prompt}, {"role": "user", "content": user_prompt}]
-    code = chat(msgs, complexity="standard", max_tokens=2048)
+    code = chat(
+        msgs,
+        complexity="standard",
+        max_tokens=2048,
+        target_model=target_model,
+        effort=effort,
+        session_id=session_id,
+    )
     clean_code = code.strip()
     if clean_code.startswith("```"):
         lines = clean_code.split("\n")
@@ -242,7 +268,13 @@ def _generate_single_notebook_code(nb: dict, folder: str) -> str:
     return clean_code
 
 
-def generate_notebook_codes(notebooks: list[dict], folder: str) -> dict[str, str]:
+def generate_notebook_codes(
+    notebooks: list[dict],
+    folder: str,
+    target_model: str | None = None,
+    effort: str = "medium",
+    session_id: str | None = None,
+) -> dict[str, str]:
     """Generates PySpark code for all notebooks in parallel."""
     codes = {}
     if not notebooks:
@@ -250,7 +282,7 @@ def generate_notebook_codes(notebooks: list[dict], folder: str) -> dict[str, str
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=min(len(notebooks), 4)) as pool:
         future_map = {
-            pool.submit(_generate_single_notebook_code, nb, folder): nb.get("name", f"nb_{i}")
+            pool.submit(_generate_single_notebook_code, nb, folder, target_model, effort, session_id): nb.get("name", f"nb_{i}")
             for i, nb in enumerate(notebooks)
         }
         for future in concurrent.futures.as_completed(future_map):
