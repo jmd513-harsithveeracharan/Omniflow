@@ -129,13 +129,11 @@ def set_progress_step(
 
 
 def clear_progress(session_id: str) -> None:
-    """Cleans up memory for a completed session."""
+    """Cleans up active progress memory for a session."""
     if not session_id:
         return
     with _PROGRESS_LOCK:
         _ACTIVE_PROGRESS.pop(session_id, None)
-    with _LISTENERS_LOCK:
-        _STEP_LISTENERS.pop(session_id, None)
 
 
 def _now_utc_str() -> str:

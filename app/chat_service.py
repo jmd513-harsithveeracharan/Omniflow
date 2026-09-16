@@ -285,12 +285,19 @@ def process_chat_turn_stream(
         # Stream thought steps in real time as each agent node fires
         while True:
             try:
-                step_item = step_q.get(timeout=0.1)
+                step_item = step_q.get(timeout=0.05)
                 if step_item is None:
                     break
                 yield ("thought_step", json.dumps(step_item), None)
             except queue.Empty:
                 if not worker_th.is_alive():
+                    while not step_q.empty():
+                        try:
+                            rem = step_q.get_nowait()
+                            if rem is not None:
+                                yield ("thought_step", json.dumps(rem), None)
+                        except Exception:
+                            break
                     break
 
         remove_step_listener(session_id, on_step_event)

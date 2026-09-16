@@ -176,21 +176,23 @@ export const ChatTimeline: React.FC<ChatTimelineProps> = ({
             );
           }
 
-          const liveThoughtMeta: import('../types').ThoughtMeta | null =
-            m.thoughtSteps && m.thoughtSteps.length > 0
-              ? { steps: m.thoughtSteps, elapsed: m.thoughtElapsed }
-              : thoughtMeta;
-
           const isCurrentlyStreaming = Boolean(m.isStreaming || (isStreaming && idx === messages.length - 1));
+
+          const liveThoughtMeta: import('../types').ThoughtMeta | null =
+            !isCurrentlyStreaming && thoughtMeta && (thoughtMeta.steps.length >= (m.thoughtSteps?.length || 0))
+              ? thoughtMeta
+              : m.thoughtSteps && m.thoughtSteps.length > 0
+              ? { steps: m.thoughtSteps, elapsed: m.thoughtElapsed || thoughtMeta?.elapsed }
+              : thoughtMeta;
 
           const activeMeta: import('../types').ThoughtMeta = liveThoughtMeta || {
             elapsed: '0.0',
             steps: [
               {
-                title: 'Explored Context & Intent',
+                title: 'Explored Active Context',
                 action: 'Explored',
                 badge: 'DAG',
-                target: 'Active Context & Workspace Schema',
+                target: 'Active Context',
                 detail: 'Analyzing request intent, workspace parameters, and Medallion requirements...',
                 status: 'in_progress',
               },
