@@ -28,6 +28,9 @@ Thumbs.db
 *.log
 logs/
 *.db
+*.db-*
+*.sqlite
+execution_traces/
 
 # Reference Repos & Archives
 _reference_repos/
@@ -38,6 +41,7 @@ scratch/
 claude_response.txt
 ingest-one-feat-ai-driven-onboarding/
 diagrams/
+agentic_snowball_arr-main/
 
 # Test artifacts
 .pytest_cache/
