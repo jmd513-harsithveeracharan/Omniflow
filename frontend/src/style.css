@@ -3299,110 +3299,237 @@ ul.chat-md-list {
     font-size: 13.5px;
 }
 
-/* ═══════════════ CODE BLOCKS & SYNTAX HIGHLIGHTING ═══════════════ */
+/* ═══════════════ ULTRA-VIBRANT CODE BLOCKS & SYNTAX HIGHLIGHTING ═══════════════ */
+.modern-code-card,
 .code-card {
-    margin: 14px 0;
-    border-radius: 10px;
-    background: #141416;
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    margin: 16px 0;
+    border-radius: 16px;
+    background: #111317;
+    border: 1px solid rgba(255, 255, 255, 0.09);
     overflow: hidden;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5), 0 2px 8px rgba(0, 0, 0, 0.3);
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
+.modern-code-card:hover,
+.code-card:hover {
+    border-color: rgba(255, 255, 255, 0.15);
+    box-shadow: 0 12px 36px rgba(0, 0, 0, 0.6), 0 4px 12px rgba(0, 0, 0, 0.35);
+}
+
+.modern-code-header,
 .code-card-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 6px 14px;
-    background: #1f2023;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    padding: 10px 18px;
+    background: #16181d;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.07);
 }
 
+.modern-code-title-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.modern-code-lang-label,
 .code-lang-label {
-    font-size: 11.5px;
-    font-family: var(--font-mono, monospace);
-    color: #9ca3af;
-    text-transform: lowercase;
-    font-weight: 500;
+    font-size: 13px;
+    font-family: var(--font-mono, 'JetBrains Mono', 'Fira Code', monospace);
+    color: #f4f4f5;
+    font-weight: 600;
+    letter-spacing: -0.01em;
 }
 
+.modern-code-line-badge {
+    font-size: 11px;
+    font-family: var(--font-mono, 'JetBrains Mono', 'Fira Code', monospace);
+    color: #71717a;
+    background: rgba(255, 255, 255, 0.05);
+    padding: 1px 6px;
+    border-radius: 4px;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.modern-code-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.modern-code-btn,
 .code-copy-btn {
     display: inline-flex;
     align-items: center;
-    gap: 5px;
-    padding: 3px 8px;
-    border-radius: 4px;
-    border: none;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    border: 1px solid transparent;
     background: transparent;
-    color: #9ca3af;
-    font-size: 12px;
+    color: #a1a1aa;
     cursor: pointer;
     transition: all 0.15s ease;
 }
 
+.modern-code-btn:hover,
 .code-copy-btn:hover {
-    background: rgba(255, 255, 255, 0.08);
-    color: #f3f4f6;
+    background: rgba(255, 255, 255, 0.09);
+    border-color: rgba(255, 255, 255, 0.12);
+    color: #ffffff;
 }
 
+.modern-code-btn.is-copied,
 .code-copy-btn.copied {
     color: #10b981;
+    background: rgba(16, 185, 129, 0.12);
+    border-color: rgba(16, 185, 129, 0.25);
 }
 
+.modern-code-body-wrapper {
+    position: relative;
+}
+
+.modern-code-pre,
 .code-card-body {
     margin: 0;
-    padding: 14px 16px;
-    font-family: var(--font-mono, 'JetBrains Mono', 'Fira Code', monospace);
+    padding: 18px 22px;
+    font-family: var(--font-mono, 'JetBrains Mono', 'Fira Code', 'SF Mono', Consolas, monospace);
     font-size: 13.5px;
-    line-height: 1.55;
+    font-weight: 480;
+    line-height: 1.7;
     overflow-x: auto;
-    color: #abb2bf;
-    background: #141416;
+    color: #f1f5f9;
+    background: #111317;
+    tab-size: 4;
+    white-space: pre;
+    word-spacing: normal;
+    word-break: normal;
 }
 
-/* Syntax Highlighting Colors (Prism & Single-Pass Syn) */
-.syn-kw, .token.keyword { color: #c678dd !important; font-weight: 600; }
-.syn-fn, .token.function { color: #61afef !important; }
-.syn-cls, .token.class-name { color: #e5c07b !important; }
-.syn-str, .token.string { color: #98c379 !important; }
-.syn-num, .token.number { color: #d19a66 !important; }
-.syn-com, .token.comment { color: #5c6370 !important; font-style: italic; }
-.syn-blt, .token.builtin { color: #e5c07b !important; }
-.syn-dec, .token.decorator { color: #d19a66 !important; }
-.syn-op, .token.operator { color: #56b6c2 !important; }
-.syn-bool, .token.boolean { color: #d19a66 !important; font-weight: 600; }
-.token.punctuation { color: #abb2bf !important; }
-.token.property { color: #e06c75 !important; }
-.token.variable { color: #e06c75 !important; }
-.token.attr-name { color: #e5c07b !important; }
-.token.attr-value { color: #98c379 !important; }
-.token.tag { color: #e06c75 !important; }
+.modern-code-fade-gradient {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 60px;
+    background: linear-gradient(to bottom, transparent, #111317 90%);
+    pointer-events: none;
+}
 
+.modern-code-footer,
 .code-card-footer {
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 7px 14px;
-    background: #1a1b1e;
-    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    padding: 8px 16px;
+    background: #16181d;
+    border-top: 1px solid rgba(255, 255, 255, 0.07);
 }
 
+.modern-code-expand-btn,
 .btn-code-show-more {
     display: inline-flex;
     align-items: center;
     gap: 6px;
     background: transparent;
     border: none;
-    color: #9ca3af;
+    color: #a1a1aa;
     font-size: 12px;
     font-weight: 500;
     cursor: pointer;
-    transition: color 0.15s ease;
+    transition: all 0.15s ease;
 }
 
+.modern-code-expand-btn:hover,
 .btn-code-show-more:hover {
     color: #38bdf8;
 }
+
+/* ═══════════════ VIBRANT SYNTAX TOKEN PALETTE ═══════════════ */
+/* 1. Comments: Sleek Slate Gray (Grey comments, NEVER green) */
+.token.comment,
+.token.prolog,
+.token.doctype,
+.token.cdata,
+.syn-com {
+    color: #71717a !important;
+    font-style: normal !important;
+    font-weight: 400 !important;
+}
+
+/* 2. Keywords & Flow: Vibrant Electric Indigo / Periwinkle Blue */
+.token.keyword,
+.token.atrule,
+.syn-kw {
+    color: #818cf8 !important;
+    font-weight: 600 !important;
+}
+
+/* 3. Functions & Method Calls: Vibrant Soft Coral / Bright Rose (like .filter, .table, .join) */
+.token.function,
+.token.function-call,
+.syn-fn {
+    color: #fb7185 !important;
+    font-weight: 500 !important;
+}
+
+/* 4. Strings & Literals: Bright Glowing Neon Emerald */
+.token.string,
+.token.char,
+.token.attr-value,
+.syn-str {
+    color: #4ade80 !important;
+    font-weight: 450 !important;
+}
+
+/* 5. Numbers, Booleans & Constants: Vibrant Warm Amber */
+.token.number,
+.token.boolean,
+.token.constant,
+.token.symbol,
+.syn-num,
+.syn-bool {
+    color: #fbbf24 !important;
+    font-weight: 600 !important;
+}
+
+/* 6. Builtins, Classes, Types & Decorators: Bright Sky Cyan */
+.token.builtin,
+.token.class-name,
+.token.decorator,
+.syn-blt,
+.syn-cls,
+.syn-dec {
+    color: #38bdf8 !important;
+    font-weight: 500 !important;
+}
+
+/* 7. Variables, Properties & Plain Text: Crisp Bright Off-White */
+.token.variable,
+.token.property,
+.token.parameter {
+    color: #f8fafc !important;
+    font-weight: 480 !important;
+}
+
+/* 8. Punctuation & Operators: Clean Light Slate */
+.token.punctuation,
+.token.operator,
+.syn-op {
+    color: #94a3b8 !important;
+}
+
+/* 9. Tags, Selector & Regex: Vibrant Violet / Purple */
+.token.tag,
+.token.selector,
+.token.regex,
+.token.important {
+    color: #c084fc !important;
+    font-weight: 500 !important;
+}
+
 
 .chat-md-pre {
     background: #141416;
@@ -10428,15 +10555,17 @@ ul.chat-md-list {
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   PRISM.JS SYNTAX HIGHLIGHTING TOKENS (VSCODE DARK MODERN / GOOGLE AI STUDIO)
+   PRISM.JS SYNTAX HIGHLIGHTING TOKENS (ULTRA-VIBRANT / DARK OBSIDIAN MODERN)
    ═══════════════════════════════════════════════════════════════════════════ */
+.modern-code-body-wrapper code,
 .code-card-body code,
 code[class*="language-"],
 pre[class*="language-"] {
-    font-family: var(--font-mono, 'Roboto Mono', 'JetBrains Mono', monospace);
-    font-size: 12.5px;
-    line-height: 1.6;
-    color: #d4d4d8;
+    font-family: var(--font-mono, 'JetBrains Mono', 'Fira Code', 'SF Mono', Consolas, monospace);
+    font-size: 13.5px;
+    font-weight: 480;
+    line-height: 1.7;
+    color: #f1f5f9;
     text-shadow: none;
     direction: ltr;
     text-align: left;
@@ -10451,65 +10580,80 @@ pre[class*="language-"] {
 .token.prolog,
 .token.doctype,
 .token.cdata {
-    color: #6a9955 !important;
-    font-style: italic;
+    color: #71717a !important;
+    font-style: normal !important;
+    font-weight: 400 !important;
 }
 
 .token.punctuation {
-    color: #9ca3af !important;
+    color: #94a3b8 !important;
 }
 
 .token.property,
-.token.tag,
+.token.variable,
+.token.parameter {
+    color: #f8fafc !important;
+    font-weight: 480 !important;
+}
+
 .token.boolean,
 .token.number,
 .token.constant,
-.token.symbol,
-.token.deleted {
-    color: #b5cea8 !important;
+.token.symbol {
+    color: #fbbf24 !important;
+    font-weight: 600 !important;
 }
 
-.token.selector,
-.token.attr-name,
 .token.string,
 .token.char,
-.token.builtin,
+.token.attr-value,
 .token.inserted {
-    color: #ce9178 !important;
+    color: #4ade80 !important;
+    font-weight: 450 !important;
 }
 
 .token.operator,
 .token.entity,
 .token.url {
-    color: #d4d4d8 !important;
+    color: #94a3b8 !important;
 }
 
 .token.atrule,
-.token.attr-value,
 .token.keyword {
-    color: #569cd6 !important;
-    font-weight: 500;
+    color: #818cf8 !important;
+    font-weight: 600 !important;
 }
 
 .token.function,
-.token.class-name {
-    color: #dcdcaa !important;
+.token.function-call {
+    color: #fb7185 !important;
+    font-weight: 500 !important;
 }
 
+.token.class-name,
+.token.builtin,
+.token.decorator {
+    color: #38bdf8 !important;
+    font-weight: 500 !important;
+}
+
+.token.tag,
+.token.selector,
 .token.regex,
-.token.important,
-.token.variable {
-    color: #9cdcfe !important;
+.token.important {
+    color: #c084fc !important;
+    font-weight: 500 !important;
 }
 
 .token.important,
 .token.bold {
-    font-weight: bold;
+    font-weight: 700;
 }
 
 .token.italic {
     font-style: italic;
 }
+
 
 /* ═══════════════════════════════════════════════════════════════════════════
    CHAT MARKDOWN ENHANCEMENTS & FABRIC ASSET CARDS

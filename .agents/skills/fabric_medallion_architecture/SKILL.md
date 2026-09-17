@@ -29,11 +29,34 @@ description: Playbook for designing and provisioning multi-tier Medallion (Bronz
   }
   ```
 
-## 3. PySpark Notebook Template
+## 3. PySpark Notebook Template & Code Standards
 Every generated notebook must use the `synapse_pyspark` kernel and standard OneLake ABFSS paths:
 ```python
 # OneLake Path Resolution (Dynamic)
 workspace_id = spark.conf.get("trident.workspace.id")
 lakehouse_name = "lh_sales_bronze"
 target_path = f"abfss://{lakehouse_name}@onelake.dfs.fabric.microsoft.com/Tables/{table_name}"
+```
+
+### PySpark Deduplication (Silver)
+```python
+from pyspark.sql.window import Window
+from pyspark.sql import functions as F
+
+# Correct Window usage
+window_spec = Window.partitionBy("transaction_id").orderBy(F.col("_ingest_ts").desc())
+dedup_df = bronze_df.withColumn("row_num", F.row_number().over(window_spec)).filter("row_num = 1").drop("row_num")
+```
+
+### Fact Table Star Schema & Partitioning (Gold)
+```python
+# Ensure partition columns exist in the projection
+fact_df = spark.sql("""
+    SELECT 
+        s.sale_id, s.product_id, s.store_id, s.date_id,
+        d.year, d.month, s.quantity, s.revenue
+    FROM silver_sales s
+    JOIN dim_date d ON s.date_id = d.date_id
+""")
+fact_df.write.format("delta").mode("overwrite").partitionBy("year", "month").save(fact_path)
 ```
