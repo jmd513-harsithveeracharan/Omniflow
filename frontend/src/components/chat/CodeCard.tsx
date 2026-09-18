@@ -203,6 +203,8 @@ export const CodeCard: React.FC<CodeCardProps> = ({ language, code, filename }) 
           className="modern-code-pre"
           style={{
             maxHeight: isLong && !isExpanded ? '360px' : 'none',
+            overflowY: isLong && !isExpanded ? 'hidden' : 'visible',
+            overflowX: 'auto',
           }}
         >
           <code

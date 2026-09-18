@@ -3408,6 +3408,12 @@ ul.chat-md-list {
     word-break: normal;
 }
 
+.modern-code-card.is-collapsed .modern-code-pre,
+.code-card.is-collapsed .code-card-body {
+    overflow-y: hidden !important;
+    max-height: 360px;
+}
+
 .modern-code-fade-gradient {
     position: absolute;
     bottom: 0;
