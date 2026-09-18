@@ -10708,12 +10708,13 @@ pre[class*="language-"] {
 
 .chat-md-inline-code {
     background: rgba(255, 255, 255, 0.08);
-    padding: 2px 6px;
+    padding: 2px 7px;
     border-radius: 4px;
     font-size: 13px;
-    font-family: var(--font-mono, 'Roboto Mono', monospace);
-    color: #38bdf8;
-    border: 1px solid rgba(255, 255, 255, 0.05);
+    font-family: var(--font-mono, 'JetBrains Mono', 'Roboto Mono', monospace);
+    color: #f4f4f5 !important;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    font-weight: 500;
 }
 
 .chat-md-italic {
