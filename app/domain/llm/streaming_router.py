@@ -316,12 +316,22 @@ def chat_stream(
     if stream_fn:
         candidates.append((stream_fn, provider_name, model_name))
 
-    if _get_claude_cli_binary():
-        candidates.append((lambda: stream_claude_cli(messages, None, max_tokens, session_id=session_id, resume=resume), "Anthropic (CLI)", "claude-code-cli"))
-    if GEMINI_KEY:
-        candidates.append((lambda: stream_gemini(messages, LLM_MODELS.get("gemini_standard", "gemini-3.6-flash"), max_tokens), "Google Gemini", "gemini-3.6-flash"))
-    if GROQ_KEYS:
-        candidates.append((lambda: stream_groq(messages, LLM_MODELS.get("groq_fast", "openai/gpt-oss-20b"), max_tokens), "Groq Cloud", "openai/gpt-oss-20b"))
+    if complexity == "complex" or (target_model and "claude" in target_model.lower()):
+        # Complex DE architecture & code generation: Prioritize Claude CLI / Sonnet
+        if _get_claude_cli_binary() and not stream_fn:
+            candidates.append((lambda: stream_claude_cli(messages, None, max_tokens, session_id=session_id, resume=resume), "Anthropic (CLI)", "claude-code-cli"))
+        if GEMINI_KEY:
+            candidates.append((lambda: stream_gemini(messages, LLM_MODELS.get("gemini_high", "gemini-2.5-pro"), max_tokens), "Google Gemini", "gemini-2.5-pro"))
+        if GROQ_KEYS:
+            candidates.append((lambda: stream_groq(messages, LLM_MODELS.get("groq_high", "openai/gpt-oss-120b"), max_tokens), "Groq Cloud", "openai/gpt-oss-120b"))
+    else:
+        # Standard / general conversation: Use fast Gemini & Groq to save Claude subscription quota
+        if GEMINI_KEY:
+            candidates.append((lambda: stream_gemini(messages, LLM_MODELS.get("gemini_standard", "gemini-3.6-flash"), max_tokens), "Google Gemini", "gemini-3.6-flash"))
+        if GROQ_KEYS:
+            candidates.append((lambda: stream_groq(messages, LLM_MODELS.get("groq_fast", "openai/gpt-oss-20b"), max_tokens), "Groq Cloud", "openai/gpt-oss-20b"))
+        if _get_claude_cli_binary() and not candidates:
+            candidates.append((lambda: stream_claude_cli(messages, None, max_tokens, session_id=session_id, resume=resume), "Anthropic (CLI)", "claude-code-cli"))
 
     last_err: Exception | None = None
     for gen_fn, prov, mdl in candidates:

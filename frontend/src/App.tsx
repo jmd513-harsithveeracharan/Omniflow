@@ -223,16 +223,7 @@ export const App: React.FC = () => {
       role: 'assistant',
       content: '',
       isStreaming: true,
-      thoughtSteps: [
-        {
-          title: 'Explored Context & Intent',
-          action: 'Explored',
-          badge: 'DAG',
-          target: 'Active Context & Workspace Schema',
-          detail: 'Analyzing request intent, workspace parameters, and Medallion requirements...',
-          status: 'in_progress',
-        },
-      ],
+      thoughtSteps: [],
       thoughtElapsed: '0.0',
     };
     setMessages((prev) => [...prev, userMsg, placeholderAssistantMsg]);

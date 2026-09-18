@@ -179,30 +179,25 @@ export const ChatTimeline: React.FC<ChatTimelineProps> = ({
           const isCurrentlyStreaming = Boolean(m.isStreaming || (isStreaming && idx === messages.length - 1));
 
           const liveThoughtMeta: import('../types').ThoughtMeta | null =
-            !isCurrentlyStreaming && thoughtMeta && (thoughtMeta.steps.length >= (m.thoughtSteps?.length || 0))
+            m.thoughtSteps && m.thoughtSteps.length > 0
+              ? { steps: m.thoughtSteps, elapsed: m.thoughtElapsed || thoughtMeta?.elapsed || '0.0' }
+              : thoughtMeta && thoughtMeta.steps && thoughtMeta.steps.length > 0
               ? thoughtMeta
-              : m.thoughtSteps && m.thoughtSteps.length > 0
-              ? { steps: m.thoughtSteps, elapsed: m.thoughtElapsed || thoughtMeta?.elapsed }
-              : thoughtMeta;
-
-          const activeMeta: import('../types').ThoughtMeta = liveThoughtMeta || {
-            elapsed: '0.0',
-            steps: [
-              {
-                title: 'Explored Active Context',
-                action: 'Explored',
-                badge: 'DAG',
-                target: 'Active Context',
-                detail: 'Analyzing request intent, workspace parameters, and Medallion requirements...',
-                status: 'in_progress',
-              },
-            ],
-          };
+              : null;
 
           return (
             <div key={idx} className="chat-bubble assistant" data-raw-content={cleanContent}>
-              {(liveThoughtMeta || isCurrentlyStreaming) && (
-                <ThoughtTrace meta={activeMeta} isStreaming={isCurrentlyStreaming} />
+              {liveThoughtMeta && liveThoughtMeta.steps.length > 0 && (
+                <ThoughtTrace meta={liveThoughtMeta} isStreaming={isCurrentlyStreaming} />
+              )}
+
+              {!cleanContent && isCurrentlyStreaming && (!liveThoughtMeta || liveThoughtMeta.steps.length === 0) && (
+                <div className="chat-content-card" style={{ padding: '12px 18px' }}>
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', color: '#a1a1aa', fontSize: '13px' }}>
+                    <span className="thinking-pulse-dot" style={{ width: '6px', height: '6px' }} />
+                    <span>Generating response...</span>
+                  </div>
+                </div>
               )}
 
               {cleanContent ? (
