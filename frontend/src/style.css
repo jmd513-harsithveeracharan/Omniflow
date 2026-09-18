@@ -3304,7 +3304,7 @@ ul.chat-md-list {
 .code-card {
     margin: 16px 0;
     border-radius: 16px;
-    background: #16181d !important;
+    background: #1c1c1f !important;
     border: 1px solid rgba(255, 255, 255, 0.08) !important;
     overflow: hidden;
     box-shadow: 0 8px 30px rgba(0, 0, 0, 0.45), 0 2px 8px rgba(0, 0, 0, 0.25);
@@ -3324,7 +3324,7 @@ ul.chat-md-list {
     align-items: center;
     justify-content: space-between;
     padding: 14px 22px 0 22px !important;
-    background: #16181d !important;
+    background: #1c1c1f !important;
     border: none !important;
     border-bottom: none !important;
 }
@@ -3386,7 +3386,7 @@ ul.chat-md-list {
 
 .modern-code-body-wrapper {
     position: relative;
-    background: #16181d !important;
+    background: #1c1c1f !important;
 }
 
 .markdown-body .modern-code-card pre.modern-code-pre,
@@ -3401,7 +3401,7 @@ ul.chat-md-list {
     line-height: 1.7 !important;
     overflow-x: auto;
     color: #f1f5f9 !important;
-    background: #16181d !important;
+    background: #1c1c1f !important;
     border: none !important;
     border-radius: 0 !important;
     box-shadow: none !important;
@@ -3423,7 +3423,7 @@ ul.chat-md-list {
     left: 0;
     right: 0;
     height: 60px;
-    background: linear-gradient(to bottom, rgba(22, 24, 29, 0) 0%, rgba(22, 24, 29, 0.45) 30%, rgba(22, 24, 29, 0.88) 70%, #16181d 100%);
+    background: linear-gradient(to bottom, rgba(28, 28, 31, 0) 0%, rgba(28, 28, 31, 0.45) 30%, rgba(28, 28, 31, 0.88) 70%, #1c1c1f 100%);
     backdrop-filter: blur(3px);
     -webkit-backdrop-filter: blur(3px);
     mask-image: linear-gradient(to bottom, transparent 0%, rgba(0, 0, 0, 0.35) 25%, black 65%, black 100%);

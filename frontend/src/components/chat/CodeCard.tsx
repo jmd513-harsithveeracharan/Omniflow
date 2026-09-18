@@ -158,12 +158,12 @@ export const CodeCard: React.FC<CodeCardProps> = ({ language, code, filename }) 
   return (
     <div
       className={`modern-code-card ${isLong && !isExpanded ? 'is-collapsed' : ''}`}
-      style={{ background: '#16181d', border: '1px solid rgba(255, 255, 255, 0.08)' }}
+      style={{ background: '#1c1c1f', border: '1px solid rgba(255, 255, 255, 0.08)' }}
     >
       {/* Code Header Bar */}
       <div
         className="modern-code-header"
-        style={{ background: '#16181d', border: 'none', borderBottom: 'none' }}
+        style={{ background: '#1c1c1f', border: 'none', borderBottom: 'none' }}
       >
         <div className="modern-code-title-group">
           <span className="modern-code-lang-label">
@@ -201,14 +201,14 @@ export const CodeCard: React.FC<CodeCardProps> = ({ language, code, filename }) 
       </div>
 
       {/* Code Content Pre/Code */}
-      <div className="modern-code-body-wrapper" style={{ background: '#16181d' }}>
+      <div className="modern-code-body-wrapper" style={{ background: '#1c1c1f' }}>
         <pre
           className="modern-code-pre"
           style={{
             maxHeight: isLong && !isExpanded ? '360px' : 'none',
             overflowY: isLong && !isExpanded ? 'hidden' : 'visible',
             overflowX: 'auto',
-            background: '#16181d',
+            background: '#1c1c1f',
             border: 'none',
             borderRadius: 0,
             margin: 0,
