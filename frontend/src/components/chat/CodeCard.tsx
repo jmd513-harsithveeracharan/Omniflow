@@ -163,9 +163,6 @@ export const CodeCard: React.FC<CodeCardProps> = ({ language, code, filename }) 
           <span className="modern-code-lang-label">
             {langMeta.display}
           </span>
-          <span className="modern-code-line-badge">
-            {lineCount} {lineCount === 1 ? 'line' : 'lines'}
-          </span>
         </div>
 
         <div className="modern-code-actions">
@@ -222,7 +219,7 @@ export const CodeCard: React.FC<CodeCardProps> = ({ language, code, filename }) 
               onClick={() => setIsExpanded(true)}
             >
               <ChevronDown width={13} height={13} />
-              <span>Expand full snippet ({lineCount} lines)</span>
+              <span>Expand</span>
             </button>
           </div>
         )}
@@ -237,11 +234,12 @@ export const CodeCard: React.FC<CodeCardProps> = ({ language, code, filename }) 
             onClick={() => setIsExpanded(false)}
           >
             <ChevronUp width={13} height={13} />
-            <span>Collapse snippet</span>
+            <span>Collapse</span>
           </button>
         </div>
       )}
     </div>
   );
 };
+
 
