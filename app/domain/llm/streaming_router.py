@@ -245,8 +245,10 @@ def stream_gemini(messages: list[dict[str, str]], model: str, max_tokens: int = 
         f"https://generativelanguage.googleapis.com/v1beta/models/{model}:streamGenerateContent?alt=sse&key={GEMINI_KEY}",
         json=payload,
         stream=True,
-        timeout=60,
+        timeout=(5.0, 30.0),
     )
+    if resp.status_code in (429, 500, 502, 503, 504):
+        raise RuntimeError(f"Gemini {model} returned HTTP {resp.status_code}: {resp.text[:120]}")
     resp.raise_for_status()
     for line in resp.iter_lines():
         if line:
@@ -311,27 +313,40 @@ def chat_stream(
                 provider_name = "Anthropic"
                 model_name = act_mdl
 
-    # 2. Waterfall candidates
+    # 2. Waterfall candidates with strict deduplication
+    seen_keys: set[str] = set()
     candidates: list[tuple[Any, str, str]] = []
+
+    def _add_candidate(fn: Any, prov: str, mdl: str) -> None:
+        key = f"{prov}::{mdl}"
+        if key not in seen_keys:
+            seen_keys.add(key)
+            candidates.append((fn, prov, mdl))
+
     if stream_fn:
-        candidates.append((stream_fn, provider_name, model_name))
+        _add_candidate(stream_fn, provider_name, model_name)
 
     if complexity == "complex" or (target_model and "claude" in target_model.lower()):
-        # Complex DE architecture & code generation: Prioritize Claude CLI / Sonnet
-        if _get_claude_cli_binary() and not stream_fn:
-            candidates.append((lambda: stream_claude_cli(messages, None, max_tokens, session_id=session_id, resume=resume), "Anthropic (CLI)", "claude-code-cli"))
+        # Complex DE architecture & code generation: Prioritize Claude CLI / Sonnet -> Gemini Pro -> Groq 120B
+        if _get_claude_cli_binary():
+            _add_candidate(lambda: stream_claude_cli(messages, None, max_tokens, session_id=session_id, resume=resume), "Anthropic (CLI)", "claude-code-cli")
+        elif ANTHROPIC_KEY:
+            _add_candidate(lambda: stream_anthropic(messages, LLM_MODELS.get("anthropic_high", "claude-3-7-sonnet-20250219"), max_tokens), "Anthropic", "claude-3-7-sonnet")
         if GEMINI_KEY:
-            candidates.append((lambda: stream_gemini(messages, LLM_MODELS.get("gemini_high", "gemini-2.5-pro"), max_tokens), "Google Gemini", "gemini-2.5-pro"))
+            _add_candidate(lambda: stream_gemini(messages, LLM_MODELS.get("gemini_high", "gemini-2.5-pro"), max_tokens), "Google Gemini", "gemini-2.5-pro")
         if GROQ_KEYS:
-            candidates.append((lambda: stream_groq(messages, LLM_MODELS.get("groq_high", "openai/gpt-oss-120b"), max_tokens), "Groq Cloud", "openai/gpt-oss-120b"))
+            _add_candidate(lambda: stream_groq(messages, LLM_MODELS.get("groq_high", "openai/gpt-oss-120b"), max_tokens), "Groq Cloud", "openai/gpt-oss-120b")
     else:
-        # Standard / general conversation: Use fast Gemini & Groq to save Claude subscription quota
+        # Standard / general conversation: Fast Gemini Flash -> Groq Fast -> Groq 120B -> Claude CLI (guaranteed fallback)
         if GEMINI_KEY:
-            candidates.append((lambda: stream_gemini(messages, LLM_MODELS.get("gemini_standard", "gemini-3.6-flash"), max_tokens), "Google Gemini", "gemini-3.6-flash"))
+            _add_candidate(lambda: stream_gemini(messages, LLM_MODELS.get("gemini_standard", "gemini-3.6-flash"), max_tokens), "Google Gemini", "gemini-3.6-flash")
         if GROQ_KEYS:
-            candidates.append((lambda: stream_groq(messages, LLM_MODELS.get("groq_fast", "openai/gpt-oss-20b"), max_tokens), "Groq Cloud", "openai/gpt-oss-20b"))
-        if _get_claude_cli_binary() and not candidates:
-            candidates.append((lambda: stream_claude_cli(messages, None, max_tokens, session_id=session_id, resume=resume), "Anthropic (CLI)", "claude-code-cli"))
+            _add_candidate(lambda: stream_groq(messages, LLM_MODELS.get("groq_fast", "openai/gpt-oss-20b"), max_tokens), "Groq Cloud", "openai/gpt-oss-20b")
+            _add_candidate(lambda: stream_groq(messages, LLM_MODELS.get("groq_high", "openai/gpt-oss-120b"), max_tokens), "Groq Cloud", "openai/gpt-oss-120b")
+        if _get_claude_cli_binary():
+            _add_candidate(lambda: stream_claude_cli(messages, None, max_tokens, session_id=session_id, resume=resume), "Anthropic (CLI)", "claude-code-cli")
+        elif ANTHROPIC_KEY:
+            _add_candidate(lambda: stream_anthropic(messages, LLM_MODELS.get("anthropic_fast", "claude-3-5-haiku-20241022"), max_tokens), "Anthropic", "claude-3-5-haiku")
 
     last_err: Exception | None = None
     for gen_fn, prov, mdl in candidates:
@@ -361,6 +376,7 @@ def chat_stream(
                 return
         except Exception as e:
             last_err = e
+            print(f"[STREAM_WATERFALL] Provider '{prov}' ({mdl}) failed: {e}. Cascading...")
             continue
 
     if last_err:
