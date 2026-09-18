@@ -49,14 +49,26 @@ interface LanguageMeta {
   prismLang: string;
 }
 
-const getLanguageMeta = (langRaw: string): LanguageMeta => {
+const getLanguageMeta = (langRaw: string, codeSnippet?: string): LanguageMeta => {
   const l = (langRaw || 'python').toLowerCase().trim();
 
-  if (l === 'py' || l === 'python') {
-    return { display: 'Python', ext: 'py', grammar: Prism.languages.python, prismLang: 'python' };
-  }
-  if (l === 'pyspark' || l === 'spark') {
-    return { display: 'PySpark', ext: 'py', grammar: Prism.languages.python, prismLang: 'python' };
+  if (l === 'py' || l === 'python' || l === 'pyspark' || l === 'spark') {
+    const isPySpark =
+      l === 'pyspark' ||
+      l === 'spark' ||
+      Boolean(
+        codeSnippet &&
+          /\b(pyspark|spark\.|DeltaTable|mssparkutils|trident|deltaTable|sparkSession|createDataFrame)\b/i.test(
+            codeSnippet
+          )
+      );
+
+    return {
+      display: isPySpark ? 'PySpark' : 'Python',
+      ext: 'py',
+      grammar: Prism.languages.python,
+      prismLang: 'python',
+    };
   }
   if (l === 'sql' || l === 'sparksql' || l === 'tsql' || l === 'mysql' || l === 'pgsql') {
     return { display: 'SQL', ext: 'sql', grammar: Prism.languages.sql, prismLang: 'sql' };
@@ -118,7 +130,7 @@ export const CodeCard: React.FC<CodeCardProps> = ({ language, code, filename }) 
   const cleanCode = code.trim();
   const lineCount = cleanCode.split('\n').length;
   const isLong = lineCount > 18;
-  const langMeta = useMemo(() => getLanguageMeta(language), [language]);
+  const langMeta = useMemo(() => getLanguageMeta(language, cleanCode), [language, cleanCode]);
 
   const highlightedHtml = useMemo(() => {
     try {
