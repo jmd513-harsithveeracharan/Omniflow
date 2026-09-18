@@ -212,31 +212,36 @@ export const CodeCard: React.FC<CodeCardProps> = ({ language, code, filename }) 
             dangerouslySetInnerHTML={{ __html: highlightedHtml }}
           />
         </pre>
-        {isLong && !isExpanded && <div className="modern-code-fade-gradient" />}
+
+        {/* Floating Blur Gradient with Inline Expand Button */}
+        {isLong && !isExpanded && (
+          <div className="modern-code-fade-gradient">
+            <button
+              type="button"
+              className="modern-code-expand-btn"
+              onClick={() => setIsExpanded(true)}
+            >
+              <ChevronDown width={13} height={13} />
+              <span>Expand full snippet ({lineCount} lines)</span>
+            </button>
+          </div>
+        )}
       </div>
 
-      {/* Expand / Collapse Footer for long code snippets */}
-      {isLong && (
-        <div className="modern-code-footer">
+      {/* Clean borderless collapse button when expanded */}
+      {isLong && isExpanded && (
+        <div className="modern-code-collapse-footer">
           <button
             type="button"
             className="modern-code-expand-btn"
-            onClick={() => setIsExpanded(!isExpanded)}
+            onClick={() => setIsExpanded(false)}
           >
-            {!isExpanded ? (
-              <>
-                <ChevronDown width={14} height={14} />
-                <span>Expand full snippet ({lineCount} lines)</span>
-              </>
-            ) : (
-              <>
-                <ChevronUp width={14} height={14} />
-                <span>Collapse snippet</span>
-              </>
-            )}
+            <ChevronUp width={13} height={13} />
+            <span>Collapse snippet</span>
           </button>
         </div>
       )}
     </div>
   );
 };
+
