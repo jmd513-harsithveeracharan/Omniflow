@@ -27,20 +27,12 @@ CRITICAL RULES:
 3. Keep answers concise, professional, and directly actionable."""
 
 
-def is_architecture_request(prompt: str) -> bool:
-    """Determines whether a user prompt is requesting Fabric asset creation or Medallion planning."""
-    p = prompt.lower()
-    keywords = [
-        "create", "build", "generate", "plan", "deploy", "provision", "architect",
-        "lakehouse", "warehouse", "notebook", "pipeline", "medallion", "eventstream",
-        "kql", "dataflow", "semantic model", "report", "spark job", "mirrored",
-        "reflex", "activator", "bronze", "silver", "gold", "etl", "star schema",
-    ]
-    patterns = [r"\blh_[a-z0-9_\-]+", r"\bnb_[a-z0-9_\-]+", r"\bwh_[a-z0-9_\-]+", r"\bpl_[a-z0-9_\-]+", r"\bsm_[a-z0-9_\-]+"]
+from app.intent_classifier import classify_prompt_intent
 
-    has_keyword = any(k in p for k in keywords)
-    has_token = any(re.search(pat, p, re.IGNORECASE) for pat in patterns)
-    return (has_keyword and len(p.split()) > 3) or has_token
+def is_architecture_request(prompt: str, mode: str = "auto") -> bool:
+    """Determines whether a user prompt is requesting Fabric asset creation or Medallion planning."""
+    intent, _ = classify_prompt_intent(prompt, forced_mode=mode)
+    return intent == "BUILD_ARCHITECTURE"
 
 
 def format_architecture_response(plan: dict[str, Any], audit_messages: list[str]) -> str:
@@ -208,9 +200,13 @@ def process_chat_turn(
     target_model: str | None = None,
     complexity: str = "standard",
     effort: str = "medium",
+    mode: str = "auto",
 ) -> tuple[str, dict[str, Any] | None]:
-    """Executes a chat turn synchronously."""
-    if is_architecture_request(prompt):
+    """Executes a chat turn synchronously using LLM intent classification."""
+    intent, meta = classify_prompt_intent(prompt, forced_mode=mode)
+    print(f"[CHAT_TURN] Intent: {intent} (method: {meta.get('method')}, mode: {mode})")
+
+    if intent == "BUILD_ARCHITECTURE":
         plan, audit_messages = run_pipeline(
             prompt,
             session_id=session_id,
@@ -221,14 +217,21 @@ def process_chat_turn(
         response_text = thought_tag + format_architecture_response(plan, audit_messages)
         return response_text, plan
 
+    sys_prompt = (
+        FABRIC_STUDIO_SYSTEM
+        if intent == "PROJECT_CONSULT"
+        else "You are a helpful, expert AI programming and knowledge assistant. Provide clear, concise, accurate responses."
+    )
     messages = [
-        {"role": "system", "content": FABRIC_STUDIO_SYSTEM},
+        {"role": "system", "content": sys_prompt},
         {"role": "user", "content": prompt},
     ]
 
+    use_complexity = "complex" if intent == "PROJECT_CONSULT" else complexity
+
     response_text = chat(
         messages=messages,
-        complexity=complexity,
+        complexity=use_complexity,
         target_model=target_model,
         effort=effort,
         session_id=session_id,
@@ -244,13 +247,17 @@ def process_chat_turn_stream(
     target_model: str | None = None,
     complexity: str = "standard",
     effort: str = "medium",
+    mode: str = "auto",
 ) -> Generator[tuple[str, str, dict[str, Any] | None], None, None]:
     """
-    Real-time streaming chat generator.
+    Real-time streaming chat generator with zero-shot LLM intent routing.
     Yields (event_type, payload_str, optional_plan).
     Event types: 'thought_step', 'chunk', 'stage', 'done'
     """
-    if is_architecture_request(prompt):
+    intent, meta = classify_prompt_intent(prompt, forced_mode=mode)
+    print(f"[STREAM_TURN] Intent: {intent} (method: {meta.get('method')}, mode: {mode})")
+
+    if intent == "BUILD_ARCHITECTURE":
         import queue
         import threading
         from app.agent_pipeline import add_step_listener, remove_step_listener
@@ -318,16 +325,23 @@ def process_chat_turn_stream(
         yield ("done", full_resp, plan)
         return
 
-    # Direct conversational / query streaming via multi-provider waterfall
+    # Direct conversational / consultative streaming via multi-provider waterfall
+    sys_prompt = (
+        FABRIC_STUDIO_SYSTEM
+        if intent == "PROJECT_CONSULT"
+        else "You are a helpful, expert AI programming and knowledge assistant. Provide clear, concise, accurate responses."
+    )
     messages = [
-        {"role": "system", "content": FABRIC_STUDIO_SYSTEM},
+        {"role": "system", "content": sys_prompt},
         {"role": "user", "content": prompt},
     ]
+
+    use_complexity = "complex" if intent == "PROJECT_CONSULT" else complexity
 
     accumulated: list[str] = []
     for token in chat_stream(
         messages=messages,
-        complexity=complexity,
+        complexity=use_complexity,
         target_model=target_model,
         effort=effort,
         session_id=session_id,

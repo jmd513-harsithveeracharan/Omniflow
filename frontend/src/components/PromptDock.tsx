@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Loader2 } from 'lucide-react';
 
 interface PromptDockProps {
-  onSendMessage: (text: string, model?: string, effort?: string) => void;
+  onSendMessage: (text: string, model?: string, effort?: string, mode?: 'auto' | 'general' | 'project') => void;
   isStreaming: boolean;
 }
 
@@ -11,12 +11,12 @@ export const PromptDock: React.FC<PromptDockProps> = ({
   isStreaming,
 }) => {
   const [input, setInput] = useState('');
+  const [chatMode, setChatMode] = useState<'general' | 'project'>('project');
   const [selectedModel, setSelectedModel] = useState('Gemini 3.6 Flash');
   const [selectedEffort, setSelectedEffort] = useState('Medium');
   const [isModelDropdownOpen, setIsModelDropdownOpen] = useState(false);
   const [activeSubmenu, setActiveSubmenu] = useState<'none' | 'effort' | 'models'>('none');
   const [isTuningOpen, setIsTuningOpen] = useState(false);
-  const [isToolsOpen, setIsToolsOpen] = useState(false);
   const [temperature, setTemperature] = useState(0.2);
   const [isListening, setIsListening] = useState(false);
 
@@ -37,7 +37,6 @@ export const PromptDock: React.FC<PromptDockProps> = ({
       const target = e.target as Node;
       if (leftControlsRef.current && !leftControlsRef.current.contains(target)) {
         setIsTuningOpen(false);
-        setIsToolsOpen(false);
       }
       if (modelPillWrapperRef.current && !modelPillWrapperRef.current.contains(target)) {
         setIsModelDropdownOpen(false);
@@ -47,7 +46,6 @@ export const PromptDock: React.FC<PromptDockProps> = ({
     const handleKeyDownGlobal = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         setIsTuningOpen(false);
-        setIsToolsOpen(false);
         setIsModelDropdownOpen(false);
         setActiveSubmenu('none');
       }
@@ -63,7 +61,7 @@ export const PromptDock: React.FC<PromptDockProps> = ({
   const handleSubmit = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!input.trim() || isStreaming) return;
-    onSendMessage(input.trim(), selectedModel, selectedEffort.toLowerCase());
+    onSendMessage(input.trim(), selectedModel, selectedEffort.toLowerCase(), chatMode);
     setInput('');
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
@@ -176,7 +174,6 @@ export const PromptDock: React.FC<PromptDockProps> = ({
               id="btnTuneModel"
               onClick={() => {
                 setIsTuningOpen(!isTuningOpen);
-                setIsToolsOpen(false);
               }}
               title="System Prompt & Model Tuning"
             >
@@ -227,59 +224,68 @@ export const PromptDock: React.FC<PromptDockProps> = ({
               </div>
             )}
 
-            {/* Tools Button */}
-            <button
-              type="button"
-              className={`dock-tool-pill ${isToolsOpen ? 'active' : ''}`}
-              id="btnToolsMenu"
-              onClick={() => {
-                setIsToolsOpen(!isToolsOpen);
-                setIsTuningOpen(false);
+            {/* Mode Switcher Pill (General vs Project) */}
+            <div
+              className="dock-mode-switch-group"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                background: 'rgba(255, 255, 255, 0.05)',
+                borderRadius: '20px',
+                padding: '2px',
+                border: '1px solid rgba(255, 255, 255, 0.08)',
+                gap: '2px',
               }}
-              title="Active Model Tools"
             >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <rect x="3" y="3" width="7" height="7" rx="1.5" />
-                <rect x="14" y="3" width="7" height="7" rx="1.5" />
-                <rect x="14" y="14" width="7" height="7" rx="1.5" />
-                <rect x="3" y="14" width="7" height="7" rx="1.5" />
-              </svg>
-              <span>Tools</span>
-            </button>
-
-            {/* Tools Popover */}
-            {isToolsOpen && (
-              <div
+              <button
+                type="button"
+                className={`dock-mode-btn ${chatMode === 'general' ? 'active' : ''}`}
+                onClick={() => setChatMode('general')}
                 style={{
-                  position: 'absolute',
-                  bottom: '44px',
-                  left: '42px',
-                  width: '260px',
-                  background: '#1e1f20',
-                  border: '1px solid rgba(255,255,255,0.12)',
-                  borderRadius: '12px',
-                  padding: '12px',
-                  boxShadow: '0 16px 36px rgba(0,0,0,0.65)',
-                  zIndex: 100,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  padding: '3px 9px',
+                  borderRadius: '16px',
+                  border: 'none',
+                  fontSize: '11.5px',
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease',
+                  background: chatMode === 'general' ? '#27272a' : 'transparent',
+                  color: chatMode === 'general' ? '#f4f4f5' : '#71717a',
+                  boxShadow: chatMode === 'general' ? '0 1px 4px rgba(0,0,0,0.3)' : 'none',
                 }}
+                title="General Mode: Fast Gemini/Groq, no Fabric schema overhead, general questions"
               >
-                <div style={{ fontSize: '12.5px', fontWeight: 600, color: '#fff', marginBottom: '8px' }}>Active Tools</div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  {[
-                    'Microsoft Fabric REST API',
-                    'PySpark Code Synthesizer',
-                    'SQLGlot AST Transpiler',
-                    'SQLite Multi-Turn Memory',
-                    'OneLake ABFSS Storage',
-                  ].map((tool, ti) => (
-                    <div key={ti} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11.5px', color: '#d4d4d8' }}>
-                      <span style={{ color: '#10b981', fontWeight: 700 }}>✓</span>
-                      <span>{tool}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
+                <span style={{ fontSize: '12px' }}>🌐</span>
+                <span>General</span>
+              </button>
+              <button
+                type="button"
+                className={`dock-mode-btn ${chatMode === 'project' ? 'active' : ''}`}
+                onClick={() => setChatMode('project')}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  padding: '3px 9px',
+                  borderRadius: '16px',
+                  border: 'none',
+                  fontSize: '11.5px',
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease',
+                  background: chatMode === 'project' ? '#0284c7' : 'transparent',
+                  color: chatMode === 'project' ? '#ffffff' : '#71717a',
+                  boxShadow: chatMode === 'project' ? '0 1px 4px rgba(0,0,0,0.3)' : 'none',
+                }}
+                title="Project Mode: Full Fabric workspace context, session memory, Claude DE reasoning"
+              >
+                <span style={{ fontSize: '12px' }}>⚡</span>
+                <span>Project</span>
+              </button>
+            </div>
           </div>
 
           <div className="dock-right-controls">

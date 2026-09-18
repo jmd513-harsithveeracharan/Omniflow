@@ -93,6 +93,7 @@ class ChatRequest(BaseModel):
     model: str | None = Field(None, description="Target LLM model override")
     complexity: str = Field("standard", description="standard | high | compress")
     effort: str = Field("medium", description="Thinking effort: low | medium | high")
+    mode: str = Field("auto", description="Chat mode: auto | general | project")
     stream: bool = Field(False, description="Whether to stream response tokens via SSE")
 
 
@@ -310,6 +311,7 @@ async def handle_chat(req: ChatRequest):
             target_model=req.model,
             complexity=req.complexity,
             effort=req.effort,
+            mode=req.mode,
         )
 
         add_message(sid, "assistant", response_text)
@@ -358,6 +360,7 @@ async def handle_chat_stream(req: ChatRequest):
                     target_model=req.model,
                     complexity=req.complexity,
                     effort=req.effort,
+                    mode=req.mode,
                 ):
                     loop.call_soon_threadsafe(queue.put_nowait, item)
             except Exception as ex:

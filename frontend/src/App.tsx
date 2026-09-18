@@ -211,7 +211,12 @@ export const App: React.FC = () => {
     );
   };
 
-  const handleSendMessage = async (text: string, model?: string, effort?: string) => {
+  const handleSendMessage = async (
+    text: string,
+    model?: string,
+    effort?: string,
+    mode?: 'auto' | 'general' | 'project'
+  ) => {
     if (!text.trim() || isStreaming) return;
 
     if (activeView !== 'chat') {
@@ -299,7 +304,8 @@ export const App: React.FC = () => {
           }
           return prev;
         });
-      }
+      },
+      mode
     );
   };
 
