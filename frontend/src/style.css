@@ -3304,17 +3304,17 @@ ul.chat-md-list {
 .code-card {
     margin: 16px 0;
     border-radius: 16px;
-    background: #111317 !important;
-    border: 1px solid rgba(255, 255, 255, 0.09) !important;
+    background: #16181d !important;
+    border: 1px solid rgba(255, 255, 255, 0.08) !important;
     overflow: hidden;
-    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5), 0 2px 8px rgba(0, 0, 0, 0.3);
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.45), 0 2px 8px rgba(0, 0, 0, 0.25);
     transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
 .modern-code-card:hover,
 .code-card:hover {
-    border-color: rgba(255, 255, 255, 0.15) !important;
-    box-shadow: 0 12px 36px rgba(0, 0, 0, 0.6), 0 4px 12px rgba(0, 0, 0, 0.35);
+    border-color: rgba(255, 255, 255, 0.14) !important;
+    box-shadow: 0 12px 36px rgba(0, 0, 0, 0.55), 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 
 .modern-code-header,
@@ -3324,7 +3324,7 @@ ul.chat-md-list {
     align-items: center;
     justify-content: space-between;
     padding: 14px 22px 0 22px !important;
-    background: #111317 !important;
+    background: #16181d !important;
     border: none !important;
     border-bottom: none !important;
 }
@@ -3386,7 +3386,7 @@ ul.chat-md-list {
 
 .modern-code-body-wrapper {
     position: relative;
-    background: #111317 !important;
+    background: #16181d !important;
 }
 
 .markdown-body .modern-code-card pre.modern-code-pre,
@@ -3401,7 +3401,7 @@ ul.chat-md-list {
     line-height: 1.7 !important;
     overflow-x: auto;
     color: #f1f5f9 !important;
-    background: #111317 !important;
+    background: #16181d !important;
     border: none !important;
     border-radius: 0 !important;
     box-shadow: none !important;
@@ -3422,14 +3422,16 @@ ul.chat-md-list {
     bottom: 0;
     left: 0;
     right: 0;
-    height: 44px;
-    background: linear-gradient(to bottom, rgba(17, 19, 23, 0) 0%, rgba(17, 19, 23, 0.7) 40%, #111317 100%);
-    backdrop-filter: blur(1.5px);
-    -webkit-backdrop-filter: blur(1.5px);
+    height: 60px;
+    background: linear-gradient(to bottom, rgba(22, 24, 29, 0) 0%, rgba(22, 24, 29, 0.45) 30%, rgba(22, 24, 29, 0.88) 70%, #16181d 100%);
+    backdrop-filter: blur(3px);
+    -webkit-backdrop-filter: blur(3px);
+    mask-image: linear-gradient(to bottom, transparent 0%, rgba(0, 0, 0, 0.35) 25%, black 65%, black 100%);
+    -webkit-mask-image: linear-gradient(to bottom, transparent 0%, rgba(0, 0, 0, 0.35) 25%, black 65%, black 100%);
     display: flex;
-    align-items: center;
+    align-items: flex-end;
     justify-content: center;
-    padding-bottom: 4px;
+    padding-bottom: 8px;
     pointer-events: auto;
     border-bottom-left-radius: 16px;
     border-bottom-right-radius: 16px;
