@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Globe, Layers } from 'lucide-react';
 
 interface PromptDockProps {
   onSendMessage: (text: string, model?: string, effort?: string, mode?: 'auto' | 'general' | 'project') => void;
@@ -12,6 +12,7 @@ export const PromptDock: React.FC<PromptDockProps> = ({
 }) => {
   const [input, setInput] = useState('');
   const [chatMode, setChatMode] = useState<'general' | 'project'>('project');
+  const [isFlipping, setIsFlipping] = useState(false);
   const [selectedModel, setSelectedModel] = useState('Gemini 3.6 Flash');
   const [selectedEffort, setSelectedEffort] = useState('Medium');
   const [isModelDropdownOpen, setIsModelDropdownOpen] = useState(false);
@@ -19,6 +20,12 @@ export const PromptDock: React.FC<PromptDockProps> = ({
   const [isTuningOpen, setIsTuningOpen] = useState(false);
   const [temperature, setTemperature] = useState(0.2);
   const [isListening, setIsListening] = useState(false);
+
+  const handleToggleMode = () => {
+    setIsFlipping(true);
+    setChatMode((prev) => (prev === 'project' ? 'general' : 'project'));
+    setTimeout(() => setIsFlipping(false), 280);
+  };
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const leftControlsRef = useRef<HTMLDivElement>(null);
@@ -224,68 +231,28 @@ export const PromptDock: React.FC<PromptDockProps> = ({
               </div>
             )}
 
-            {/* Mode Switcher Pill (General vs Project) */}
-            <div
-              className="dock-mode-switch-group"
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                background: 'rgba(255, 255, 255, 0.05)',
-                borderRadius: '20px',
-                padding: '2px',
-                border: '1px solid rgba(255, 255, 255, 0.08)',
-                gap: '2px',
-              }}
+            {/* Single Mode Toggle Button with Flip Animation (General vs Project) */}
+            <button
+              type="button"
+              className={`dock-mode-toggle-pill ${chatMode} ${isFlipping ? 'flipping' : ''}`}
+              id="btnDockModeToggle"
+              onClick={handleToggleMode}
+              title={`Active: ${chatMode === 'project' ? 'Project' : 'General'} Mode — Click to switch to ${chatMode === 'project' ? 'General' : 'Project'} Mode`}
             >
-              <button
-                type="button"
-                className={`dock-mode-btn ${chatMode === 'general' ? 'active' : ''}`}
-                onClick={() => setChatMode('general')}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '4px',
-                  padding: '3px 9px',
-                  borderRadius: '16px',
-                  border: 'none',
-                  fontSize: '11.5px',
-                  fontWeight: 500,
-                  cursor: 'pointer',
-                  transition: 'all 0.15s ease',
-                  background: chatMode === 'general' ? '#27272a' : 'transparent',
-                  color: chatMode === 'general' ? '#f4f4f5' : '#71717a',
-                  boxShadow: chatMode === 'general' ? '0 1px 4px rgba(0,0,0,0.3)' : 'none',
-                }}
-                title="General Mode: Fast Gemini/Groq, no Fabric schema overhead, general questions"
-              >
-                <span style={{ fontSize: '12px' }}>🌐</span>
-                <span>General</span>
-              </button>
-              <button
-                type="button"
-                className={`dock-mode-btn ${chatMode === 'project' ? 'active' : ''}`}
-                onClick={() => setChatMode('project')}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '4px',
-                  padding: '3px 9px',
-                  borderRadius: '16px',
-                  border: 'none',
-                  fontSize: '11.5px',
-                  fontWeight: 500,
-                  cursor: 'pointer',
-                  transition: 'all 0.15s ease',
-                  background: chatMode === 'project' ? '#0284c7' : 'transparent',
-                  color: chatMode === 'project' ? '#ffffff' : '#71717a',
-                  boxShadow: chatMode === 'project' ? '0 1px 4px rgba(0,0,0,0.3)' : 'none',
-                }}
-                title="Project Mode: Full Fabric workspace context, session memory, Claude DE reasoning"
-              >
-                <span style={{ fontSize: '12px' }}>⚡</span>
-                <span>Project</span>
-              </button>
-            </div>
+              <div className="mode-toggle-inner">
+                {chatMode === 'project' ? (
+                  <>
+                    <Layers size={13} strokeWidth={1.8} className="mode-icon" />
+                    <span className="mode-label">Project</span>
+                  </>
+                ) : (
+                  <>
+                    <Globe size={13} strokeWidth={1.8} className="mode-icon" />
+                    <span className="mode-label">General</span>
+                  </>
+                )}
+              </div>
+            </button>
           </div>
 
           <div className="dock-right-controls">
