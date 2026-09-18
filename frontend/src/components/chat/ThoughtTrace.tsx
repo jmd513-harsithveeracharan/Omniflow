@@ -153,7 +153,7 @@ export const ThoughtTrace: React.FC<ThoughtTraceProps> = ({ meta, isStreaming = 
         )}
 
         <span style={{ fontWeight: 500, color: isStreaming ? '#e2e8f0' : '#94a3b8' }}>
-          {isStreaming ? `Worked for ${displayTime}` : `Worked for ${displayTime}`}
+          {`Worked for ${displayTime}`}
         </span>
       </button>
 
@@ -268,37 +268,34 @@ export const ThoughtTrace: React.FC<ThoughtTraceProps> = ({ meta, isStreaming = 
                   )}
                 </div>
 
-                {/* Expanded Drawer: Terminal / Code / Detail */}
+                {/* Expanded Clean Indented Detail (No bulky blue boxes) */}
                 {isRowExpanded && (
                   <div
                     className="antigravity-step-drawer"
                     style={{
-                      marginLeft: '8px',
-                      marginTop: '4px',
+                      marginLeft: '14px',
+                      marginTop: '3px',
                       marginBottom: '6px',
-                      padding: '8px 12px',
-                      background: '#090d16',
-                      border: '1px solid rgba(255, 255, 255, 0.08)',
-                      borderRadius: '6px',
-                      fontSize: '11.5px',
-                      fontFamily: 'var(--font-mono, "JetBrains Mono", monospace)',
-                      color: '#cbd5e1',
+                      paddingLeft: '10px',
+                      borderLeft: '1.5px solid rgba(255, 255, 255, 0.12)',
+                      background: 'transparent',
+                      fontSize: '12px',
+                      color: '#94a3b8',
                       lineHeight: '1.5',
                       whiteSpace: 'pre-wrap',
-                      maxHeight: '280px',
+                      maxHeight: '260px',
                       overflowY: 'auto',
-                      boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.5)',
                     }}
                   >
                     {st.output ? (
-                      <div>
-                        <div style={{ color: '#64748b', marginBottom: '4px', fontSize: '10.5px' }}>
+                      <div style={{ fontFamily: 'var(--font-mono, "JetBrains Mono", monospace)', fontSize: '11.5px' }}>
+                        <div style={{ color: '#64748b', marginBottom: '2px', fontSize: '10.5px' }}>
                           ...\Fabric_AI &gt; {action} {target}
                         </div>
-                        <div style={{ color: '#a5f3fc' }}>{st.output}</div>
+                        <div style={{ color: '#cbd5e1' }}>{st.output}</div>
                       </div>
                     ) : (
-                      <div style={{ color: '#94a3b8' }}>{st.detail}</div>
+                      <div>{st.detail}</div>
                     )}
                   </div>
                 )}
