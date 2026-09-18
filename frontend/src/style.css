@@ -3304,8 +3304,8 @@ ul.chat-md-list {
 .code-card {
     margin: 16px 0;
     border-radius: 16px;
-    background: #111317;
-    border: 1px solid rgba(255, 255, 255, 0.09);
+    background: #111317 !important;
+    border: 1px solid rgba(255, 255, 255, 0.09) !important;
     overflow: hidden;
     box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5), 0 2px 8px rgba(0, 0, 0, 0.3);
     transition: border-color 0.2s ease, box-shadow 0.2s ease;
@@ -3313,18 +3313,20 @@ ul.chat-md-list {
 
 .modern-code-card:hover,
 .code-card:hover {
-    border-color: rgba(255, 255, 255, 0.15);
+    border-color: rgba(255, 255, 255, 0.15) !important;
     box-shadow: 0 12px 36px rgba(0, 0, 0, 0.6), 0 4px 12px rgba(0, 0, 0, 0.35);
 }
 
 .modern-code-header,
-.code-card-header {
+.code-card-header,
+.modern-code-card .modern-code-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 14px 22px 4px 22px;
-    background: #111317;
-    border-bottom: none;
+    padding: 14px 22px 0 22px !important;
+    background: #111317 !important;
+    border: none !important;
+    border-bottom: none !important;
 }
 
 .modern-code-title-group {
@@ -3344,13 +3346,7 @@ ul.chat-md-list {
 
 
 .modern-code-line-badge {
-    font-size: 11px;
-    font-family: var(--font-mono, 'JetBrains Mono', 'Fira Code', monospace);
-    color: #71717a;
-    background: rgba(255, 255, 255, 0.05);
-    padding: 1px 6px;
-    border-radius: 4px;
-    border: 1px solid rgba(255, 255, 255, 0.06);
+    display: none !important;
 }
 
 .modern-code-actions {
@@ -3390,19 +3386,25 @@ ul.chat-md-list {
 
 .modern-code-body-wrapper {
     position: relative;
+    background: #111317 !important;
 }
 
+.markdown-body .modern-code-card pre.modern-code-pre,
+.chat-content-card pre.modern-code-pre,
 .modern-code-pre,
 .code-card-body {
-    margin: 0;
-    padding: 8px 22px 18px 22px;
-    font-family: var(--font-mono, 'JetBrains Mono', 'Fira Code', 'SF Mono', Consolas, monospace);
-    font-size: 13.5px;
-    font-weight: 480;
-    line-height: 1.7;
+    margin: 0 !important;
+    padding: 10px 22px 18px 22px !important;
+    font-family: var(--font-mono, 'JetBrains Mono', 'Fira Code', 'SF Mono', Consolas, monospace) !important;
+    font-size: 13.5px !important;
+    font-weight: 480 !important;
+    line-height: 1.7 !important;
     overflow-x: auto;
-    color: #f1f5f9;
-    background: #111317;
+    color: #f1f5f9 !important;
+    background: #111317 !important;
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
     tab-size: 4;
     white-space: pre;
     word-spacing: normal;
@@ -9134,12 +9136,12 @@ ul.chat-md-list {
     word-break: break-word;
 }
 
-/* General Chat Code Blocks: Clean default scroll */
-.chat-card-text pre,
-.assistant-bubble pre,
-.user-bubble pre,
-.chat-content-card pre,
-.markdown-body pre {
+/* General Chat Code Blocks: Clean default scroll (excluding modern code cards) */
+.chat-card-text pre:not(.modern-code-pre),
+.assistant-bubble pre:not(.modern-code-pre),
+.user-bubble pre:not(.modern-code-pre),
+.chat-content-card pre:not(.modern-code-pre),
+.markdown-body pre:not(.modern-code-pre) {
     max-height: 480px;
     overflow-y: auto;
     overflow-x: auto;
