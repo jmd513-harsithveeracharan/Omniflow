@@ -6,36 +6,102 @@ interface MarkdownRendererProps {
   content: string;
 }
 
+interface MarkdownSegment {
+  type: 'text' | 'code';
+  language?: string;
+  code?: string;
+  text?: string;
+}
+
+const parseMarkdownSegments = (content: string): MarkdownSegment[] => {
+  if (!content) return [];
+  const lines = content.split('\n');
+  const segments: MarkdownSegment[] = [];
+
+  let inCode = false;
+  let codeFenceChar = '`';
+  let codeFenceLength = 3;
+  let codeLanguage = '';
+  let codeLines: string[] = [];
+  let textLines: string[] = [];
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const trimmed = line.trimEnd();
+
+    // Check for code fence start/end: 3 or more backticks or tildes at start of line
+    const fenceMatch = trimmed.match(/^(`{3,}|~{3,})(.*)$/);
+
+    if (fenceMatch) {
+      const fenceStr = fenceMatch[1];
+      const fenceChar = fenceStr[0];
+      const fenceLen = fenceStr.length;
+      const fenceRest = fenceMatch[2].trim();
+
+      if (!inCode) {
+        // Opening code fence
+        if (textLines.length > 0) {
+          segments.push({ type: 'text', text: textLines.join('\n') });
+          textLines = [];
+        }
+        inCode = true;
+        codeFenceChar = fenceChar;
+        codeFenceLength = fenceLen;
+        codeLanguage = (fenceRest.split(/\s+/)[0] || '').toLowerCase().trim();
+        codeLines = [];
+      } else {
+        // Closing code fence check: must match fence char and have AT LEAST the opening length
+        if (fenceChar === codeFenceChar && fenceLen >= codeFenceLength && fenceRest === '') {
+          const fullCode = codeLines.join('\n');
+          if (fullCode.trim().length > 0) {
+            segments.push({
+              type: 'code',
+              language: codeLanguage || 'python',
+              code: fullCode,
+            });
+          }
+          inCode = false;
+          codeLines = [];
+          codeLanguage = '';
+        } else {
+          // Inner code fence (e.g. 3 backticks inside 4-backtick markdown example)
+          codeLines.push(line);
+        }
+      }
+    } else {
+      if (inCode) {
+        codeLines.push(line);
+      } else {
+        textLines.push(line);
+      }
+    }
+  }
+
+  // Flush remaining at EOF (handles streaming active blocks)
+  if (inCode && codeLines.length > 0) {
+    const fullCode = codeLines.join('\n');
+    if (fullCode.trim().length > 0) {
+      segments.push({
+        type: 'code',
+        language: codeLanguage || 'python',
+        code: fullCode,
+      });
+    }
+  } else if (textLines.length > 0) {
+    segments.push({
+      type: 'text',
+      text: textLines.join('\n'),
+    });
+  }
+
+  return segments;
+};
+
 export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content }) => {
   if (!content) return null;
 
-  // 1. Separate code blocks and text segments
-  const segments: Array<{ type: 'text' | 'code'; language?: string; code?: string; text?: string }> = [];
-  const codeBlockRegex = /```([a-zA-Z0-9_-]*)\n?([\s\S]*?)```/g;
-  let lastIndex = 0;
-  let match: RegExpExecArray | null;
-
-  while ((match = codeBlockRegex.exec(content)) !== null) {
-    if (match.index > lastIndex) {
-      segments.push({
-        type: 'text',
-        text: content.substring(lastIndex, match.index),
-      });
-    }
-    segments.push({
-      type: 'code',
-      language: (match[1] || 'python').toLowerCase().trim(),
-      code: match[2] || '',
-    });
-    lastIndex = codeBlockRegex.lastIndex;
-  }
-
-  if (lastIndex < content.length) {
-    segments.push({
-      type: 'text',
-      text: content.substring(lastIndex),
-    });
-  }
+  // 1. Separate code blocks and text segments using GFM fence parsing
+  const segments = parseMarkdownSegments(content);
 
   const renderFabricItemBadge = (line: string): React.ReactNode | null => {
     const trimmed = line.trim();
@@ -334,6 +400,7 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content }) =
     <div className="chat-markdown-renderer">
       {segments.map((seg, idx) => {
         if (seg.type === 'code') {
+          if (!seg.code || !seg.code.trim()) return null;
           return <CodeCard key={idx} language={seg.language || 'python'} code={seg.code || ''} />;
         }
         return <React.Fragment key={idx}>{renderInlineFormatted(seg.text || '')}</React.Fragment>;
