@@ -27,9 +27,9 @@ const parseMarkdownSegments = (content: string): MarkdownSegment[] => {
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
-    const trimmed = line.trimEnd();
+    const trimmed = line.trim();
 
-    // Check for code fence start/end: 3 or more backticks or tildes at start of line
+    // Check for code fence start/end: 3 or more backticks or tildes
     const fenceMatch = trimmed.match(/^(`{3,}|~{3,})(.*)$/);
 
     if (fenceMatch) {
@@ -47,11 +47,13 @@ const parseMarkdownSegments = (content: string): MarkdownSegment[] => {
         inCode = true;
         codeFenceChar = fenceChar;
         codeFenceLength = fenceLen;
-        codeLanguage = (fenceRest.split(/\s+/)[0] || '').toLowerCase().trim();
+        // Clean language identifier (e.g., "python", "json", "ts:app.ts" -> "ts")
+        const rawLang = fenceRest.split(/[\s:{]/)[0] || '';
+        codeLanguage = rawLang.toLowerCase().replace(/[^a-z0-9_-]/g, '').trim();
         codeLines = [];
       } else {
         // Closing code fence check: must match fence char and have AT LEAST the opening length
-        if (fenceChar === codeFenceChar && fenceLen >= codeFenceLength && fenceRest === '') {
+        if (fenceChar === codeFenceChar && fenceLen >= codeFenceLength && (fenceRest === '' || fenceRest.startsWith(fenceChar))) {
           const fullCode = codeLines.join('\n');
           if (fullCode.trim().length > 0) {
             segments.push({
@@ -77,7 +79,7 @@ const parseMarkdownSegments = (content: string): MarkdownSegment[] => {
     }
   }
 
-  // Flush remaining at EOF (handles streaming active blocks)
+  // Flush remaining at EOF (handles active streaming code blocks seamlessly)
   if (inCode && codeLines.length > 0) {
     const fullCode = codeLines.join('\n');
     if (fullCode.trim().length > 0) {
@@ -181,7 +183,7 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content }) =
         continue;
       }
 
-      // Detect Blockquote / Callout (e.g., > [!NOTE], > [!TIP], > [!IMPORTANT], > [!WARNING])
+      // Detect Blockquote / Callout (e.g., > [!NOTE], > [!TIP], > [!IMPORTANT], > [!WARNING], > [!CAUTION])
       if (trimmed.startsWith('>')) {
         const quoteLines: string[] = [];
         while (i < lines.length && lines[i].trim().startsWith('>')) {
@@ -223,22 +225,28 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content }) =
       }
 
       // Detect Markdown Table
-      if (trimmed.startsWith('|') && trimmed.endsWith('|') && i + 1 < lines.length && lines[i + 1].includes('---')) {
+      if (trimmed.includes('|') && i + 1 < lines.length && /\|?\s*[:-]+[-| :]+\s*\|?/.test(lines[i + 1])) {
         const tableLines: string[] = [];
-        while (i < lines.length && lines[i].trim().startsWith('|') && lines[i].trim().endsWith('|')) {
+        while (i < lines.length && lines[i].trim().includes('|')) {
           tableLines.push(lines[i]);
           i++;
         }
         if (tableLines.length >= 2) {
-          const headers = tableLines[0].split('|').slice(1, -1).map((c) => c.trim());
-          const rows = tableLines.slice(2).map((r) => r.split('|').slice(1, -1).map((c) => c.trim()));
+          const splitCells = (row: string) => {
+            let r = row.trim();
+            if (r.startsWith('|')) r = r.substring(1);
+            if (r.endsWith('|')) r = r.substring(0, r.length - 1);
+            return r.split('|').map((c) => c.trim());
+          };
+          const headers = splitCells(tableLines[0]);
+          const rows = tableLines.slice(2).map(splitCells);
           nodes.push(
             <div key={`table-${i}`} className="chat-md-table-wrapper">
               <table className="chat-md-table">
                 <thead>
                   <tr>
                     {headers.map((h, hi) => (
-                      <th key={hi}>{h}</th>
+                      <th key={hi}>{formatSpan(h)}</th>
                     ))}
                   </tr>
                 </thead>
@@ -258,26 +266,55 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content }) =
         }
       }
 
-      // Detect Headings
-      if (line.startsWith('#### ')) {
-        nodes.push(<h5 key={i} className="chat-md-h5">{formatSpan(line.replace('#### ', ''))}</h5>);
+      // Detect Headings (# to ######)
+      if (trimmed.startsWith('###### ')) {
+        nodes.push(<h6 key={i} className="chat-md-h6">{formatSpan(trimmed.replace('###### ', ''))}</h6>);
         i++;
         continue;
       }
-      if (line.startsWith('### ')) {
-        nodes.push(<h4 key={i} className="chat-md-h4">{formatSpan(line.replace('### ', ''))}</h4>);
+      if (trimmed.startsWith('##### ')) {
+        nodes.push(<h5 key={i} className="chat-md-h5">{formatSpan(trimmed.replace('##### ', ''))}</h5>);
         i++;
         continue;
       }
-      if (line.startsWith('## ')) {
-        nodes.push(<h3 key={i} className="chat-md-h3">{formatSpan(line.replace('## ', ''))}</h3>);
+      if (trimmed.startsWith('#### ')) {
+        nodes.push(<h5 key={i} className="chat-md-h5">{formatSpan(trimmed.replace('#### ', ''))}</h5>);
         i++;
         continue;
       }
-      if (line.startsWith('# ')) {
-        nodes.push(<h2 key={i} className="chat-md-h2">{formatSpan(line.replace('# ', ''))}</h2>);
+      if (trimmed.startsWith('### ')) {
+        nodes.push(<h4 key={i} className="chat-md-h4">{formatSpan(trimmed.replace('### ', ''))}</h4>);
         i++;
         continue;
+      }
+      if (trimmed.startsWith('## ')) {
+        nodes.push(<h3 key={i} className="chat-md-h3">{formatSpan(trimmed.replace('## ', ''))}</h3>);
+        i++;
+        continue;
+      }
+      if (trimmed.startsWith('# ')) {
+        nodes.push(<h2 key={i} className="chat-md-h2">{formatSpan(trimmed.replace('# ', ''))}</h2>);
+        i++;
+        continue;
+      }
+
+      // Detect Task List Checkboxes (- [ ] or - [x])
+      if (/^[-*•]\s+\[([ xX])\]\s+/.test(trimmed)) {
+        const taskMatch = trimmed.match(/^[-*•]\s+\[([ xX])\]\s+(.*)$/);
+        if (taskMatch) {
+          const isChecked = taskMatch[1].toLowerCase() === 'x';
+          const taskContent = taskMatch[2];
+          nodes.push(
+            <div key={`task-${i}`} className="chat-md-task-item" style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '4px 0' }}>
+              <input type="checkbox" checked={isChecked} readOnly style={{ accentColor: '#38bdf8', cursor: 'default' }} />
+              <span style={{ textDecoration: isChecked ? 'line-through' : 'none', color: isChecked ? '#71717a' : '#f4f4f5' }}>
+                {formatSpan(taskContent)}
+              </span>
+            </div>
+          );
+          i++;
+          continue;
+        }
       }
 
       // Detect Ordered Lists (1. 2. 3.)
@@ -303,11 +340,11 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content }) =
         continue;
       }
 
-      // Detect Bullet Lists (- * •)
-      if (/^[-*•]\s+/.test(trimmed)) {
+      // Detect Bullet Lists (- * • +)
+      if (/^[-*•+]\s+/.test(trimmed)) {
         const listItems: string[] = [];
-        while (i < lines.length && /^[-*•]\s+/.test(lines[i].trim())) {
-          listItems.push(lines[i].trim().replace(/^[-*•]\s+/, ''));
+        while (i < lines.length && /^[-*•+]\s+/.test(lines[i].trim())) {
+          listItems.push(lines[i].trim().replace(/^[-*•+]\s+/, ''));
           i++;
         }
         nodes.push(
@@ -347,7 +384,8 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content }) =
 
   const formatSpan = (text: string): React.ReactNode => {
     const parts: React.ReactNode[] = [];
-    const inlineRegex = /(\*\*[^*]+\*\*|`[^`]+`|\*[^*]+\*|\[[^\]]+\]\([^)]+\))/g;
+    // Matches **bold**, __bold__, `code`, ~~strikethrough~~, *italic*, _italic_, [link](url)
+    const inlineRegex = /(\*\*[^*]+\*\*|__[^_]+__|`[^`]+`|~~[^~]+~~|\*[^*]+\*|_[^_]+_|\[[^\]]+\]\([^)]+\))/g;
     let last = 0;
     let m: RegExpExecArray | null;
 
@@ -356,7 +394,7 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content }) =
         parts.push(text.substring(last, m.index));
       }
       const matchText = m[0];
-      if (matchText.startsWith('**') && matchText.endsWith('**')) {
+      if ((matchText.startsWith('**') && matchText.endsWith('**')) || (matchText.startsWith('__') && matchText.endsWith('__'))) {
         parts.push(
           <strong key={m.index} className="chat-md-bold">
             {matchText.slice(2, -2)}
@@ -368,7 +406,13 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content }) =
             {matchText.slice(1, -1)}
           </code>
         );
-      } else if (matchText.startsWith('*') && matchText.endsWith('*')) {
+      } else if (matchText.startsWith('~~') && matchText.endsWith('~~')) {
+        parts.push(
+          <s key={m.index} className="chat-md-strike" style={{ textDecoration: 'line-through', color: '#71717a' }}>
+            {matchText.slice(2, -2)}
+          </s>
+        );
+      } else if ((matchText.startsWith('*') && matchText.endsWith('*')) || (matchText.startsWith('_') && matchText.endsWith('_'))) {
         parts.push(<em key={m.index} className="chat-md-italic">{matchText.slice(1, -1)}</em>);
       } else if (matchText.startsWith('[')) {
         const linkMatch = matchText.match(/\[([^\]]+)\]\(([^)]+)\)/);
