@@ -138,12 +138,16 @@ def record_token_usage(
     prompt_tokens: int | None = None,
     completion_tokens: int | None = None,
     duration_ms: float = 0.0,
+    latency_sec: float | None = None,
     session_id: str | None = None,
     complexity: str = "standard",
     status: str = "success",
     error_message: str | None = None,
 ) -> TokenUsageRecord:
     """Records an LLM interaction and clocks its token usage and cost into the database."""
+    if latency_sec is not None and duration_ms == 0.0:
+        duration_ms = latency_sec * 1000.0
+
     # 1. Compute tokens
     if prompt_tokens is None:
         if isinstance(prompt_text, list):

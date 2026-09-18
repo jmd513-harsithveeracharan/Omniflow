@@ -335,14 +335,19 @@ def chat_stream(
             if tokens_out:
                 full_text = "".join(tokens_out)
                 prompt_text = " ".join([m.get("content", "") for m in messages])
-                record_token_usage(
-                    provider=prov,
-                    model=mdl,
-                    prompt_text=prompt_text,
-                    completion_text=full_text,
-                    latency_sec=round(time.time() - t0, 3),
-                    session_id=session_id,
-                )
+                dur_ms = round((time.time() - t0) * 1000.0, 2)
+                try:
+                    record_token_usage(
+                        provider=prov,
+                        model=mdl,
+                        prompt_text=prompt_text,
+                        completion_text=full_text,
+                        duration_ms=dur_ms,
+                        session_id=session_id,
+                        status="success",
+                    )
+                except Exception as tr_err:
+                    print(f"[STREAM_TOKEN_TRACKER] Audit log warning: {tr_err}")
                 return
         except Exception as e:
             last_err = e
