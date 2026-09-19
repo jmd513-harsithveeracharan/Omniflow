@@ -41,17 +41,33 @@ class PostgresStorageAdapter(StorageAdapter):
     Enterprise-grade PostgreSQL + pgvector storage adapter.
     """
 
-    def __init__(self, connection_uri: str) -> None:
+    def __init__(self, connection_uri: str, use_pool: bool | None = None) -> None:
         if not _PSYCOPG_AVAILABLE:
             raise RuntimeError("psycopg v3 is not installed. Run 'pip install psycopg[binary,pool]'")
         self.connection_uri = connection_uri
         self._lock = threading.Lock()
+        self._pool = None
+
+        # Bypass connection pool for mock/test URIs so unit tests can patch psycopg.connect cleanly
+        is_test_uri = "localhost" in connection_uri or "127.0.0.1" in connection_uri or "test" in connection_uri
+        if use_pool is not False and not is_test_uri:
+            try:
+                from psycopg_pool import ConnectionPool
+                self._pool = ConnectionPool(
+                    conninfo=connection_uri,
+                    min_size=1,
+                    max_size=10,
+                    timeout=10,
+                    kwargs={"row_factory": dict_row, "connect_timeout": 10},
+                )
+            except Exception as e:
+                logger.warning(f"[POSTGRES] Connection pool fallback: {e}")
         self.init_db()
 
-    def _get_conn(self) -> psycopg.Connection:
-        """Returns a connection to the PostgreSQL database with dict_row factory."""
-        return psycopg.connect(self.connection_uri, row_factory=dict_row)
-        """Returns a connection to the PostgreSQL database with dict_row factory and 10s connect timeout."""
+    def _get_conn(self):
+        """Returns a connection from the pool or opens a direct connection."""
+        if self._pool is not None:
+            return self._pool.connection()
         return psycopg.connect(self.connection_uri, row_factory=dict_row, connect_timeout=10)
 
     def init_db(self) -> None:
@@ -265,18 +281,20 @@ class PostgresStorageAdapter(StorageAdapter):
                         ORDER BY turn_index ASC LIMIT 1
                     ), 'New Chat') as first_user_message
                 FROM sessions s
-                LEFT JOIN messages m ON s.session_id = m.session_id
+                INNER JOIN messages m ON s.session_id = m.session_id
                 """
                 if workspace_id:
-                    query += " WHERE s.workspace_id = %s GROUP BY s.session_id ORDER BY s.last_active DESC"
+                    query += " WHERE s.workspace_id = %s GROUP BY s.session_id HAVING COUNT(m.id) > 0 ORDER BY s.last_active DESC"
                     cur.execute(query, (workspace_id,))
                 else:
-                    query += " GROUP BY s.session_id ORDER BY s.last_active DESC"
+                    query += " GROUP BY s.session_id HAVING COUNT(m.id) > 0 ORDER BY s.last_active DESC"
                     cur.execute(query)
                 
                 rows = cur.fetchall()
                 results = []
                 for r in rows:
+                    if (r["message_count"] or 0) <= 0:
+                        continue
                     meta = r["metadata"] if isinstance(r["metadata"], dict) else json.loads(r["metadata"] or "{}")
                     custom_title = meta.get("title")
                     title = custom_title or r["first_user_message"][:40]

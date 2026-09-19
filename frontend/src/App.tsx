@@ -17,7 +17,6 @@ import { WorkspaceExplorerView } from './components/WorkspaceExplorerView';
 import { IngestionStudioView } from './components/IngestionStudioView';
 import {
   fetchFabricStatus,
-  createNewSession,
   streamChatTurn,
   fetchSessions,
   fetchSessionDetail,
@@ -37,6 +36,7 @@ export const App: React.FC = () => {
   const [sessionId, setSessionId] = useState<string>('');
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [isLoadingSessions, setIsLoadingSessions] = useState<boolean>(true);
+  const [isLoadingSession, setIsLoadingSession] = useState<boolean>(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isStreaming, setIsStreaming] = useState<boolean>(false);
 
@@ -53,6 +53,8 @@ export const App: React.FC = () => {
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState<boolean>(false);
   const [isFabricConnectionModalOpen, setIsFabricConnectionModalOpen] = useState<boolean>(false);
   const [currentPlan, setCurrentPlan] = useState<IngestionPlan | null>(null);
+
+  const generateNewSessionId = () => 'sess_' + Math.random().toString(36).substring(2, 11);
 
   const loadSessions = async () => {
     try {
@@ -85,40 +87,39 @@ export const App: React.FC = () => {
     loadSessions();
     loadProjectsList();
 
-    createNewSession()
-      .then((sid) => {
-        setSessionId(sid);
-      })
-      .catch((e) => console.error('Failed to init session', e));
+    const initialSid = generateNewSessionId();
+    setSessionId(initialSid);
+    setMessages([]);
   }, []);
 
-  const handleNewSession = async () => {
-    try {
-      setIsStreaming(false);
-      const newSid = await createNewSession(status?.workspaceId);
-      setSessionId(newSid);
-      setMessages([]);
-      setActiveView('chat');
-      loadSessions();
-    } catch (e) {
-      console.error(e);
-    }
+  const handleNewSession = () => {
+    if (isStreaming) return;
+    const newSid = generateNewSessionId();
+    setSessionId(newSid);
+    setMessages([]);
+    setActiveView('chat');
   };
 
   const handleSelectSession = async (sid: string) => {
+    if (isStreaming) return;
+    if (sid === sessionId && messages.length > 0) return;
     try {
-      setIsStreaming(false);
-      setSessionId(sid);
+      setIsLoadingSession(true);
       setActiveView('chat');
+      setSessionId(sid);
       const detail = await fetchSessionDetail(sid);
-      setMessages(
-        detail.messages.map((m) => ({
-          role: m.role,
-          content: m.content,
-        }))
-      );
+      if (detail && Array.isArray(detail.messages)) {
+        setMessages(
+          detail.messages.map((m) => ({
+            role: m.role,
+            content: m.content,
+          }))
+        );
+      }
     } catch (e) {
       console.error('Failed to load session detail', e);
+    } finally {
+      setIsLoadingSession(false);
     }
   };
 
@@ -262,6 +263,7 @@ export const App: React.FC = () => {
           setCurrentPlan(plan as unknown as IngestionPlan);
           setIsWorkbenchOpen(true);
         }
+        loadSessions();
       },
       (err) => {
         console.error('Stream error:', err);
@@ -437,7 +439,12 @@ export const App: React.FC = () => {
                 isWorkbenchOpen ? 'with-workbench' : 'full-width'
               }`}
             >
-              {messages.length === 0 ? (
+              {isLoadingSession ? (
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: '14px', minHeight: '320px' }}>
+                  <div className="agent-working-spinner" style={{ width: '28px', height: '28px', borderTopColor: '#10b981' }} />
+                  <span style={{ fontSize: '13px', color: '#a1a1aa' }}>Loading conversation history...</span>
+                </div>
+              ) : messages.length === 0 ? (
                 <PlaygroundHome onSelectPrompt={handleSendMessage} />
               ) : (
                 <ChatTimeline

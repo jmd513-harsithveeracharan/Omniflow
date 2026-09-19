@@ -131,13 +131,27 @@ def get_conversation_messages(session_id: str) -> list[dict]:
 
 
 def get_conversation_full(session_id: str) -> dict | None:
-    sess = get_session(session_id)
-    if not sess:
-        return None
-    messages = get_conversation_messages(session_id)
-    facts = get_facts(session_id)
-    runs = get_session_runs(session_id)
-    latest_run = runs[0] if runs else None
+    pg = get_pg()
+    with pg._get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT * FROM sessions WHERE session_id = %s", (session_id,))
+            s_row = cur.fetchone()
+            if not s_row:
+                return None
+            sess = dict(s_row)
+            sess["created_at"], sess["last_active"] = str(sess.get("created_at", "")), str(sess.get("last_active", ""))
+            if isinstance(sess.get("metadata"), dict):
+                sess["metadata"] = json.dumps(sess["metadata"])
+
+            cur.execute("SELECT role, content, turn_index, created_at FROM messages WHERE session_id = %s ORDER BY turn_index ASC", (session_id,))
+            messages = [{"role": m["role"], "content": m["content"], "turn_index": m["turn_index"], "created_at": str(m["created_at"])} for m in cur.fetchall()]
+
+            cur.execute("SELECT fact_key, fact_value FROM learned_facts WHERE session_id = %s", (session_id,))
+            facts = {r["fact_key"]: r["fact_value"] for r in cur.fetchall()}
+
+            cur.execute("SELECT * FROM runs WHERE session_id = %s ORDER BY created_at DESC LIMIT 5", (session_id,))
+            runs = [dict(r) for r in cur.fetchall()]
+            latest_run = runs[0] if runs else None
 
     meta = sess.get("metadata")
     if isinstance(meta, str):
