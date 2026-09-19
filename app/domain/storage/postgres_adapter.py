@@ -51,6 +51,8 @@ class PostgresStorageAdapter(StorageAdapter):
     def _get_conn(self) -> psycopg.Connection:
         """Returns a connection to the PostgreSQL database with dict_row factory."""
         return psycopg.connect(self.connection_uri, row_factory=dict_row)
+        """Returns a connection to the PostgreSQL database with dict_row factory and 10s connect timeout."""
+        return psycopg.connect(self.connection_uri, row_factory=dict_row, connect_timeout=10)
 
     def init_db(self) -> None:
         """Initializes tables, pgvector extensions, and HNSW indexes with seamless migrations."""

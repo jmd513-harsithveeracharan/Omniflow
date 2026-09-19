@@ -26,6 +26,7 @@ def get_storage() -> StorageAdapter:
         return _active_storage
 
     db_url = os.getenv("DATABASE_URL", "").strip()
+    db_url = os.getenv("DATABASE_URL_POOLED", "").strip() or os.getenv("DATABASE_URL", "").strip()
 
     if db_url.startswith("postgresql://") or db_url.startswith("postgres://"):
         try:
