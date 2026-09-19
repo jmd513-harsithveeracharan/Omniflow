@@ -3748,44 +3748,51 @@ ul.chat-md-list {
     height: 12px;
 }
 
-/* Sleek Markdown Tables */
+/* Sleek Markdown Tables - Uniform Dark, No Banded Rows */
 .chat-md-table-wrapper {
     width: 100%;
     overflow-x: auto;
     margin: 16px 0;
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.09);
     border-radius: 10px;
-    background: #1e1e1e;
+    background: #161719;
 }
 
 .chat-md-table {
     width: 100%;
     border-collapse: collapse;
-    font-size: 14px;
-    line-height: 1.5;
+    font-size: 13.5px;
+    line-height: 1.6;
     text-align: left;
 }
 
 .chat-md-table th {
-    background: #282826;
-    color: #f9fafb;
+    background: #1f2024;
+    color: #38bdf8;
     font-weight: 600;
     padding: 11px 16px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .chat-md-table td {
     padding: 11px 16px;
     border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-    color: #d4d4d4;
+    color: #e2e8f0;
+    background: transparent !important;
 }
 
 .chat-md-table tr:last-child td {
     border-bottom: none;
 }
 
-.chat-md-table tr:nth-child(even) td {
-    background: rgba(255, 255, 255, 0.02);
+.chat-md-table tr td,
+.chat-md-table tr:nth-child(even) td,
+.chat-md-table tr:nth-child(odd) td {
+    background: transparent !important;
+}
+
+.chat-md-table tr:hover td {
+    background: rgba(255, 255, 255, 0.035) !important;
 }
 
 /* Dynamic & Collapsible Thinking Card */
@@ -11095,35 +11102,47 @@ pre[class*="language-"] {
 /* Markdown Tables */
 .chat-md-table-wrapper {
     overflow-x: auto;
-    margin: 10px 0;
-    border-radius: 8px;
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    background: #141416;
+    margin: 14px 0;
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    background: #161719;
 }
 
 .chat-md-table {
     width: 100%;
     border-collapse: collapse;
-    font-size: 12.5px;
+    font-size: 13.5px;
+    line-height: 1.6;
 }
 
 .chat-md-table th {
-    padding: 8px 12px;
-    background: #1e1f23;
+    padding: 11px 16px;
+    background: #1f2024;
     color: #38bdf8;
     font-weight: 600;
     text-align: left;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .chat-md-table td {
-    padding: 8px 12px;
-    color: #d4d4d8;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    padding: 11px 16px;
+    color: #e2e8f0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    background: transparent !important;
+}
+
+.chat-md-table tr:last-child td {
+    border-bottom: none;
+}
+
+.chat-md-table tr td,
+.chat-md-table tr:nth-child(even) td,
+.chat-md-table tr:nth-child(odd) td {
+    background: transparent !important;
 }
 
 .chat-md-table tr:hover td {
-    background: rgba(255, 255, 255, 0.03);
+    background: rgba(255, 255, 255, 0.035) !important;
 }
 
 /* ═════════════════════════════════════════════════════════════════════════════

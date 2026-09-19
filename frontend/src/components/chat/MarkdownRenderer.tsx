@@ -2,11 +2,40 @@ import React from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Database, FileCode, GitBranch, AlertCircle, Info, Sparkles, AlertTriangle } from 'lucide-react';
-import { CodeCard } from './CodeCard';
+import { CodeCard, isArchitectureFlow } from './CodeCard';
 
 interface MarkdownRendererProps {
   content: string;
 }
+
+const renderWithLineBreaks = (node: React.ReactNode): React.ReactNode => {
+  if (typeof node === 'string') {
+    if (!/<br\s*\/?>/i.test(node)) return node;
+    const parts = node.split(/<br\s*\/?>/i);
+    return parts.map((part, index) => (
+      <React.Fragment key={index}>
+        {index > 0 && <br />}
+        {part}
+      </React.Fragment>
+    ));
+  }
+  if (React.isValidElement(node)) {
+    const children = (node.props as any)?.children;
+    if (children) {
+      return React.cloneElement(node, {
+        ...(node.props as any),
+        children: renderWithLineBreaks(children),
+      });
+    }
+    return node;
+  }
+  if (Array.isArray(node)) {
+    return node.map((child, idx) => (
+      <React.Fragment key={idx}>{renderWithLineBreaks(child)}</React.Fragment>
+    ));
+  }
+  return node;
+};
 
 export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content }) => {
   if (!content) return null;
@@ -79,7 +108,22 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content }) =
             const isInline = inline ?? (!match && !String(children || '').includes('\n'));
 
             if (!isInline && codeString.trim()) {
-              const lang = match ? match[1] : 'python';
+              let lang = match ? match[1] : '';
+              if (!lang || lang === 'python') {
+                if (isArchitectureFlow(codeString)) {
+                  lang = 'flow';
+                } else if (!lang) {
+                  if (/\b(select\s+.+\s+from|create\s+table)\b/i.test(codeString)) {
+                    lang = 'sql';
+                  } else if (/\b(pyspark|spark\.|def\s+\w+\(|import\s+\w+)\b/.test(codeString)) {
+                    lang = 'python';
+                  } else if (/^[\s\n]*[{\[]/.test(codeString) && /[}\]][\s\n]*$/.test(codeString)) {
+                    lang = 'json';
+                  } else {
+                    lang = 'text';
+                  }
+                }
+              }
               return <CodeCard language={lang} code={codeString} />;
             }
 
@@ -125,6 +169,8 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content }) =
               </div>
             );
           },
+          td: ({ children, ...props }: any) => <td {...props}>{renderWithLineBreaks(children)}</td>,
+          th: ({ children, ...props }: any) => <th {...props}>{renderWithLineBreaks(children)}</th>,
           a({ href, children }: any) {
             return (
               <a href={href} target="_blank" rel="noreferrer" className="chat-md-link">
@@ -138,14 +184,14 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content }) =
               const fb = renderFabricItemBadge(str);
               if (fb) return <li>{fb}</li>;
             }
-            return <li {...props}>{children}</li>;
+            return <li {...props}>{renderWithLineBreaks(children)}</li>;
           },
-          p({ children }: any) {
+          p({ children, ...props }: any) {
             if (typeof children === 'string') {
               const fb = renderFabricItemBadge(children);
               if (fb) return <>{fb}</>;
             }
-            return <p className="chat-md-paragraph">{children}</p>;
+            return <p className="chat-md-paragraph" {...props}>{renderWithLineBreaks(children)}</p>;
           },
           h1: ({ children }: any) => <h1 className="chat-md-h1">{children}</h1>,
           h2: ({ children }: any) => <h2 className="chat-md-h2">{children}</h2>,

@@ -49,8 +49,49 @@ interface LanguageMeta {
   prismLang: string;
 }
 
+export const isArchitectureFlow = (code: string): boolean => {
+  const trimmed = (code || '').trim();
+  if (!trimmed) return false;
+  // Check for flow arrows (ASCII or Unicode)
+  const hasArrows = /[→←↑↓↳➔➜]|(?:-->|->|==>|<--|<-)/.test(trimmed);
+  // Check for diagram box node connections like [Node A] -> [Node B]
+  const hasBoxes = /\[[^\]\n]+\]\s*(?:-->|->|==>|\|)\s*\[[^\]\n]+\]/.test(trimmed);
+  // Check for box drawing characters
+  const hasBoxChars = /[┌├└│─┐┤┘┬┴┼═║╔╠╚╗╣╝]/.test(trimmed);
+  // Must not be an actual Python script
+  const isPythonSyntax = /\b(def\s+\w+\(|class\s+\w+:|import\s+\w+|from\s+\w+\s+import)\b/.test(trimmed);
+
+  return (hasArrows || hasBoxes || hasBoxChars) && !isPythonSyntax;
+};
+
 const getLanguageMeta = (langRaw: string, codeSnippet?: string): LanguageMeta => {
-  const l = (langRaw || 'python').toLowerCase().trim();
+  const l = (langRaw || '').toLowerCase().trim();
+
+  // 1. Detect Architecture Flows / ASCII diagrams
+  if (
+    l === 'flow' ||
+    l === 'diagram' ||
+    l === 'ascii' ||
+    l === 'architecture' ||
+    (codeSnippet && isArchitectureFlow(codeSnippet))
+  ) {
+    return {
+      display: 'Architecture Flow',
+      ext: 'txt',
+      grammar: undefined as any,
+      prismLang: 'text',
+    };
+  }
+
+  // 2. Plain text / logs / output
+  if (l === 'text' || l === 'plaintext' || l === 'txt' || l === 'output' || l === 'log') {
+    return {
+      display: 'Text',
+      ext: 'txt',
+      grammar: undefined as any,
+      prismLang: 'text',
+    };
+  }
 
   if (l === 'py' || l === 'python' || l === 'pyspark' || l === 'spark') {
     const isPySpark =
@@ -118,8 +159,8 @@ const getLanguageMeta = (langRaw: string, codeSnippet?: string): LanguageMeta =>
   return {
     display: capitalized || 'Code',
     ext: 'txt',
-    grammar: Prism.languages.python || Prism.languages.markup,
-    prismLang: 'python',
+    grammar: undefined as any,
+    prismLang: 'text',
   };
 };
 
