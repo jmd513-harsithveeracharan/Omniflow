@@ -34,22 +34,26 @@ export const ChatTimeline: React.FC<ChatTimelineProps> = ({
   const [dislikedIdxs, setDislikedIdxs] = useState<Record<number, boolean>>({});
 
   const lastUserRef = useRef<HTMLDivElement | null>(null);
+  const activeAssistantRef = useRef<HTMLDivElement | null>(null);
 
   // User manual scroll detection
   const handleScroll = () => {
     if (!threadRef.current) return;
     const { scrollTop, scrollHeight, clientHeight } = threadRef.current;
     const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
-    isUserScrolledUpRef.current = distanceFromBottom > 140;
+    // If the user has scrolled up more than 80px from bottom, pause autoscroll
+    isUserScrolledUpRef.current = distanceFromBottom > 80;
   };
 
   // Reset scroll to top on mount or session switch
+  // Reset scroll to top on mount
   useEffect(() => {
     if (threadRef.current) {
       threadRef.current.scrollTop = 0;
     }
   }, []);
 
+  // Handle session switches
   useEffect(() => {
     if (sessionId !== prevSessionIdRef.current) {
       prevSessionIdRef.current = sessionId || '';
@@ -57,40 +61,63 @@ export const ChatTimeline: React.FC<ChatTimelineProps> = ({
       prevCountRef.current = messages.length;
       if (threadRef.current) {
         threadRef.current.scrollTo({ top: 0, behavior: 'instant' });
+        if (messages.length > 0) {
+          requestAnimationFrame(() => {
+            if (threadRef.current) {
+              threadRef.current.scrollTop = threadRef.current.scrollHeight;
+            }
+          });
+        } else {
+          threadRef.current.scrollTop = 0;
+        }
       }
     }
   }, [sessionId, messages.length]);
 
   // Handle message changes & streaming autoscroll
   useEffect(() => {
-    if (!threadRef.current) return;
-    const thread = threadRef.current;
+    // A. Detect newly added user message (e.g. user submitted a prompt)
+    const isNewMessageBatch = messages.length > prevCountRef.current;
+    const hasNewUserMsg =
+      isNewMessageBatch && messages.slice(prevCountRef.current).some((m) => m.role === 'user');
 
-    // A. New User Message Sent
-    if (messages.length > prevCountRef.current) {
-      const lastMsg = messages[messages.length - 1];
-      if (lastMsg && lastMsg.role === 'user') {
-        isUserScrolledUpRef.current = false;
-        requestAnimationFrame(() => {
-          if (thread) {
-            if (messages.length > 1 && lastUserRef.current) {
-              const topOffset = Math.max(0, lastUserRef.current.offsetTop - 20);
-              thread.scrollTo({ top: topOffset, behavior: 'smooth' });
-            } else {
-              thread.scrollTo({ top: 0, behavior: 'instant' });
-            }
-          }
-        });
-      }
+    if (hasNewUserMsg) {
+      isUserScrolledUpRef.current = false;
+      requestAnimationFrame(() => {
+        if (!threadRef.current) return;
+        const currentThread = threadRef.current;
+        if (messages.length <= 2) {
+          // First turn in the thread: start smoothly at top
+          currentThread.scrollTo({ top: 0, behavior: 'smooth' });
+        } else if (lastUserRef.current) {
+          const threadRect = currentThread.getBoundingClientRect();
+          const userRect = lastUserRef.current.getBoundingClientRect();
+          // Position user prompt 24px below container top
+          const targetScroll = currentThread.scrollTop + (userRect.top - threadRect.top) - 24;
+          currentThread.scrollTo({ top: Math.max(0, targetScroll), behavior: 'smooth' });
+        }
+      });
     }
-    // B. Assistant Streaming Progress - only follow if content extends below visible viewport
+    // B. Assistant Streaming Progress - autoscroll ONLY when content extends below visible viewport
     else if (isStreaming && !isUserScrolledUpRef.current) {
-      const { scrollTop, clientHeight, scrollHeight } = thread;
-      const dockReserved = 110;
-      const contentVisibleBottom = scrollTop + clientHeight - dockReserved;
-      if (scrollHeight - 90 > contentVisibleBottom) {
-        thread.scrollTop = scrollHeight - clientHeight;
-      }
+      requestAnimationFrame(() => {
+        if (!threadRef.current) return;
+        const currentThread = threadRef.current;
+        const targetEl =
+          activeAssistantRef.current || (currentThread.lastElementChild as HTMLElement | null);
+        if (!targetEl) return;
+
+        const threadRect = currentThread.getBoundingClientRect();
+        const targetRect = targetEl.getBoundingClientRect();
+        // Floating prompt dock height reserved at the bottom (~160px)
+        const dockReserved = 160;
+        const visibleBottom = threadRect.bottom - dockReserved;
+
+        if (targetRect.bottom > visibleBottom) {
+          const overflow = targetRect.bottom - visibleBottom;
+          currentThread.scrollTop += overflow;
+        }
+      });
     }
 
     prevCountRef.current = messages.length;
@@ -185,8 +212,15 @@ export const ChatTimeline: React.FC<ChatTimelineProps> = ({
               ? thoughtMeta
               : null;
 
+          const isLatestAssistant = idx === messages.length - 1 && !isUser;
+
           return (
-            <div key={idx} className="chat-bubble assistant" data-raw-content={cleanContent}>
+            <div
+              key={idx}
+              ref={isLatestAssistant ? activeAssistantRef : undefined}
+              className="chat-bubble assistant"
+              data-raw-content={cleanContent}
+            >
               {liveThoughtMeta && liveThoughtMeta.steps.length > 0 && (
                 <ThoughtTrace meta={liveThoughtMeta} isStreaming={isCurrentlyStreaming} />
               )}
@@ -347,7 +381,7 @@ export const ChatTimeline: React.FC<ChatTimelineProps> = ({
           );
         })}
 
-        <div id="chatBottomSpacer" className="chat-thread-bottom-spacer" style={{ height: '8px', flexShrink: 0 }} />
+        <div id="chatBottomSpacer" className="chat-thread-bottom-spacer" style={{ height: '16px', flexShrink: 0 }} />
       </div>
     </div>
   );

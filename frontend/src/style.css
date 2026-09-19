@@ -1245,14 +1245,13 @@ nav.sidebar-nav {
     flex: 1;
     overflow-y: auto;
     overflow-x: hidden;
-    padding: 24px 0 100px 0 !important;
+    padding: 24px 0 170px 0 !important;
     display: flex;
     flex-direction: column;
     gap: 28px;
     width: 100%;
     max-width: 100%;
     margin: 0 !important;
-    scroll-behavior: smooth;
 }
 
 /* Chat scrollbar on the far right edge of browser */
@@ -3319,8 +3318,8 @@ nav.sidebar-nav {
 }
 
 .chat-thread-bottom-spacer {
-    height: calc(100vh - 240px);
-    min-height: calc(100vh - 240px);
+    height: 16px;
+    min-height: 16px;
     width: 100%;
     flex-shrink: 0;
     pointer-events: none;
