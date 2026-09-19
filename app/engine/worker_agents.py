@@ -62,7 +62,7 @@ def execute_notebook_worker(
         raw_code = chat(
             msgs,
             complexity="high",
-            max_tokens=3000,
+            max_tokens=8192,
             target_model=target_model,
             effort=effort,
             session_id=session_id,

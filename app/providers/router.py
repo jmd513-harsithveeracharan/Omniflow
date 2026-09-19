@@ -19,7 +19,7 @@ from app.providers.waterfall import (
 def chat(
     messages: list,
     complexity: str = "standard",
-    max_tokens: int = 4096,
+    max_tokens: int = 8192,
     target_model: str = None,
     effort: str = "medium",
     session_id: str = None,
@@ -30,9 +30,7 @@ def chat(
     Supports thinking effort scaling (low, medium, high) and native session resumption.
     Clocks and audits token consumption per provider and model.
     """
-    if effort == "low":
-        max_tokens = min(max_tokens, 2048)
-    elif effort == "high":
+    if effort == "high":
         max_tokens = max(max_tokens, 8192)
 
     if complexity == "high":
@@ -97,7 +95,7 @@ def chat(
 def chat_json(
     messages: list,
     complexity: str = "standard",
-    max_tokens: int = 4096,
+    max_tokens: int = 8192,
     target_model: str = None,
     effort: str = "medium",
     session_id: str = None,

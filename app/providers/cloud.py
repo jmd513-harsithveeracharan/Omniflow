@@ -14,7 +14,7 @@ from app.config import (
 from app.providers.session import _SESSION
 
 
-def _call_anthropic(messages: list, model: str, max_tokens: int = 4096) -> str:
+def _call_anthropic(messages: list, model: str, max_tokens: int = 8192) -> str:
     """Invokes Anthropic Messages API."""
     if not ANTHROPIC_KEY:
         raise RuntimeError("ANTHROPIC_API_KEY not set.")
@@ -43,7 +43,7 @@ def _call_anthropic(messages: list, model: str, max_tokens: int = 4096) -> str:
     return resp.json()["content"][0]["text"]
 
 
-def _call_openai(messages: list, model: str, max_tokens: int = 4096) -> str:
+def _call_openai(messages: list, model: str, max_tokens: int = 8192) -> str:
     """Invokes OpenAI Chat Completions API."""
     if not OPENAI_KEY:
         raise RuntimeError("OPENAI_API_KEY not set.")
@@ -64,7 +64,7 @@ def _call_openai(messages: list, model: str, max_tokens: int = 4096) -> str:
     return resp.json()["choices"][0]["message"]["content"]
 
 
-def _call_gemini(messages: list, model: str, max_tokens: int = 4096) -> str:
+def _call_gemini(messages: list, model: str, max_tokens: int = 8192) -> str:
     """Invokes Google Gemini REST API with Google Search grounding."""
     if not GEMINI_KEY:
         raise RuntimeError("GEMINI_API_KEY not set.")
@@ -107,7 +107,7 @@ def _call_gemini(messages: list, model: str, max_tokens: int = 4096) -> str:
     return candidates[0]["content"]["parts"][0]["text"]
 
 
-def _call_groq(messages: list, model: str, max_tokens: int = 4096) -> str:
+def _call_groq(messages: list, model: str, max_tokens: int = 8192) -> str:
     """Invokes Groq Cloud completions with round-robin key fallback."""
     if not GROQ_KEYS:
         raise RuntimeError("No GROQ_API_KEY set.")
@@ -138,4 +138,3 @@ def _call_groq(messages: list, model: str, max_tokens: int = 4096) -> str:
             last_err = str(e)
             continue
     raise RuntimeError(f"All Groq keys failed. Last error: {last_err}")
-

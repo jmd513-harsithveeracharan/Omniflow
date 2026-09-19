@@ -42,7 +42,7 @@ def run_auditor(
         raw = chat(
             msgs,
             complexity="standard",
-            max_tokens=512,
+            max_tokens=2048,
             target_model=target_model,
             effort=effort,
             session_id=session_id,

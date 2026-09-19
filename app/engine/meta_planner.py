@@ -63,22 +63,13 @@ def run_meta_planner(state: PipelineState) -> StepDAG:
         {"role": "system", "content": META_PLANNER_SYSTEM},
         {"role": "user", "content": state.prompt + context_hint},
     ]
-    raw = chat(
-        msgs,
-        complexity="standard",
-        max_tokens=2048,
-        target_model=state.target_model,
-        effort=state.effort,
-        session_id=state.session_id,
-    )
-    parsed = extract_json(raw)
     raw = ""
     for attempt in range(2):
         try:
             raw = chat(
                 msgs,
                 complexity="high",
-                max_tokens=4096,
+                max_tokens=8192,
                 target_model=state.target_model,
                 effort=state.effort,
                 session_id=state.session_id,

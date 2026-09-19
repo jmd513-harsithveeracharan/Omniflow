@@ -33,7 +33,7 @@ def _get_claude_cli_binary() -> str | None:
 def _call_claude_cli(
     messages: list,
     model: str = None,
-    max_tokens: int = 4096,
+    max_tokens: int = 8192,
     session_id: str = None,
     resume: bool = False,
 ) -> str:
@@ -129,7 +129,7 @@ def _call_claude_cli(
         raise RuntimeError(f"Claude Code CLI invocation failed: {e}")
 
 
-def _call_claude_session(messages: list, model: str = "claude-opus-5", max_tokens: int = 4096) -> str:
+def _call_claude_session(messages: list, model: str = "claude-opus-5", max_tokens: int = 8192) -> str:
     """Call Claude Web Session using user's active browser subscription cookies with real-time SSE parsing."""
     if not CLAUDE_COOKIE:
         raise RuntimeError("CLAUDE_COOKIE is not configured in .env.")
