@@ -185,8 +185,10 @@ def create_project(name: str, description: str = "", metadata: dict | None = Non
 def update_project(
     project_id: str, name: str | None = None, description: str | None = None,
     is_pinned: int | None = None, is_archived: int | None = None,
+    metadata: dict | None = None,
 ) -> bool:
     return _dispatch("update_project", project_id, name, description, is_pinned, is_archived)
+    return _dispatch("update_project", project_id, name, description, is_pinned, is_archived, metadata)
 
 
 def delete_project(project_id: str) -> bool:

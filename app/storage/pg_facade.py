@@ -291,8 +291,10 @@ def update_project(
     description: str | None = None,
     is_pinned: int | None = None,
     is_archived: int | None = None,
+    metadata: dict | None = None,
 ) -> bool:
     return get_pg().update_project(project_id, name, description, is_pinned, is_archived)
+    return get_pg().update_project(project_id, name, description, is_pinned, is_archived, metadata)
 
 
 def delete_project(project_id: str) -> bool:

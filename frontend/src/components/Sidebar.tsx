@@ -39,6 +39,7 @@ interface SidebarProps {
   onDeleteSession?: (sessionId: string) => void;
   onRenameSession?: (sessionId: string, newTitle: string) => void;
   projects?: ProjectRecord[];
+  isLoadingProjects?: boolean;
   activeProjectId?: string | null;
   onSelectProject?: (projectId: string) => void;
   onTogglePinProject?: (projectId: string, currentPinned: number) => void;
@@ -69,6 +70,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onDeleteSession,
   onRenameSession,
   projects = [],
+  isLoadingProjects = false,
   activeProjectId = null,
   onSelectProject,
   onTogglePinProject,
@@ -357,7 +359,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
           {isProjectsOpen && (
             <div className="sidebar-projects-list">
-              {sortedProjects.length === 0 ? (
+              {isLoadingProjects ? (
+                <div className="sidebar-skeleton-list" style={{ padding: '4px 6px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <div className="skeleton-line" style={{ height: '28px', borderRadius: '6px' }} />
+                  <div className="skeleton-line" style={{ height: '28px', borderRadius: '6px' }} />
+                  <div className="skeleton-line" style={{ height: '28px', borderRadius: '6px' }} />
+                </div>
+              ) : sortedProjects.length === 0 ? (
                 <div style={{ padding: '6px 8px', fontSize: '12px', color: '#71717a' }}>
                   No projects yet
                 </div>

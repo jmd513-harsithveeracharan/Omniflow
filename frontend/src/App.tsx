@@ -42,6 +42,7 @@ export const App: React.FC = () => {
 
   // Projects State
   const [projects, setProjects] = useState<ProjectRecord[]>([]);
+  const [isLoadingProjects, setIsLoadingProjects] = useState<boolean>(true);
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
   const [editingProject, setEditingProject] = useState<ProjectRecord | null>(null);
 
@@ -70,12 +71,15 @@ export const App: React.FC = () => {
 
   const loadProjectsList = async () => {
     try {
+      setIsLoadingProjects(true);
       const projs = await fetchProjects();
       if (projs && projs.length > 0) {
         setProjects(projs);
       }
     } catch (e) {
       console.error('Failed to load projects', e);
+    } finally {
+      setIsLoadingProjects(false);
     }
   };
 
@@ -374,6 +378,7 @@ export const App: React.FC = () => {
         userName={status?.userIdentity ? status.userIdentity.split('@')[0].replace('.', ' ') : 'Harsith Veer'}
         userEmail={status?.userIdentity || 'Bheesetti.Harsith@Pelibiothermal.com'}
         projects={projects}
+        isLoadingProjects={isLoadingProjects}
         activeProjectId={activeProjectId}
         onSelectProject={handleSelectProject}
         onTogglePinProject={handleTogglePinProject}

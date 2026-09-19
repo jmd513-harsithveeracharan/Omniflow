@@ -241,6 +241,7 @@ class UpdateProjectRequest(BaseModel):
     description: str | None = None
     is_pinned: int | None = None
     is_archived: int | None = None
+    metadata: dict[str, Any] | None = None
 
 
 class DeleteProjectRequest(BaseModel):
@@ -258,6 +259,7 @@ async def create_new_project_endpoint(req: CreateProjectRequest):
 async def update_project_endpoint(req: UpdateProjectRequest):
     from app.session_store import update_project
     updated = update_project(req.id, req.name, req.description, req.is_pinned, req.is_archived)
+    updated = update_project(req.id, req.name, req.description, req.is_pinned, req.is_archived, req.metadata)
     return {"status": "success", "success": updated, "id": req.id}
 
 

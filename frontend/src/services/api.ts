@@ -316,11 +316,15 @@ export async function fetchProjects(): Promise<import('../types').ProjectRecord[
   }));
 }
 
-export async function createProject(name: string, description = ''): Promise<import('../types').ProjectRecord> {
+export async function createProject(
+  name: string,
+  description = '',
+  metadata?: import('../types').ProjectMetadata
+): Promise<import('../types').ProjectRecord> {
   const res = await fetch(`${API_BASE}/projects/new`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name, description }),
+    body: JSON.stringify({ name, description, metadata: metadata || {} }),
   });
   if (!res.ok) throw new Error(`Failed to create project: ${res.statusText}`);
   const data = await res.json();
@@ -329,7 +333,13 @@ export async function createProject(name: string, description = ''): Promise<imp
 
 export async function updateProject(
   id: string,
-  updates: { name?: string; description?: string; is_pinned?: number; is_archived?: number }
+  updates: {
+    name?: string;
+    description?: string;
+    is_pinned?: number;
+    is_archived?: number;
+    metadata?: import('../types').ProjectMetadata;
+  }
 ): Promise<boolean> {
   const res = await fetch(`${API_BASE}/projects/update`, {
     method: 'POST',

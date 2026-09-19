@@ -772,6 +772,7 @@ class PostgresStorageAdapter(StorageAdapter):
         description: str | None = None,
         is_pinned: int | None = None,
         is_archived: int | None = None,
+        metadata: dict[str, Any] | None = None,
     ) -> bool:
         fields = []
         values = []
@@ -787,6 +788,9 @@ class PostgresStorageAdapter(StorageAdapter):
         if is_archived is not None:
             fields.append("is_archived = %s")
             values.append(int(is_archived))
+        if metadata is not None:
+            fields.append("metadata = %s")
+            values.append(json.dumps(metadata) if isinstance(metadata, dict) else metadata)
 
         if not fields:
             return False

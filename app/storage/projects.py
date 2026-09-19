@@ -16,7 +16,16 @@ def get_all_projects() -> list[dict]:
         "SELECT id, name, description, is_pinned, is_archived, created_at, updated_at, metadata FROM projects WHERE is_archived = 0 ORDER BY is_pinned DESC, updated_at DESC"
     ).fetchall()
     conn.close()
-    return [dict(r) for r in rows]
+    res = []
+    for r in rows:
+        d = dict(r)
+        if isinstance(d.get("metadata"), str):
+            try:
+                d["metadata"] = json.loads(d["metadata"])
+            except Exception:
+                d["metadata"] = {}
+        res.append(d)
+    return res
 
 
 def create_project(name: str, description: str = "", metadata: dict | None = None) -> dict:
@@ -49,6 +58,7 @@ def update_project(
     description: str | None = None,
     is_pinned: int | None = None,
     is_archived: int | None = None,
+    metadata: dict | None = None,
 ) -> bool:
     """Updates fields of an existing project."""
     now = _now()
@@ -66,6 +76,9 @@ def update_project(
     if is_archived is not None:
         updates.append("is_archived = ?")
         params.append(1 if is_archived else 0)
+    if metadata is not None:
+        updates.append("metadata = ?")
+        params.append(json.dumps(metadata) if isinstance(metadata, dict) else metadata)
 
     params.append(project_id)
     with _db_lock:
