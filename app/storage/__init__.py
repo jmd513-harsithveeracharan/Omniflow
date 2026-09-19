@@ -97,3 +97,4 @@ __all__ = [
     "delete_project",
     "seed_default_projects_if_empty",
 ]
+

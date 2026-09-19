@@ -218,3 +218,4 @@ def delete_folder(folder_id: str, workspace_id: str = ALLOWED_WORKSPACE_ID) -> b
     else:
         print(f"[FABRIC] Delete folder failed for {folder_id}: {resp.status_code} {resp.text[:200]}")
     return success
+

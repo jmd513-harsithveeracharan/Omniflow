@@ -30,3 +30,4 @@ def _call_lmstudio(messages: list, model: str, max_tokens: int = 4096) -> str:
     resp = _SESSION.post("http://localhost:1234/v1/chat/completions", json=payload, timeout=90)
     resp.raise_for_status()
     return resp.json()["choices"][0]["message"]["content"]
+

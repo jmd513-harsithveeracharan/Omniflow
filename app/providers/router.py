@@ -149,3 +149,4 @@ def chat_json(
                 pass
 
     raise ValueError(f"LLM returned invalid JSON. Raw response:\n{raw[:500]}")
+

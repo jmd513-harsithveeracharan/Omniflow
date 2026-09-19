@@ -114,3 +114,4 @@ def delete_onelake_shortcut(
     else:
         print(f"[FABRIC] delete_onelake_shortcut failed: {resp.status_code} {resp.text[:200]}")
     return success
+

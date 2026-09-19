@@ -110,3 +110,4 @@ def seed_default_projects_if_empty() -> None:
             p = create_project(name, desc)
             if pinned:
                 update_project(p["id"], is_pinned=1)
+

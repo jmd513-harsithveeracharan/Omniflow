@@ -82,3 +82,4 @@ def get_messages_with_index(session_id: str) -> list[dict]:
     ).fetchall()
     conn.close()
     return [{"turn_index": r["turn_index"], "role": r["role"], "content": r["content"]} for r in rows]
+

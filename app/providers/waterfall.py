@@ -163,3 +163,4 @@ def _parse_provider_and_model(name: str, target_model: str | None = None) -> tup
         prov = "LLM Engine"
         mdl = target_model or name
     return prov, mdl
+

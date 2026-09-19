@@ -190,3 +190,4 @@ def _resolve_claude_mix_model(prompt_text: str) -> str:
         return "claude-3-5-haiku-20241022"
     else:
         return "claude-3-5-sonnet-20241022"
+

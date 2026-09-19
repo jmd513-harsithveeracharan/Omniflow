@@ -247,3 +247,4 @@ def refresh_semantic_model(
         return {"success": True, "job_id": job_id, "location": location}
     print(f"[FABRIC] Semantic Model refresh trigger failed: {resp.status_code} {resp.text[:250]}")
     return {"success": False, "error": resp.text, "status_code": resp.status_code}
+

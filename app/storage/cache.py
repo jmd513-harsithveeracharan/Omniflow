@@ -39,3 +39,4 @@ def get_workspace_cache(workspace_id: str) -> dict | None:
     d["items"] = json.loads(d.pop("items_json", "[]"))
     d["folders"] = json.loads(d.pop("folders_json", "[]"))
     return d
+

@@ -162,3 +162,4 @@ def prune_old_sessions(days: int = 30) -> int:
         conn.close()
     print(f"[MEMORY] Pruned {deleted} sessions older than {days} days.")
     return deleted
+

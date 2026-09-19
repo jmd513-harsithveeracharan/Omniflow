@@ -75,3 +75,4 @@ def get_recent_runs(limit: int = 5) -> list[dict]:
     ).fetchall()
     conn.close()
     return [_deserialize_run(dict(r)) for r in rows]
+

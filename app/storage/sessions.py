@@ -149,3 +149,4 @@ def truncate_messages_from(session_id: str, turn_index: int) -> int:
         conn.commit()
         conn.close()
     return deleted
+

@@ -18,3 +18,4 @@ _retries = Retry(
 _adapter = HTTPAdapter(pool_connections=20, pool_maxsize=20, max_retries=_retries)
 _SESSION.mount("https://", _adapter)
 _SESSION.mount("http://", _adapter)
+

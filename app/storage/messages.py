@@ -134,3 +134,4 @@ def get_message_count(session_id: str) -> int:
     row = conn.execute("SELECT COUNT(*) FROM messages WHERE session_id=?", (session_id,)).fetchone()
     conn.close()
     return row[0]
+
