@@ -65,7 +65,7 @@ def _call_openai(messages: list, model: str, max_tokens: int = 4096) -> str:
 
 
 def _call_gemini(messages: list, model: str, max_tokens: int = 4096) -> str:
-    """Invokes Google Gemini REST API."""
+    """Invokes Google Gemini REST API with Google Search grounding."""
     if not GEMINI_KEY:
         raise RuntimeError("GEMINI_API_KEY not set.")
     contents = [
@@ -73,19 +73,34 @@ def _call_gemini(messages: list, model: str, max_tokens: int = 4096) -> str:
         for m in messages if m["role"] != "system"
     ]
     system_parts = [m["content"] for m in messages if m["role"] == "system"]
+
+    # Prefer stable flash-latest endpoint for high reliability
+    active_model = "gemini-flash-latest" if ("3.6" in model or "flash" in model.lower()) else model
+
     payload = {
         "contents": contents,
         "generationConfig": {"maxOutputTokens": max_tokens},
+        "tools": [{"googleSearch": {}}],
     }
     if system_parts:
         payload["systemInstruction"] = {"parts": [{"text": "\n\n".join(system_parts)}]}
 
     resp = _SESSION.post(
-        f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={GEMINI_KEY}",
+        f"https://generativelanguage.googleapis.com/v1beta/models/{active_model}:generateContent?key={GEMINI_KEY}",
         json=payload,
         timeout=60,
     )
-    resp.raise_for_status()
+    status = getattr(resp, "status_code", None)
+    if isinstance(status, int) and (status == 429 or status >= 400):
+        # Fallback without search tool
+        payload.pop("tools", None)
+        resp = _SESSION.post(
+            f"https://generativelanguage.googleapis.com/v1beta/models/{active_model}:generateContent?key={GEMINI_KEY}",
+            json=payload,
+            timeout=60,
+        )
+    if hasattr(resp, "raise_for_status"):
+        resp.raise_for_status()
     candidates = resp.json().get("candidates", [])
     if not candidates:
         raise RuntimeError("Gemini returned no candidates.")

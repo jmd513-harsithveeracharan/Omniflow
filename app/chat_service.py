@@ -28,6 +28,19 @@ CRITICAL RULES:
 
 
 from app.intent_classifier import classify_prompt_intent
+from app.tools.web_search import format_search_context, search_web
+
+
+def _detect_web_search_need(prompt: str) -> bool:
+    """Detects if prompt is querying for live news, real-time events, current date, or live web info."""
+    p = prompt.lower()
+    keywords = [
+        "today", "news", "latest", "recent", "current", "release notes",
+        "what happened", "announcement", "live", "date today", "weather",
+        "who won", "breaking", "price of", "sep 19", "september 19"
+    ]
+    return any(re.search(rf"\b{re.escape(k)}\b", p) for k in keywords)
+
 
 def is_architecture_request(prompt: str, mode: str = "auto") -> bool:
     """Determines whether a user prompt is requesting Fabric asset creation or Medallion planning."""
@@ -217,11 +230,20 @@ def process_chat_turn(
         response_text = thought_tag + format_architecture_response(plan, audit_messages)
         return response_text, plan
 
+    search_context = ""
+    if _detect_web_search_need(prompt):
+        hits = search_web(prompt, max_results=4)
+        if hits:
+            search_context = format_search_context(hits)
+
     sys_prompt = (
         FABRIC_STUDIO_SYSTEM
         if intent == "PROJECT_CONSULT"
         else "You are a helpful, expert AI programming and knowledge assistant. Provide clear, concise, accurate responses."
     )
+    if search_context:
+        sys_prompt += f"\n\n{search_context}"
+
     messages = [
         {"role": "system", "content": sys_prompt},
         {"role": "user", "content": prompt},
@@ -326,11 +348,20 @@ def process_chat_turn_stream(
         return
 
     # Direct conversational / consultative streaming via multi-provider waterfall
+    search_context = ""
+    if _detect_web_search_need(prompt):
+        hits = search_web(prompt, max_results=4)
+        if hits:
+            search_context = format_search_context(hits)
+
     sys_prompt = (
         FABRIC_STUDIO_SYSTEM
         if intent == "PROJECT_CONSULT"
         else "You are a helpful, expert AI programming and knowledge assistant. Provide clear, concise, accurate responses."
     )
+    if search_context:
+        sys_prompt += f"\n\n{search_context}"
+
     messages = [
         {"role": "system", "content": sys_prompt},
         {"role": "user", "content": prompt},

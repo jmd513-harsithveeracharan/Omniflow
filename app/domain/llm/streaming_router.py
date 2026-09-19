@@ -53,12 +53,25 @@ def stream_claude_cli(
         except Exception:
             valid_uuid = str(uuid.uuid5(uuid.NAMESPACE_DNS, session_id))
 
+    # Sanitize model parameter for Claude Code CLI
+    effective_model = model
+    if effective_model:
+        em_lower = effective_model.lower().strip()
+        if em_lower in ("claude-mix", "claude_mix", "mix", "default", "auto") or "haiku" in em_lower:
+            effective_model = None
+        elif "sonnet" in em_lower:
+            effective_model = "claude-3-7-sonnet"
+        elif "opus" in em_lower:
+            effective_model = "claude-3-opus-20240229"
+
     if valid_uuid and resume:
         latest_msgs = [m.get("content", "") for m in messages if m.get("role") == "user"]
         latest_turn = latest_msgs[-1] if latest_msgs else "Continue"
         cmd = [claude_bin, "-p", latest_turn, "--resume", valid_uuid, "--tools", ""]
         if model:
             cmd.extend(["--model", model])
+        if effective_model:
+            cmd.extend(["--model", effective_model])
     else:
         sys_prompts = [m["content"] for m in messages if m.get("role") == "system"]
         turns = [m for m in messages if m.get("role") != "system"]
@@ -78,9 +91,12 @@ def stream_claude_cli(
             cmd.extend(["--session-id", valid_uuid])
         if model:
             cmd.extend(["--model", model])
+        if effective_model:
+            cmd.extend(["--model", effective_model])
 
     proc = subprocess.Popen(
         cmd,
+        stdin=subprocess.DEVNULL,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True,
@@ -226,7 +242,7 @@ def stream_groq(messages: list[dict[str, str]], model: str, max_tokens: int = 40
 
 
 def stream_gemini(messages: list[dict[str, str]], model: str, max_tokens: int = 4096) -> Generator[str, None, None]:
-    """Streams tokens from Google Gemini API via SSE."""
+    """Streams tokens from Google Gemini API via SSE with Google Search grounding."""
     if not GEMINI_KEY:
         raise RuntimeError("GEMINI_API_KEY is not configured.")
     contents = [
@@ -234,22 +250,40 @@ def stream_gemini(messages: list[dict[str, str]], model: str, max_tokens: int = 
         for m in messages if m["role"] != "system"
     ]
     sys_parts = [m["content"] for m in messages if m["role"] == "system"]
+
+    # Prefer stable flash-latest endpoint for high reliability
+    active_model = "gemini-flash-latest" if ("3.6" in model or "flash" in model.lower()) else model
+
     payload: dict[str, Any] = {
         "contents": contents,
         "generationConfig": {"maxOutputTokens": max_tokens},
+        "tools": [{"googleSearch": {}}],
     }
     if sys_parts:
         payload["systemInstruction"] = {"parts": [{"text": "\n\n".join(sys_parts)}]}
 
     resp = _SESSION.post(
-        f"https://generativelanguage.googleapis.com/v1beta/models/{model}:streamGenerateContent?alt=sse&key={GEMINI_KEY}",
+        f"https://generativelanguage.googleapis.com/v1beta/models/{active_model}:streamGenerateContent?alt=sse&key={GEMINI_KEY}",
         json=payload,
         stream=True,
         timeout=(5.0, 30.0),
     )
-    if resp.status_code in (429, 500, 502, 503, 504):
-        raise RuntimeError(f"Gemini {model} returned HTTP {resp.status_code}: {resp.text[:120]}")
-    resp.raise_for_status()
+    status = getattr(resp, "status_code", None)
+    if isinstance(status, int) and (status == 429 or status >= 400):
+        # Fallback without search tool to conserve quota
+        payload.pop("tools", None)
+        resp = _SESSION.post(
+            f"https://generativelanguage.googleapis.com/v1beta/models/{active_model}:streamGenerateContent?alt=sse&key={GEMINI_KEY}",
+            json=payload,
+            stream=True,
+            timeout=(5.0, 30.0),
+        )
+        status = getattr(resp, "status_code", None)
+
+    if isinstance(status, int) and status in (429, 500, 502, 503, 504):
+        raise RuntimeError(f"Gemini {active_model} returned HTTP {status}: {getattr(resp, 'text', '')[:120]}")
+    if hasattr(resp, "raise_for_status"):
+        resp.raise_for_status()
     for line in resp.iter_lines():
         if line:
             decoded = line.decode("utf-8")

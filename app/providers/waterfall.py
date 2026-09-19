@@ -55,6 +55,7 @@ def _model_to_provider_call(
         if not GEMINI_KEY:
             raise RuntimeError("GEMINI_API_KEY is not configured in .env.")
         actual_model = LLM_MODELS.get("gemini_high", "gemini-2.5-pro") if "pro" in m else LLM_MODELS.get("gemini_standard", "gemini-3.6-flash")
+        actual_model = LLM_MODELS.get("gemini_high", "gemini-2.5-pro") if "pro" in m else LLM_MODELS.get("gemini_standard", "gemini-flash-latest")
         return (lambda: _call_gemini(messages, actual_model, max_tokens), f"Gemini ({actual_model})")
     elif "llama" in m or "groq" in m or "qwen" in m or "gpt-oss" in m or "oss" in m:
         if not GROQ_KEYS:
@@ -70,6 +71,7 @@ def _model_to_provider_call(
                 cli_model = "claude-3-5-haiku-20241022"
             elif "sonnet" in m:
                 cli_model = "claude-3-7-sonnet-20250219"
+                cli_model = "claude-3-7-sonnet"
             return (lambda: _call_claude_cli(messages, cli_model, max_tokens, session_id=session_id, resume=resume), f"Claude Code CLI ({cli_model or 'Default'})")
 
         if ANTHROPIC_KEY:

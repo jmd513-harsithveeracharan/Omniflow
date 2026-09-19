@@ -54,12 +54,25 @@ def _call_claude_cli(
             import uuid
             valid_uuid_session = str(uuid.uuid5(uuid.NAMESPACE_DNS, session_id))
 
+    # Sanitize model parameter for Claude Code CLI
+    effective_model = model
+    if effective_model:
+        em_lower = effective_model.lower().strip()
+        if em_lower in ("claude-mix", "claude_mix", "mix", "default", "auto") or "haiku" in em_lower:
+            effective_model = None
+        elif "sonnet" in em_lower:
+            effective_model = "claude-3-7-sonnet"
+        elif "opus" in em_lower:
+            effective_model = "claude-3-opus-20240229"
+
     if valid_uuid_session and resume:
         latest_user_msgs = [m.get("content", "") for m in messages if m.get("role") == "user"]
         latest_turn = latest_user_msgs[-1] if latest_user_msgs else "Continue"
         cmd = [claude_bin, "-p", latest_turn, "--resume", valid_uuid_session, "--tools", ""]
         if model:
             cmd.extend(["--model", model])
+        if effective_model:
+            cmd.extend(["--model", effective_model])
     else:
         system_prompts = [m["content"] for m in messages if m.get("role") == "system"]
         conversation_turns = [m for m in messages if m.get("role") != "system"]
@@ -84,6 +97,8 @@ def _call_claude_cli(
             cmd.extend(["--session-id", valid_uuid_session])
         if model:
             cmd.extend(["--model", model])
+        if effective_model:
+            cmd.extend(["--model", effective_model])
 
     try:
         import tempfile
@@ -92,6 +107,7 @@ def _call_claude_cli(
             capture_output=True,
             text=True,
             input="",
+            stdin=subprocess.DEVNULL,
             encoding="utf-8",
             cwd=tempfile.gettempdir(),
             timeout=120,
