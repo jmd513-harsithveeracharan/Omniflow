@@ -128,6 +128,7 @@ def run_pipeline(
                 session_id=session_id,
                 target_model=state.target_model,
                 effort=state.effort,
+                prompt_context=state.prompt,
             )
             state.worker_results.update(new_results)
         except Exception as e:

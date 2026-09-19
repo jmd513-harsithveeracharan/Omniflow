@@ -72,6 +72,25 @@ def run_meta_planner(state: PipelineState) -> StepDAG:
         session_id=state.session_id,
     )
     parsed = extract_json(raw)
+    raw = ""
+    for attempt in range(2):
+        try:
+            raw = chat(
+                msgs,
+                complexity="high",
+                max_tokens=4096,
+                target_model=state.target_model,
+                effort=state.effort,
+                session_id=state.session_id,
+            )
+            parsed = extract_json(raw)
+            if parsed and parsed.get("steps"):
+                break
+        except Exception:
+            if attempt == 1:
+                break
+    else:
+        parsed = extract_json(raw)
 
     if not parsed or not parsed.get("steps"):
         return heuristic_dag(state.prompt)
@@ -112,8 +131,14 @@ def heuristic_dag(prompt: str) -> StepDAG:
     nb_tokens = list(dict.fromkeys(re.findall(r"\b(nb_[a-zA-Z0-9_\-]+)\b", prompt, re.IGNORECASE)))
 
     # Detect numeric notebook counts e.g. "3 nb", "3 notebooks"
+    # Detect Medallion layers or numeric counts
     if not nb_lines and not nb_tokens:
         count_m = re.search(r"\b(\d+)\s*(?:nb|notebooks?|pyspark)\b", prompt, re.IGNORECASE)
+        is_medallion = (
+            "medallion" in prompt.lower()
+            or ("bronze" in prompt.lower() and "silver" in prompt.lower())
+            or bool(re.search(r"\blh_[a-zA-Z0-9_\-]+_(?:bronze|silver|gold)\b", prompt, re.IGNORECASE))
+        )
         if count_m:
             cnt = int(count_m.group(1))
             prefix = folder.lower() if folder != "AI_Test_Folder" else "medallion"
@@ -128,6 +153,18 @@ def heuristic_dag(prompt: str) -> StepDAG:
                     (f"nb_{prefix}_stage_{i+1}", f"PySpark data processing activity {i+1}")
                     for i in range(cnt)
                 ]
+        elif is_medallion:
+            prefix = folder.lower() if folder != "AI_Test_Folder" else "medallion"
+            lh_m = re.search(r"\blh_([a-zA-Z0-9_\-]+)_(?:bronze|silver|gold)\b", prompt, re.IGNORECASE)
+            if lh_m:
+                prefix = lh_m.group(1).lower()
+            elif re.search(r'["\']([A-Za-z0-9_\-]+)["\']', prompt):
+                prefix = re.search(r'["\']([A-Za-z0-9_\-]+)["\']', prompt).group(1).lower()
+            nb_lines = [
+                (f"nb_{prefix}_bronze_ingestion", "Ingest raw source data streams and relational tables into immutable Bronze Delta Lake tables with ingestion timestamps and lineage tags."),
+                (f"nb_{prefix}_silver_transformation", "Cleanse, type-cast, deduplicate, compute excursion flags, enforce Great Expectations data quality rules, and perform idempotent Delta Lake MERGE on primary keys."),
+                (f"nb_{prefix}_gold_starschema", "Construct Kimball star-schema dimensional models (Fact and Dimension tables) with business aggregations optimized for Power BI Direct Lake consumption."),
+            ]
 
     # Structure folder steps with containment inside AI_Test_Folder
     if folder != "AI_Test_Folder":
@@ -145,14 +182,16 @@ def heuristic_dag(prompt: str) -> StepDAG:
     if nb_lines:
         for nb_name, desc in nb_lines:
             sid = f"step_{nb_name.strip().lower()}"
-            steps.append(PipelineStep(step_id=sid, type="notebook", name=nb_name.strip(), layer="Notebook",
-                                      description=desc.strip(), depends_on=["step_folder"], can_parallel=True))
+            layer = "Bronze" if "bronze" in nb_name.lower() else ("Silver" if "silver" in nb_name.lower() else ("Gold" if "gold" in nb_name.lower() else "Notebook"))
+            steps.append(PipelineStep(step_id=sid, type="notebook", name=nb_name.strip(), layer=layer,
+                                      description=desc.strip(), depends_on=["step_folder"], can_parallel=(layer == "Notebook")))
             nb_step_ids.append(sid)
     elif nb_tokens:
         for tok in nb_tokens:
             sid = f"step_{tok.lower()}"
-            steps.append(PipelineStep(step_id=sid, type="notebook", name=tok, layer="Notebook",
-                                      description=f"PySpark notebook {tok}", depends_on=["step_folder"], can_parallel=True))
+            layer = "Bronze" if "bronze" in tok.lower() else ("Silver" if "silver" in tok.lower() else ("Gold" if "gold" in tok.lower() else "Notebook"))
+            steps.append(PipelineStep(step_id=sid, type="notebook", name=tok, layer=layer,
+                                      description=f"PySpark notebook {tok}", depends_on=["step_folder"], can_parallel=(layer == "Notebook")))
             nb_step_ids.append(sid)
     elif "notebook" in prompt.lower():
         algo_m = re.search(r"with\s+([A-Za-z0-9_\-]+)\s+code", prompt, re.IGNORECASE)
@@ -198,59 +237,41 @@ def heuristic_dag(prompt: str) -> StepDAG:
         steps.append(PipelineStep(step_id=f"step_{kql}", type="kql_database", name=kql, layer=None,
                                   description=f"KQL Database {kql}", depends_on=["step_folder"], can_parallel=True))
 
-    kq_tokens = list(dict.fromkeys(re.findall(r"\b(kq_[a-zA-Z0-9_\-]+)\b", prompt, re.IGNORECASE)))
-    for kq in kq_tokens:
-        steps.append(PipelineStep(step_id=f"step_{kq}", type="kql_queryset", name=kq, layer=None,
-                                  description=f"KQL Queryset {kq}", depends_on=["step_folder"], can_parallel=True))
+    for kq in list(dict.fromkeys(re.findall(r"\b(kq_[a-zA-Z0-9_\-]+)\b", prompt, re.IGNORECASE))):
+        steps.append(PipelineStep(step_id=f"step_{kq}", type="kql_queryset", name=kq, layer=None, description=f"KQL Queryset {kq}", depends_on=["step_folder"], can_parallel=True))
 
-    es_tokens = list(dict.fromkeys(re.findall(r"\b(es_[a-zA-Z0-9_\-]+)\b", prompt, re.IGNORECASE)))
-    for es in es_tokens:
-        steps.append(PipelineStep(step_id=f"step_{es}", type="eventstream", name=es, layer=None,
-                                  description=f"Real-Time Eventstream {es}", depends_on=["step_folder"], can_parallel=True))
+    for es in list(dict.fromkeys(re.findall(r"\b(es_[a-zA-Z0-9_\-]+)\b", prompt, re.IGNORECASE))):
+        steps.append(PipelineStep(step_id=f"step_{es}", type="eventstream", name=es, layer=None, description=f"Real-Time Eventstream {es}", depends_on=["step_folder"], can_parallel=True))
 
-    df_tokens = list(dict.fromkeys(re.findall(r"\b(df_[a-zA-Z0-9_\-]+)\b", prompt, re.IGNORECASE)))
-    for df in df_tokens:
-        steps.append(PipelineStep(step_id=f"step_{df}", type="dataflow", name=df, layer=None,
-                                  description=f"Dataflow Gen2 {df}", depends_on=["step_folder"], can_parallel=True))
+    for df in list(dict.fromkeys(re.findall(r"\b(df_[a-zA-Z0-9_\-]+)\b", prompt, re.IGNORECASE))):
+        steps.append(PipelineStep(step_id=f"step_{df}", type="dataflow", name=df, layer=None, description=f"Dataflow Gen2 {df}", depends_on=["step_folder"], can_parallel=True))
 
-    sjd_tokens = list(dict.fromkeys(re.findall(r"\b(sjd_[a-zA-Z0-9_\-]+)\b", prompt, re.IGNORECASE)))
-    for sjd in sjd_tokens:
-        steps.append(PipelineStep(step_id=f"step_{sjd}", type="spark_job", name=sjd, layer=None,
-                                  description=f"Spark Job Definition {sjd}", depends_on=["step_folder"], can_parallel=True))
+    for sjd in list(dict.fromkeys(re.findall(r"\b(sjd_[a-zA-Z0-9_\-]+)\b", prompt, re.IGNORECASE))):
+        steps.append(PipelineStep(step_id=f"step_{sjd}", type="spark_job", name=sjd, layer=None, description=f"Spark Job Definition {sjd}", depends_on=["step_folder"], can_parallel=True))
 
-    rfx_tokens = list(dict.fromkeys(re.findall(r"\b(rfx_[a-zA-Z0-9_\-]+)\b", prompt, re.IGNORECASE)))
-    for rfx in rfx_tokens:
-        steps.append(PipelineStep(step_id=f"step_{rfx}", type="reflex", name=rfx, layer=None,
-                                  description=f"Data Activator Reflex {rfx}", depends_on=["step_folder"], can_parallel=True))
+    for rfx in list(dict.fromkeys(re.findall(r"\b(rfx_[a-zA-Z0-9_\-]+)\b", prompt, re.IGNORECASE))):
+        steps.append(PipelineStep(step_id=f"step_{rfx}", type="reflex", name=rfx, layer=None, description=f"Data Activator Reflex {rfx}", depends_on=["step_folder"], can_parallel=True))
 
     sm_tokens = list(dict.fromkeys(re.findall(r"\b(sm_[a-zA-Z0-9_\-]+|sem_[a-zA-Z0-9_\-]+)\b", prompt, re.IGNORECASE)))
     if not sm_tokens and "semantic model" in prompt.lower():
         sm_tokens = [f"sm_{folder.lower()}_gold"]
     for sm in sm_tokens:
-        steps.append(PipelineStep(step_id=f"step_{sm}", type="semantic_model", name=sm, layer="Gold",
-                                  description=f"Direct Lake Semantic Model {sm}", depends_on=nb_step_ids or ["step_folder"], can_parallel=True))
+        steps.append(PipelineStep(step_id=f"step_{sm}", type="semantic_model", name=sm, layer="Gold", description=f"Direct Lake Semantic Model {sm}", depends_on=nb_step_ids or ["step_folder"], can_parallel=True))
 
-    rpt_tokens = list(dict.fromkeys(re.findall(r"\b(rpt_[a-zA-Z0-9_\-]+)\b", prompt, re.IGNORECASE)))
-    for rpt in rpt_tokens:
-        steps.append(PipelineStep(step_id=f"step_{rpt}", type="report", name=rpt, layer=None,
-                                  description=f"Power BI Report {rpt}", depends_on=nb_step_ids or ["step_folder"], can_parallel=True))
+    for rpt in list(dict.fromkeys(re.findall(r"\b(rpt_[a-zA-Z0-9_\-]+)\b", prompt, re.IGNORECASE))):
+        steps.append(PipelineStep(step_id=f"step_{rpt}", type="report", name=rpt, layer=None, description=f"Power BI Report {rpt}", depends_on=nb_step_ids or ["step_folder"], can_parallel=True))
 
-    gql_tokens = list(dict.fromkeys(re.findall(r"\b(gql_[a-zA-Z0-9_\-]+)\b", prompt, re.IGNORECASE)))
-    for gql in gql_tokens:
-        steps.append(PipelineStep(step_id=f"step_{gql}", type="graphql_api", name=gql, layer=None,
-                                  description=f"GraphQL API {gql}", depends_on=nb_step_ids or ["step_folder"], can_parallel=True))
+    for gql in list(dict.fromkeys(re.findall(r"\b(gql_[a-zA-Z0-9_\-]+)\b", prompt, re.IGNORECASE))):
+        steps.append(PipelineStep(step_id=f"step_{gql}", type="graphql_api", name=gql, layer=None, description=f"GraphQL API {gql}", depends_on=nb_step_ids or ["step_folder"], can_parallel=True))
 
-    exp_tokens = list(dict.fromkeys(re.findall(r"\b(mlexp_[a-zA-Z0-9_\-]+|exp_[a-zA-Z0-9_\-]+)\b", prompt, re.IGNORECASE)))
-    for exp in exp_tokens:
-        steps.append(PipelineStep(step_id=f"step_{exp}", type="ml_experiment", name=exp, layer=None,
-                                  description=f"ML Experiment {exp}", depends_on=["step_folder"], can_parallel=True))
+    for exp in list(dict.fromkeys(re.findall(r"\b(mlexp_[a-zA-Z0-9_\-]+|exp_[a-zA-Z0-9_\-]+)\b", prompt, re.IGNORECASE))):
+        steps.append(PipelineStep(step_id=f"step_{exp}", type="ml_experiment", name=exp, layer=None, description=f"ML Experiment {exp}", depends_on=["step_folder"], can_parallel=True))
 
     sc_tokens = list(dict.fromkeys(re.findall(r"\b(sc_[a-zA-Z0-9_\-]+)\b", prompt, re.IGNORECASE)))
     if not sc_tokens and "shortcut" in prompt.lower():
         sc_tokens = [f"sc_{folder.lower()}_raw"]
     for sc in sc_tokens:
-        steps.append(PipelineStep(step_id=f"step_{sc}", type="shortcut", name=sc, layer=None,
-                                  description=f"OneLake Shortcut {sc}", depends_on=["step_folder"], can_parallel=True))
+        steps.append(PipelineStep(step_id=f"step_{sc}", type="shortcut", name=sc, layer=None, description=f"OneLake Shortcut {sc}", depends_on=["step_folder"], can_parallel=True))
 
     pl_match = re.search(r"\b(pl_[a-zA-Z0-9_\-]+)\b", prompt, re.IGNORECASE)
     pl_name = pl_match.group(1) if pl_match else f"pl_{folder.lower()}_etl"

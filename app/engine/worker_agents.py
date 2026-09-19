@@ -24,6 +24,7 @@ def execute_notebook_worker(
     session_id: str | None = None,
     target_model: str | None = None,
     effort: str = "medium",
+    prompt_context: str | None = None,
 ) -> WorkerResult:
     start_t = time.perf_counter()
     start_utc = _now_utc_str()
@@ -48,6 +49,9 @@ def execute_notebook_worker(
         sys_prompt = WORKER_CODE_ALGO_SYSTEM
 
     user_prompt = f"Write PySpark code for notebook '{step.name}' in folder '{folder}'.\nDescription: {step.description}"
+    user_prompt = f"Write PySpark code for notebook '{step.name}' (layer: {step.layer or 'Notebook'}) in folder '{folder}'.\nTask Description: {step.description}"
+    if prompt_context:
+        user_prompt += f"\n\nBusiness Scenario & System Requirements Context:\n{prompt_context}"
     if upstream and upstream.delta_schema:
         user_prompt += f"\n\nUpstream context from {upstream.name}:\n" + json.dumps(
             {"lh_path": upstream.lh_path, "schema": upstream.delta_schema[:10]}
@@ -116,6 +120,7 @@ def run_workers(
     session_id: str | None = None,
     target_model: str | None = None,
     effort: str = "medium",
+    prompt_context: str | None = None,
 ) -> dict[str, WorkerResult]:
     """Executes worker agents: sequentially for Medallion dependencies, in parallel for others."""
     notebook_steps = [s for s in dag.steps if s.type == "notebook"]
@@ -137,6 +142,7 @@ def run_workers(
             session_id=session_id,
             target_model=target_model,
             effort=effort,
+            prompt_context=prompt_context,
         )
         results[step.step_id] = res
         last_result = res
@@ -144,7 +150,7 @@ def run_workers(
     if parallel_steps:
         with concurrent.futures.ThreadPoolExecutor(max_workers=min(len(parallel_steps), 6)) as pool:
             future_map = {
-                pool.submit(execute_notebook_worker, s, dag.folder, None, session_id, target_model, effort): s.step_id
+                pool.submit(execute_notebook_worker, s, dag.folder, None, session_id, target_model, effort, prompt_context): s.step_id
                 for s in parallel_steps
             }
             for future in concurrent.futures.as_completed(future_map):
