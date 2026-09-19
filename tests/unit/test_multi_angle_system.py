@@ -171,7 +171,7 @@ def test_live_fastapi_server():
                     if first_token_time is None:
                         first_token_time = time.time() - start_time
                     chunks_received += 1
-                    full_text.append(evt.get("payload", ""))
+                    full_text.append(evt.get("text", "") or evt.get("payload", ""))
             except Exception:
                 pass
 
