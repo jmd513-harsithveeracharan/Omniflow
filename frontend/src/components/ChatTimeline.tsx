@@ -193,9 +193,13 @@ export const ChatTimeline: React.FC<ChatTimelineProps> = ({
 
               {!cleanContent && isCurrentlyStreaming && (!liveThoughtMeta || liveThoughtMeta.steps.length === 0) && (
                 <div className="chat-content-card" style={{ padding: '12px 18px' }}>
-                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', color: '#a1a1aa', fontSize: '13px' }}>
-                    <span className="thinking-pulse-dot" style={{ width: '6px', height: '6px' }} />
-                    <span>Generating response...</span>
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: '10px', color: '#a1a1aa', fontSize: '13px' }}>
+                    <div className="chat-three-dots-loader">
+                      <span className="chat-loading-dot" />
+                      <span className="chat-loading-dot" />
+                      <span className="chat-loading-dot" />
+                    </div>
+                    <span style={{ fontWeight: 500, color: '#9ca3af', letterSpacing: '0.01em' }}>Thinking...</span>
                   </div>
                 </div>
               )}

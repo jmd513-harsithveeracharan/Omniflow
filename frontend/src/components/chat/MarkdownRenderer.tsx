@@ -72,6 +72,7 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content }) =
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{
+          pre: ({ children }: any) => <>{children}</>,
           code({ inline, className, children, ...props }: any) {
             const match = /language-(\w+)/.exec(className || '');
             const codeString = String(children || '').replace(/\n$/, '');

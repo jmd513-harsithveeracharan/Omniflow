@@ -9252,6 +9252,64 @@ ul.chat-md-list {
     scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
 }
 
+/* Ensure no outer pre container renders a darker background or border around modern code cards */
+.markdown-body pre:has(.modern-code-card),
+.markdown-body pre:has(.code-card),
+.chat-content-card pre:has(.modern-code-card),
+.chat-content-card pre:has(.code-card),
+pre:has(.modern-code-card),
+pre:has(.code-card) {
+    background: transparent !important;
+    border: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    max-height: none !important;
+    overflow: visible !important;
+}
+
+/* ═══════════════ CHAT 3-DOT LOADING INDICATOR (NO GLOW) ═══════════════ */
+.chat-three-dots-loader {
+    display: inline-flex;
+    align-items: center;
+    gap: 4.5px;
+    line-height: 1;
+}
+
+.chat-loading-dot {
+    display: inline-block;
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background-color: #9ca3af;
+    opacity: 0.35;
+    animation: chatDotBounce 1.4s infinite ease-in-out both;
+}
+
+.chat-loading-dot:nth-child(1) {
+    animation-delay: -0.32s;
+}
+
+.chat-loading-dot:nth-child(2) {
+    animation-delay: -0.16s;
+}
+
+.chat-loading-dot:nth-child(3) {
+    animation-delay: 0s;
+}
+
+@keyframes chatDotBounce {
+    0%, 80%, 100% {
+        transform: scale(0.75);
+        opacity: 0.3;
+    }
+    40% {
+        transform: scale(1.15);
+        opacity: 0.95;
+    }
+}
+
 /* Collapsible Code Cards */
 .code-card.is-collapsible.is-collapsed .code-card-body {
     max-height: 220px !important;
