@@ -33,6 +33,7 @@ class StepDAG:
     steps: list[PipelineStep]
     pipeline: dict | None
     summary: str
+    lakehouses: list[str] = field(default_factory=list)
 
 
 @dataclass

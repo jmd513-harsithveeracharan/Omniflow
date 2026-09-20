@@ -91,9 +91,8 @@ def _call_claude_cli(
                     formatted_parts.append(f"[{role}]:\n{m.get('content', '')}")
 
         full_prompt = "\n\n---\n\n".join(formatted_parts) if formatted_parts else "Hello"
-        cmd = [claude_bin, "-p", full_prompt, "--tools", ""]
-        if valid_uuid_session:
-            cmd.extend(["--session-id", valid_uuid_session])
+        import uuid as _uuid
+        cmd = [claude_bin, "-p", full_prompt, "--tools", "", "--session-id", str(_uuid.uuid4())]
         if target_m:
             cmd.extend(["--model", target_m])
 

@@ -23,31 +23,45 @@ _LAYER_SCOPE: dict[str, str] = {
     "Bronze": (
         "## YOUR LAYER: BRONZE\n"
         "You are ONLY writing the Bronze ingestion notebook.\n"
-        "- Read from the staging source tables listed in the schema context below.\n"
-        "- Write immutable raw copies to lh_*_bronze using .saveAsTable().\n"
-        "- Add _ingested_at (current_timestamp) and _source_system (literal string) columns.\n"
+        "CRITICAL WRITE RULE: When writing output tables, use ONLY a single-part table name.\n"
+        "  CORRECT:   bronze_df.write.format('delta').mode('overwrite').saveAsTable('orders')\n"
+        "  WRONG:     bronze_df.write.format('delta').mode('overwrite').saveAsTable('lh_orders_live_bronze.orders')  # NO prefix\n"
+        "  WRONG:     bronze_df.write.format('delta').mode('overwrite').saveAsTable('lh_orders_live_bronze.dbo.orders')  # NO 3-part\n"
+        "The notebook is already attached to the default Bronze Lakehouse — saveAsTable with a plain table name writes there automatically.\n"
+        "- Read staging source tables via OneLake ABFSS delta path:\n"
+        "  path = 'abfss://PBT_DATA_AGENT@onelake.dfs.fabric.microsoft.com/lh_stage_ai.Lakehouse/Tables/dbo/<table_name>'\n"
+        "  df = spark.read.format('delta').load(path)\n"
+        "- Add _ingested_at (F.current_timestamp()) and _source_system (F.lit('stage_ai')) columns.\n"
         "- DO NOT clean, filter, or transform data. Preserve original schema exactly.\n"
         "- DO NOT read from any Silver or Gold lakehouse.\n"
     ),
     "Silver": (
         "## YOUR LAYER: SILVER\n"
         "You are ONLY writing the Silver transformation notebook.\n"
-        "- Read ONLY from the Bronze lakehouses (lh_*_bronze tables).\n"
+        "CRITICAL WRITE RULE: When writing output tables, use ONLY a single-part table name.\n"
+        "  CORRECT:   silver_df.write.format('delta').mode('overwrite').saveAsTable('orders')\n"
+        "  WRONG:     silver_df.write.format('delta').mode('overwrite').saveAsTable('lh_orders_live_silver.orders')  # NO prefix\n"
+        "The notebook is already attached to the default Silver Lakehouse — saveAsTable with a plain table name writes there automatically.\n"
+        "- Read ONLY from the Bronze lakehouse tables using spark.read.table('<bronze_lakehouse_name>.<table_name>').\n"
+        "  Example: df = spark.read.table('lh_orders_live_bronze.orders')\n"
         "- DO NOT re-read from original staging source tables.\n"
         "- The Bronze ingestion timestamp column is _ingested_at -- use EXACTLY that name in window dedup.\n"
         "- Perform: trim whitespace, cast types, filter invalid rows (e.g. negative amounts).\n"
-        "- Use Delta MERGE or overwrite saveAsTable to lh_*_silver.\n"
         "- DO NOT implement star-schema or aggregations -- that is Gold's responsibility.\n"
     ),
     "Gold": (
         "## YOUR LAYER: GOLD\n"
         "You are ONLY writing the Gold dimensional modeling notebook.\n"
-        "- Read ONLY from Silver lakehouses (lh_*_silver tables).\n"
+        "CRITICAL WRITE RULE: When writing output tables, use ONLY a single-part table name.\n"
+        "  CORRECT:   agg_df.write.format('delta').mode('overwrite').saveAsTable('orders_by_status')\n"
+        "  WRONG:     agg_df.write.format('delta').mode('overwrite').saveAsTable('lh_orders_live_gold.orders_by_status')  # NO prefix\n"
+        "The notebook is already attached to the default Gold Lakehouse — saveAsTable with a plain table name writes there automatically.\n"
+        "- Read ONLY from Silver lakehouse tables using spark.read.table('<silver_lakehouse_name>.<table_name>').\n"
+        "  Example: df = spark.read.table('lh_orders_live_silver.orders')\n"
         "- DO NOT re-read from Bronze or staging source tables.\n"
         "- DO NOT re-implement deduplication, cleansing, or ingestion logic.\n"
         "- Build Kimball star-schema: fact + dimension tables with business aggregations.\n"
         "- Always project year/month columns via F.year()/F.month() before .partitionBy().\n"
-        "- Write to lh_*_gold using .saveAsTable().\n"
     ),
 }
 
@@ -100,9 +114,10 @@ def _build_medallion_prompt(
     return "\n".join(parts)
 
 
-def _infer_lh_path(step: PipelineStep, folder: str) -> str:
-    """Infers the managed lakehouse name for a Medallion step using naming conventions."""
+def _infer_lh_path(step: PipelineStep, folder: str, lakehouses: list[str] | None = None) -> str:
+    """Infers the managed lakehouse name for a Medallion step matching planned lakehouses."""
     name_lower = step.name.lower()
+    suffix = ""
     if "bronze" in name_lower:
         suffix = "bronze"
     elif "silver" in name_lower:
@@ -110,6 +125,14 @@ def _infer_lh_path(step: PipelineStep, folder: str) -> str:
     elif "gold" in name_lower:
         suffix = "gold"
     else:
+        pass  # suffix stays empty, handled below
+
+    if lakehouses and suffix:
+        for lh in lakehouses:
+            if suffix in lh.lower():
+                return lh
+
+    if not suffix:
         return step.name.replace("nb_", "lh_", 1)
 
     parts = name_lower.replace("nb_", "").split("_")
@@ -128,6 +151,7 @@ def execute_notebook_worker(
     effort: str = "medium",
     prompt_context: str | None = None,
     schema_context: str = "",
+    lakehouses: list[str] | None = None,
 ) -> WorkerResult:
     start_t = time.perf_counter()
     start_utc = _now_utc_str()
@@ -175,7 +199,7 @@ def execute_notebook_worker(
             lines = lines[:-1] if lines and lines[-1].startswith("```") else lines
             code = "\n".join(lines).strip()
 
-        lh_path = _infer_lh_path(step, folder)
+        lh_path = _infer_lh_path(step, folder, lakehouses=lakehouses)
         output_cols = resolve_upstream_schema(code)
 
         end_t = time.perf_counter()
@@ -241,6 +265,8 @@ def run_workers(
     )
     parallel_steps = [s for s in notebook_steps if s.layer not in ("Bronze", "Silver", "Gold")]
 
+    lh_list = getattr(dag, "lakehouses", None) or [s.name for s in dag.steps if s.type == "lakehouse"]
+
     results: dict[str, WorkerResult] = {}
     last_result: WorkerResult | None = None
     for step in medallion_steps:
@@ -253,6 +279,7 @@ def run_workers(
             effort=effort,
             prompt_context=prompt_context,
             schema_context=schema_context,
+            lakehouses=lh_list,
         )
         results[step.step_id] = res
         last_result = res
@@ -263,6 +290,7 @@ def run_workers(
                 pool.submit(
                     execute_notebook_worker,
                     s, dag.folder, None, session_id, target_model, effort, prompt_context, schema_context,
+                    lakehouses=lh_list,
                 ): s.step_id
                 for s in parallel_steps
             }

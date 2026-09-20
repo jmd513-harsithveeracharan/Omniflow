@@ -52,6 +52,17 @@ def _static_code_audit(plan: dict[str, Any]) -> list[dict[str, str]]:
                     "description": "Table written via ABFSS path -- must use .saveAsTable() for Fabric managed tables.",
                     "severity": "error",
                 })
+        # Rule C: Writing table directly to ABFSS path instead of managed saveAsTable
+        if (
+            re.search(r'\.write[^\n]*\.(?:save|csv|parquet|delta)\(\s*["\']abfss://', code)
+            or re.search(r'CREATE\s+TABLE[^\n]+LOCATION\s+["\']abfss://', code, re.IGNORECASE)
+        ):
+            violations.append({
+                "notebook": name,
+                "rule": "C",
+                "description": "Table written via ABFSS path -- must use .saveAsTable() for Fabric managed tables.",
+                "severity": "error",
+            })
 
         # Rule D: _ingest_ts mismatch -- Silver/Gold referencing wrong column name
         if layer in ("Silver", "Gold"):
@@ -132,6 +143,7 @@ def run_auditor(
                 "layer": nb.get("layer"),
                 "description": nb.get("description", ""),
                 "code_excerpt": (nb.get("pyspark_code") or nb.get("pyspark") or "")[:600],
+                "code_excerpt": (nb.get("pyspark_code") or nb.get("pyspark") or "")[:3500],
             }
             for nb in plan.get("notebooks", [])
         ],

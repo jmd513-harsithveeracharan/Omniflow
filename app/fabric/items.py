@@ -112,6 +112,7 @@ def update_definition(
     item_id: str,
     parts: list[dict],
     workspace_id: str = ALLOWED_WORKSPACE_ID,
+    update_metadata: bool = False,
 ) -> bool:
     """
     Uploads item definition parts (Base64 encoded).
@@ -121,9 +122,11 @@ def update_definition(
     req = get_requests()
     headers = get_auth_headers()
     payload = {"definition": {"parts": parts}}
+    has_meta = update_metadata or any(p.get("path") in (".platform", "item.metadata.json") for p in parts)
+    url = f"{_BASE}/workspaces/{workspace_id}/items/{item_id}/updateDefinition" + ("?updateMetadata=true" if has_meta else "")
 
     resp = req.post(
-        f"{_BASE}/workspaces/{workspace_id}/items/{item_id}/updateDefinition",
+        url,
         headers=headers,
         json=payload,
         timeout=30,
@@ -161,9 +164,14 @@ def get_item_definition(item_id: str, workspace_id: str = ALLOWED_WORKSPACE_ID) 
         if location:
             for _ in range(10):
                 time.sleep(2)
-                poll = req.get(location, headers=headers, timeout=15)
+                # Fabric LRO returns definition parts at {location}/result
+                poll = req.get(f"{location}/result", headers=headers, timeout=15)
                 if poll.status_code == 200:
                     return poll.json().get("definition", {}).get("parts", [])
+                # Some operations might return 200 at {location} directly
+                direct = req.get(location, headers=headers, timeout=15)
+                if direct.status_code == 200 and direct.json().get("definition"):
+                    return direct.json().get("definition", {}).get("parts", [])
     print(f"[FABRIC] getDefinition failed for {item_id}: {resp.status_code}")
     return None
 

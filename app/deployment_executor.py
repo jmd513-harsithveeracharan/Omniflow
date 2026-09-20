@@ -43,6 +43,10 @@ from app.fabric_compiler import (
     compile_report,
     compile_semantic_model,
     compile_spark_job_definition,
+    compile_dataflow, compile_environment, compile_eventstream, compile_graphql_api,
+    compile_kql_database, compile_kql_queryset, compile_lakehouse, compile_mirrored_database,
+    compile_ml_experiment, compile_ml_model, compile_notebook, compile_pipeline,
+    compile_reflex, compile_report, compile_semantic_model, compile_spark_job_definition,
     compile_warehouse,
 )
 from app.self_healer import diagnose_and_patch_code
@@ -80,14 +84,28 @@ def _now_utc() -> str:
 
 
 def _deploy_notebook_with_healing(
-    name: str, pyspark_code: str, folder_id: str | None, workspace_id: str, max_retries: int = 2
+    name: str,
+    pyspark_code: str,
+    folder_id: str | None,
+    workspace_id: str,
+    lakehouse_id: str | None = None,
+    lakehouse_name: str | None = None,
+    known_lakehouses: list[str] | None = None,
+    max_retries: int = 2,
 ) -> DeploymentStepResult:
     """Provisions a PySpark notebook with automated cyclic self-healing retries."""
     t0 = time.perf_counter()
     code, retries, last_error = pyspark_code, 0, None
 
     while retries <= max_retries:
-        payload = compile_notebook(name, code)
+        payload = compile_notebook(
+            name,
+            code,
+            lakehouse_id=lakehouse_id,
+            lakehouse_name=lakehouse_name,
+            workspace_id=workspace_id,
+            known_lakehouses=known_lakehouses,
+        )
         parts = payload.get("definition", {}).get("parts", [])
         res = provision_item_with_definition(name, "Notebook", parts=parts, folder_id=folder_id, workspace_id=workspace_id)
         if res.get("success"):
@@ -198,6 +216,21 @@ def deploy_fabric_plan(
         nb_name = nb.get("name", "nb_transform") if isinstance(nb, dict) else str(nb)
         nb_code = nb.get("pyspark_code") or nb.get("pyspark", "") if isinstance(nb, dict) else ""
         step = _deploy_notebook_with_healing(nb_name, nb_code, folder_id, workspace_id)
+        nb_lower = nb_name.lower()
+        matched_lh_name, matched_lh_id = None, None
+        for suffix in ("bronze", "silver", "gold"):
+            if suffix in nb_lower:
+                for lh_name, lh_id in lakehouse_ids.items():
+                    if suffix in lh_name.lower():
+                        matched_lh_name, matched_lh_id = lh_name, lh_id
+                        break
+                if matched_lh_id:
+                    break
+        step = _deploy_notebook_with_healing(
+            nb_name, nb_code, folder_id, workspace_id,
+            lakehouse_id=matched_lh_id, lakehouse_name=matched_lh_name,
+            known_lakehouses=list(lakehouse_ids.values()),
+        )
         if step.item_id:
             notebook_ids.append(step.item_id)
         if step.status == "failed" and step.error:

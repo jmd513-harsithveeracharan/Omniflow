@@ -8,6 +8,7 @@ monitors progress, patches code upon cell failure, and validates live Delta tabl
 
 from __future__ import annotations
 
+import re
 import time
 import uuid
 from typing import Any
@@ -167,21 +168,41 @@ def execute_closed_loop(
                     heal = diagnose_and_patch_code(current_code, err_msg, notebook_name=nb_name)
                     if heal.get("success") and heal.get("patched_code"):
                         current_code = heal["patched_code"]
-                        compiled = compile_notebook(nb_name, current_code)
-                        update_definition(nb_id, parts=compiled.get("definition", {}).get("parts", []), workspace_id=workspace_id)
+                        matched_lh = next((item for item in dep_report.deployed_items if item.item_type == "lakehouse" and any(k in nb_name.lower() and k in item.name.lower() for k in ("bronze", "silver", "gold"))), None)
+                        all_lh_ids = [item.item_id for item in dep_report.deployed_items if item.item_type == "lakehouse" and item.item_id]
+                        compiled = compile_notebook(
+                            nb_name, current_code,
+                            lakehouse_id=matched_lh.item_id if matched_lh else None,
+                            lakehouse_name=matched_lh.name if matched_lh else None,
+                            workspace_id=workspace_id,
+                            known_lakehouses=all_lh_ids,
+                        )
+                        update_definition(nb_id, parts=compiled.get("definition", {}).get("parts", []), workspace_id=workspace_id, update_metadata=True)
                         report.healing_events.append({
                             "notebook": nb_name, "retry": retry + 1, "diagnosis": heal.get("diagnosis")
                         })
                 retry += 1
 
-    # 3. Output Table Validation
-    target_tables = [
-        f"{lh}.dbo.{nb.get('name', '').replace('nb_', '')}"
-        for lh in plan.get("lakehouses", [])
-        for nb in plan.get("notebooks", [])
-        if "gold" in lh.lower() or "silver" in lh.lower()
-    ]
-    for tbl_ref in target_tables[:4]:
+    # 3. Output Table Validation — parse .saveAsTable() calls from notebook code
+    target_tables: list[str] = []
+    for nb in plan.get("notebooks", []):
+        code = nb.get("pyspark_code") or nb.get("pyspark") or ""
+        written = re.findall(r'\.saveAsTable\(\s*["\']([a-zA-Z0-9_]+)["\']\s*\)', code)
+        nb_name = nb.get("name", "").lower()
+        matched_lh = next(
+            (lh for lh in plan.get("lakehouses", []) if any(k in nb_name and k in lh.lower() for k in ("gold", "silver", "bronze"))),
+            None
+        )
+        if matched_lh and written:
+            for tbl in written:
+                ref = f"{matched_lh}.{tbl}"
+                if ref not in target_tables:
+                    target_tables.append(ref)
+
+    if not target_tables:
+        target_tables = [f"{lh}.orders" for lh in plan.get("lakehouses", []) if "gold" in lh.lower() or "silver" in lh.lower()]
+
+    for tbl_ref in target_tables[:6]:
         cols = resolve_table_schema(tbl_ref, workspace="PBT_DATA_AGENT")
         report.validation_results.append({
             "table": tbl_ref,
