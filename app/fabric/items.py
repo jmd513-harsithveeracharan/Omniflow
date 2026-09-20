@@ -217,6 +217,7 @@ def provision_item_with_definition(
 
     item_id = create_res.get("item_id")
     if parts and item_id:
+    if parts and item_id and item_type.lower() not in ("lakehouse", "warehouse"):
         update_fn = get_client_attr("update_definition", update_definition)
         update_ok = update_fn(item_id, parts, workspace_id)
         if not update_ok:

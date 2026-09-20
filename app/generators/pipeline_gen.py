@@ -13,6 +13,7 @@ from typing import Any
 def generate_pipeline_activity_dag(
     activities_spec: list[dict[str, Any]] | list[str],
     pipeline_name: str = "Medallion_Ingestion_Pipeline",
+    workspace_id: str | None = None,
     parameters: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """
@@ -26,12 +27,14 @@ def generate_pipeline_activity_dag(
             act_name = f"Execute_Notebook_{i+1}"
             act_type = "TridentNotebook"
             notebook_id = act
+            act_ws_id = workspace_id or ""
             depends_on = [prev_activity_name] if prev_activity_name else []
             prev_activity_name = act_name
         else:
             act_name = act.get("name", f"Execute_Step_{i+1}").replace(" ", "_")
             act_type = act.get("type", "TridentNotebook")
             notebook_id = act.get("notebook_id", "")
+            act_ws_id = act.get("workspace_id") or workspace_id or ""
             depends_on = act.get("depends_on", [])
             prev_activity_name = act_name
 
@@ -56,6 +59,7 @@ def generate_pipeline_activity_dag(
             },
             "typeProperties": {
                 "notebookId": notebook_id,
+                "workspaceId": act_ws_id,
                 "parameters": act.get("parameters", {}) if isinstance(act, dict) else {},
             },
         }

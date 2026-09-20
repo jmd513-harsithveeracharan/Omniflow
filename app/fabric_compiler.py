@@ -81,6 +81,7 @@ def compile_pipeline(
     """Returns (create_payload, update_parts) for a Data Factory pipeline."""
     from app.generators.pipeline_gen import generate_pipeline_activity_dag, package_pipeline_definition_parts
     activities = generate_pipeline_activity_dag(notebook_ids, workspace_id)
+    activities = generate_pipeline_activity_dag(notebook_ids, pipeline_name=name, workspace_id=workspace_id)
     parts = package_pipeline_definition_parts(activities, schedule_cron=schedule_cron)
     parts.append(_platform_part("DataPipeline", name))
     create_payload = {"displayName": name, "type": "DataPipeline", "description": "AI-orchestrated pipeline"}

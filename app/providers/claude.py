@@ -73,6 +73,9 @@ def _call_claude_cli(
             cmd.extend(["--model", model])
         if effective_model:
             cmd.extend(["--model", effective_model])
+        target_m = effective_model or model
+        if target_m:
+            cmd.extend(["--model", target_m])
     else:
         system_prompts = [m["content"] for m in messages if m.get("role") == "system"]
         conversation_turns = [m for m in messages if m.get("role") != "system"]
@@ -99,6 +102,9 @@ def _call_claude_cli(
             cmd.extend(["--model", model])
         if effective_model:
             cmd.extend(["--model", effective_model])
+        target_m = effective_model or model
+        if target_m:
+            cmd.extend(["--model", target_m])
 
     try:
         import tempfile

@@ -188,6 +188,13 @@ def get_message_count(session_id: str) -> int:
 
 
 def upsert_run(run_id: str, session_id: str | None = None, **fields: Any) -> None:
+    if session_id:
+        try:
+            from app.config import ALLOWED_WORKSPACE_ID
+            if not get_pg().get_session(session_id):
+                create_session(session_id, ALLOWED_WORKSPACE_ID, {"source": "auto_run"})
+        except Exception:
+            pass
     plan = fields.get("plan_json") or fields.get("plan_dict") or {}
     steps = fields.get("steps_json") or fields.get("steps") or []
     rec = RunRecord(
@@ -244,6 +251,7 @@ def set_fact(session_id: str, fact_key: str, fact_value: str, confidence: float 
         fact_value=fact_value,
         confidence=confidence,
     )
+    rec = LearnedFact(session_id=session_id, fact_key=fact_key, fact_value=fact_value, confidence=confidence)
     get_pg().upsert_fact(rec)
 
 
@@ -255,6 +263,7 @@ def get_tier_summary(session_id: str, tier: int = 2) -> dict | None:
     facts = get_pg().get_facts(session_id)
     key = f"_tier{tier}_summary"
     val = facts.get(key)
+    val = facts.get(f"_tier{tier}_summary")
     if not val:
         return None
     try:
@@ -267,6 +276,7 @@ def set_tier_summary(session_id: str, tier: int, summary: str, compressed_up_to_
     key = f"_tier{tier}_summary"
     val = json.dumps({"summary": summary, "compressed_up_to_turn": compressed_up_to_turn})
     set_fact(session_id, key, val, confidence=0.0)
+    set_fact(session_id, f"_tier{tier}_summary", val, confidence=0.0)
 
 
 def update_workspace_cache(workspace_id: str, items: list[dict], folders: list[dict] | None = None) -> None:
