@@ -9,6 +9,7 @@ WorkerResult.delta_schema so downstream workers receive real upstream schema.
 from __future__ import annotations
 
 import concurrent.futures
+import re
 import time
 from typing import Any
 
@@ -26,37 +27,24 @@ from app.skill_loader import load_skills
 # --- Layer-scoped isolation instruction blocks injected per worker ---
 _LAYER_SCOPE: dict[str, str] = {
     "Bronze": (
-        "## YOUR LAYER: BRONZE\n"
-        "You are ONLY writing the Bronze ingestion notebook.\n"
-        "- Read staging source tables via OneLake ABFSS delta path:\n"
-        "  path = 'abfss://PBT_DATA_AGENT@onelake.dfs.fabric.microsoft.com/lh_stage_ai.Lakehouse/Tables/dbo/<table_name>'\n"
-        "  df = spark.read.format('delta').load(path)\n"
-        "- Add _ingested_at (F.current_timestamp()) and _source_system (F.lit('stage_ai')) columns.\n"
-        "- Write immutable raw copies to default Lakehouse using .write.format('delta').mode('overwrite').saveAsTable('<table_name>').\n"
-        "- CRITICAL WRITE RULE: Use ONLY single-part table name in saveAsTable (e.g. saveAsTable('orders')). Never prefix lakehouse name.\n"
-        "- DO NOT clean, filter, or transform data. Preserve original schema exactly.\n"
-        "- DO NOT read from any Silver or Gold lakehouse.\n"
+        "## YOUR LAYER: BRONZE\nWrite Bronze ingestion notebook.\n"
+        "- Read staging source tables via OneLake ABFSS delta path: 'abfss://PBT_DATA_AGENT@onelake.dfs.fabric.microsoft.com/lh_stage_ai.Lakehouse/Tables/dbo/<table_name>'\n"
+        "- Add _ingested_at and _source_system ('stage_ai'). Write raw copies using .write.format('delta').mode('overwrite').saveAsTable('<table_name>').\n"
+        "- CRITICAL: Use ONLY single-part table name in saveAsTable (e.g. saveAsTable('orders')). Never prefix lakehouse name.\n"
+        "- DO NOT clean or transform data. Preserve schema. DO NOT read from Silver/Gold.\n"
     ),
     "Silver": (
-        "## YOUR LAYER: SILVER\n"
-        "You are ONLY writing the Silver transformation notebook.\n"
-        "- Read ONLY from Bronze lakehouse tables using spark.read.table('<bronze_lakehouse_name>.<table_name>') or spark.read.table('<table_name>').\n"
-        "- DO NOT re-read from original staging source tables.\n"
-        "- Perform: trim whitespace, cast types, filter invalid rows, and deduplicate with window on _ingested_at.\n"
-        "- Save cleaned tables using .write.format('delta').mode('overwrite').saveAsTable('<table_name>').\n"
-        "- CRITICAL WRITE RULE: Use ONLY single-part table name in saveAsTable (e.g. saveAsTable('orders')). Never prefix lakehouse name.\n"
-        "- DO NOT implement star-schema or aggregations -- that is Gold's responsibility.\n"
+        "## YOUR LAYER: SILVER\nWrite Silver transformation notebook.\n"
+        "- Read ONLY from Bronze lakehouse tables using spark.read.table('<bronze_lakehouse_name>.<table_name>'). DO NOT re-read staging.\n"
+        "- Deduplicate with window on _ingested_at, trim whitespace, cast types, filter invalid rows.\n"
+        "- Write cleaned tables using .write.format('delta').mode('overwrite').saveAsTable('<table_name>').\n"
+        "- CRITICAL: Use ONLY single-part table name in saveAsTable (e.g. saveAsTable('orders')). Never prefix lakehouse name.\n"
     ),
     "Gold": (
-        "## YOUR LAYER: GOLD\n"
-        "You are ONLY writing the Gold dimensional modeling notebook.\n"
-        "- Read ONLY from Silver lakehouse tables using spark.read.table('<silver_lakehouse_name>.<table_name>') or spark.read.table('<table_name>').\n"
-        "- DO NOT re-read from Bronze or staging source tables.\n"
-        "- DO NOT re-implement deduplication or cleansing logic.\n"
-        "- For multi-entity models (e.g. Customers, Orders, Products), join Silver tables to construct Kimball Fact and Dimension tables.\n"
-        "- Always project year/month columns via F.year()/F.month() before .partitionBy().\n"
-        "- Write to default Gold Lakehouse using .write.format('delta').mode('overwrite').saveAsTable('<table_name>').\n"
-        "- CRITICAL WRITE RULE: Use ONLY single-part table name in saveAsTable (e.g. saveAsTable('fact_orders')). Never prefix lakehouse name.\n"
+        "## YOUR LAYER: GOLD\nWrite Gold dimensional modeling notebook.\n"
+        "- Read ONLY from Silver lakehouse tables. Join Silver tables to construct Kimball Fact and Dimension tables.\n"
+        "- Always project year/month before .partitionBy(). Write using .write.format('delta').mode('overwrite').saveAsTable('<table_name>').\n"
+        "- CRITICAL: Use ONLY single-part table name in saveAsTable. Never prefix lakehouse name.\n"
     ),
 }
 
@@ -81,22 +69,23 @@ def _build_medallion_prompt(
     if schema_context:
         parts.append(f"\n\n{schema_context}")
 
-    upstream_list = upstream if isinstance(upstream, list) else ([upstream] if upstream else [])
-    for up in upstream_list:
-        if up and up.delta_schema:
-            upstream_schema_str = ", ".join(up.delta_schema[:20])
-            parts.append(
-                f"\n\nUpstream {up.layer or 'Notebook'} (`{up.name}`) "
-                f"produces these output columns:\n{upstream_schema_str}\n"
-                f"Target lakehouse path / table: `{up.lh_path}`\n"
-                "Read from THAT lakehouse/table -- do NOT re-query the original source."
-            )
-        elif up and up.lh_path:
-            parts.append(
-                f"\n\nUpstream {up.layer or 'Notebook'} (`{up.name}`) "
-                f"writes to: `{up.lh_path}`\n"
-                "Read from THAT lakehouse/table -- do NOT re-query the original source."
-            )
+    if layer != "Bronze":
+        upstream_list = upstream if isinstance(upstream, list) else ([upstream] if upstream else [])
+        for up in upstream_list:
+            if up and up.delta_schema:
+                upstream_schema_str = ", ".join(up.delta_schema[:20])
+                parts.append(
+                    f"\n\nUpstream {up.layer or 'Notebook'} (`{up.name}`) "
+                    f"produces these output columns:\n{upstream_schema_str}\n"
+                    f"Target lakehouse path / table: `{up.lh_path}`\n"
+                    "Read from THAT lakehouse/table -- do NOT re-query the original source."
+                )
+            elif up and up.lh_path:
+                parts.append(
+                    f"\n\nUpstream {up.layer or 'Notebook'} (`{up.name}`) "
+                    f"writes to: `{up.lh_path}`\n"
+                    "Read from THAT lakehouse/table -- do NOT re-query the original source."
+                )
 
     if prompt_context:
         ctx = prompt_context
@@ -111,30 +100,35 @@ def _build_medallion_prompt(
     return "\n".join(parts)
 
 
+def _clean_code(raw: str) -> str:
+    """Extracts pristine python/sql code, stripping markdown fences and conversational narratives."""
+    m = re.search(r"```(?:python|pyspark|sql)?\s*\n(.*?)```", raw, re.DOTALL | re.IGNORECASE)
+    code = m.group(1).strip() if m else raw.strip()
+    if code.startswith("```"):
+        lines = code.splitlines()
+        lines = lines[1:] if lines[0].startswith("```") else lines
+        lines = lines[:-1] if lines and lines[-1].startswith("```") else lines
+        code = "\n".join(lines).strip()
+    lines = code.splitlines()
+    for i, line in enumerate(lines):
+        l_str = line.strip()
+        if l_str.startswith(("#", "from ", "import ", "spark.", "df", "source_", "--", "CREATE", "SELECT")):
+            return "\n".join(lines[i:]).strip()
+    return code
+
+
 def _infer_lh_path(step: PipelineStep, folder: str, lakehouses: list[str] | None = None) -> str:
     """Infers the managed lakehouse name for a Medallion step matching planned lakehouses."""
     name_lower = step.name.lower()
-    suffix = ""
-    if "bronze" in name_lower:
-        suffix = "bronze"
-    elif "silver" in name_lower:
-        suffix = "silver"
-    elif "gold" in name_lower:
-        suffix = "gold"
+    for layer in ("bronze", "silver", "gold"):
+        if layer in name_lower:
+            if lakehouses:
+                matched = next((lh for lh in lakehouses if layer in lh.lower()), None)
+                if matched:
+                    return matched
+            return f"lh_{folder.lower()}_{layer}"
+    return step.name.replace("nb_", "lh_", 1)
 
-    if lakehouses and suffix:
-        for lh in lakehouses:
-            if suffix in lh.lower():
-                return lh
-
-    if not suffix:
-        return step.name.replace("nb_", "lh_", 1)
-
-    parts = name_lower.replace("nb_", "").split("_")
-    noise = {suffix, "ingestion", "transformation", "starschema", "ingest", "merge", "star"}
-    meaningful = [p for p in parts if p not in noise]
-    project = "_".join(meaningful) if meaningful else folder.lower()
-    return f"lh_{project}_{suffix}"
 
 
 def execute_notebook_worker(
@@ -199,12 +193,7 @@ def execute_notebook_worker(
             effort=effort,
             session_id=session_id,
         )
-        code = raw_code.strip()
-        if code.startswith("```"):
-            lines = code.split("\n")
-            lines = lines[1:] if lines[0].startswith("```") else lines
-            lines = lines[:-1] if lines and lines[-1].startswith("```") else lines
-            code = "\n".join(lines).strip()
+        code = _clean_code(raw_code)
 
         lh_path = _infer_lh_path(step, folder, lakehouses=lakehouses)
         output_cols = resolve_upstream_schema(code)
@@ -218,36 +207,21 @@ def execute_notebook_worker(
                 session_id,
                 title=f"Synthesized PY {step.name}.py",
                 detail=f"Code generated ({code_lines} lines, {dur}s). Output schema: {len(output_cols)} cols.",
-                status="completed",
-                action="Synthesized",
-                badge="PY",
-                target=f"{step.name}.py",
-                diff=f"+{code_lines} -0",
+                status="completed", action="Synthesized", badge="PY",
+                target=f"{step.name}.py", diff=f"+{code_lines} -0",
                 output=code[:400] + ("\n..." if len(code) > 400 else ""),
             )
         return WorkerResult(
-            step_id=step.step_id,
-            name=step.name,
-            layer=step.layer,
-            pyspark=code,
-            lh_path=lh_path,
-            delta_schema=output_cols,
-            started_at=start_utc,
-            completed_at=_now_utc_str(),
-            duration_sec=dur,
+            step_id=step.step_id, name=step.name, layer=step.layer,
+            pyspark=code, lh_path=lh_path, delta_schema=output_cols,
+            started_at=start_utc, completed_at=_now_utc_str(), duration_sec=dur,
         )
     except Exception as e:
-        end_t = time.perf_counter()
-        dur = round(end_t - start_t, 2)
+        dur = round(time.perf_counter() - start_t, 2)
         return WorkerResult(
-            step_id=step.step_id,
-            name=step.name,
-            layer=step.layer,
-            pyspark=f"# Error generating code: {e}\nprint('Error')",
-            error=str(e),
-            started_at=start_utc,
-            completed_at=_now_utc_str(),
-            duration_sec=dur,
+            step_id=step.step_id, name=step.name, layer=step.layer,
+            pyspark=f"# Error generating code: {e}\nprint('Error')", error=str(e),
+            started_at=start_utc, completed_at=_now_utc_str(), duration_sec=dur,
         )
 
 
@@ -314,13 +288,7 @@ def run_workers(
                     results[sid] = future.result()
                 except Exception as e:
                     results[sid] = WorkerResult(
-                        step_id=sid,
-                        name=sid,
-                        layer=None,
-                        pyspark=f"# Error: {e}",
-                        error=str(e),
-                        started_at=_now_utc_str(),
-                        completed_at=_now_utc_str(),
-                        duration_sec=0.0,
+                        step_id=sid, name=sid, layer=None, pyspark=f"# Error: {e}",
+                        error=str(e), started_at=_now_utc_str(), completed_at=_now_utc_str(), duration_sec=0.0,
                     )
     return results
