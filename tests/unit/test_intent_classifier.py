@@ -81,3 +81,16 @@ def test_end_to_end_classify_intent():
     # Scenario 2: Clear build command
     intent_build, _ = classify_prompt_intent("Create project Sales_5 with lh_bronze, lh_silver, 3 notebooks")
     assert intent_build == "BUILD_ARCHITECTURE"
+
+
+def test_fallback_rule_deploy_and_run():
+    """Verify deploy and run orders are recognized as DEPLOY_AND_RUN."""
+    prompts = [
+        "deploy and run this pipeline",
+        "execute active plan in Fabric and verify Delta tables",
+        "deploy it run the pipeline check if any errors are there solve them",
+        "trigger notebook nb_silver and verify output",
+    ]
+    for p in prompts:
+        intent, reason = _fallback_rule_classify(p)
+        assert intent == "DEPLOY_AND_RUN", f"Expected DEPLOY_AND_RUN for '{p}', got {intent} ({reason})"

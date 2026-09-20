@@ -115,6 +115,7 @@ class FabricDeployRequest(BaseModel):
     plan: dict[str, Any] = Field(..., description="Fabric execution plan with Medallion items")
     session_id: str | None = None
     workspace_id: str | None = None
+    run_immediately: bool = Field(False, description="Whether to trigger Fabric pipeline/notebook jobs and verify live Delta tables")
 
 
 # ── Endpoints ───────────────────────────────────────────────────────────────
@@ -448,6 +449,21 @@ async def handle_fabric_deploy(req: FabricDeployRequest):
     """Executes full multi-tier architecture plan to Microsoft Fabric with cyclic self-healing."""
     wid = req.workspace_id or ALLOWED_WORKSPACE_ID
     try:
+        if req.run_immediately:
+            from app.engine.executor import execute_closed_loop
+            exec_report = execute_closed_loop(req.plan, workspace_id=wid, session_id=req.session_id)
+            return {
+                "status": "success" if exec_report.status in ("success", "partial", "completed") else "failed",
+                "run_id": exec_report.run_id,
+                "execution_status": exec_report.status,
+                "duration_sec": exec_report.duration_sec,
+                "deployed_items": exec_report.deployed_items,
+                "job_results": exec_report.job_results,
+                "healing_events": exec_report.healing_events,
+                "validation_results": exec_report.validation_results,
+                "summary_markdown": exec_report.summary_markdown,
+            }
+
         report = deploy_fabric_plan(req.plan, workspace_id=wid, session_id=req.session_id)
         return {
             "status": "success" if report.status in ("completed", "partial") else "failed",

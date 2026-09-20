@@ -10,13 +10,18 @@ from __future__ import annotations
 
 import json
 import re
+from collections.abc import Generator
 from typing import Any
 
 from collections.abc import Generator
 from app.agent_pipeline import run_pipeline
+from app.config import ALLOWED_WORKSPACE_ID, ALLOWED_WORKSPACE_NAME
 from app.domain.llm.streaming_router import chat_stream
+from app.engine.formatter import build_thought_meta, format_architecture_response
+from app.intent_classifier import classify_prompt_intent
 from app.llm_router import chat
 from app.config import ALLOWED_WORKSPACE_ID, ALLOWED_WORKSPACE_NAME
+from app.tools.web_search import format_search_context, search_web
 
 def _build_fabric_system_prompt() -> str:
     ws_ref = f"workspace {ALLOWED_WORKSPACE_ID}" if ALLOWED_WORKSPACE_ID else "the active Microsoft Fabric workspace"
@@ -33,10 +38,6 @@ def _build_fabric_system_prompt() -> str:
 FABRIC_STUDIO_SYSTEM = _build_fabric_system_prompt()
 
 
-from app.intent_classifier import classify_prompt_intent
-from app.tools.web_search import format_search_context, search_web
-
-
 def _detect_web_search_need(prompt: str) -> bool:
     """Detects if prompt is querying for live news, real-time events, current date, or live web info."""
     p = prompt.lower()
@@ -51,10 +52,41 @@ def _detect_web_search_need(prompt: str) -> bool:
 def is_architecture_request(prompt: str, mode: str = "auto") -> bool:
     """Determines whether a user prompt is requesting Fabric asset creation or Medallion planning."""
     intent, _ = classify_prompt_intent(prompt, forced_mode=mode)
-    return intent == "BUILD_ARCHITECTURE"
+    return intent in ("BUILD_ARCHITECTURE", "DEPLOY_AND_RUN")
 
 
-from app.engine.formatter import build_thought_meta, format_architecture_response
+def _get_active_session_plan(session_id: str) -> dict[str, Any] | None:
+    """Retrieves the latest synthesized architecture plan from the active session."""
+    try:
+        from app.session_store import get_session_runs
+        for r in get_session_runs(session_id):
+            p = r.get("plan_json")
+            if p and isinstance(p, dict) and p.get("notebooks"):
+                return p
+    except Exception:
+        pass
+    return None
+
+
+def _drain_step_queue(step_q: Any, worker_th: Any) -> Generator[tuple[str, str, dict[str, Any] | None], None, None]:
+    """Yields progress thought steps in real time from worker thread queue."""
+    import queue
+    while True:
+        try:
+            item = step_q.get(timeout=0.05)
+            if item is None:
+                break
+            yield ("thought_step", json.dumps(item), None)
+        except queue.Empty:
+            if not worker_th.is_alive():
+                while not step_q.empty():
+                    try:
+                        rem = step_q.get_nowait()
+                        if rem is not None:
+                            yield ("thought_step", json.dumps(rem), None)
+                    except Exception:
+                        break
+                break
 
 
 def process_chat_turn(
@@ -70,15 +102,30 @@ def process_chat_turn(
     intent, meta = classify_prompt_intent(prompt, forced_mode=mode)
     print(f"[CHAT_TURN] Intent: {intent} (method: {meta.get('method')}, mode: {mode})")
 
-    if intent == "BUILD_ARCHITECTURE":
-        plan, audit_messages = run_pipeline(
-            prompt,
-            session_id=session_id,
-            target_model=target_model,
-            effort=effort,
-        )
+    if intent in ("BUILD_ARCHITECTURE", "DEPLOY_AND_RUN"):
+        plan = _get_active_session_plan(session_id) if intent == "DEPLOY_AND_RUN" else None
+        audit_messages: list[str] = []
+        if not plan:
+            plan, audit_messages = run_pipeline(
+                prompt,
+                session_id=session_id,
+                target_model=target_model,
+                effort=effort,
+            )
+            try:
+                from app.session_store import upsert_run
+                upsert_run(run_id=plan.get("run_id", f"run_{session_id}"), session_id=session_id, plan_json=plan)
+            except Exception:
+                pass
+
         thought_tag = build_thought_meta(plan)
         response_text = thought_tag + format_architecture_response(plan, audit_messages)
+
+        if intent == "DEPLOY_AND_RUN":
+            from app.engine.executor import execute_closed_loop
+            exec_rep = execute_closed_loop(plan, workspace_id=ALLOWED_WORKSPACE_ID, session_id=session_id)
+            response_text += f"\n\n---\n\n{exec_rep.summary_markdown}"
+
         return response_text, plan
 
     search_context = ""
@@ -130,7 +177,7 @@ def process_chat_turn_stream(
     intent, meta = classify_prompt_intent(prompt, forced_mode=mode)
     print(f"[STREAM_TURN] Intent: {intent} (method: {meta.get('method')}, mode: {mode})")
 
-    if intent == "BUILD_ARCHITECTURE":
+    if intent in ("BUILD_ARCHITECTURE", "DEPLOY_AND_RUN"):
         import queue
         import threading
         from app.agent_pipeline import add_step_listener, remove_step_listener
@@ -141,17 +188,24 @@ def process_chat_turn_stream(
             step_q.put(step_dict)
 
         add_step_listener(session_id, on_step_event)
-
         pipeline_res: list[Any] = [None, None, None]
 
         def run_worker() -> None:
             try:
-                p, a = run_pipeline(
-                    prompt,
-                    session_id=session_id,
-                    target_model=target_model,
-                    effort=effort,
-                )
+                p = _get_active_session_plan(session_id) if intent == "DEPLOY_AND_RUN" else None
+                a = []
+                if not p:
+                    p, a = run_pipeline(
+                        prompt,
+                        session_id=session_id,
+                        target_model=target_model,
+                        effort=effort,
+                    )
+                    try:
+                        from app.session_store import upsert_run
+                        upsert_run(run_id=p.get("run_id", f"run_{session_id}"), session_id=session_id, plan_json=p)
+                    except Exception:
+                        pass
                 pipeline_res[0] = p
                 pipeline_res[1] = a
             except Exception as ex:
@@ -162,33 +216,40 @@ def process_chat_turn_stream(
         worker_th = threading.Thread(target=run_worker, daemon=True)
         worker_th.start()
 
-        # Stream thought steps in real time as each agent node fires
-        while True:
-            try:
-                step_item = step_q.get(timeout=0.05)
-                if step_item is None:
-                    break
-                yield ("thought_step", json.dumps(step_item), None)
-            except queue.Empty:
-                if not worker_th.is_alive():
-                    while not step_q.empty():
-                        try:
-                            rem = step_q.get_nowait()
-                            if rem is not None:
-                                yield ("thought_step", json.dumps(rem), None)
-                        except Exception:
-                            break
-                    break
-
-        remove_step_listener(session_id, on_step_event)
+        yield from _drain_step_queue(step_q, worker_th)
 
         if pipeline_res[2] is not None:
+            remove_step_listener(session_id, on_step_event)
             raise pipeline_res[2]
 
         plan = pipeline_res[0] or {}
         audit_messages = pipeline_res[1] or []
         thought_tag = build_thought_meta(plan)
         full_resp = thought_tag + format_architecture_response(plan, audit_messages)
+
+        if intent == "DEPLOY_AND_RUN":
+            exec_res: list[Any] = [None, None]
+
+            def run_exec() -> None:
+                try:
+                    from app.engine.executor import execute_closed_loop
+                    exec_res[0] = execute_closed_loop(plan, workspace_id=ALLOWED_WORKSPACE_ID, session_id=session_id)
+                except Exception as ex:
+                    exec_res[1] = ex
+                finally:
+                    step_q.put(None)
+
+            exec_th = threading.Thread(target=run_exec, daemon=True)
+            exec_th.start()
+            yield from _drain_step_queue(step_q, exec_th)
+
+            if exec_res[1] is not None:
+                remove_step_listener(session_id, on_step_event)
+                raise exec_res[1]
+            if exec_res[0]:
+                full_resp += f"\n\n---\n\n{exec_res[0].summary_markdown}"
+
+        remove_step_listener(session_id, on_step_event)
 
         # Stream synthesized architecture summary in smooth chunks
         chunk_sz = 32

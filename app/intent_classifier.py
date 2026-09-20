@@ -15,17 +15,18 @@ from typing import Any, Literal
 from app.config import GEMINI_KEY, GROQ_KEYS, LLM_MODELS
 from app.llm_router import _SESSION
 
-IntentType = Literal["BUILD_ARCHITECTURE", "PROJECT_CONSULT", "GENERAL_CHAT"]
+IntentType = Literal["BUILD_ARCHITECTURE", "DEPLOY_AND_RUN", "PROJECT_CONSULT", "GENERAL_CHAT"]
 
 INTENT_SYSTEM_PROMPT = """You are the precise intent classification engine for Microsoft Fabric AI Studio.
-Analyze the user's prompt and categorize it into EXACTLY ONE of three intents:
+Analyze the user's prompt and categorize it into EXACTLY ONE of four intents:
 
-1. "BUILD_ARCHITECTURE": The user is explicitly ordering to create, provision, build, deploy, or generate new Microsoft Fabric assets (e.g., "Create project Sales_5 with lh_bronze, lh_silver, 3 notebooks, and pipeline pl_daily", "provision medallion lakehouse for SAP", "build delta pipeline").
-2. "PROJECT_CONSULT": The user is asking an architectural consultation question, comparison, optimization advice, or query about their Fabric data engineering setup/project (e.g., "We ingested using batch load, do you think incremental is better?", "how should I partition silver tables?", "what is the difference between Lakehouse and Warehouse?").
-3. "GENERAL_CHAT": The user is asking general coding/programming, algorithms, concepts (e.g., "what are skill.md files?", "how does neural net backprop work?", "reverse a linked list in python"), casual conversation ("hi, how are you?"), or non-Fabric questions.
+1. "BUILD_ARCHITECTURE": The user is explicitly ordering to create, provision, build, or scaffold new Microsoft Fabric assets (e.g., "Create project Sales_5 with lh_bronze, lh_silver, 3 notebooks, and pipeline pl_daily", "provision medallion lakehouse for SAP", "build delta pipeline").
+2. "DEPLOY_AND_RUN": The user is explicitly ordering to deploy, execute, run, or verify an architecture/pipeline/jobs in Fabric, or solve execution errors (e.g., "deploy and run this pipeline", "execute the plan", "deploy it run the pipeline check if any errors are there solve them", "run pipeline and verify output").
+3. "PROJECT_CONSULT": The user is asking an architectural consultation question, comparison, optimization advice, or query about their Fabric data engineering setup/project (e.g., "We ingested using batch load, do you think incremental is better?", "how should I partition silver tables?", "what is the difference between Lakehouse and Warehouse?").
+4. "GENERAL_CHAT": The user is asking general coding/programming, algorithms, concepts (e.g., "what are skill.md files?", "how does neural net backprop work?", "reverse a linked list in python"), casual conversation ("hi, how are you?"), or non-Fabric questions.
 
 Respond ONLY with valid JSON in this exact structure:
-{"intent": "BUILD_ARCHITECTURE" | "PROJECT_CONSULT" | "GENERAL_CHAT", "reason": "short explanation"}"""
+{"intent": "BUILD_ARCHITECTURE" | "DEPLOY_AND_RUN" | "PROJECT_CONSULT" | "GENERAL_CHAT", "reason": "short explanation"}"""
 
 
 def _fast_llm_classify(prompt: str) -> tuple[IntentType, str] | None:
@@ -59,7 +60,7 @@ def _fast_llm_classify(prompt: str) -> tuple[IntentType, str] | None:
                 raw_text = data["candidates"][0]["content"]["parts"][0]["text"]
                 parsed = json.loads(raw_text)
                 intent = parsed.get("intent", "").upper().strip()
-                if intent in ("BUILD_ARCHITECTURE", "PROJECT_CONSULT", "GENERAL_CHAT"):
+                if intent in ("BUILD_ARCHITECTURE", "DEPLOY_AND_RUN", "PROJECT_CONSULT", "GENERAL_CHAT"):
                     return intent, parsed.get("reason", "classified_by_gemini")
         except Exception:
             pass
@@ -87,7 +88,7 @@ def _fast_llm_classify(prompt: str) -> tuple[IntentType, str] | None:
                     raw_text = resp.json()["choices"][0]["message"]["content"]
                     parsed = json.loads(raw_text)
                     intent = parsed.get("intent", "").upper().strip()
-                    if intent in ("BUILD_ARCHITECTURE", "PROJECT_CONSULT", "GENERAL_CHAT"):
+                    if intent in ("BUILD_ARCHITECTURE", "DEPLOY_AND_RUN", "PROJECT_CONSULT", "GENERAL_CHAT"):
                         return intent, parsed.get("reason", "classified_by_groq")
             except Exception:
                 continue
@@ -98,6 +99,16 @@ def _fast_llm_classify(prompt: str) -> tuple[IntentType, str] | None:
 def _fallback_rule_classify(prompt: str) -> tuple[IntentType, str]:
     """Deterministic, strict regex classifier used only if LLM call is unavailable or times out."""
     p = prompt.strip().lower()
+
+    # Explicit command to deploy and run, execute jobs, or heal/verify in Fabric
+    deploy_run_imperatives = [
+        r"\b(?:deploy|execute)\b.*\b(?:run|pipeline|fabric|job|verify|test|error)\b",
+        r"\b(?:run|trigger)\b.*\b(?:pipeline|notebook|architecture|plan)\b",
+        r"\b(?:deploy\s+it\s+and\s+run|deploy\s+and\s+run|execute\s+plan|run\s+the\s+pipeline)\b",
+    ]
+    for pat in deploy_run_imperatives:
+        if re.search(pat, p, re.IGNORECASE):
+            return "DEPLOY_AND_RUN", "rule_deploy_and_run_command"
 
     # Explicit imperative action triggers for building Fabric infrastructure
     build_imperatives = [
