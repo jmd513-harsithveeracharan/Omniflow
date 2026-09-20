@@ -24,6 +24,7 @@ def generate_mermaid_lineage(plan: dict[str, Any]) -> str:
             "```"
         )
 
+
     lines = ["```mermaid", "graph LR"]
     has_medallion = any(nb.get("layer") in ("Bronze", "Silver", "Gold") for nb in notebooks)
 
