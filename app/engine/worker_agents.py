@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import concurrent.futures
 import time
+from typing import Any
 
 from app.engine.models import PipelineStep, StepDAG, WorkerResult
 from app.engine.progress import _now_utc_str, set_progress_step
@@ -22,6 +23,7 @@ from app.meta_skill import (
 )
 from app.skill_loader import load_skills
 
+# --- Layer-scoped isolation instruction blocks injected per worker ---
 _LAYER_SCOPE: dict[str, str] = {
     "Bronze": (
         "## YOUR LAYER: BRONZE\n"
@@ -33,11 +35,13 @@ _LAYER_SCOPE: dict[str, str] = {
         "- Write immutable raw copies to default Lakehouse using .write.format('delta').mode('overwrite').saveAsTable('<table_name>').\n"
         "- CRITICAL WRITE RULE: Use ONLY single-part table name in saveAsTable (e.g. saveAsTable('orders')). Never prefix lakehouse name.\n"
         "- DO NOT clean, filter, or transform data. Preserve original schema exactly.\n"
+        "- DO NOT read from any Silver or Gold lakehouse.\n"
     ),
     "Silver": (
         "## YOUR LAYER: SILVER\n"
         "You are ONLY writing the Silver transformation notebook.\n"
         "- Read ONLY from Bronze lakehouse tables using spark.read.table('<bronze_lakehouse_name>.<table_name>') or spark.read.table('<table_name>').\n"
+        "- DO NOT re-read from original staging source tables.\n"
         "- Perform: trim whitespace, cast types, filter invalid rows, and deduplicate with window on _ingested_at.\n"
         "- Save cleaned tables using .write.format('delta').mode('overwrite').saveAsTable('<table_name>').\n"
         "- CRITICAL WRITE RULE: Use ONLY single-part table name in saveAsTable (e.g. saveAsTable('orders')). Never prefix lakehouse name.\n"
@@ -47,6 +51,8 @@ _LAYER_SCOPE: dict[str, str] = {
         "## YOUR LAYER: GOLD\n"
         "You are ONLY writing the Gold dimensional modeling notebook.\n"
         "- Read ONLY from Silver lakehouse tables using spark.read.table('<silver_lakehouse_name>.<table_name>') or spark.read.table('<table_name>').\n"
+        "- DO NOT re-read from Bronze or staging source tables.\n"
+        "- DO NOT re-implement deduplication or cleansing logic.\n"
         "- For multi-entity models (e.g. Customers, Orders, Products), join Silver tables to construct Kimball Fact and Dimension tables.\n"
         "- Always project year/month columns via F.year()/F.month() before .partitionBy().\n"
         "- Write to default Gold Lakehouse using .write.format('delta').mode('overwrite').saveAsTable('<table_name>').\n"
@@ -268,6 +274,7 @@ def run_workers(
 
     lh_list = getattr(dag, "lakehouses", None) or [s.name for s in dag.steps if s.type == "lakehouse"]
     results: dict[str, WorkerResult] = {}
+    last_result: WorkerResult | None = None
 
     for step in ordered_steps:
         dep_ids = set(step.depends_on or [])
@@ -275,7 +282,7 @@ def run_workers(
             res for sid, res in results.items()
             if sid in dep_ids or any(res.name == d for d in dep_ids)
         ]
-        chosen_upstream = matching_upstreams if matching_upstreams else (list(results.values())[-1:] if results else None)
+        chosen_upstream = matching_upstreams if matching_upstreams else ([last_result] if last_result else None)
 
         res = execute_notebook_worker(
             step,
@@ -289,6 +296,7 @@ def run_workers(
             lakehouses=lh_list,
         )
         results[step.step_id] = res
+        last_result = res
 
     if parallel_steps:
         with concurrent.futures.ThreadPoolExecutor(max_workers=min(len(parallel_steps), 6)) as pool:
