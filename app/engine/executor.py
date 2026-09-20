@@ -21,7 +21,6 @@ from app.fabric_client import (
     get_job_status,
     run_notebook,
     update_definition,
-    provision_item_with_definition,
 )
 from app.fabric_compiler import compile_notebook
 from app.engine.polling import poll_fabric_job_adaptive
@@ -122,7 +121,6 @@ def execute_closed_loop(
 
     # 2. Trigger Execution & Self-Healing Loop
     if pipeline_item and pipeline_item.item_id:
-        # Trigger Data Factory Pipeline
         trigger_res = trigger_pipeline_run(pipeline_item.item_id, workspace_id=workspace_id)
         if trigger_res.get("success") and trigger_res.get("job_id"):
             job_id = trigger_res["job_id"]
@@ -145,7 +143,6 @@ def execute_closed_loop(
                 "success": False, "status": "TriggerFailed", "error": trigger_res.get("error")
             })
     elif notebook_items:
-        # Sequential Medallion notebook execution (Bronze -> Silver -> Gold)
         for idx, nb_item in enumerate(notebook_items):
             is_cold = (idx == 0)
             nb_name = nb_item.name
@@ -338,4 +335,3 @@ def run_single_notebook_interactive(
         "duration_sec": round(time.perf_counter() - t0, 2),
         "healing_events": healing_events,
     }
-

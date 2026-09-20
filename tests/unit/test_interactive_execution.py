@@ -67,3 +67,4 @@ def test_run_single_notebook_interactive_self_healing(
     assert len(res["healing_events"]) == 1
     assert res["healing_events"][0]["diagnosis"] == "Fixed table reference"
     assert mock_update.call_count == 1
+

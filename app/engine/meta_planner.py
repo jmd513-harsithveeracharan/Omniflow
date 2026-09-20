@@ -129,6 +129,8 @@ def heuristic_dag(prompt: str) -> StepDAG:
     nb_lines = re.findall(r"[-*\u2022]?\s*(nb_[a-zA-Z0-9_\-]+)\s*[:\-]\s*([^\n\r]+)", prompt, re.IGNORECASE)
     nb_tokens = list(dict.fromkeys(re.findall(r"\b(nb_[a-zA-Z0-9_\-]+)\b", prompt, re.IGNORECASE)))
 
+    # Detect numeric notebook counts e.g. "3 nb", "3 notebooks"
+    # Detect Medallion layers or numeric counts
     # Detect multi-entity domain lists (e.g. Customers, Orders, Products or Patients, Encounters, Claims)
     entity_matches = re.findall(r"\b(customers?|orders?|products?|shipments?|inventory|suppliers?|claims?|patients?|encounters?|invoices?|payments?)\b", prompt, re.IGNORECASE)
     unique_entities = list(dict.fromkeys([e.lower().rstrip("s") for e in entity_matches]))

@@ -70,3 +70,4 @@ BEGIN
         VALUES (source.[customer_id], source.[customer_name], source.[email], SYSUTCDATETIME());
 END;
 ```
+

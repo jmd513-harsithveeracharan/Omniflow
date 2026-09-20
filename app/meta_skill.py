@@ -39,9 +39,15 @@ Return ONLY valid JSON:
 
 ## Planning Rules
 
+### Rule 1: Dependency Classification
+- Medallion notebooks (Bronze/Silver/Gold) are SEQUENTIAL:
 ### Rule 1: Dependency & Topology Classification
 - Single-Entity Medallion:
     Bronze first, Silver depends on Bronze, Gold depends on Silver.
+    Set can_parallel = false for all Medallion notebooks.
+- Standalone notebooks (layer="Notebook") are PARALLEL:
+    depends_on = [] (or just the folder step), can_parallel = true.
+    They run simultaneously in a ThreadPool.
 - Multi-Entity Medallion (e.g. Customers, Orders, Products):
     - Create Bronze ingestion step for each entity (e.g. nb_cust_bronze, nb_orders_bronze) [can_parallel = true].
     - Create Silver conforming step for each entity (e.g. nb_cust_silver, nb_orders_silver) [depends on its matching Bronze step].

@@ -46,3 +46,4 @@ CREATE TABLE fact_sales (
     # Verify chat was called with warehouse system instructions
     called_msgs = mock_chat.call_args[0][0]
     assert any("T-SQL Data Warehouse" in m["content"] for m in called_msgs if m["role"] == "system")
+
