@@ -1,5 +1,5 @@
 import React from 'react';
-import { Pin, MoreVertical } from 'lucide-react';
+import { Pin, MoreVertical, Database } from 'lucide-react';
 import { ProjectRecord } from '../../types';
 
 interface ProjectListRowProps {
@@ -37,7 +37,13 @@ export const ProjectListRow: React.FC<ProjectListRowProps> = ({
   const isPinned = Boolean(project.is_pinned);
   const timeAgo = formatRelativeTime(project.updated_at || project.created_at);
   const meta = project.metadata || {};
-  const badgeLabel = meta.badge || project.badge || 'Medallion Architecture';
+  const workspaces = meta.workspaces || [];
+  const workspaceLabel =
+    workspaces.length > 0
+      ? workspaces.length === 1
+        ? workspaces[0]
+        : `${workspaces[0]} +${workspaces.length - 1}`
+      : 'PBT_DATA_AGENT';
   const members = meta.members || [];
 
   return (
@@ -49,8 +55,12 @@ export const ProjectListRow: React.FC<ProjectListRowProps> = ({
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
           {isPinned && <Pin width={12} height={12} style={{ color: '#10b981', flexShrink: 0 }} />}
           <span className="projects-list-name">{project.name}</span>
-          <span className="project-card-badge" style={{ padding: '2px 8px', fontSize: '11px' }}>
-            {badgeLabel}
+          <span
+            className="project-card-badge"
+            style={{ padding: '2px 8px', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px' }}
+          >
+            <Database width={10} height={10} style={{ opacity: 0.8 }} />
+            <span>{workspaceLabel}</span>
           </span>
         </div>
         <span className="projects-list-desc">
@@ -59,20 +69,22 @@ export const ProjectListRow: React.FC<ProjectListRowProps> = ({
       </div>
 
       {members.length > 0 ? (
-        <div className="project-members-stack" style={{ marginRight: '16px' }}>
+        <div className="project-members-stack" style={{ marginRight: '16px' }} title={`${members.length} collaborators`}>
           {members.slice(0, 2).map((m, idx) => {
+            const cleanName = m.name.replace(/\s*\(You\)/, '');
             const initials =
-              m.name
+              cleanName
                 .split(' ')
                 .map((w) => w[0])
                 .slice(0, 2)
                 .join('')
-                .toUpperCase() || 'M';
+                .toUpperCase() || 'U';
             return (
               <span
                 key={m.id || idx}
                 className="project-member-avatar-pill"
-                title={`${m.name} (${m.role})`}
+                style={{ background: m.avatarBg || '#10b981' }}
+                title={m.name}
               >
                 {initials}
               </span>

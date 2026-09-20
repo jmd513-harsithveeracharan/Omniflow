@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { X, Users, UserPlus, Trash2, Shield, UserCheck } from 'lucide-react';
+import { X, Users } from 'lucide-react';
 import { ProjectRecord, ProjectMember } from '../../types';
+import { ProjectTeamSearch } from './ProjectTeamSearch';
 
 interface ProjectMembersModalProps {
   isOpen: boolean;
@@ -15,40 +16,24 @@ export const ProjectMembersModal: React.FC<ProjectMembersModalProps> = ({
   project,
   onUpdateMembers,
 }) => {
-  const [newEmail, setNewEmail] = useState('');
-  const [newName, setNewName] = useState('');
-  const [newRole, setNewRole] = useState<'owner' | 'engineer' | 'viewer'>('engineer');
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [, setIsSubmitting] = useState(false);
 
   if (!isOpen || !project) return null;
 
   const currentMembers: ProjectMember[] = project.metadata?.members || [
     {
-      id: 'usr_owner',
-      name: 'Current User',
-      email: 'lead.architect@company.com',
-      role: 'owner',
+      id: 'usr_harsith',
+      name: 'Harsith Veer Bheesetti (You)',
+      email: 'harsith@fabric.internal',
+      avatarBg: '#10b981',
     },
   ];
 
-  const handleAddMember = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newEmail.trim() || !newName.trim() || isSubmitting) return;
-
-    const newMember: ProjectMember = {
-      id: `usr_${Date.now()}`,
-      name: newName.trim(),
-      email: newEmail.trim().toLowerCase(),
-      role: newRole,
-    };
-
+  const handleAddMember = async (newMember: ProjectMember) => {
     const updated = [...currentMembers, newMember];
     try {
       setIsSubmitting(true);
       await onUpdateMembers(project.id, updated);
-      setNewEmail('');
-      setNewName('');
-      setNewRole('engineer');
     } catch (err) {
       console.error('Failed to add member', err);
     } finally {
@@ -103,8 +88,8 @@ export const ProjectMembersModal: React.FC<ProjectMembersModalProps> = ({
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <div
               style={{
-                width: '34px',
-                height: '34px',
+                width: '36px',
+                height: '36px',
                 borderRadius: '8px',
                 background: 'rgba(59, 130, 246, 0.15)',
                 display: 'flex',
@@ -117,7 +102,7 @@ export const ProjectMembersModal: React.FC<ProjectMembersModalProps> = ({
             </div>
             <div>
               <h3 style={{ fontSize: '16px', fontWeight: 600, color: '#f4f4f5', margin: 0 }}>
-                Project Team & Collaboration
+                Project Collaborators
               </h3>
               <p style={{ fontSize: '12px', color: '#a1a1aa', margin: 0 }}>
                 {project.name}
@@ -134,119 +119,27 @@ export const ProjectMembersModal: React.FC<ProjectMembersModalProps> = ({
         </div>
 
         {/* Onboarding Notice */}
-        <div style={{ padding: '10px 14px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '8px', marginBottom: '18px', fontSize: '12px', color: '#a1a1aa', lineHeight: '1.5' }}>
-          Team members inherit read/write access to this project’s Lakehouses, PySpark notebooks, and agent-generated blast-radius lineage graphs.
+        <div
+          style={{
+            padding: '10px 14px',
+            background: 'rgba(255,255,255,0.03)',
+            border: '1px solid rgba(255,255,255,0.08)',
+            borderRadius: '8px',
+            marginBottom: '18px',
+            fontSize: '12px',
+            color: '#a1a1aa',
+            lineHeight: '1.5',
+          }}
+        >
+          Collaborators share multi-turn chat history, Fabric Lakehouse lineage, and agent session context within this project. Permissions are governed by your Microsoft Fabric tenant access.
         </div>
 
-        {/* Add Member Form */}
-        <form onSubmit={handleAddMember} style={{ marginBottom: '20px' }}>
-          <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: '#a1a1aa', marginBottom: '8px', letterSpacing: '0.04em' }}>
-            INVITE TEAM MEMBER
-          </label>
-          <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1.5fr 1fr auto', gap: '8px', alignItems: 'center' }}>
-            <input
-              type="text"
-              placeholder="Full name"
-              value={newName}
-              onChange={(e) => setNewName(e.target.value)}
-              className="projects-modal-input"
-              style={{ fontSize: '12.5px', padding: '8px 10px' }}
-              required
-            />
-            <input
-              type="email"
-              placeholder="user@company.com"
-              value={newEmail}
-              onChange={(e) => setNewEmail(e.target.value)}
-              className="projects-modal-input"
-              style={{ fontSize: '12.5px', padding: '8px 10px' }}
-              required
-            />
-            <select
-              value={newRole}
-              onChange={(e) => setNewRole(e.target.value as 'owner' | 'engineer' | 'viewer')}
-              className="projects-modal-input"
-              style={{ fontSize: '12px', padding: '8px 8px', cursor: 'pointer' }}
-            >
-              <option value="owner">Owner / Architect</option>
-              <option value="engineer">Data Engineer</option>
-              <option value="viewer">Viewer / Analyst</option>
-            </select>
-            <button
-              type="submit"
-              disabled={isSubmitting || !newEmail.trim() || !newName.trim()}
-              className="projects-btn-new-primary"
-              style={{ padding: '8px 12px', fontSize: '12.5px' }}
-            >
-              <UserPlus width={13} height={13} />
-              <span>Add</span>
-            </button>
-          </div>
-        </form>
-
-        {/* Member List */}
-        <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: '#a1a1aa', marginBottom: '10px', letterSpacing: '0.04em' }}>
-          MEMBERS ({currentMembers.length})
-        </label>
-        <div style={{ maxHeight: '220px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-          {currentMembers.map((m) => {
-            const initials = m.name.split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase() || 'U';
-            return (
-              <div
-                key={m.id}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: '8px 12px',
-                  background: 'rgba(255,255,255,0.03)',
-                  border: '1px solid rgba(255,255,255,0.06)',
-                  borderRadius: '8px',
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <div className="project-member-avatar-pill" style={{ width: '28px', height: '28px', fontSize: '11px' }}>
-                    {initials}
-                  </div>
-                  <div>
-                    <div style={{ fontSize: '13px', fontWeight: 500, color: '#f4f4f5' }}>{m.name}</div>
-                    <div style={{ fontSize: '11px', color: '#71717a' }}>{m.email}</div>
-                  </div>
-                </div>
-
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <span
-                    style={{
-                      fontSize: '11px',
-                      padding: '2px 8px',
-                      borderRadius: '12px',
-                      background: m.role === 'owner' ? 'rgba(16,185,129,0.15)' : 'rgba(255,255,255,0.08)',
-                      color: m.role === 'owner' ? '#10b981' : '#a1a1aa',
-                      fontWeight: 500,
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '4px',
-                    }}
-                  >
-                    {m.role === 'owner' ? <Shield width={10} height={10} /> : <UserCheck width={10} height={10} />}
-                    {m.role === 'owner' ? 'Owner' : m.role === 'engineer' ? 'Data Engineer' : 'Viewer'}
-                  </span>
-
-                  {currentMembers.length > 1 && (
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveMember(m.id)}
-                      style={{ background: 'transparent', border: 'none', color: '#71717a', cursor: 'pointer', padding: '4px' }}
-                      title="Remove member"
-                    >
-                      <Trash2 width={13} height={13} />
-                    </button>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
+        {/* Team Search & Discovery */}
+        <ProjectTeamSearch
+          members={currentMembers}
+          onAddMember={handleAddMember}
+          onRemoveMember={handleRemoveMember}
+        />
 
         {/* Footer */}
         <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '20px' }}>
@@ -258,4 +151,3 @@ export const ProjectMembersModal: React.FC<ProjectMembersModalProps> = ({
     </div>
   );
 };
-

@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { X, FolderPlus, FolderGit2, Check } from 'lucide-react';
+import { X, FolderPlus, FolderGit2 } from 'lucide-react';
 import { ProjectRecord, ProjectMetadata, ProjectMember } from '../../types';
-import { ProjectTeamPicker } from './ProjectTeamPicker';
+import { ProjectTeamSearch } from './ProjectTeamSearch';
+import { ProjectWorkspacesPicker } from './ProjectWorkspacesPicker';
 
 interface ProjectModalProps {
   isOpen: boolean;
@@ -16,16 +17,6 @@ interface ProjectModalProps {
   }) => Promise<void>;
 }
 
-const DOMAIN_BADGES = [
-  'Medallion Architecture',
-  'SQLGlot AST Transpile',
-  'Direct Lake Power BI',
-  'Streaming IoT Telemetry',
-  'Enterprise CDC Ingestion',
-  'Data Quality & Governance',
-  'Cross-Workspace Pipeline',
-];
-
 export const ProjectModal: React.FC<ProjectModalProps> = ({
   isOpen,
   onClose,
@@ -34,7 +25,7 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
 }) => {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
-  const [badge, setBadge] = useState('Medallion Architecture');
+  const [selectedWorkspaces, setSelectedWorkspaces] = useState<string[]>(['PBT_DATA_AGENT']);
   const [sharedContext, setSharedContext] = useState(true);
   const [members, setMembers] = useState<ProjectMember[]>([]);
   const [isSaving, setIsSaving] = useState(false);
@@ -45,20 +36,20 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
       setName(project.name);
       setDescription(project.description || '');
       const meta = project.metadata || {};
-      setBadge(meta.badge || project.badge || 'Medallion Architecture');
+      setSelectedWorkspaces(meta.workspaces || ['PBT_DATA_AGENT']);
       setSharedContext(meta.sharedContext !== false);
       setMembers(
         meta.members || [
-          { id: 'usr_owner', name: 'Lead Architect', email: 'architect@enterprise.internal', role: 'owner' },
+          { id: 'usr_harsith', name: 'Harsith Veer Bheesetti (You)', email: 'harsith@fabric.internal', avatarBg: '#10b981' },
         ]
       );
     } else {
       setName('');
       setDescription('');
-      setBadge('Medallion Architecture');
+      setSelectedWorkspaces(['PBT_DATA_AGENT']);
       setSharedContext(true);
       setMembers([
-        { id: 'usr_owner', name: 'Lead Architect', email: 'architect@enterprise.internal', role: 'owner' },
+        { id: 'usr_harsith', name: 'Harsith Veer Bheesetti (You)', email: 'harsith@fabric.internal', avatarBg: '#10b981' },
       ]);
     }
     setError(null);
@@ -66,14 +57,8 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
 
   if (!isOpen) return null;
 
-  const handleAddMember = (mName: string, mEmail: string, mRole: 'owner' | 'engineer' | 'viewer') => {
-    const newM: ProjectMember = {
-      id: `usr_${Date.now()}`,
-      name: mName,
-      email: mEmail,
-      role: mRole,
-    };
-    setMembers((prev) => [...prev, newM]);
+  const handleAddMember = (newMember: ProjectMember) => {
+    setMembers((prev) => [...prev, newMember]);
   };
 
   const handleRemoveMember = (id: string) => {
@@ -95,8 +80,10 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
 
       const meta: ProjectMetadata = {
         ...(project?.metadata || {}),
-        badge,
+        badge: 'Fabric Project',
         fabricFolder: project?.metadata?.fabricFolder || `AI_Test_Folder/${slug || 'project'}`,
+        workspaces: selectedWorkspaces.length > 0 ? selectedWorkspaces : ['PBT_DATA_AGENT'],
+        targetWorkspace: selectedWorkspaces[0] || 'PBT_DATA_AGENT',
         sharedContext,
         members,
       };
@@ -105,7 +92,7 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
         id: project?.id,
         name: name.trim(),
         description: description.trim(),
-        badge,
+        badge: 'Fabric Project',
         metadata: meta,
       });
       onClose();
@@ -134,7 +121,7 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
       <div
         className="modal-content project-modal-enterprise"
         style={{
-          width: '560px',
+          width: '580px',
           maxWidth: '95vw',
           maxHeight: '90vh',
           overflowY: 'auto',
@@ -201,14 +188,14 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
 
         <form onSubmit={handleSubmit}>
           {/* Project Name */}
-          <div style={{ marginBottom: '14px' }}>
+          <div style={{ marginBottom: '16px' }}>
             <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#a1a1aa', marginBottom: '6px' }}>
               PROJECT NAME <span style={{ color: '#ef4444' }}>*</span>
             </label>
             <input
               type="text"
               required
-              placeholder="e.g. Paxafe-PBT, Enterprise Retail Medallion"
+              placeholder="e.g. Paxafe-PBT, Enterprise Medallion Platform"
               value={name}
               onChange={(e) => setName(e.target.value)}
               className="projects-modal-input"
@@ -216,30 +203,16 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
             />
           </div>
 
-          {/* Architecture / Domain */}
-          <div style={{ marginBottom: '14px' }}>
-            <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#a1a1aa', marginBottom: '6px' }}>
-              ARCHITECTURE DOMAIN
-            </label>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-              {DOMAIN_BADGES.map((b) => (
-                <button
-                  key={b}
-                  type="button"
-                  onClick={() => setBadge(b)}
-                  className={`project-domain-chip ${badge === b ? 'active' : ''}`}
-                >
-                  {badge === b && <Check width={11} height={11} />}
-                  <span>{b}</span>
-                </button>
-              ))}
-            </div>
-          </div>
+          {/* Workspaces in Scope */}
+          <ProjectWorkspacesPicker
+            selectedWorkspaces={selectedWorkspaces}
+            onChange={setSelectedWorkspaces}
+          />
 
-          {/* Description */}
-          <div style={{ marginBottom: '14px' }}>
+          {/* Objectives & Scope */}
+          <div style={{ marginBottom: '16px' }}>
             <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#a1a1aa', marginBottom: '6px' }}>
-              OBJECTIVES & DATA PLATFORM SCOPE
+              OBJECTIVES & SCOPE
             </label>
             <textarea
               rows={3}
@@ -251,8 +224,8 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
             />
           </div>
 
-          {/* Team Collaboration & Onboarding */}
-          <ProjectTeamPicker
+          {/* Team Collaboration with Account Discovery */}
+          <ProjectTeamSearch
             members={members}
             onAddMember={handleAddMember}
             onRemoveMember={handleRemoveMember}

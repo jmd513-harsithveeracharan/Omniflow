@@ -1,5 +1,5 @@
 import React from 'react';
-import { Pin, MoreVertical, FolderGit2 } from 'lucide-react';
+import { Pin, MoreVertical, FolderGit2, Database } from 'lucide-react';
 import { ProjectRecord } from '../../types';
 
 interface ProjectCardProps {
@@ -37,7 +37,13 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
   const isPinned = Boolean(project.is_pinned);
   const timeAgo = formatRelativeTime(project.updated_at || project.created_at);
   const meta = project.metadata || {};
-  const badgeLabel = meta.badge || project.badge || 'Medallion Architecture';
+  const workspaces = meta.workspaces || [];
+  const workspaceLabel =
+    workspaces.length > 0
+      ? workspaces.length === 1
+        ? workspaces[0]
+        : `${workspaces[0]} +${workspaces.length - 1}`
+      : 'PBT_DATA_AGENT';
   const members = meta.members || [];
 
   return (
@@ -47,7 +53,10 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
     >
       <div className="project-card-top-row">
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-          <div className="project-card-badge">{badgeLabel}</div>
+          <div className="project-card-badge" style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+            <Database width={11} height={11} style={{ opacity: 0.8 }} />
+            <span>{workspaceLabel}</span>
+          </div>
         </div>
 
         <div className="project-card-actions-row" onClick={(e) => e.stopPropagation()}>
@@ -83,20 +92,22 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
           </span>
 
           {members.length > 0 && (
-            <div className="project-members-stack" title={`${members.length} team members`}>
+            <div className="project-members-stack" title={`${members.length} collaborators`}>
               {members.slice(0, 3).map((m, idx) => {
+                const cleanName = m.name.replace(/\s*\(You\)/, '');
                 const initials =
-                  m.name
+                  cleanName
                     .split(' ')
                     .map((w) => w[0])
                     .slice(0, 2)
                     .join('')
-                    .toUpperCase() || 'M';
+                    .toUpperCase() || 'U';
                 return (
                   <span
                     key={m.id || idx}
                     className="project-member-avatar-pill"
-                    title={`${m.name} (${m.role})`}
+                    style={{ background: m.avatarBg || '#10b981' }}
+                    title={m.name}
                   >
                     {initials}
                   </span>

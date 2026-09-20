@@ -173,12 +173,22 @@ export interface WorkspaceFolder {
   items: WorkspaceItem[];
 }
 
+export interface FabricWorkspaceSummary {
+  id: string;
+  displayName: string;
+  description?: string;
+  type?: string;
+  capacityId?: string;
+  isActive?: boolean;
+}
+
 export interface ProjectMember {
   id: string;
   name: string;
   email: string;
-  role: 'owner' | 'engineer' | 'viewer';
+  role?: string;
   avatar?: string;
+  avatarBg?: string;
 }
 
 export interface ProjectMetadata {
@@ -186,6 +196,7 @@ export interface ProjectMetadata {
   badge?: string;
   members?: ProjectMember[];
   targetWorkspace?: string;
+  workspaces?: string[];
   sharedContext?: boolean;
 }
 

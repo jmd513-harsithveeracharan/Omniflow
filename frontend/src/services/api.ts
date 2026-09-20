@@ -362,3 +362,36 @@ export async function deleteProject(id: string): Promise<boolean> {
   return Boolean(data.success);
 }
 
+export async function fetchFabricWorkspaces(): Promise<{
+  activeWorkspaceId: string;
+  activeWorkspaceName: string;
+  workspaces: import('../types').FabricWorkspaceSummary[];
+}> {
+  try {
+    const res = await fetch(`${API_BASE}/workspace/list`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    const list = (data.workspaces || []).map((w: Record<string, unknown>) => ({
+      id: String(w.id || ''),
+      displayName: String(w.displayName || w.name || 'Workspace'),
+      description: String(w.description || ''),
+      type: String(w.type || 'Workspace'),
+      capacityId: String(w.capacityId || ''),
+      isActive: String(w.id || '') === String(data.active_workspace_id || ''),
+    }));
+    return {
+      activeWorkspaceId: String(data.active_workspace_id || ''),
+      activeWorkspaceName: String(data.active_workspace_name || 'PBT_DATA_AGENT'),
+      workspaces: list,
+    };
+  } catch (err) {
+    console.warn('Failed to fetch workspace list from Fabric API, using fallback defaults', err);
+    return {
+      activeWorkspaceId: 'ws_pbt_agent',
+      activeWorkspaceName: 'PBT_DATA_AGENT',
+      workspaces: [],
+    };
+  }
+}
+
+
