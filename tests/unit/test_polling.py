@@ -181,3 +181,4 @@ def test_pre_flight_auto_remediates_in_executor():
         nb = plan_with_bad_target["notebooks"][0]
         assert ".saveAsTable('orders')" in nb["pyspark_code"]
         assert "lh_orders_silver.dbo" not in nb["pyspark_code"]
+

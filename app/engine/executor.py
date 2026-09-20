@@ -199,7 +199,6 @@ def execute_closed_loop(
                             "notebook": nb_name, "retry": retry + 1, "diagnosis": heal.get("diagnosis")
                         })
                 retry += 1
-
     # 3. Output Table Validation — parse .saveAsTable() calls from notebook code
     target_tables: list[str] = []
     for nb in plan.get("notebooks", []):
