@@ -39,13 +39,18 @@ Return ONLY valid JSON:
 
 ## Planning Rules
 
-### Rule 1: Dependency Classification
-- Medallion notebooks (Bronze/Silver/Gold) are SEQUENTIAL:
+### Rule 1: Dependency & Topology Classification
+- Single-Entity Medallion:
     Bronze first, Silver depends on Bronze, Gold depends on Silver.
-    Set can_parallel = false for all Medallion notebooks.
-- Standalone notebooks (layer="Notebook") are PARALLEL:
-    depends_on = [] (or just the folder step), can_parallel = true.
-    They run simultaneously in a ThreadPool.
+- Multi-Entity Medallion (e.g. Customers, Orders, Products):
+    - Create Bronze ingestion step for each entity (e.g. nb_cust_bronze, nb_orders_bronze) [can_parallel = true].
+    - Create Silver conforming step for each entity (e.g. nb_cust_silver, nb_orders_silver) [depends on its matching Bronze step].
+    - Create Gold Star Schema step (e.g. nb_fact_orders_gold) [depends on ALL upstream Silver steps].
+- Fabric Data Warehouse & T-SQL:
+    - If user requests a Data Warehouse / T-SQL, create type: "warehouse" (e.g. wh_sales_edw).
+    - T-SQL stored procedures / DDL steps can be created with layer="Warehouse".
+- Standalone notebooks (layer="Notebook"):
+    depends_on = ["step_folder"], can_parallel = true. They run simultaneously in a ThreadPool.
 - A pipeline step always depends_on ALL notebook step_ids.
 
 ### Rule 2: Folder Containment & Hierarchy
@@ -154,6 +159,19 @@ Write clean, elegant, self-contained Python/PySpark code with cell structure com
 Focus directly on the requested algorithm with step-by-step logic, sample input data, and driver execution printouts.
 DO NOT add fake Delta Lake read/writes or DBFS mounts unless explicitly requested.
 Return ONLY executable Python code. No markdown fences, no explanation text.
+"""
+
+
+WORKER_CODE_WAREHOUSE_SYSTEM = """You are an expert T-SQL Data Warehouse engineer writing Microsoft Fabric Warehouse scripts.
+Generate production-grade T-SQL DDL and ELT stored procedures with cell structure comments (-- CELL).
+
+## FABRIC WAREHOUSE T-SQL RULES
+1. Use standard T-SQL syntax for Fabric Data Warehouses.
+2. For table creation, define clean columnar types (VARCHAR, INT, DECIMAL, DATETIME2, DATE).
+3. Primary keys should use NOT ENFORCED syntax where appropriate:
+   CONSTRAINT PK_name PRIMARY KEY NONCLUSTERED (col_id) NOT ENFORCED
+4. For Stored Procedures, use idempotent MERGE statements to upsert staging data into conformed tables.
+5. Return ONLY executable T-SQL code. No markdown fences, no explanation text.
 """
 
 

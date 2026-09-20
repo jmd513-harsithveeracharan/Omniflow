@@ -199,6 +199,7 @@ def execute_closed_loop(
                             "notebook": nb_name, "retry": retry + 1, "diagnosis": heal.get("diagnosis")
                         })
                 retry += 1
+
     # 3. Output Table Validation — parse .saveAsTable() calls from notebook code
     target_tables: list[str] = []
     for nb in plan.get("notebooks", []):
@@ -268,4 +269,73 @@ def _format_report_markdown(report: ExecutionReport) -> str:
             lines.append(f"- {status_emoji} `{v.get('table')}`: {v.get('column_count', 0)} columns verified in OneLake")
 
     return "\n".join(lines).strip()
+
+
+def run_single_notebook_interactive(
+    notebook_id: str,
+    notebook_name: str = "notebook",
+    workspace_id: str = ALLOWED_WORKSPACE_ID,
+    session_id: str | None = None,
+    timeout_sec: int = 60,
+    current_code: str | None = None,
+    max_heal_retries: int = 1,
+) -> dict[str, Any]:
+    """Fast interactive execution for a single notebook bypassing pipeline compilation."""
+    t0 = time.perf_counter()
+    retry = 0
+    code_to_run = current_code or ""
+    healing_events: list[dict[str, Any]] = []
+
+    while retry <= max_heal_retries:
+        trig = run_notebook(notebook_id, workspace_id=workspace_id)
+        if not trig.get("success") or not trig.get("job_id"):
+            return {
+                "success": False,
+                "status": "TriggerFailed",
+                "notebook": notebook_name,
+                "error": trig.get("error"),
+                "duration_sec": round(time.perf_counter() - t0, 2),
+            }
+
+        job_id = trig["job_id"]
+        poll_res = _poll_job_completion(
+            notebook_id,
+            job_id,
+            workspace_id,
+            session_id=session_id,
+            timeout_sec=timeout_sec,
+            task_type="interactive",
+            target_name=notebook_name,
+            is_first_run=False,
+            skip_initial_delay=True,
+        )
+
+        if poll_res.get("success"):
+            return {
+                "success": True,
+                "status": "Completed",
+                "notebook": notebook_name,
+                "job_id": job_id,
+                "duration_sec": poll_res.get("duration_sec", round(time.perf_counter() - t0, 2)),
+                "healing_events": healing_events,
+            }
+
+        err_msg = poll_res.get("failure_reason") or "Interactive cell execution failed"
+        if retry < max_heal_retries and code_to_run:
+            heal = diagnose_and_patch_code(code_to_run, err_msg, notebook_name=notebook_name)
+            if heal.get("success") and heal.get("patched_code"):
+                code_to_run = heal["patched_code"]
+                compiled = compile_notebook(notebook_name, code_to_run, workspace_id=workspace_id)
+                update_definition(notebook_id, parts=compiled.get("definition", {}).get("parts", []), workspace_id=workspace_id)
+                healing_events.append({"retry": retry + 1, "diagnosis": heal.get("diagnosis")})
+        retry += 1
+
+    return {
+        "success": False,
+        "status": poll_res.get("status", "Failed"),
+        "notebook": notebook_name,
+        "error": poll_res.get("failure_reason"),
+        "duration_sec": round(time.perf_counter() - t0, 2),
+        "healing_events": healing_events,
+    }
 
