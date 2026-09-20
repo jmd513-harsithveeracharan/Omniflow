@@ -24,6 +24,7 @@ from app.fabric_client import (
     provision_item_with_definition,
 )
 from app.fabric_compiler import compile_notebook
+from app.engine.polling import poll_fabric_job_adaptive
 from app.engine.progress import set_progress_step, _now_utc_str
 from app.engine.schema_resolver import resolve_table_schema
 from app.self_healer import diagnose_and_patch_code
@@ -49,40 +50,24 @@ def _poll_job_completion(
     session_id: str | None = None,
     timeout_sec: int = 180,
     poll_interval_sec: int = 5,
+    task_type: str = "notebook",
+    target_name: str = "",
+    is_first_run: bool = True,
+    skip_initial_delay: bool = False,
 ) -> dict[str, Any]:
-    """Polls a triggered Fabric job instance until terminal state or timeout."""
-    t0 = time.perf_counter()
-    while time.perf_counter() - t0 < timeout_sec:
-        res = get_job_status(item_id, job_id, workspace_id=workspace_id)
-        status = res.get("status", "Unknown") if res.get("success") else "Unknown"
-
-        if session_id:
-            set_progress_step(
-                session_id,
-                title="Monitored Fabric Job",
-                detail=f"Job {job_id[:8]} status: {status} ({round(time.perf_counter() - t0, 1)}s elapsed)...",
-                status="in_progress" if status not in ("Completed", "Failed", "Cancelled") else "completed",
-                action="Monitored",
-                badge="JOB",
-                target=f"Job {job_id[:8]}",
-            )
-
-        if status in ("Completed", "Failed", "Cancelled", "Succeeded"):
-            return {
-                "success": status in ("Completed", "Succeeded"),
-                "status": status,
-                "duration_sec": round(time.perf_counter() - t0, 2),
-                "failure_reason": res.get("failure_reason"),
-                "raw": res.get("raw", {}),
-            }
-        time.sleep(poll_interval_sec)
-
-    return {
-        "success": False,
-        "status": "TimedOut",
-        "duration_sec": round(time.perf_counter() - t0, 2),
-        "failure_reason": f"Execution timed out after {timeout_sec} seconds.",
-    }
+    """Polls a triggered Fabric job instance using the adaptive polling engine."""
+    return poll_fabric_job_adaptive(
+        item_id=item_id,
+        job_id=job_id,
+        workspace_id=workspace_id,
+        task_type=task_type,
+        session_id=session_id,
+        is_first_run=is_first_run,
+        target_name=target_name,
+        custom_timeout_sec=timeout_sec,
+        skip_initial_delay=skip_initial_delay or (poll_interval_sec < 1.0),
+        get_status_fn=get_job_status,
+    )
 
 
 def execute_closed_loop(
@@ -101,6 +86,20 @@ def execute_closed_loop(
     folder = plan.get("folder") or "AI_Test_Folder"
 
     report = ExecutionReport(run_id=run_id, workspace_id=workspace_id, folder=folder)
+
+    # 0. Pre-Flight Code Safety Guardrail (auto-remediate multi-part table targets)
+    for nb in plan.get("notebooks", []):
+        raw_code = nb.get("pyspark_code") or nb.get("pyspark") or ""
+        if raw_code:
+            fixed_code = re.sub(
+                r'\.saveAsTable\(\s*["\'][a-zA-Z0-9_]+\.(?:dbo\.)?([a-zA-Z0-9_]+)["\']\s*\)',
+                r".saveAsTable('\1')",
+                raw_code,
+            )
+            if fixed_code != raw_code:
+                nb["pyspark_code"] = fixed_code
+                if "pyspark" in nb:
+                    nb["pyspark"] = fixed_code
 
     # 1. Non-Destructive Deployment
     if session_id:
@@ -127,7 +126,15 @@ def execute_closed_loop(
         trigger_res = trigger_pipeline_run(pipeline_item.item_id, workspace_id=workspace_id)
         if trigger_res.get("success") and trigger_res.get("job_id"):
             job_id = trigger_res["job_id"]
-            job_res = _poll_job_completion(pipeline_item.item_id, job_id, workspace_id, session_id, timeout_sec)
+            job_res = _poll_job_completion(
+                pipeline_item.item_id,
+                job_id,
+                workspace_id,
+                session_id=session_id,
+                timeout_sec=timeout_sec if timeout_sec != 180 else 480,
+                task_type="pipeline",
+                target_name=pipeline_item.name,
+            )
             report.job_results.append({
                 "target": pipeline_item.name, "type": "pipeline",
                 "job_id": job_id, **job_res
@@ -139,7 +146,8 @@ def execute_closed_loop(
             })
     elif notebook_items:
         # Sequential Medallion notebook execution (Bronze -> Silver -> Gold)
-        for nb_item in notebook_items:
+        for idx, nb_item in enumerate(notebook_items):
+            is_cold = (idx == 0)
             nb_name = nb_item.name
             nb_id = nb_item.item_id
             nb_plan = next((n for n in plan.get("notebooks", []) if n.get("name") == nb_name), {})
@@ -156,7 +164,16 @@ def execute_closed_loop(
                     break
 
                 job_id = trig["job_id"]
-                poll_res = _poll_job_completion(nb_id, job_id, workspace_id, session_id, timeout_sec)
+                poll_res = _poll_job_completion(
+                    nb_id,
+                    job_id,
+                    workspace_id,
+                    session_id=session_id,
+                    timeout_sec=timeout_sec,
+                    task_type="notebook_cold" if is_cold else "notebook_warm",
+                    target_name=nb_name,
+                    is_first_run=is_cold,
+                )
 
                 if poll_res.get("success"):
                     report.job_results.append({"target": nb_name, "type": "notebook", "job_id": job_id, **poll_res})

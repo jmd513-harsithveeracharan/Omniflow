@@ -43,15 +43,6 @@ def _static_code_audit(plan: dict[str, Any]) -> list[dict[str, str]]:
                 "severity": "error",
             })
 
-        # Rule C: ABFSS path for table creation
-        if re.search(r'abfss://[^"\']+@onelake\.dfs\.fabric\.microsoft\.com', code):
-            if re.search(r'\.save\(|\.saveAsTable\(|CREATE TABLE.*LOCATION', code, re.IGNORECASE):
-                violations.append({
-                    "notebook": name,
-                    "rule": "C",
-                    "description": "Table written via ABFSS path -- must use .saveAsTable() for Fabric managed tables.",
-                    "severity": "error",
-                })
         # Rule C: Writing table directly to ABFSS path instead of managed saveAsTable
         if (
             re.search(r'\.write[^\n]*\.(?:save|csv|parquet|delta)\(\s*["\']abfss://', code)
@@ -63,6 +54,21 @@ def _static_code_audit(plan: dict[str, Any]) -> list[dict[str, str]]:
                 "description": "Table written via ABFSS path -- must use .saveAsTable() for Fabric managed tables.",
                 "severity": "error",
             })
+
+        # Rule G: Multi-part or lakehouse-prefixed saveAsTable write target (Fabric requirement)
+        bad_writes = re.findall(r'\.saveAsTable\(\s*["\']([^"\']+\.[^"\']+)["\']\s*\)', code)
+        if bad_writes:
+            for bad_target in bad_writes:
+                violations.append({
+                    "notebook": name,
+                    "rule": "G",
+                    "description": (
+                        f"Multi-part write target '{bad_target}' in .saveAsTable() -- standard Fabric "
+                        "lakehouses require a single-part table name (e.g. saveAsTable('orders')). "
+                        "The notebook default lakehouse binding handles routing automatically."
+                    ),
+                    "severity": "error",
+                })
 
         # Rule D: _ingest_ts mismatch -- Silver/Gold referencing wrong column name
         if layer in ("Silver", "Gold"):

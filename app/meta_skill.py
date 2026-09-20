@@ -118,7 +118,11 @@ Your task is to catch bugs that would cause runtime failures in Microsoft Fabric
 - This terminates the interactive kernel and breaks all downstream pipeline activities.
 
 ### Rule F: Fabric spark.catalog vs sparkContext
-- Use spark.catalog.tableExists("lh.dbo.table") for table existence checks NOT spark.sparkContext or databricks-specific APIs.
+- Use spark.catalog.tableExists("table") for table existence checks NOT spark.sparkContext or databricks-specific APIs.
+
+### Rule G: Fabric Lakehouse Single-Part Target Namespace
+- Output Delta table writes MUST use single-part table names: .saveAsTable("table_name").
+- NEVER write using multi-part identifiers like .saveAsTable("lh_name.dbo.table_name") or .saveAsTable("lh_name.table_name") on standard lakehouses. The notebook default Lakehouse binding routes writes automatically.
 
 ## Output Format
 Return ONLY valid JSON:
@@ -129,7 +133,7 @@ Return ONLY valid JSON:
   "violations": [
     {
       "notebook": string,
-      "rule": "A" | "B" | "C" | "D" | "E" | "F",
+      "rule": "A" | "B" | "C" | "D" | "E" | "F" | "G",
       "description": string,
       "severity": "error" | "warning"
     }
@@ -157,46 +161,45 @@ Generate production-grade PySpark code with cell structure comments (# CELL).
 ## LAYER-SPECIFIC STRICT RULES (CRITICAL -- Violations cause runtime failures)
 
 ### BRONZE LAYER RULES (layer = Bronze)
-- READ ONLY from the staging source tables provided in the task description (e.g., lh_stage_ai.dbo.table_name).
+- READ ONLY from the staging source tables provided in the task description (via ABFSS path for schema-enabled Lakehouses).
 - DO NOT read from any Silver or Gold lakehouse in a Bronze notebook.
-- Write raw ingested data to Bronze lakehouse using: df.write.format("delta").mode("overwrite").saveAsTable("lh_NAME_bronze.dbo.table_name")
+- Write raw ingested data to Bronze lakehouse using: df.write.format("delta").mode("overwrite").saveAsTable("table_name") (single-part table name ONLY).
 - Add ingestion timestamp column EXACTLY as: F.current_timestamp().alias("_ingested_at") -- no other naming variants.
 - Preserve all source columns with original names. No transformations, no filtering in Bronze.
 - Source lineage tag: add column F.lit("source_system_name").alias("_source_system").
 
 ### SILVER LAYER RULES (layer = Silver)
-- READ ONLY from Bronze lakehouses (lh_*_bronze). NEVER re-read from original staging source tables.
+- READ ONLY from Bronze lakehouses using spark.read.table("lh_name_bronze.table_name"). NEVER re-read from original staging source tables.
 - The upstream Bronze column for deduplication is _ingested_at -- use EXACTLY that name.
 - Deduplication window:
   from pyspark.sql.window import Window
   w = Window.partitionBy("primary_key_col").orderBy(F.col("_ingested_at").desc())
   df = df.withColumn("_rn", F.row_number().over(w)).filter(F.col("_rn") == 1).drop("_rn")
-- Write cleaned data using: df.write.format("delta").mode("overwrite").saveAsTable("lh_NAME_silver.dbo.table_name")
+- Write cleaned data using: df.write.format("delta").mode("overwrite").saveAsTable("table_name") (single-part table name ONLY).
 - Clean column names (trim whitespace, cast types). Filter invalid data (e.g., negative amounts).
 - For Delta MERGE upsert (preferred on re-runs):
   from delta.tables import DeltaTable
-  if spark.catalog.tableExists("lh_NAME_silver.dbo.table_name"):
-      target = DeltaTable.forName(spark, "lh_NAME_silver.dbo.table_name")
+  if spark.catalog.tableExists("table_name"):
+      target = DeltaTable.forName(spark, "table_name")
       target.alias("t").merge(df.alias("s"), "t.pk_col = s.pk_col").whenMatchedUpdateAll().whenNotMatchedInsertAll().execute()
   else:
-      df.write.format("delta").mode("overwrite").saveAsTable("lh_NAME_silver.dbo.table_name")
+      df.write.format("delta").mode("overwrite").saveAsTable("table_name")
 
 ### GOLD LAYER RULES (layer = Gold)
-- READ ONLY from Silver lakehouses (lh_*_silver). NEVER re-read Bronze or staging sources.
+- READ ONLY from Silver lakehouses using spark.read.table("lh_name_silver.table_name"). NEVER re-read Bronze or staging sources.
 - DO NOT re-implement deduplication, cleansing, or Bronze ingestion logic.
 - Build Kimball star-schema: fact tables + dimension tables with surrogate keys.
 - For partitioned writes, ALWAYS project partition columns BEFORE the write:
   df = df.withColumn("year", F.year("date_col")).withColumn("month", F.month("date_col"))
-  df.write.format("delta").partitionBy("year", "month").mode("overwrite").saveAsTable("lh_NAME_gold.dbo.fact_table")
-- Write using: df.write.format("delta").mode("overwrite").saveAsTable("lh_NAME_gold.dbo.table_name")
+  df.write.format("delta").partitionBy("year", "month").mode("overwrite").saveAsTable("fact_table")
+- Write using: df.write.format("delta").mode("overwrite").saveAsTable("table_name") (single-part table name ONLY).
 
 ## UNIVERSAL FABRIC CONSTRAINTS (Apply to ALL layers)
 1. NEVER call spark.stop() -- it terminates the kernel and breaks the pipeline.
-2. NEVER use ABFSS paths (abfss://...@onelake.dfs.fabric.microsoft.com/Tables/...) for table creation.
-   Use ONLY .saveAsTable("lakehouse_name.dbo.table_name") for Fabric managed tables.
+2. Output table writes: Use ONLY single-part .saveAsTable("table_name") for Fabric managed tables (the notebook default Lakehouse attachment routes this automatically). NEVER use 3-part names like lh.dbo.table.
 3. NEVER use F.window for analytical windowing -- F.window is a streaming time-window function.
    Use: from pyspark.sql.window import Window for analytic window functions.
-4. Table existence check: spark.catalog.tableExists("lh_name.dbo.table_name") -- never use Databricks-specific APIs.
+4. Table existence check: spark.catalog.tableExists("table_name") -- never use Databricks-specific APIs.
 5. Gold partitioning: year and month columns MUST be projected via F.year() / F.month() BEFORE .partitionBy().
 
 Return ONLY executable Python code. No markdown fences, no explanation text.

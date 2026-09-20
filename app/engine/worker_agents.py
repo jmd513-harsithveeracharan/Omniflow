@@ -23,6 +23,10 @@ _LAYER_SCOPE: dict[str, str] = {
     "Bronze": (
         "## YOUR LAYER: BRONZE\n"
         "You are ONLY writing the Bronze ingestion notebook.\n"
+        "- Read from the staging source tables listed in the schema context below.\n"
+        "- Write immutable raw copies to lh_*_bronze using .saveAsTable().\n"
+        "- Add _ingested_at (current_timestamp) and _source_system (literal string) columns.\n"
+        "- When reading from staging Lakehouse schemas (e.g. lh_stage_ai.dbo.<table_name>), load via OneLake ABFSS delta path:\n"
         "CRITICAL WRITE RULE: When writing output tables, use ONLY a single-part table name.\n"
         "  CORRECT:   bronze_df.write.format('delta').mode('overwrite').saveAsTable('orders')\n"
         "  WRONG:     bronze_df.write.format('delta').mode('overwrite').saveAsTable('lh_orders_live_bronze.orders')  # NO prefix\n"
@@ -32,12 +36,15 @@ _LAYER_SCOPE: dict[str, str] = {
         "  path = 'abfss://PBT_DATA_AGENT@onelake.dfs.fabric.microsoft.com/lh_stage_ai.Lakehouse/Tables/dbo/<table_name>'\n"
         "  df = spark.read.format('delta').load(path)\n"
         "- Add _ingested_at (F.current_timestamp()) and _source_system (F.lit('stage_ai')) columns.\n"
+        "- Write immutable raw copies to the default Lakehouse using .write.format('delta').mode('overwrite').saveAsTable('<table_name>').\n"
         "- DO NOT clean, filter, or transform data. Preserve original schema exactly.\n"
         "- DO NOT read from any Silver or Gold lakehouse.\n"
     ),
     "Silver": (
         "## YOUR LAYER: SILVER\n"
         "You are ONLY writing the Silver transformation notebook.\n"
+        "- Read ONLY from the Bronze lakehouses (lh_*_bronze tables).\n"
+        "- Read ONLY from the Bronze lakehouse tables using spark.read.table('<bronze_lakehouse>.<table_name>') or spark.read.table('<table_name>').\n"
         "CRITICAL WRITE RULE: When writing output tables, use ONLY a single-part table name.\n"
         "  CORRECT:   silver_df.write.format('delta').mode('overwrite').saveAsTable('orders')\n"
         "  WRONG:     silver_df.write.format('delta').mode('overwrite').saveAsTable('lh_orders_live_silver.orders')  # NO prefix\n"
@@ -47,11 +54,15 @@ _LAYER_SCOPE: dict[str, str] = {
         "- DO NOT re-read from original staging source tables.\n"
         "- The Bronze ingestion timestamp column is _ingested_at -- use EXACTLY that name in window dedup.\n"
         "- Perform: trim whitespace, cast types, filter invalid rows (e.g. negative amounts).\n"
+        "- Use Delta MERGE or overwrite saveAsTable to lh_*_silver.\n"
+        "- Save cleaned tables using .write.format('delta').mode('overwrite').saveAsTable('<table_name>').\n"
         "- DO NOT implement star-schema or aggregations -- that is Gold's responsibility.\n"
     ),
     "Gold": (
         "## YOUR LAYER: GOLD\n"
         "You are ONLY writing the Gold dimensional modeling notebook.\n"
+        "- Read ONLY from Silver lakehouses (lh_*_silver tables).\n"
+        "- Read ONLY from Silver lakehouse tables using spark.read.table('<silver_lakehouse>.<table_name>') or spark.read.table('<table_name>').\n"
         "CRITICAL WRITE RULE: When writing output tables, use ONLY a single-part table name.\n"
         "  CORRECT:   agg_df.write.format('delta').mode('overwrite').saveAsTable('orders_by_status')\n"
         "  WRONG:     agg_df.write.format('delta').mode('overwrite').saveAsTable('lh_orders_live_gold.orders_by_status')  # NO prefix\n"
@@ -62,6 +73,8 @@ _LAYER_SCOPE: dict[str, str] = {
         "- DO NOT re-implement deduplication, cleansing, or ingestion logic.\n"
         "- Build Kimball star-schema: fact + dimension tables with business aggregations.\n"
         "- Always project year/month columns via F.year()/F.month() before .partitionBy().\n"
+        "- Write to lh_*_gold using .saveAsTable().\n"
+        "- Write to default Gold Lakehouse using .write.format('delta').mode('overwrite').saveAsTable('<table_name>').\n"
     ),
 }
 
@@ -114,6 +127,8 @@ def _build_medallion_prompt(
     return "\n".join(parts)
 
 
+def _infer_lh_path(step: PipelineStep, folder: str) -> str:
+    """Infers the managed lakehouse name for a Medallion step using naming conventions."""
 def _infer_lh_path(step: PipelineStep, folder: str, lakehouses: list[str] | None = None) -> str:
     """Infers the managed lakehouse name for a Medallion step matching planned lakehouses."""
     name_lower = step.name.lower()
@@ -199,6 +214,7 @@ def execute_notebook_worker(
             lines = lines[:-1] if lines and lines[-1].startswith("```") else lines
             code = "\n".join(lines).strip()
 
+        lh_path = _infer_lh_path(step, folder)
         lh_path = _infer_lh_path(step, folder, lakehouses=lakehouses)
         output_cols = resolve_upstream_schema(code)
 

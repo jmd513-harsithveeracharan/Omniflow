@@ -39,6 +39,20 @@ const getBadgeStyle = (badge: string): React.CSSProperties => {
       border: '1px solid rgba(52, 211, 153, 0.25)',
     };
   }
+  if (b === 'JOB' || b === 'PIPELINE') {
+    return {
+      background: 'rgba(251, 191, 36, 0.12)',
+      color: '#fbbf24',
+      border: '1px solid rgba(251, 191, 36, 0.25)',
+    };
+  }
+  if (b === 'FAB' || b === 'FABRIC' || b === 'LAKEHOUSE') {
+    return {
+      background: 'rgba(167, 139, 250, 0.12)',
+      color: '#a78bfa',
+      border: '1px solid rgba(167, 139, 250, 0.25)',
+    };
+  }
   if (b === 'CLI' || b === 'TERMINAL') {
     return {
       background: 'rgba(148, 163, 184, 0.12)',

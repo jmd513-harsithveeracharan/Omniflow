@@ -98,6 +98,7 @@ def _deploy_notebook_with_healing(
     code, retries, last_error = pyspark_code, 0, None
 
     while retries <= max_retries:
+        payload = compile_notebook(name, code)
         payload = compile_notebook(
             name,
             code,
