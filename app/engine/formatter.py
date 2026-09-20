@@ -10,48 +10,49 @@ from __future__ import annotations
 import json
 from typing import Any
 
+from app.config import ALLOWED_WORKSPACE_ID, ALLOWED_WORKSPACE_NAME
+
 
 def generate_mermaid_lineage(plan: dict[str, Any]) -> str:
     """Generates a clean horizontal Mermaid DAG (graph LR) representing data lineage."""
     notebooks = plan.get("notebooks", [])
-    lakehouses = plan.get("lakehouses", [])
-    
+    if not notebooks:
+        return "```mermaid
+        return """```mermaid
+graph LR
+    Source[(Source Ingestion)] --> Bronze[(Bronze Delta)] --> Silver[(Silver Curated)] --> Gold[(Gold Star Schema)]
+```"
+```"""
+
     lines = ["```mermaid", "graph LR"]
-    
-    # Identify bronze, silver, gold items
-    bronze_nbs = [nb for nb in notebooks if "bronze" in nb.get("name", "").lower() or nb.get("layer", "").lower() == "bronze"]
-    silver_nbs = [nb for nb in notebooks if "silver" in nb.get("name", "").lower() or nb.get("layer", "").lower() == "silver"]
-    gold_nbs = [nb for nb in notebooks if "gold" in nb.get("name", "").lower() or nb.get("layer", "").lower() == "gold"]
+    has_medallion = any(nb.get("layer") in ("Bronze", "Silver", "Gold") for nb in notebooks)
 
-    if bronze_nbs or silver_nbs or gold_nbs:
-        lines.append('  SRC["Upstream Sources"] --> BZ["Bronze Layer (Raw Ingest)"]')
-        for i, nb in enumerate(bronze_nbs):
-            b_id = f"bz_{i}"
-            lines.append(f'  BZ --> {b_id}["{nb.get("name")}"]')
-            for j, sv in enumerate(silver_nbs):
-                s_id = f"sv_{j}"
-                lines.append(f'  {b_id} --> {s_id}["{sv.get("name")}"]')
-
-        if not bronze_nbs and silver_nbs:
-            lines.append('  BZ --> sv_0["Silver Curated"]')
-
-        for j, sv in enumerate(silver_nbs):
-            s_id = f"sv_{j}"
-            for k, gd in enumerate(gold_nbs):
-                g_id = f"gd_{k}"
-                lines.append(f'  {s_id} --> {g_id}["{gd.get("name")}"]')
-
-        if gold_nbs:
-            for k in range(len(gold_nbs)):
-                lines.append(f'  gd_{k} --> PBI["Power BI Direct Lake"]')
-        elif silver_nbs:
-            lines.append('  sv_0 --> PBI["Power BI Direct Lake"]')
+    if has_medallion:
+        lines.extend([
+            "    subgraph Ingestion [Source Tier]",
+            "        SRC[(Source Staging Lakehouse)]",
+            "    end",
+            "    subgraph Bronze [Bronze Layer - Raw]",
+            "        B_NB[PySpark Ingestion Notebook] --> B_LH[(Immutable Delta Tables)]",
+            "    end",
+            "    subgraph Silver [Silver Layer - Curated]",
+            "        S_NB[Delta MERGE Upsert Notebook] --> S_LH[(Cleaned Delta Lake)]",
+            "    end",
+            "    subgraph Gold [Gold Layer - Consumption]",
+            "        G_NB[Star Schema Notebook] --> G_LH[(Direct Lake Fact/Dim)]",
+            "    end",
+            "    SRC --> B_NB",
+            "    B_LH --> S_NB",
+            "    S_LH --> G_NB",
+        ])
     else:
-        # Fallback to items or flow edges
-        lines.append('  SRC["Ingestion Stream"] --> LH["Delta Lakehouse"]')
-        for i, nb in enumerate(notebooks[:3]):
-            lines.append(f'  LH --> nb_{i}["{nb.get("name")}"]')
-            lines.append(f'  nb_{i} --> PBI["Direct Lake Semantic Model"]')
+        lines.append("    subgraph Pipeline [Execution Workflow]")
+        for i, nb in enumerate(notebooks):
+            name = nb.get("name", f"notebook_{i}")
+            lines.append(f"        NB_{i}[`{name}`]")
+            if i > 0:
+                lines.append(f"        NB_{i-1} --> NB_{i}")
+        lines.append("    end")
 
     lines.append("```")
     return "\n".join(lines)
@@ -67,9 +68,11 @@ def format_architecture_response(plan: dict[str, Any], audit_messages: list[str]
     sm_models = plan.get("semantic_models", [])
     reports = plan.get("reports", [])
 
+    ws_display = f"`{ALLOWED_WORKSPACE_NAME}`" if ALLOWED_WORKSPACE_NAME else "Active Workspace"
+    ws_id_display = f" (`{ALLOWED_WORKSPACE_ID}`)" if ALLOWED_WORKSPACE_ID else ""
     lines = [
-        f"### 🏛️ Proposed Fabric Architecture: `{folder}`\n",
-        f"**Target Workspace**: `PBT_DATA_AGENT` (`db7344c1-ecd9-44d6-849f-f2de49484f9f`)  ",
+        f"### \U0001f3db\ufe0f Proposed Fabric Architecture: `{folder}`\n",
+        f"**Target Workspace**: {ws_display}{ws_id_display}  ",
         f"**Target Folder**: `AI_Test_Folder/{folder}`\n",
     ]
 
@@ -86,7 +89,7 @@ def format_architecture_response(plan: dict[str, Any], audit_messages: list[str]
     if sm_models or reports:
         lines.append(f"**Direct Lake Analytics**: {', '.join([f'`{sm}`' for sm in sm_models] + [f'`{rpt}`' for rpt in reports])}")
 
-    lines.append("\n#### 📊 End-to-End Medallion Data Lineage\n")
+    lines.append("\n#### \U0001f4ca End-to-End Medallion Data Lineage\n")
     lines.append(generate_mermaid_lineage(plan))
     lines.append("\n> *Generated via 4-Stage Multi-Agent Architecture Engine. Synchronized with Visual Canvas.*\n")
 
@@ -97,12 +100,16 @@ def format_architecture_response(plan: dict[str, Any], audit_messages: list[str]
             nb_layer = nb.get("layer", "Notebook") if isinstance(nb, dict) else "Notebook"
             nb_desc = nb.get("description", "PySpark transformation") if isinstance(nb, dict) else ""
             code = (nb.get("pyspark_code") or nb.get("pyspark", "")) if isinstance(nb, dict) else ""
+            code_lines = len(code.splitlines()) if code else 0
 
-            lines.append(f"#### 📄 `{nb_name}` [{nb_layer}]")
+            layer_emoji = {"Bronze": "\U0001f949", "Silver": "\U0001f948", "Gold": "\U0001f947"}.get(nb_layer, "\U0001f4c4")
+            lines.append(f"#### {layer_emoji} `{nb_name}` [{nb_layer}]")
             if nb_desc:
-                lines.append(f"*{nb_desc}*\n")
-            if code and code.strip():
-                lines.append(f"```python\n{code.strip()}\n```\n")
+                lines.append(f"*{nb_desc}*")
+            if code_lines:
+                lines.append(f"> \U0001f4dd **{code_lines} lines** generated \u00b7 Available in Visual Canvas for review and deployment.\n")
+            else:
+                lines.append("")
 
     return "\n".join(lines).strip()
 
@@ -164,7 +171,7 @@ def build_thought_meta(plan: dict[str, Any]) -> str:
             "action": "Ran",
             "badge": "CLI",
             "target": "fabric build --trident",
-            "diff": "✓ 0 errors",
+            "diff": "\u2713 0 errors",
             "detail": "Serialized Trident kernel specifications, validated pipeline dependencies, and configured trigger schedule.",
             "status": "completed",
         },

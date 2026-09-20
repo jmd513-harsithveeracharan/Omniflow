@@ -15,6 +15,7 @@ from app.engine.builder import run_builder
 from app.engine.meta_planner import heuristic_dag, run_context_gate, run_meta_planner
 from app.engine.models import MAX_AUDIT_RETRIES, PipelineState, PipelineStep
 from app.engine.progress import _now_utc_str, clear_progress, set_progress_step
+from app.engine.schema_resolver import build_schema_context
 from app.engine.worker_agents import run_workers
 from app.ingestion_planner import parse_schedule
 
@@ -76,6 +77,27 @@ def run_pipeline(
         target="Active Context",
     )
 
+    # JIT Schema Discovery — resolve real column schemas from Fabric before workers run
+    set_progress_step(
+        session_id,
+        title="Hydrated Live Schema Context",
+        detail="Querying Fabric Lakehouse for live column schemas via 'fab table schema'. Injecting verified column definitions into worker prompts...",
+        status="in_progress",
+        action="Hydrated",
+        badge="DB",
+        target="Schema Registry",
+    )
+    schema_context = build_schema_context(prompt)
+    set_progress_step(
+        session_id,
+        title="Hydrated Live Schema Context",
+        detail=f"Schema hydration complete. {'Resolved live schemas for source tables.' if schema_context else 'No Fabric table refs found in prompt — using prompt-described schema.'}",
+        status="completed",
+        action="Hydrated",
+        badge="DB",
+        target="Schema Registry",
+    )
+
     # Stage 1: Meta-Planner
     set_progress_step(
         session_id,
@@ -129,6 +151,7 @@ def run_pipeline(
                 target_model=state.target_model,
                 effort=state.effort,
                 prompt_context=state.prompt,
+                schema_context=schema_context,
             )
             state.worker_results.update(new_results)
         except Exception as e:

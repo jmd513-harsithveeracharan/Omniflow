@@ -16,15 +16,21 @@ from collections.abc import Generator
 from app.agent_pipeline import run_pipeline
 from app.domain.llm.streaming_router import chat_stream
 from app.llm_router import chat
+from app.config import ALLOWED_WORKSPACE_ID, ALLOWED_WORKSPACE_NAME
 
-FABRIC_STUDIO_SYSTEM = """You are Microsoft Fabric AI Studio — an autonomous enterprise data platform engineer.
-You are directly integrated with Microsoft Fabric REST API workspace db7344c1-ecd9-44d6-849f-f2de49484f9f and OneLake.
-All Lakehouses, Warehouses, PySpark Notebooks, and Data Pipelines are provisioned directly to Microsoft Fabric.
+def _build_fabric_system_prompt() -> str:
+    ws_ref = f"workspace {ALLOWED_WORKSPACE_ID}" if ALLOWED_WORKSPACE_ID else "the active Microsoft Fabric workspace"
+    return (
+        "You are Microsoft Fabric AI Studio — an autonomous enterprise data platform engineer.\n"
+        f"You are directly integrated with Microsoft Fabric REST API {ws_ref} and OneLake.\n"
+        "All Lakehouses, Warehouses, PySpark Notebooks, and Data Pipelines are provisioned directly to Microsoft Fabric.\n\n"
+        "CRITICAL RULES:\n"
+        "1. NEVER output local bash scripts, mkdir commands, or tell the user to manually create files on their local machine.\n"
+        "2. When answering architecture queries, provide the PySpark / T-SQL / Delta Lake logic and explain how assets link in Microsoft Fabric.\n"
+        "3. Keep answers concise, professional, and directly actionable."
+    )
 
-CRITICAL RULES:
-1. NEVER output local bash scripts, mkdir commands, or tell the user to manually create files on their local machine.
-2. When answering architecture queries, provide the PySpark / T-SQL / Delta Lake logic and explain how assets link in Microsoft Fabric.
-3. Keep answers concise, professional, and directly actionable."""
+FABRIC_STUDIO_SYSTEM = _build_fabric_system_prompt()
 
 
 from app.intent_classifier import classify_prompt_intent
