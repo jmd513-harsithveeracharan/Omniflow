@@ -20,3 +20,4 @@ def test_build_quality_check_block():
     assert "null_count_customer_id" in block
     assert "invalid_range_total_amount" in block
     assert "_quality_verified_at" in block
+

@@ -21,6 +21,7 @@ from app.fabric_client import (
     get_job_status,
     run_notebook,
     update_definition,
+    provision_item_with_definition,
 )
 from app.fabric_compiler import compile_notebook
 from app.engine.polling import poll_fabric_job_adaptive
@@ -54,6 +55,11 @@ def _poll_job_completion(
     is_first_run: bool = True,
     skip_initial_delay: bool = False,
 ) -> dict[str, Any]:
+    """Polls a triggered Fabric job instance until terminal state or timeout."""
+    t0 = time.perf_counter()
+    while time.perf_counter() - t0 < timeout_sec:
+        res = get_job_status(item_id, job_id, workspace_id=workspace_id)
+        status = res.get("status", "Unknown") if res.get("success") else "Unknown"
     """Polls a triggered Fabric job instance using the adaptive polling engine."""
     return poll_fabric_job_adaptive(
         item_id=item_id,
@@ -67,6 +73,34 @@ def _poll_job_completion(
         skip_initial_delay=skip_initial_delay or (poll_interval_sec < 1.0),
         get_status_fn=get_job_status,
     )
+
+        if session_id:
+            set_progress_step(
+                session_id,
+                title="Monitored Fabric Job",
+                detail=f"Job {job_id[:8]} status: {status} ({round(time.perf_counter() - t0, 1)}s elapsed)...",
+                status="in_progress" if status not in ("Completed", "Failed", "Cancelled") else "completed",
+                action="Monitored",
+                badge="JOB",
+                target=f"Job {job_id[:8]}",
+            )
+
+        if status in ("Completed", "Failed", "Cancelled", "Succeeded"):
+            return {
+                "success": status in ("Completed", "Succeeded"),
+                "status": status,
+                "duration_sec": round(time.perf_counter() - t0, 2),
+                "failure_reason": res.get("failure_reason"),
+                "raw": res.get("raw", {}),
+            }
+        time.sleep(poll_interval_sec)
+
+    return {
+        "success": False,
+        "status": "TimedOut",
+        "duration_sec": round(time.perf_counter() - t0, 2),
+        "failure_reason": f"Execution timed out after {timeout_sec} seconds.",
+    }
 
 
 def execute_closed_loop(
@@ -121,9 +155,11 @@ def execute_closed_loop(
 
     # 2. Trigger Execution & Self-Healing Loop
     if pipeline_item and pipeline_item.item_id:
+        # Trigger Data Factory Pipeline
         trigger_res = trigger_pipeline_run(pipeline_item.item_id, workspace_id=workspace_id)
         if trigger_res.get("success") and trigger_res.get("job_id"):
             job_id = trigger_res["job_id"]
+            job_res = _poll_job_completion(pipeline_item.item_id, job_id, workspace_id, session_id, timeout_sec)
             job_res = _poll_job_completion(
                 pipeline_item.item_id,
                 job_id,
@@ -143,6 +179,8 @@ def execute_closed_loop(
                 "success": False, "status": "TriggerFailed", "error": trigger_res.get("error")
             })
     elif notebook_items:
+        # Sequential Medallion notebook execution (Bronze -> Silver -> Gold)
+        for nb_item in notebook_items:
         for idx, nb_item in enumerate(notebook_items):
             is_cold = (idx == 0)
             nb_name = nb_item.name
@@ -161,6 +199,7 @@ def execute_closed_loop(
                     break
 
                 job_id = trig["job_id"]
+                poll_res = _poll_job_completion(nb_id, job_id, workspace_id, session_id, timeout_sec)
                 poll_res = _poll_job_completion(
                     nb_id,
                     job_id,
@@ -182,6 +221,8 @@ def execute_closed_loop(
                     heal = diagnose_and_patch_code(current_code, err_msg, notebook_name=nb_name)
                     if heal.get("success") and heal.get("patched_code"):
                         current_code = heal["patched_code"]
+                        compiled = compile_notebook(nb_name, current_code)
+                        update_definition(nb_id, parts=compiled.get("definition", {}).get("parts", []), workspace_id=workspace_id)
                         matched_lh = next((item for item in dep_report.deployed_items if item.item_type == "lakehouse" and any(k in nb_name.lower() and k in item.name.lower() for k in ("bronze", "silver", "gold"))), None)
                         all_lh_ids = [item.item_id for item in dep_report.deployed_items if item.item_type == "lakehouse" and item.item_id]
                         compiled = compile_notebook(
@@ -197,6 +238,14 @@ def execute_closed_loop(
                         })
                 retry += 1
 
+    # 3. Output Table Validation
+    target_tables = [
+        f"{lh}.dbo.{nb.get('name', '').replace('nb_', '')}"
+        for lh in plan.get("lakehouses", [])
+        for nb in plan.get("notebooks", [])
+        if "gold" in lh.lower() or "silver" in lh.lower()
+    ]
+    for tbl_ref in target_tables[:4]:
     # 3. Output Table Validation — parse .saveAsTable() calls from notebook code
     target_tables: list[str] = []
     for nb in plan.get("notebooks", []):
@@ -335,3 +384,4 @@ def run_single_notebook_interactive(
         "duration_sec": round(time.perf_counter() - t0, 2),
         "healing_events": healing_events,
     }
+

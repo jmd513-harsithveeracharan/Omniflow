@@ -68,3 +68,4 @@ def build_quality_check_block(
     ])
 
     return "\n".join(lines)
+

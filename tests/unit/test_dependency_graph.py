@@ -55,3 +55,4 @@ def test_get_safe_unpublish_order():
     assert order_types.index("pipeline") < order_types.index("notebook")
     assert order_types.index("notebook") < order_types.index("lakehouse")
     assert order_types.index("lakehouse") < order_types.index("folder")
+

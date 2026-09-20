@@ -39,3 +39,4 @@ def test_run_benchmark_suite():
     assert report.passed_scenarios == 3
     assert report.average_score == 1.0
     assert report.duration_sec < 5.0
+

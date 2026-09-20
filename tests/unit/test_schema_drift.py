@@ -44,3 +44,4 @@ def test_compute_schema_diff_type_mismatch():
     assert res.evolution_strategy == "manual_intervention"
     assert len(res.type_mismatches) == 1
     assert "cast('int')" in res.pyspark_remediation_snippet
+

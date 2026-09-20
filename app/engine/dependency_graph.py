@@ -87,3 +87,4 @@ def get_safe_unpublish_order(items: list[dict[str, Any]]) -> list[dict[str, Any]
         items,
         key=lambda item: unpublish_priority.get(item.get("item_type", "").lower(), 1),
     )
+
