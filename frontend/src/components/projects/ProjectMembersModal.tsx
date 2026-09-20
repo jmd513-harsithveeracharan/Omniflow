@@ -69,7 +69,20 @@ export const ProjectMembersModal: React.FC<ProjectMembersModalProps> = ({
   };
 
   return (
-    <div className="modal-backdrop active" onClick={onClose}>
+    <div
+      className="modal-backdrop open active"
+      onClick={onClose}
+      style={{
+        display: 'flex',
+        position: 'fixed',
+        inset: 0,
+        zIndex: 9999,
+        background: 'rgba(0, 0, 0, 0.75)',
+        backdropFilter: 'blur(8px)',
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
+    >
       <div
         className="modal-content project-members-modal"
         style={{
@@ -80,6 +93,8 @@ export const ProjectMembersModal: React.FC<ProjectMembersModalProps> = ({
           padding: '24px 26px',
           border: '1px solid rgba(255, 255, 255, 0.12)',
           boxShadow: '0 24px 60px rgba(0, 0, 0, 0.8)',
+          position: 'relative',
+          zIndex: 10000,
         }}
         onClick={(e) => e.stopPropagation()}
       >

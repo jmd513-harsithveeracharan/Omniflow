@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { X, FolderPlus, FolderGit2, Check, Folder } from 'lucide-react';
-import { ProjectRecord, ProjectMetadata } from '../../types';
+import { X, FolderPlus, FolderGit2, Check } from 'lucide-react';
+import { ProjectRecord, ProjectMetadata, ProjectMember } from '../../types';
+import { ProjectTeamPicker } from './ProjectTeamPicker';
 
 interface ProjectModalProps {
   isOpen: boolean;
@@ -16,12 +17,13 @@ interface ProjectModalProps {
 }
 
 const DOMAIN_BADGES = [
-  'Medallion Lakehouse',
+  'Medallion Architecture',
   'SQLGlot AST Transpile',
   'Direct Lake Power BI',
   'Streaming IoT Telemetry',
   'Enterprise CDC Ingestion',
   'Data Quality & Governance',
+  'Cross-Workspace Pipeline',
 ];
 
 export const ProjectModal: React.FC<ProjectModalProps> = ({
@@ -32,9 +34,9 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
 }) => {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
-  const [badge, setBadge] = useState('Medallion Lakehouse');
-  const [fabricFolder, setFabricFolder] = useState('');
+  const [badge, setBadge] = useState('Medallion Architecture');
   const [sharedContext, setSharedContext] = useState(true);
+  const [members, setMembers] = useState<ProjectMember[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -43,27 +45,39 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
       setName(project.name);
       setDescription(project.description || '');
       const meta = project.metadata || {};
-      setBadge(meta.badge || project.badge || 'Medallion Lakehouse');
-      setFabricFolder(meta.fabricFolder || `AI_Test_Folder/${project.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`);
+      setBadge(meta.badge || project.badge || 'Medallion Architecture');
       setSharedContext(meta.sharedContext !== false);
+      setMembers(
+        meta.members || [
+          { id: 'usr_owner', name: 'Lead Architect', email: 'architect@enterprise.internal', role: 'owner' },
+        ]
+      );
     } else {
       setName('');
       setDescription('');
-      setBadge('Medallion Lakehouse');
-      setFabricFolder('AI_Test_Folder/new-project');
+      setBadge('Medallion Architecture');
       setSharedContext(true);
+      setMembers([
+        { id: 'usr_owner', name: 'Lead Architect', email: 'architect@enterprise.internal', role: 'owner' },
+      ]);
     }
     setError(null);
   }, [project, isOpen]);
 
   if (!isOpen) return null;
 
-  const handleNameChange = (val: string) => {
-    setName(val);
-    if (!project) {
-      const slug = val.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
-      setFabricFolder(`AI_Test_Folder/${slug || 'new-project'}`);
-    }
+  const handleAddMember = (mName: string, mEmail: string, mRole: 'owner' | 'engineer' | 'viewer') => {
+    const newM: ProjectMember = {
+      id: `usr_${Date.now()}`,
+      name: mName,
+      email: mEmail,
+      role: mRole,
+    };
+    setMembers((prev) => [...prev, newM]);
+  };
+
+  const handleRemoveMember = (id: string) => {
+    setMembers((prev) => prev.filter((m) => m.id !== id));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -73,11 +87,18 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
     try {
       setIsSaving(true);
       setError(null);
+      const slug = name
+        .toLowerCase()
+        .trim()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '');
+
       const meta: ProjectMetadata = {
         ...(project?.metadata || {}),
         badge,
-        fabricFolder: fabricFolder.trim() || `AI_Test_Folder/${name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`,
+        fabricFolder: project?.metadata?.fabricFolder || `AI_Test_Folder/${slug || 'project'}`,
         sharedContext,
+        members,
       };
 
       await onSave({
@@ -96,26 +117,44 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
   };
 
   return (
-    <div className="modal-backdrop active" onClick={onClose}>
+    <div
+      className="modal-backdrop open active"
+      onClick={onClose}
+      style={{
+        display: 'flex',
+        position: 'fixed',
+        inset: 0,
+        zIndex: 9999,
+        background: 'rgba(0, 0, 0, 0.75)',
+        backdropFilter: 'blur(8px)',
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
+    >
       <div
         className="modal-content project-modal-enterprise"
         style={{
-          width: '520px',
+          width: '560px',
           maxWidth: '95vw',
+          maxHeight: '90vh',
+          overflowY: 'auto',
           background: '#18181b',
           borderRadius: '16px',
           padding: '24px 26px',
           border: '1px solid rgba(255, 255, 255, 0.12)',
           boxShadow: '0 24px 60px rgba(0, 0, 0, 0.8)',
+          position: 'relative',
+          zIndex: 10000,
         }}
         onClick={(e) => e.stopPropagation()}
       >
+        {/* Header */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <div
               style={{
-                width: '34px',
-                height: '34px',
+                width: '36px',
+                height: '36px',
                 borderRadius: '8px',
                 background: 'rgba(16, 185, 129, 0.15)',
                 display: 'flex',
@@ -124,14 +163,14 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
                 color: '#10b981',
               }}
             >
-              {project ? <FolderGit2 width={18} height={18} /> : <FolderPlus width={18} height={18} />}
+              {project ? <FolderGit2 width={20} height={20} /> : <FolderPlus width={20} height={20} />}
             </div>
             <div>
-              <h3 style={{ fontSize: '16px', fontWeight: 600, color: '#f4f4f5', margin: 0 }}>
-                {project ? 'Edit Project' : 'Create Enterprise Project'}
+              <h3 style={{ fontSize: '17px', fontWeight: 600, color: '#f4f4f5', margin: 0 }}>
+                {project ? 'Edit Project' : 'Create Project'}
               </h3>
-              <p style={{ fontSize: '12px', color: '#a1a1aa', margin: 0 }}>
-                Fabric folder scope, Medallion tier, and team context
+              <p style={{ fontSize: '12px', color: '#a1a1aa', margin: '2px 0 0 0' }}>
+                Shared collaborative workspace for pipelines, lakehouses, and agent lineage
               </p>
             </div>
           </div>
@@ -140,12 +179,22 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
             onClick={onClose}
             style={{ background: 'transparent', border: 'none', color: '#71717a', cursor: 'pointer', padding: '4px' }}
           >
-            <X width={16} height={16} />
+            <X width={18} height={18} />
           </button>
         </div>
 
         {error && (
-          <div style={{ padding: '8px 12px', background: 'rgba(239, 68, 68, 0.15)', border: '1px solid #ef4444', borderRadius: '8px', color: '#fca5a5', fontSize: '12.5px', marginBottom: '14px' }}>
+          <div
+            style={{
+              padding: '8px 12px',
+              background: 'rgba(239, 68, 68, 0.15)',
+              border: '1px solid #ef4444',
+              borderRadius: '8px',
+              color: '#fca5a5',
+              fontSize: '12.5px',
+              marginBottom: '14px',
+            }}
+          >
             {error}
           </div>
         )}
@@ -159,15 +208,15 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
             <input
               type="text"
               required
-              placeholder="e.g. Enterprise Retail Medallion"
+              placeholder="e.g. Paxafe-PBT, Enterprise Retail Medallion"
               value={name}
-              onChange={(e) => handleNameChange(e.target.value)}
+              onChange={(e) => setName(e.target.value)}
               className="projects-modal-input"
               autoFocus
             />
           </div>
 
-          {/* Architecture Badge */}
+          {/* Architecture / Domain */}
           <div style={{ marginBottom: '14px' }}>
             <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#a1a1aa', marginBottom: '6px' }}>
               ARCHITECTURE DOMAIN
@@ -187,38 +236,27 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
             </div>
           </div>
 
-          {/* Fabric Target Folder */}
-          <div style={{ marginBottom: '14px' }}>
-            <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#a1a1aa', marginBottom: '6px' }}>
-              FABRIC WORKSPACE FOLDER SCOPE
-            </label>
-            <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-              <Folder width={14} height={14} style={{ position: 'absolute', left: '12px', color: '#71717a' }} />
-              <input
-                type="text"
-                value={fabricFolder}
-                onChange={(e) => setFabricFolder(e.target.value)}
-                placeholder="AI_Test_Folder/project-name"
-                className="projects-modal-input"
-                style={{ paddingLeft: '34px', fontFamily: 'var(--font-mono, monospace)', fontSize: '12.5px' }}
-              />
-            </div>
-          </div>
-
           {/* Description */}
           <div style={{ marginBottom: '14px' }}>
             <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#a1a1aa', marginBottom: '6px' }}>
-              ARCHITECTURE & ETL OBJECTIVES
+              OBJECTIVES & DATA PLATFORM SCOPE
             </label>
             <textarea
               rows={3}
-              placeholder="Describe ingestion sources, Medallion tiers, PySpark transformations, or business KPIs..."
+              placeholder="Describe upstream data sources, Medallion layer goals, PySpark transformations, or business KPIs..."
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               className="projects-modal-input"
               style={{ resize: 'vertical', lineHeight: '1.5' }}
             />
           </div>
+
+          {/* Team Collaboration & Onboarding */}
+          <ProjectTeamPicker
+            members={members}
+            onAddMember={handleAddMember}
+            onRemoveMember={handleRemoveMember}
+          />
 
           {/* Shared Context Toggle */}
           <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', marginBottom: '22px' }}>
@@ -229,7 +267,7 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
               style={{ accentColor: '#10b981', width: '15px', height: '15px' }}
             />
             <span style={{ fontSize: '12.5px', color: '#d4d4d8' }}>
-              Share Lakehouse Lineage & Agent Session Context across project team
+              Share multi-turn chat history & agent blast-radius lineage across project members
             </span>
           </label>
 
@@ -251,4 +289,3 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
     </div>
   );
 };
-

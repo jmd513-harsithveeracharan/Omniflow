@@ -120,6 +120,12 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({
       const created = await createProject(data.name, data.description, data.metadata);
       if (created) {
         setProjects((prev) => [created, ...prev]);
+        const enriched: ProjectRecord = {
+          ...created,
+          badge: data.badge,
+          metadata: data.metadata,
+        };
+        setProjects((prev) => [enriched, ...prev]);
       }
     }
     onProjectsChanged?.();

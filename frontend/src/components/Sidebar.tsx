@@ -342,7 +342,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         {/* Projects Accordion Section */}
         <div className="sidebar-section sidebar-projects-section">
-          <div className="sidebar-section-header">
+          <div className="sidebar-section-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div
               className="sidebar-section-title-wrap"
               onClick={() => setIsProjectsOpen(!isProjectsOpen)}
@@ -356,6 +356,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 />
               </span>
             </div>
+            <button
+              type="button"
+              className="sidebar-section-action-btn"
+              onClick={() => onSelectView('projects')}
+              title="New project / Manage projects"
+              style={{ background: 'transparent', border: 'none', color: '#71717a', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '2px 4px', borderRadius: '4px' }}
+            >
+              <Plus width={13} height={13} />
+            </button>
           </div>
           {isProjectsOpen && (
             <div className="sidebar-projects-list">

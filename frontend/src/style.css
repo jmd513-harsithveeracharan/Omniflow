@@ -5790,7 +5790,8 @@ ul.chat-md-list {
     justify-content: center;
 }
 
-.drawer-backdrop.open, .modal-backdrop.open {
+.drawer-backdrop.open, .modal-backdrop.open,
+.drawer-backdrop.active, .modal-backdrop.active {
     display: flex;
 }
 

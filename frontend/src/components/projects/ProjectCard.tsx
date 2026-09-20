@@ -1,5 +1,5 @@
 import React from 'react';
-import { Pin, MoreVertical, FolderGit2, Folder } from 'lucide-react';
+import { Pin, MoreVertical, FolderGit2 } from 'lucide-react';
 import { ProjectRecord } from '../../types';
 
 interface ProjectCardProps {
@@ -37,8 +37,7 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
   const isPinned = Boolean(project.is_pinned);
   const timeAgo = formatRelativeTime(project.updated_at || project.created_at);
   const meta = project.metadata || {};
-  const folderPath = meta.fabricFolder || `AI_Test_Folder/${project.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
-  const badgeLabel = meta.badge || project.badge || 'Fabric Project';
+  const badgeLabel = meta.badge || project.badge || 'Medallion Architecture';
   const members = meta.members || [];
 
   return (
@@ -49,15 +48,6 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
       <div className="project-card-top-row">
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
           <div className="project-card-badge">{badgeLabel}</div>
-          {folderPath && (
-            <div
-              className="project-folder-pill"
-              title={`Fabric Workspace Folder: ${folderPath}`}
-            >
-              <Folder width={11} height={11} style={{ opacity: 0.7 }} />
-              <span>{folderPath.replace('AI_Test_Folder/', '')}</span>
-            </div>
-          )}
         </div>
 
         <div className="project-card-actions-row" onClick={(e) => e.stopPropagation()}>
@@ -95,12 +85,13 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
           {members.length > 0 && (
             <div className="project-members-stack" title={`${members.length} team members`}>
               {members.slice(0, 3).map((m, idx) => {
-                const initials = m.name
-                  .split(' ')
-                  .map((w) => w[0])
-                  .slice(0, 2)
-                  .join('')
-                  .toUpperCase() || 'M';
+                const initials =
+                  m.name
+                    .split(' ')
+                    .map((w) => w[0])
+                    .slice(0, 2)
+                    .join('')
+                    .toUpperCase() || 'M';
                 return (
                   <span
                     key={m.id || idx}
@@ -125,4 +116,3 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
     </div>
   );
 };
-
