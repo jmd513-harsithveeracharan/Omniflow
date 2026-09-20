@@ -128,14 +128,27 @@ def execute_closed_loop(
         if trigger_res.get("success") and trigger_res.get("job_id"):
             job_id = trigger_res["job_id"]
             job_res = _poll_job_completion(
-                pipeline_item.item_id, job_id, workspace_id,
-                session_id=session_id, timeout_sec=timeout_sec if timeout_sec != 180 else 480,
-                task_type="pipeline", target_name=pipeline_item.name,
+                pipeline_item.item_id,
+                job_id,
+                workspace_id,
+                session_id=session_id,
+                timeout_sec=timeout_sec if timeout_sec != 180 else 480,
+                task_type="pipeline",
+                target_name=pipeline_item.name,
             )
-            report.job_results.append({"target": pipeline_item.name, "type": "pipeline", "job_id": job_id, **job_res})
+            report.job_results.append({
+                "target": pipeline_item.name,
+                "type": "pipeline",
+                "job_id": job_id,
+                **job_res,
+            })
         else:
             report.job_results.append({
-                "target": pipeline_item.name, "type": "pipeline", "success": False, "status": "TriggerFailed", "error": trigger_res.get("error")
+                "target": pipeline_item.name,
+                "type": "pipeline",
+                "success": False,
+                "status": "TriggerFailed",
+                "error": trigger_res.get("error"),
             })
     elif notebook_items:
         for idx, nb_item in enumerate(notebook_items):
@@ -149,18 +162,27 @@ def execute_closed_loop(
                 trig = run_notebook(nb_id, workspace_id=workspace_id)
                 if not trig.get("success") or not trig.get("job_id"):
                     report.job_results.append({
-                        "target": nb_name, "type": "notebook", "success": False, "status": "TriggerFailed", "error": trig.get("error")
+                        "target": nb_name,
+                        "type": "notebook",
+                        "success": False,
+                        "status": "TriggerFailed",
+                        "error": trig.get("error"),
                     })
                     break
 
                 job_id = trig["job_id"]
                 poll_res = _poll_job_completion(
-                    nb_id, job_id, workspace_id, session_id=session_id, timeout_sec=timeout_sec,
-                    task_type="notebook_cold" if is_cold else "notebook_warm", target_name=nb_name, is_first_run=is_cold,
+                    nb_id,
+                    job_id,
+                    workspace_id,
+                    session_id=session_id,
+                    timeout_sec=timeout_sec,
+                    task_type="notebook_cold" if is_cold else "notebook_warm",
+                    target_name=nb_name,
+                    is_first_run=is_cold,
                 )
 
                 if poll_res.get("success"):
-                    # Check Data Quality Gates on output logs
                     logs = poll_res.get("log") or poll_res.get("output") or poll_res.get("stdout") or ""
                     if logs:
                         q_res = evaluate_quality_gate(logs)
@@ -176,13 +198,18 @@ def execute_closed_loop(
                     heal = diagnose_and_patch_code(current_code, err_msg, notebook_name=nb_name)
                     if heal.get("success") and heal.get("patched_code"):
                         current_code = heal["patched_code"]
-                        matched_lh = next((item for item in dep_report.deployed_items if item.item_type == "lakehouse" and any(k in nb_name.lower() and k in item.name.lower() for k in ("bronze", "silver", "gold"))), None)
+                        matched_lh = next(
+                            (item for item in dep_report.deployed_items if item.item_type == "lakehouse" and any(k in nb_name.lower() and k in item.name.lower() for k in ("bronze", "silver", "gold"))),
+                            None
+                        )
                         all_lh_ids = [item.item_id for item in dep_report.deployed_items if item.item_type == "lakehouse" and item.item_id]
                         compiled = compile_notebook(
-                            nb_name, current_code,
+                            nb_name,
+                            current_code,
                             lakehouse_id=matched_lh.item_id if matched_lh else None,
                             lakehouse_name=matched_lh.name if matched_lh else None,
-                            workspace_id=workspace_id, known_lakehouses=all_lh_ids,
+                            workspace_id=workspace_id,
+                            known_lakehouses=all_lh_ids,
                         )
                         update_definition(nb_id, parts=compiled.get("definition", {}).get("parts", []), workspace_id=workspace_id, update_metadata=True)
                         report.healing_events.append({"notebook": nb_name, "retry": retry + 1, "diagnosis": heal.get("diagnosis")})
@@ -207,7 +234,10 @@ def execute_closed_loop(
     for tbl_ref in target_tables[:6]:
         cols = resolve_table_schema(tbl_ref, workspace="PBT_DATA_AGENT")
         report.validation_results.append({
-            "table": tbl_ref, "exists": len(cols) > 0, "column_count": len(cols), "columns": [c["name"] for c in cols[:6]],
+            "table": tbl_ref,
+            "exists": len(cols) > 0,
+            "column_count": len(cols),
+            "columns": [c["name"] for c in cols[:6]],
         })
 
     # 4. Final Telemetry & Summary

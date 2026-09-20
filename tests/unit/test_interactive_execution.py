@@ -34,7 +34,6 @@ def test_run_single_notebook_interactive_success(mock_poll, mock_run):
     assert res["duration_sec"] == 8.5
     assert res["quality_gate"]["passed"] is True
     assert mock_run.call_count == 1
-    # Verify interactive task_type was passed to poll
     assert mock_poll.call_args[1]["task_type"] == "interactive"
     assert mock_poll.call_args[1]["skip_initial_delay"] is True
 
@@ -72,7 +71,6 @@ def test_run_single_notebook_interactive_self_healing(
     mock_update, mock_compile, mock_diagnose, mock_poll, mock_run
 ):
     mock_run.return_value = {"success": True, "job_id": "job_12345"}
-    # Fail on first run, succeed on second run
     mock_poll.side_effect = [
         {"success": False, "status": "Failed", "failure_reason": "AnalysisException: table not found"},
         {"success": True, "status": "Completed", "duration_sec": 12.0, "log": "clean run"},

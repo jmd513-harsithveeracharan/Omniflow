@@ -2,8 +2,10 @@
 app/engine/data_quality.py
 --------------------------
 Delta Lake Data Quality & Contract Generator for Fabric AI Studio.
+Inspired by TobikoData/sqlmesh (core/audit) and Soda Core.
 Inspired by TobikoData/sqlmesh (core/audit), Great Expectations, and Soda Core.
 Generates automated primary key uniqueness checks, null-value guards,
+and quality score projections directly into PySpark Silver/Gold layers.
 range assertions, and evaluates Spark execution logs against quality gates.
 """
 
@@ -38,6 +40,7 @@ def build_quality_check_block(
     1. Primary key uniqueness (duplicate count).
     2. Non-null column integrity.
     3. Value range assertions (e.g. amount >= 0).
+    4. Projections of _quality_score and _is_valid boolean flags.
     4. Categorical set membership assertions.
     5. Projections of _quality_verified_at audit timestamps.
     """
@@ -90,8 +93,10 @@ def build_quality_check_block(
 
     lines.extend([
         "",
+        "# 4. Audit Metadata Tagging",
         "# 5. Audit Metadata Tagging",
         "df = df.withColumn('_quality_verified_at', F.current_timestamp())",
+        "print(f'✅ Data quality validation complete for {table_name}. Final row count: {df.count()}')",
         f"print(f'✅ Data quality validation complete for {table_name}. Final row count: {{df.count()}}')",
     ])
 

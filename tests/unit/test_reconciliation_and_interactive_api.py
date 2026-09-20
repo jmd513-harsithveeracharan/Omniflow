@@ -88,3 +88,4 @@ def test_interactive_notebook_run_endpoint_direct_alias():
         assert data["status"] == "QualityGateBreached"
         assert data["quality_gate"]["passed"] is False
         assert data["quality_gate"]["duplicate_pk_count"] == 5
+

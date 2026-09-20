@@ -142,3 +142,4 @@ def run_single_notebook_interactive(
         "duration_sec": round(time.perf_counter() - t0, 2),
         "healing_events": healing_events,
     }
+
