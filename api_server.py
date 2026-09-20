@@ -477,6 +477,14 @@ async def handle_fabric_deploy(req: FabricDeployRequest):
         raise HTTPException(status_code=500, detail=f"Fabric deployment failed: {str(e)}") from e
 
 
+@app.post("/api/notebooks/run-interactive", summary="Run Single Notebook Interactively (Direct Alias)")
+async def run_notebook_interactive_alias(req: dict[str, Any]):
+    """Alias for interactive single notebook / cell execution and data quality validation."""
+    from app.api.routers.pipelines import InteractiveNotebookRunRequest, run_notebook_interactive
+    typed_req = InteractiveNotebookRunRequest(**req)
+    return await run_notebook_interactive(typed_req)
+
+
 # ── Static File Serving (Studio UI & Assets) ──────────────────────────────────
 STATIC_ROOT = os.path.dirname(os.path.abspath(__file__))
 FRONTEND_DIST = os.path.join(STATIC_ROOT, "frontend", "dist")

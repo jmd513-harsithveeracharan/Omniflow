@@ -143,3 +143,40 @@ async def schedule_pipeline(req: PipelineScheduleRequest):
         return {"status": "scheduled", "pipeline_id": req.pipeline_id, "schedule": sched_res}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to configure schedule: {str(e)}") from e
+
+
+class InteractiveNotebookRunRequest(BaseModel):
+    notebook_id: str = Field(..., description="Fabric notebook GUID or name")
+    notebook_name: str = Field("notebook", description="Display name of notebook")
+    workspace_id: str | None = Field(None, description="Target workspace ID")
+    session_id: str | None = Field(None, description="Optional session UUID for progress telemetry")
+    code: str | None = Field(None, description="Optional PySpark code override to execute")
+    timeout_sec: int = Field(60, description="Interactive execution timeout in seconds")
+    max_heal_retries: int = Field(1, description="Max self-healing retries upon cell error")
+    max_allowed_duplicates: int = Field(0, description="Maximum allowed primary key duplicates")
+    max_allowed_nulls: int = Field(0, description="Maximum allowed null values in required columns")
+
+
+@router.post("/notebook/run-interactive", summary="Run Single Notebook Interactively")
+async def run_notebook_interactive(req: InteractiveNotebookRunRequest) -> dict[str, Any]:
+    """
+    Executes a single PySpark notebook interactively with Data Quality gate checks and self-healing.
+    """
+    from app.engine.interactive_runner import run_single_notebook_interactive as exec_interactive
+    wid = req.workspace_id or ALLOWED_WORKSPACE_ID
+    try:
+        res = exec_interactive(
+            notebook_id=req.notebook_id,
+            notebook_name=req.notebook_name,
+            workspace_id=wid,
+            session_id=req.session_id,
+            timeout_sec=req.timeout_sec,
+            current_code=req.code,
+            max_heal_retries=req.max_heal_retries,
+            max_allowed_duplicates=req.max_allowed_duplicates,
+            max_allowed_nulls=req.max_allowed_nulls,
+        )
+        return res
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Interactive execution failed: {str(e)}") from e
+

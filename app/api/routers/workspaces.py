@@ -101,3 +101,22 @@ async def refresh_workspace_cache(req: CacheRefreshRequest | None = None):
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Cache refresh failed: {str(e)}") from e
+
+
+@router.get("/reconcile", summary="Reconcile Local Git Mirror with Fabric Cloud")
+async def reconcile_workspace_endpoint(workspace_id: str | None = None) -> dict[str, Any]:
+    """
+    Compares local declarative Git items against live Fabric cloud items.
+    Detects uncommitted cloud changes, pending local deployments, and schema drifts.
+    """
+    from app.engine.reconciler import reconcile_workspace
+    wid = workspace_id or ALLOWED_WORKSPACE_ID
+    try:
+        report = reconcile_workspace(workspace_id=wid)
+        return {
+            "status": "success",
+            "report": report.model_dump(),
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Reconciliation failed: {str(e)}") from e
+
