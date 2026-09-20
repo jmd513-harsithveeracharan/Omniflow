@@ -17,12 +17,12 @@ def generate_mermaid_lineage(plan: dict[str, Any]) -> str:
     """Generates a clean horizontal Mermaid DAG (graph LR) representing data lineage."""
     notebooks = plan.get("notebooks", [])
     if not notebooks:
-        return "```mermaid
-        return """```mermaid
-graph LR
-    Source[(Source Ingestion)] --> Bronze[(Bronze Delta)] --> Silver[(Silver Curated)] --> Gold[(Gold Star Schema)]
-```"
-```"""
+        return (
+            "```mermaid\n"
+            "graph LR\n"
+            "    Source[(Source Ingestion)] --> Bronze[(Bronze Delta)] --> Silver[(Silver Curated)] --> Gold[(Gold Star Schema)]\n"
+            "```"
+        )
 
     lines = ["```mermaid", "graph LR"]
     has_medallion = any(nb.get("layer") in ("Bronze", "Silver", "Gold") for nb in notebooks)
