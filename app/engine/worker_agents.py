@@ -225,6 +225,16 @@ def execute_notebook_worker(
         )
     except Exception as e:
         dur = round(time.perf_counter() - start_t, 2)
+        if session_id:
+            set_progress_step(
+                session_id,
+                title=f"Synthesized PY {step.name}.py",
+                detail=f"Worker error: {e}",
+                status="failed",
+                action="Failed",
+                badge="PY",
+                target=f"{step.name}.py",
+            )
         return WorkerResult(
             step_id=step.step_id,
             name=step.name,

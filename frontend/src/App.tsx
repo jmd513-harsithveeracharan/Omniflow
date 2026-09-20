@@ -260,6 +260,10 @@ export const App: React.FC = () => {
           const last = prev[prev.length - 1];
           if (last && last.role === 'assistant') {
             return [...prev.slice(0, -1), { ...last, isStreaming: false }];
+            const closedSteps = (last.thoughtSteps || []).map((s) =>
+              s.status === 'in_progress' ? { ...s, status: 'completed' as const } : s
+            );
+            return [...prev.slice(0, -1), { ...last, isStreaming: false, thoughtSteps: closedSteps }];
           }
           return prev;
         });
@@ -276,6 +280,10 @@ export const App: React.FC = () => {
           const errMsg = `⚠️ Error communicating with agent: ${err}`;
           if (last && last.role === 'assistant') {
             return [...prev.slice(0, -1), { ...last, content: errMsg, isStreaming: false }];
+            const closedSteps = (last.thoughtSteps || []).map((s) =>
+              s.status === 'in_progress' ? { ...s, status: 'failed' as const } : s
+            );
+            return [...prev.slice(0, -1), { ...last, content: errMsg, isStreaming: false, thoughtSteps: closedSteps }];
           }
           return [...prev, { role: 'assistant', content: errMsg }];
         });
