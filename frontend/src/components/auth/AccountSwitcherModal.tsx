@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Check, Laptop, KeyRound, Loader2, RefreshCw } from 'lucide-react';
+import { X, Laptop, KeyRound, RefreshCw } from 'lucide-react';
 import { FabricAccountProfile } from '../../types';
 import {
   fetchFabricAccounts,
@@ -9,6 +9,7 @@ import {
   pollDeviceCodeLogin,
 } from '../../services/api';
 import { DeviceCodeBanner } from './DeviceCodeBanner';
+import { AccountItemRow } from './AccountItemRow';
 
 interface AccountSwitcherModalProps {
   isOpen: boolean;
@@ -24,6 +25,7 @@ export const AccountSwitcherModal: React.FC<AccountSwitcherModalProps> = ({
   const [accounts, setAccounts] = useState<FabricAccountProfile[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [switchingId, setSwitchingId] = useState<string | null>(null);
+  const [tenantInput, setTenantInput] = useState('');
   const [statusMsg, setStatusMsg] = useState<{ text: string; type: 'success' | 'error' | 'info' } | null>(null);
 
   // Device Code state
@@ -63,7 +65,7 @@ export const AccountSwitcherModal: React.FC<AccountSwitcherModalProps> = ({
         if (res.status === 'authenticated') {
           setIsPollingDeviceCode(false);
           setDeviceCode(null);
-          setStatusMsg({ text: `Successfully signed in as ${res.user_identity || 'user'}!`, type: 'success' });
+          setStatusMsg({ text: `Successfully connected: ${res.user_identity || 'Authenticated'}`, type: 'success' });
           await loadAccounts();
           onAccountSwitched();
         } else if (res.status === 'declined' || res.status === 'expired' || res.status === 'error') {
@@ -87,7 +89,7 @@ export const AccountSwitcherModal: React.FC<AccountSwitcherModalProps> = ({
       setStatusMsg(null);
       const res = await switchFabricAccount(account.id, account.tenant_id);
       if (res.success) {
-        setStatusMsg({ text: `Switched to ${account.name}`, type: 'success' });
+        setStatusMsg({ text: `Switched session to ${account.name}`, type: 'success' });
         await loadAccounts();
         onAccountSwitched();
       } else if (res.requires_login) {
@@ -105,8 +107,8 @@ export const AccountSwitcherModal: React.FC<AccountSwitcherModalProps> = ({
   const handleBrowserLogin = async () => {
     try {
       setIsLoading(true);
-      setStatusMsg({ text: 'Opening browser for Microsoft sign-in...', type: 'info' });
-      const res = await triggerBrowserLogin();
+      setStatusMsg({ text: 'Launching Microsoft sign-in window...', type: 'info' });
+      const res = await triggerBrowserLogin(tenantInput.trim() || undefined);
       if (res.success) {
         setStatusMsg({ text: res.message, type: 'success' });
         await loadAccounts();
@@ -175,10 +177,10 @@ export const AccountSwitcherModal: React.FC<AccountSwitcherModalProps> = ({
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '18px' }}>
           <div>
             <h3 style={{ fontSize: '17px', fontWeight: 600, color: '#f4f4f5', margin: 0 }}>
-              Switch Microsoft Fabric Account
+              Fabric Accounts & Tenancy
             </h3>
             <p style={{ fontSize: '12px', color: '#a1a1aa', margin: '3px 0 0 0' }}>
-              Switch between Pelican BioThermal, JMAN Group trial, or add a new tenant
+              Switch active workspace session or connect an organization account
             </p>
           </div>
           <button
@@ -229,7 +231,7 @@ export const AccountSwitcherModal: React.FC<AccountSwitcherModalProps> = ({
         <div style={{ marginBottom: '18px' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
             <label style={{ fontSize: '11px', fontWeight: 700, color: '#a1a1aa', letterSpacing: '0.04em' }}>
-              SAVED FABRIC ACCOUNTS
+              AUTHENTICATED ACCOUNTS ({accounts.length})
             </label>
             <button
               type="button"
@@ -242,84 +244,37 @@ export const AccountSwitcherModal: React.FC<AccountSwitcherModalProps> = ({
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '200px', overflowY: 'auto' }}>
-            {accounts.map((acc) => {
-              const isSwitching = switchingId === acc.id;
-              return (
-                <div
+            {accounts.length === 0 ? (
+              <div style={{ padding: '14px', fontSize: '12px', color: '#71717a', textAlign: 'center', border: '1px dashed rgba(255,255,255,0.1)', borderRadius: '8px' }}>
+                No Fabric accounts saved. Sign in below to connect.
+              </div>
+            ) : (
+              accounts.map((acc) => (
+                <AccountItemRow
                   key={acc.id}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    padding: '10px 12px',
-                    borderRadius: '10px',
-                    background: acc.is_active ? 'rgba(16, 185, 129, 0.08)' : 'rgba(255, 255, 255, 0.03)',
-                    border: acc.is_active ? '1px solid rgba(16, 185, 129, 0.3)' : '1px solid rgba(255, 255, 255, 0.08)',
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <div
-                      style={{
-                        width: '32px',
-                        height: '32px',
-                        borderRadius: '50%',
-                        background: acc.is_active ? '#10b981' : '#3f3f46',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        color: '#ffffff',
-                        fontWeight: 600,
-                        fontSize: '12px',
-                      }}
-                    >
-                      {acc.name[0]}
-                    </div>
-                    <div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <span style={{ fontSize: '13px', fontWeight: 600, color: '#f4f4f5' }}>{acc.name}</span>
-                        <span
-                          style={{
-                            fontSize: '10px',
-                            fontWeight: 600,
-                            padding: '1px 6px',
-                            borderRadius: '4px',
-                            background: acc.account_type.includes('Trial') ? 'rgba(59, 130, 246, 0.15)' : 'rgba(16, 185, 129, 0.15)',
-                            color: acc.account_type.includes('Trial') ? '#60a5fa' : '#34d399',
-                          }}
-                        >
-                          {acc.account_type}
-                        </span>
-                      </div>
-                      <div style={{ fontSize: '11.5px', color: '#71717a' }}>{acc.email}</div>
-                    </div>
-                  </div>
-
-                  {acc.is_active ? (
-                    <span style={{ fontSize: '11px', fontWeight: 600, color: '#10b981', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      <Check width={13} height={13} /> Active
-                    </span>
-                  ) : (
-                    <button
-                      type="button"
-                      disabled={isSwitching}
-                      onClick={() => handleSwitch(acc)}
-                      className="projects-modal-btn-cancel"
-                      style={{ padding: '5px 12px', fontSize: '12px' }}
-                    >
-                      {isSwitching ? <Loader2 width={12} height={12} className="spin" /> : 'Switch'}
-                    </button>
-                  )}
-                </div>
-              );
-            })}
+                  account={acc}
+                  isSwitching={switchingId === acc.id}
+                  onSwitch={handleSwitch}
+                />
+              ))
+            )}
           </div>
         </div>
 
         {/* Sign In to Another Account */}
         <div style={{ borderTop: '1px solid rgba(255, 255, 255, 0.08)', paddingTop: '16px' }}>
-          <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: '#a1a1aa', marginBottom: '8px', letterSpacing: '0.04em' }}>
-            SIGN IN TO ANOTHER FABRIC ACCOUNT
+          <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: '#a1a1aa', marginBottom: '6px', letterSpacing: '0.04em' }}>
+            ORGANIZATION DOMAIN OR TENANT (OPTIONAL)
           </label>
+          <input
+            type="text"
+            value={tenantInput}
+            onChange={(e) => setTenantInput(e.target.value)}
+            placeholder="e.g. yourcompany.com or tenant ID (prevents Windows SSO defaulting)"
+            className="projects-modal-input"
+            style={{ fontSize: '12.5px', padding: '8px 10px', marginBottom: '10px' }}
+          />
+
           <div style={{ display: 'flex', gap: '10px' }}>
             <button
               type="button"

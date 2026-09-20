@@ -71,10 +71,11 @@ async def switch_account_endpoint(req: SwitchAccountRequest) -> dict[str, Any]:
 async def browser_login_endpoint(req: BrowserLoginRequest | None = None) -> dict[str, Any]:
     """Launches interactive browser sign-in for Microsoft Fabric."""
     tenant = req.tenant if req else None
-    success, message = await asyncio.to_thread(trigger_browser_login, tenant)
+    success, message, profile = await asyncio.to_thread(trigger_browser_login, tenant)
     return {
         "success": success,
         "message": message,
+        "account": profile.model_dump() if profile else None,
         "auth": get_auth_status(),
         "accounts": [a.model_dump() for a in list_all_accounts()],
     }
