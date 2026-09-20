@@ -24,7 +24,6 @@ from app.meta_skill import (
 )
 from app.skill_loader import load_skills
 
-# --- Layer-scoped isolation instruction blocks injected per worker ---
 _LAYER_SCOPE: dict[str, str] = {
     "Bronze": (
         "## YOUR LAYER: BRONZE\nWrite Bronze ingestion notebook.\n"
@@ -130,7 +129,6 @@ def _infer_lh_path(step: PipelineStep, folder: str, lakehouses: list[str] | None
     return step.name.replace("nb_", "lh_", 1)
 
 
-
 def execute_notebook_worker(
     step: PipelineStep,
     folder: str,
@@ -207,21 +205,35 @@ def execute_notebook_worker(
                 session_id,
                 title=f"Synthesized PY {step.name}.py",
                 detail=f"Code generated ({code_lines} lines, {dur}s). Output schema: {len(output_cols)} cols.",
-                status="completed", action="Synthesized", badge="PY",
-                target=f"{step.name}.py", diff=f"+{code_lines} -0",
+                status="completed",
+                action="Synthesized",
+                badge="PY",
+                target=f"{step.name}.py",
+                diff=f"+{code_lines} -0",
                 output=code[:400] + ("\n..." if len(code) > 400 else ""),
             )
         return WorkerResult(
-            step_id=step.step_id, name=step.name, layer=step.layer,
-            pyspark=code, lh_path=lh_path, delta_schema=output_cols,
-            started_at=start_utc, completed_at=_now_utc_str(), duration_sec=dur,
+            step_id=step.step_id,
+            name=step.name,
+            layer=step.layer,
+            pyspark=code,
+            lh_path=lh_path,
+            delta_schema=output_cols,
+            started_at=start_utc,
+            completed_at=_now_utc_str(),
+            duration_sec=dur,
         )
     except Exception as e:
         dur = round(time.perf_counter() - start_t, 2)
         return WorkerResult(
-            step_id=step.step_id, name=step.name, layer=step.layer,
-            pyspark=f"# Error generating code: {e}\nprint('Error')", error=str(e),
-            started_at=start_utc, completed_at=_now_utc_str(), duration_sec=dur,
+            step_id=step.step_id,
+            name=step.name,
+            layer=step.layer,
+            pyspark=f"# Error generating code: {e}\nprint('Error')",
+            error=str(e),
+            started_at=start_utc,
+            completed_at=_now_utc_str(),
+            duration_sec=dur,
         )
 
 
@@ -288,7 +300,13 @@ def run_workers(
                     results[sid] = future.result()
                 except Exception as e:
                     results[sid] = WorkerResult(
-                        step_id=sid, name=sid, layer=None, pyspark=f"# Error: {e}",
-                        error=str(e), started_at=_now_utc_str(), completed_at=_now_utc_str(), duration_sec=0.0,
+                        step_id=sid,
+                        name=sid,
+                        layer=None,
+                        pyspark=f"# Error: {e}",
+                        error=str(e),
+                        started_at=_now_utc_str(),
+                        completed_at=_now_utc_str(),
+                        duration_sec=0.0,
                     )
     return results
