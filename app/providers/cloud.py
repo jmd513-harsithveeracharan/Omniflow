@@ -7,6 +7,10 @@ Direct cloud REST API callers for Anthropic, OpenAI, Gemini, and Groq.
 import time
 from app.config import (
     ANTHROPIC_KEY,
+    AZURE_OPENAI_API_VERSION,
+    AZURE_OPENAI_DEPLOYMENT,
+    AZURE_OPENAI_ENDPOINT,
+    AZURE_OPENAI_KEY,
     GEMINI_KEY,
     GROQ_KEYS,
     OPENAI_KEY,
@@ -55,6 +59,31 @@ def _call_openai(messages: list, model: str, max_tokens: int = 8192) -> str:
         },
         json={
             "model": model,
+            "messages": messages,
+            "max_tokens": max_tokens,
+        },
+        timeout=60,
+    )
+    resp.raise_for_status()
+    return resp.json()["choices"][0]["message"]["content"]
+
+
+def _call_azure_openai(messages: list, model: str | None = None, max_tokens: int = 8192) -> str:
+    """Invokes In-House Azure OpenAI Service deployment."""
+    if not AZURE_OPENAI_ENDPOINT or not AZURE_OPENAI_KEY:
+        raise RuntimeError("AZURE_OPENAI_ENDPOINT or AZURE_OPENAI_KEY not set.")
+    
+    deployment = model or AZURE_OPENAI_DEPLOYMENT or "gpt-4o"
+    endpoint = AZURE_OPENAI_ENDPOINT.rstrip("/")
+    url = f"{endpoint}/openai/deployments/{deployment}/chat/completions?api-version={AZURE_OPENAI_API_VERSION}"
+    
+    resp = _SESSION.post(
+        url,
+        headers={
+            "api-key": AZURE_OPENAI_KEY,
+            "Content-Type": "application/json",
+        },
+        json={
             "messages": messages,
             "max_tokens": max_tokens,
         },

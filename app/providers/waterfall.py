@@ -6,6 +6,8 @@ Model routing resolution and tiered fallback waterfalls.
 
 from app.config import (
     ANTHROPIC_KEY,
+    AZURE_OPENAI_ENDPOINT,
+    AZURE_OPENAI_KEY,
     CLAUDE_COOKIE,
     GEMINI_KEY,
     GROQ_KEYS,
@@ -20,6 +22,7 @@ from app.providers.claude import (
 )
 from app.providers.cloud import (
     _call_anthropic,
+    _call_azure_openai,
     _call_gemini,
     _call_groq,
     _call_openai,
@@ -84,6 +87,11 @@ def _model_to_provider_call(
             return (lambda: _call_claude_session(messages, chosen_model, max_tokens), f"Claude Native Mix ({chosen_model})")
 
         raise RuntimeError("No Claude provider found: Claude Code CLI, ANTHROPIC_API_KEY, or CLAUDE_COOKIE required.")
+    elif "azure" in m or "inhouse" in m:
+        if not AZURE_OPENAI_KEY or not AZURE_OPENAI_ENDPOINT:
+            raise RuntimeError("AZURE_OPENAI_KEY or AZURE_OPENAI_ENDPOINT not configured in .env.")
+        clean_name = model_id.replace("azure:", "").replace("azure/", "").strip() or "gpt-4o"
+        return (lambda: _call_azure_openai(messages, clean_name, max_tokens), f"Azure OpenAI ({clean_name})")
     elif "gpt" in m or "openai" in m or "o3" in m:
         if not OPENAI_KEY:
             raise RuntimeError("OPENAI_API_KEY is not configured in .env.")
@@ -94,7 +102,11 @@ def _model_to_provider_call(
 
 def _high_complexity_providers(messages: list, max_tokens: int, session_id: str = None, resume: bool = False):
     """Claude Code CLI → Claude Sonnet → Gemini 3.6 Flash → GPT-4o → Groq 120B"""
+    """In-House Azure OpenAI → Claude Code CLI → Claude Sonnet → Gemini 3.6 Flash → GPT-4o → Groq 120B"""
     attempts = []
+    if AZURE_OPENAI_KEY and AZURE_OPENAI_ENDPOINT:
+        attempts.append((lambda: _call_azure_openai(messages, None, max_tokens), "Azure OpenAI Enterprise"))
+
     if _get_claude_cli_binary():
         attempts.append((lambda: _call_claude_cli(messages, None, max_tokens, session_id=session_id, resume=resume), "Claude Code CLI (Subprocess)"))
     elif ANTHROPIC_KEY:

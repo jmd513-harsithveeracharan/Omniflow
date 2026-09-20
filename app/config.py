@@ -33,6 +33,13 @@ GROQ_KEYS: list[str] = [
 ANTHROPIC_KEY: str | None = os.getenv("ANTHROPIC_API_KEY")
 OPENAI_KEY: str | None    = os.getenv("OPENAI_API_KEY")
 GEMINI_KEY: str | None    = os.getenv("GEMINI_API_KEY")
+
+# 🔵 In-House Azure OpenAI Enterprise Endpoint
+AZURE_OPENAI_ENDPOINT: str | None = os.getenv("AZURE_OPENAI_ENDPOINT")
+AZURE_OPENAI_KEY: str | None      = os.getenv("AZURE_OPENAI_KEY") or os.getenv("AZURE_OPENAI_API_KEY")
+AZURE_OPENAI_DEPLOYMENT: str      = os.getenv("AZURE_OPENAI_DEPLOYMENT", "gpt-4o")
+AZURE_OPENAI_API_VERSION: str     = os.getenv("AZURE_OPENAI_API_VERSION", "2024-08-01-preview")
+
 # 🟢 Claude Web Subscription Bridge (Native Claude Mix)
 CLAUDE_ORG_UUID: str = os.getenv("CLAUDE_ORG_UUID", "37000f3f-9944-4b11-9e3e-d255456192da")
 CLAUDE_DEVICE_ID: str = os.getenv("CLAUDE_DEVICE_ID", "c69be8b5-7e37-4b28-b7c5-72c51c218c1d")
