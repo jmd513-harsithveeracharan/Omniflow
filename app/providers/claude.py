@@ -65,15 +65,11 @@ def _call_claude_cli(
         elif "opus" in em_lower:
             effective_model = "claude-3-opus-20240229"
 
+    target_m = effective_model or model
     if valid_uuid_session and resume:
         latest_user_msgs = [m.get("content", "") for m in messages if m.get("role") == "user"]
         latest_turn = latest_user_msgs[-1] if latest_user_msgs else "Continue"
         cmd = [claude_bin, "-p", latest_turn, "--resume", valid_uuid_session, "--tools", ""]
-        if model:
-            cmd.extend(["--model", model])
-        if effective_model:
-            cmd.extend(["--model", effective_model])
-        target_m = effective_model or model
         if target_m:
             cmd.extend(["--model", target_m])
     else:
@@ -98,11 +94,6 @@ def _call_claude_cli(
         cmd = [claude_bin, "-p", full_prompt, "--tools", ""]
         if valid_uuid_session:
             cmd.extend(["--session-id", valid_uuid_session])
-        if model:
-            cmd.extend(["--model", model])
-        if effective_model:
-            cmd.extend(["--model", effective_model])
-        target_m = effective_model or model
         if target_m:
             cmd.extend(["--model", target_m])
 
@@ -112,7 +103,6 @@ def _call_claude_cli(
             cmd,
             capture_output=True,
             text=True,
-            input="",
             stdin=subprocess.DEVNULL,
             encoding="utf-8",
             cwd=tempfile.gettempdir(),
