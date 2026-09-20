@@ -1,0 +1,30 @@
+{
+  "properties": {
+    "activities": [
+      {
+        "name": "nb_ingest",
+        "type": "TridentNotebook",
+        "typeProperties": {
+          "notebookName": "nb_ingest"
+        },
+        "policy": {
+          "timeout": "0.12:00:00",
+          "retry": 0
+        },
+        "dependsOn": []
+      },
+      {
+        "name": "nb_transform",
+        "type": "TridentNotebook",
+        "typeProperties": {
+          "notebookName": "nb_transform"
+        },
+        "policy": {
+          "timeout": "0.12:00:00",
+          "retry": 0
+        },
+        "dependsOn": []
+      }
+    ]
+  }
+}

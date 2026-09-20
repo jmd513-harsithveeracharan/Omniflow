@@ -1,0 +1,18 @@
+{
+  "properties": {
+    "activities": [
+      {
+        "name": "nb_test_bronze",
+        "type": "TridentNotebook",
+        "typeProperties": {
+          "notebookName": "nb_test_bronze"
+        },
+        "policy": {
+          "timeout": "0.12:00:00",
+          "retry": 0
+        },
+        "dependsOn": []
+      }
+    ]
+  }
+}

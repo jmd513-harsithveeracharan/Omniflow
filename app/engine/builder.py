@@ -7,6 +7,7 @@ Stage 3: Assembles worker results into a unified FabricPlan and generates intera
 from __future__ import annotations
 
 from app.engine.models import StepDAG, WorkerResult
+from app.engine.workspace_mirror import export_plan_to_mirror
 from app.ingestion_planner import parse_schedule
 
 
@@ -214,7 +215,7 @@ def run_builder(dag: StepDAG, worker_results: dict[str, WorkerResult], run_id: s
         else:
             flow_edges.append({"from": "fld_root", "to": "pl_root"})
 
-    return {
+    plan = {
         "type": "plan",
         "run_id": run_id,
         "folder": dag.folder,
@@ -244,4 +245,11 @@ def run_builder(dag: StepDAG, worker_results: dict[str, WorkerResult], run_id: s
         "status": "planned",
         "_pipeline_type": "multi_agent",
     }
+
+    try:
+        export_plan_to_mirror(plan)
+    except Exception:
+        pass
+
+    return plan
 
