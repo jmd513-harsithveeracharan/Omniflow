@@ -106,6 +106,7 @@ def _call_claude_cli(
             cmd,
             capture_output=True,
             text=True,
+            input="",
             stdin=subprocess.DEVNULL,
             encoding="utf-8",
             cwd=tempfile.gettempdir(),

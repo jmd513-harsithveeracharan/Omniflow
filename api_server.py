@@ -506,6 +506,7 @@ if __name__ == "__main__":
     import uvicorn
 
     print("[API] Starting Fabric AI Studio FastAPI Server on http://127.0.0.1:8085")
+    uvicorn.run("api_server:app", host="127.0.0.1", port=8085, reload=True)
     uvicorn.run(
         "api_server:app",
         host="127.0.0.1",
