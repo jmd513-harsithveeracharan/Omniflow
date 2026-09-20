@@ -385,6 +385,7 @@ export const App: React.FC = () => {
         onEditProject={handleEditProject}
         onArchiveProject={handleArchiveProject}
         onDeleteProject={handleDeleteProject}
+        onRefreshStatus={() => fetchFabricStatus().then(setStatus)}
       />
 
       {/* 2. Main Studio Canvas */}

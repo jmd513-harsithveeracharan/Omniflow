@@ -28,6 +28,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from app.api import (
+    auth_router,
     connectors_router,
     governance_router,
     pipelines_router,
@@ -73,6 +74,7 @@ app.add_middleware(
 )
 
 # Mount Modular Domain Routers
+app.include_router(auth_router)
 app.include_router(workflow_router)
 app.include_router(skills_router)
 app.include_router(connectors_router)
@@ -152,6 +154,7 @@ async def get_fabric_status():
             "target_folder": "AI_Test_Folder",
             "workspaces_count": len(workspaces),
             "user_identity": auth_info.get("user_identity", "Bheesetti.Harsith@Pelibiothermal.com"),
+            "user_identity": auth_info.get("user_identity") or "Not Connected",
             "auth_method": auth_info.get("auth_method", "azure_cli"),
             "tenant_id": auth_info.get("tenant_id", "None"),
             "expires_in_minutes": auth_info.get("expires_in_minutes", 0),
@@ -169,6 +172,7 @@ async def get_fabric_status():
             "target_folder": "AI_Test_Folder",
             "workspaces_count": 0,
             "user_identity": auth_info.get("user_identity", "Bheesetti.Harsith@Pelibiothermal.com"),
+            "user_identity": auth_info.get("user_identity") or "Not Connected",
             "auth_method": auth_info.get("auth_method", "none"),
             "tenant_id": auth_info.get("tenant_id", "None"),
             "expires_in_minutes": 0,

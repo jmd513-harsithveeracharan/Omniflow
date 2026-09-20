@@ -21,8 +21,11 @@ import {
   Folder,
   ChevronRight,
   MessageSquare,
+  Users,
 } from 'lucide-react';
 import { ChatSession, ProjectRecord } from '../types';
+import { logoutFabric } from '../services/api';
+import { AccountSwitcherModal } from './auth/AccountSwitcherModal';
 
 interface SidebarProps {
   activeView: string;
@@ -46,6 +49,7 @@ interface SidebarProps {
   onEditProject?: (project: ProjectRecord) => void;
   onArchiveProject?: (projectId: string) => void;
   onDeleteProject?: (projectId: string) => void;
+  onRefreshStatus?: () => void;
 }
 
 const PLATFORMS = [
@@ -77,10 +81,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onEditProject,
   onArchiveProject,
   onDeleteProject,
+  onRefreshStatus,
 }) => {
   const [selectedPlatform, setSelectedPlatform] = useState('fabric');
   const [isPlatformMenuOpen, setIsPlatformMenuOpen] = useState(false);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
+  const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
   const [isProjectsOpen, setIsProjectsOpen] = useState(true);
   const [isChatsOpen, setIsChatsOpen] = useState(true);
   const [isProjectsExpanded, setIsProjectsExpanded] = useState(false);
@@ -717,11 +723,32 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 </div>
               </div>
               <div className="dock-model-divider" />
+              <button
+                className="profile-menu-item"
+                onClick={() => {
+                  setIsProfileMenuOpen(false);
+                  setIsAccountModalOpen(true);
+                }}
+              >
+                <Users width={14} height={14} />
+                <span>Switch Fabric Account</span>
+              </button>
               <button className="profile-menu-item" onClick={() => onSelectView('settings')}>
                 <Settings2 width={14} height={14} />
                 <span>Settings & Customize</span>
               </button>
-              <button className="profile-menu-item" onClick={() => setIsProfileMenuOpen(false)}>
+              <button
+                className="profile-menu-item"
+                onClick={async () => {
+                  setIsProfileMenuOpen(false);
+                  try {
+                    await logoutFabric();
+                    if (onRefreshStatus) onRefreshStatus();
+                  } catch (e) {
+                    console.error(e);
+                  }
+                }}
+              >
                 <LogOut width={14} height={14} />
                 <span>Sign out</span>
               </button>
@@ -729,6 +756,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
           )}
         </div>
       </div>
+
+      <AccountSwitcherModal
+        isOpen={isAccountModalOpen}
+        onClose={() => setIsAccountModalOpen(false)}
+        onAccountSwitched={() => {
+          if (onRefreshStatus) onRefreshStatus();
+        }}
+      />
     </aside>
   );
 };

@@ -394,4 +394,59 @@ export async function fetchFabricWorkspaces(): Promise<{
   }
 }
 
+export async function fetchFabricAccounts(): Promise<import('../types').FabricAccountProfile[]> {
+  const res = await fetch(`${API_BASE}/auth/accounts`);
+  if (!res.ok) throw new Error(`Failed to fetch accounts: ${res.statusText}`);
+  return res.json();
+}
+
+export async function switchFabricAccount(
+  accountId: string,
+  tenantId?: string
+): Promise<{ success: boolean; message: string; requires_login?: boolean; account?: import('../types').FabricAccountProfile }> {
+  const res = await fetch(`${API_BASE}/auth/switch-account`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ account_id: accountId, tenant_id: tenantId }),
+  });
+  if (!res.ok) throw new Error(`Failed to switch account: ${res.statusText}`);
+  return res.json();
+}
+
+export async function triggerBrowserLogin(
+  tenant?: string
+): Promise<{ success: boolean; message: string; accounts: import('../types').FabricAccountProfile[] }> {
+  const res = await fetch(`${API_BASE}/auth/login/browser`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ tenant }),
+  });
+  if (!res.ok) throw new Error(`Failed to initiate browser login: ${res.statusText}`);
+  return res.json();
+}
+
+export async function startDeviceCodeLogin(): Promise<import('../types').DeviceCodeInitResponse> {
+  const res = await fetch(`${API_BASE}/auth/login/device-code`, {
+    method: 'POST',
+  });
+  if (!res.ok) throw new Error(`Failed to start device code flow: ${res.statusText}`);
+  return res.json();
+}
+
+export async function pollDeviceCodeLogin(
+  deviceCode: string
+): Promise<import('../types').DeviceCodePollResponse> {
+  const res = await fetch(`${API_BASE}/auth/login/device-code/poll`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ device_code: deviceCode }),
+  });
+  if (!res.ok) throw new Error(`Failed to poll device code: ${res.statusText}`);
+  return res.json();
+}
+
+export async function logoutFabric(): Promise<void> {
+  await fetch(`${API_BASE}/auth/logout`, { method: 'POST' });
+}
+
 

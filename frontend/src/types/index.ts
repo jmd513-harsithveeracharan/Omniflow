@@ -6,6 +6,38 @@
 
 export type RoleType = 'user' | 'assistant' | 'system' | 'tool';
 
+export interface FabricAccountProfile {
+  id: string;
+  name: string;
+  email: string;
+  tenant_id: string;
+  tenant_name?: string;
+  subscription_id?: string;
+  is_active: boolean;
+  account_type: string;
+  default_workspace_id?: string;
+  default_workspace_name?: string;
+}
+
+export interface DeviceCodeInitResponse {
+  success: boolean;
+  user_code?: string;
+  device_code?: string;
+  verification_uri: string;
+  expires_in: number;
+  interval: number;
+  message?: string;
+  error?: string;
+}
+
+export interface DeviceCodePollResponse {
+  success: boolean;
+  status: 'pending' | 'authenticated' | 'declined' | 'expired' | 'error';
+  error?: string;
+  user_identity?: string;
+  tenant_id?: string;
+}
+
 export interface ThoughtStep {
   title: string;
   detail?: string;
