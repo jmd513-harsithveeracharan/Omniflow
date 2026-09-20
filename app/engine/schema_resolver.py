@@ -33,13 +33,18 @@ def _run_fab_schema(workspace: str, lakehouse: str, table_path: str) -> str | No
 def _parse_fab_schema_output(raw: str) -> list[dict[str, str]]:
     """Parses `fab table schema` columnar output into [{name, type}] list."""
     columns: list[dict[str, str]] = []
+    past_header = False
     for line in raw.splitlines():
         line = line.strip()
-        if not line or line.startswith("NAME") or line.startswith("---"):
+        if not line:
             continue
-        parts = line.split()
-        if len(parts) >= 2:
-            columns.append({"name": parts[0], "type": parts[1]})
+        if line.startswith("---"):
+            past_header = True
+            continue
+        if past_header:
+            parts = line.split()
+            if len(parts) >= 2 and parts[0].lower() not in ("name", "getting", "schema"):
+                columns.append({"name": parts[0], "type": parts[1]})
     return columns
 
 
