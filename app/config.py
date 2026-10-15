@@ -34,10 +34,10 @@ ANTHROPIC_KEY: str | None = os.getenv("ANTHROPIC_API_KEY")
 OPENAI_KEY: str | None    = os.getenv("OPENAI_API_KEY")
 GEMINI_KEY: str | None    = os.getenv("GEMINI_API_KEY")
 
-# 🔵 In-House Azure OpenAI Enterprise Endpoint
-AZURE_OPENAI_ENDPOINT: str | None = os.getenv("AZURE_OPENAI_ENDPOINT")
-AZURE_OPENAI_KEY: str | None      = os.getenv("AZURE_OPENAI_KEY") or os.getenv("AZURE_OPENAI_API_KEY")
-AZURE_OPENAI_DEPLOYMENT: str      = os.getenv("AZURE_OPENAI_DEPLOYMENT", "gpt-4o")
+# 🔵 In-House Azure OpenAI / ChatGPT Enterprise Endpoint
+AZURE_OPENAI_ENDPOINT: str | None = os.getenv("AZURE_AI_ENDPOINT") or os.getenv("AZURE_OPENAI_ENDPOINT")
+AZURE_OPENAI_KEY: str | None      = os.getenv("AZURE_AI_KEY") or os.getenv("AZURE_OPENAI_KEY") or os.getenv("AZURE_OPENAI_API_KEY")
+AZURE_OPENAI_DEPLOYMENT: str      = os.getenv("DEPLOYMENT_NAME") or os.getenv("AZURE_OPENAI_DEPLOYMENT", "omni-flow-gpt-6-luna")
 AZURE_OPENAI_API_VERSION: str     = os.getenv("AZURE_OPENAI_API_VERSION", "2024-08-01-preview")
 
 # 🟢 Claude Web Subscription Bridge (Native Claude Mix)

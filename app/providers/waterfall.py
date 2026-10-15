@@ -6,6 +6,7 @@ Model routing resolution and tiered fallback waterfalls.
 
 from app.config import (
     ANTHROPIC_KEY,
+    AZURE_OPENAI_DEPLOYMENT,
     AZURE_OPENAI_ENDPOINT,
     AZURE_OPENAI_KEY,
     CLAUDE_COOKIE,
@@ -66,17 +67,6 @@ def _model_to_provider_call(
         actual_model = LLM_MODELS.get("groq_high", "openai/gpt-oss-120b") if ("120b" in m or "70b" in m or "reasoning" in m) else LLM_MODELS.get("groq_fast", "openai/gpt-oss-20b")
         return (lambda: _call_groq(messages, actual_model, max_tokens), f"Groq ({actual_model})")
     elif "claude" in m or "sonnet" in m or "haiku" in m or "opus" in m or "mix" in m:
-        if _get_claude_cli_binary():
-            cli_model = None
-            if "opus" in m:
-                cli_model = "claude-3-opus-20240229"
-            elif "haiku" in m:
-                cli_model = "claude-3-5-haiku-20241022"
-            elif "sonnet" in m:
-                cli_model = "claude-3-7-sonnet-20250219"
-                cli_model = "claude-3-7-sonnet"
-            return (lambda: _call_claude_cli(messages, cli_model, max_tokens, session_id=session_id, resume=resume), f"Claude Code CLI ({cli_model or 'Default'})")
-
         if ANTHROPIC_KEY:
             actual_model = LLM_MODELS.get("anthropic_high", "claude-3-7-sonnet-20250219") if "sonnet" in m else LLM_MODELS.get("anthropic_fast", "claude-3-5-haiku-20241022")
             return (lambda: _call_anthropic(messages, actual_model, max_tokens), f"Claude API ({actual_model})")
@@ -86,11 +76,11 @@ def _model_to_provider_call(
             chosen_model = _resolve_claude_mix_model(full_prompt)
             return (lambda: _call_claude_session(messages, chosen_model, max_tokens), f"Claude Native Mix ({chosen_model})")
 
-        raise RuntimeError("No Claude provider found: Claude Code CLI, ANTHROPIC_API_KEY, or CLAUDE_COOKIE required.")
-    elif "azure" in m or "inhouse" in m:
+        raise RuntimeError("No Claude API provider found: ANTHROPIC_API_KEY or CLAUDE_COOKIE required.")
+    elif "azure" in m or "inhouse" in m or "luna" in m or "omni" in m or (AZURE_OPENAI_KEY and AZURE_OPENAI_ENDPOINT and not OPENAI_KEY and ("gpt" in m or "openai" in m or "o3" in m)):
         if not AZURE_OPENAI_KEY or not AZURE_OPENAI_ENDPOINT:
             raise RuntimeError("AZURE_OPENAI_KEY or AZURE_OPENAI_ENDPOINT not configured in .env.")
-        clean_name = model_id.replace("azure:", "").replace("azure/", "").strip() or "gpt-4o"
+        clean_name = model_id.replace("azure:", "").replace("azure/", "").strip() or AZURE_OPENAI_DEPLOYMENT or "gpt-4o"
         return (lambda: _call_azure_openai(messages, clean_name, max_tokens), f"Azure OpenAI ({clean_name})")
     elif "gpt" in m or "openai" in m or "o3" in m:
         if not OPENAI_KEY:
@@ -101,21 +91,16 @@ def _model_to_provider_call(
 
 
 def _high_complexity_providers(messages: list, max_tokens: int, session_id: str = None, resume: bool = False):
-    """Claude Code CLI → Claude Sonnet → Gemini 3.6 Flash → GPT-4o → Groq 120B"""
-    """In-House Azure OpenAI → Claude Code CLI → Claude Sonnet → Gemini 3.6 Flash → GPT-4o → Groq 120B"""
+    """Azure OpenAI / ChatGPT → Claude API → Gemini → GPT-4o → Groq 120B"""
     attempts = []
     if AZURE_OPENAI_KEY and AZURE_OPENAI_ENDPOINT:
-        attempts.append((lambda: _call_azure_openai(messages, None, max_tokens), "Azure OpenAI Enterprise"))
-
-    if _get_claude_cli_binary():
-        attempts.append((lambda: _call_claude_cli(messages, None, max_tokens, session_id=session_id, resume=resume), "Claude Code CLI (Subprocess)"))
-    elif ANTHROPIC_KEY:
+        attempts.append((lambda: _call_azure_openai(messages, None, max_tokens), f"Azure OpenAI ({AZURE_OPENAI_DEPLOYMENT})"))
+    if ANTHROPIC_KEY:
         attempts.append((lambda: _call_anthropic(messages, LLM_MODELS.get("anthropic_high", "claude-3-7-sonnet-20250219"), max_tokens), "Claude Sonnet"))
     elif CLAUDE_COOKIE:
         attempts.append((lambda: _call_claude_session(messages, "claude-opus-5", max_tokens), "Claude Opus (Session)"))
-
     if GEMINI_KEY:
-        attempts.append((lambda: _call_gemini(messages, LLM_MODELS.get("gemini_standard", "gemini-3.6-flash"), max_tokens), "Gemini 3.6 Flash"))
+        attempts.append((lambda: _call_gemini(messages, LLM_MODELS.get("gemini_standard", "gemini-flash-latest"), max_tokens), "Gemini"))
     if OPENAI_KEY:
         attempts.append((lambda: _call_openai(messages, LLM_MODELS.get("openai_high", "gpt-4o"), max_tokens), "GPT-4o"))
     if GROQ_KEYS:
@@ -124,12 +109,12 @@ def _high_complexity_providers(messages: list, max_tokens: int, session_id: str 
 
 
 def _standard_complexity_providers(messages: list, max_tokens: int, session_id: str = None, resume: bool = False):
-    """Gemini 3.6 Flash → Claude Code CLI → Groq 20B → Groq 120B → Claude Haiku"""
+    """Azure OpenAI / ChatGPT → Gemini → Groq 20B → Groq 120B → Claude Haiku"""
     attempts = []
+    if AZURE_OPENAI_KEY and AZURE_OPENAI_ENDPOINT:
+        attempts.append((lambda: _call_azure_openai(messages, None, max_tokens), f"Azure OpenAI ({AZURE_OPENAI_DEPLOYMENT})"))
     if GEMINI_KEY:
-        attempts.append((lambda: _call_gemini(messages, LLM_MODELS.get("gemini_standard", "gemini-3.6-flash"), max_tokens), "Gemini 3.6 Flash"))
-    if _get_claude_cli_binary():
-        attempts.append((lambda: _call_claude_cli(messages, None, max_tokens, session_id=session_id, resume=resume), "Claude Code CLI (Subprocess)"))
+        attempts.append((lambda: _call_gemini(messages, LLM_MODELS.get("gemini_standard", "gemini-flash-latest"), max_tokens), "Gemini"))
     if GROQ_KEYS:
         attempts.append((lambda: _call_groq(messages, LLM_MODELS.get("groq_fast", "openai/gpt-oss-20b"), max_tokens), "Groq gpt-oss-20B"))
         attempts.append((lambda: _call_groq(messages, LLM_MODELS.get("groq_high", "openai/gpt-oss-120b"), max_tokens), "Groq gpt-oss-120B"))

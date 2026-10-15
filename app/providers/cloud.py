@@ -69,28 +69,34 @@ def _call_openai(messages: list, model: str, max_tokens: int = 8192) -> str:
 
 
 def _call_azure_openai(messages: list, model: str | None = None, max_tokens: int = 8192) -> str:
-    """Invokes In-House Azure OpenAI Service deployment."""
+    """Invokes In-House Azure OpenAI / ChatGPT Service deployment."""
     if not AZURE_OPENAI_ENDPOINT or not AZURE_OPENAI_KEY:
-        raise RuntimeError("AZURE_OPENAI_ENDPOINT or AZURE_OPENAI_KEY not set.")
-    
-    deployment = model or AZURE_OPENAI_DEPLOYMENT or "gpt-4o"
+        raise RuntimeError("AZURE_AI_ENDPOINT or AZURE_AI_KEY not set.")
+
+    deployment = model or AZURE_OPENAI_DEPLOYMENT or "omni-flow-gpt-6-luna"
     endpoint = AZURE_OPENAI_ENDPOINT.rstrip("/")
+    if "/api/projects" in endpoint:
+        endpoint = endpoint.split("/api/projects")[0].replace(".services.ai.azure.com", ".openai.azure.com")
+    elif ".services.ai.azure.com" in endpoint:
+        endpoint = endpoint.replace(".services.ai.azure.com", ".openai.azure.com")
+
     url = f"{endpoint}/openai/deployments/{deployment}/chat/completions?api-version={AZURE_OPENAI_API_VERSION}"
-    
-    resp = _SESSION.post(
-        url,
-        headers={
-            "api-key": AZURE_OPENAI_KEY,
-            "Content-Type": "application/json",
-        },
-        json={
-            "messages": messages,
-            "max_tokens": max_tokens,
-        },
-        timeout=60,
-    )
+    headers = {
+        "api-key": AZURE_OPENAI_KEY,
+        "Content-Type": "application/json",
+    }
+
+    # Newer Azure OpenAI / reasoning models (e.g. gpt-6-luna, o1, o3) require max_completion_tokens
+    payload = {"messages": messages, "max_completion_tokens": max_tokens}
+    resp = _SESSION.post(url, headers=headers, json=payload, timeout=90)
+
+    if resp.status_code == 400 and "max_completion_tokens" in resp.text:
+        payload = {"messages": messages, "max_tokens": max_tokens}
+        resp = _SESSION.post(url, headers=headers, json=payload, timeout=90)
+
     resp.raise_for_status()
-    return resp.json()["choices"][0]["message"]["content"]
+    data = resp.json()
+    return data["choices"][0]["message"]["content"]
 
 
 def _call_gemini(messages: list, model: str, max_tokens: int = 8192) -> str:

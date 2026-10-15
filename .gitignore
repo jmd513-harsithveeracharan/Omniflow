@@ -42,6 +42,7 @@ claude_response.txt
 ingest-one-feat-ai-driven-onboarding/
 diagrams/
 agentic_snowball_arr-main/
+meeting_summaries/
 
 # Test artifacts
 .pytest_cache/
@@ -54,4 +55,5 @@ dist/
 .vite/
 *.tsbuildinfo
 
-
+# Projects
+omniflow/
