@@ -1,0 +1,119 @@
+{
+  "schema_version": "2.0",
+  "planner_type": "enterprise_data_engineering_planner",
+  "request_context": {
+    "run_id": null,
+    "project_id": null,
+    "user_id": "harsith.bheesetti@pelibiothermal.com",
+    "request_type": "new_end_to_end_data_engineering_solution",
+    "user_request": "Architect, provision, and deploy an end-to-end Microsoft Fabric data engineering platform with full Medallion architecture, automated data quality, lineage tracking, and Direct Lake Power BI serving.",
+    "priority": "high",
+    "planning_mode": "autonomous_create"
+  },
+  "project_context": {
+    "project_summary": {
+      "project_name": "Enterprise Autonomous Data Platform",
+      "business_domain": "Cross-Functional Operational Analytics",
+      "business_objective": "Consolidate operational transactions into a unified Fabric OneLake Medallion architecture with automated data quality, governance, and Direct Lake reporting.",
+      "business_context": "Disparate source systems currently cause delayed reporting, manual reconciliation overhead, and ungoverned data silos."
+    },
+    "platform_summary": {
+      "target_platform": "Microsoft Fabric",
+      "target_environment": "DEV",
+      "capacity_sku": "F64",
+      "primary_language": "PySpark / T-SQL",
+      "containment_folder": "AI_Test_Folder"
+    },
+    "solution_summary": {
+      "requirement": "Ingest source entities into Bronze, curate with null-safe SHA-256 PII masking and Delta ACID MERGE in Silver, build a Kimball star schema in Gold, publish a Direct Lake semantic model, and run automated data quality reconciliation.",
+      "expected_deliverables": [
+        "lh_data_platform_bronze.Lakehouse",
+        "lh_data_platform_silver.Lakehouse",
+        "wh_data_platform_gold.Warehouse",
+        "pl_bronze_batch_ingest.DataPipeline",
+        "nb_silver_curate_scd2.Notebook",
+        "sm_direct_lake_model.SemanticModel",
+        "dq_reconciliation_suite.Notebook",
+        "lineage_record.Graph"
+      ],
+      "success_criteria": [
+        "Source-to-target row count reconciliation variance < 0.5%",
+        "100% of sensitive PII columns masked via SHA-256",
+        "Zero circular DAG dependencies (Acyclic NetworkX graph)",
+        "All generated artifacts conform to Microsoft Fabric Git Integration (.platform + item folders)",
+        "100% Python AST syntax validation passing on all PySpark notebooks",
+        "Direct Lake Power BI semantic model bound to Gold warehouse"
+      ]
+    }
+  },
+  "retrieved_context": {
+    "data_sources": [
+      {
+        "source_name": "Operational Relational System",
+        "source_type": "Relational_DB",
+        "system_name": "operational_core",
+        "host": "db.internal.corp:5432",
+        "database_name": "operational_db",
+        "authentication_type": "Managed_Identity",
+        "tables": [
+          {
+            "table_name": "transactions",
+            "description": "Core business transactions and settlement records",
+            "layer": "Bronze",
+            "primary_key": "transaction_id",
+            "watermark_column": "updated_at",
+            "is_incremental": true,
+            "columns": [
+              {"name": "transaction_id", "data_type": "BIGINT", "is_primary_key": true, "is_pii": false, "is_business_key": true, "is_nullable": false},
+              {"name": "account_id", "data_type": "BIGINT", "is_primary_key": false, "is_pii": false, "is_business_key": false, "is_nullable": false},
+              {"name": "customer_email", "data_type": "VARCHAR(128)", "is_primary_key": false, "is_pii": true, "is_business_key": false, "is_nullable": false},
+              {"name": "customer_phone", "data_type": "VARCHAR(32)", "is_primary_key": false, "is_pii": true, "is_business_key": false, "is_nullable": true},
+              {"name": "transaction_amount", "data_type": "DECIMAL(18,2)", "is_primary_key": false, "is_pii": false, "is_business_key": false, "is_nullable": false},
+              {"name": "currency_code", "data_type": "VARCHAR(3)", "is_primary_key": false, "is_pii": false, "is_business_key": false, "is_nullable": false},
+              {"name": "status", "data_type": "VARCHAR(32)", "is_primary_key": false, "is_pii": false, "is_business_key": false, "is_nullable": false},
+              {"name": "created_at", "data_type": "TIMESTAMPTZ", "is_primary_key": false, "is_pii": false, "is_business_key": false, "is_nullable": false},
+              {"name": "updated_at", "data_type": "TIMESTAMPTZ", "is_primary_key": false, "is_pii": false, "is_business_key": false, "is_nullable": false}
+            ]
+          },
+          {
+            "table_name": "accounts",
+            "description": "Master customer and commercial accounts",
+            "layer": "Bronze",
+            "primary_key": "account_id",
+            "watermark_column": "updated_at",
+            "is_incremental": true,
+            "columns": [
+              {"name": "account_id", "data_type": "BIGINT", "is_primary_key": true, "is_pii": false, "is_business_key": true, "is_nullable": false},
+              {"name": "account_name", "data_type": "VARCHAR(128)", "is_primary_key": false, "is_pii": true, "is_business_key": true, "is_nullable": false},
+              {"name": "contact_address", "data_type": "VARCHAR(256)", "is_primary_key": false, "is_pii": true, "is_business_key": false, "is_nullable": true},
+              {"name": "account_type", "data_type": "VARCHAR(64)", "is_primary_key": false, "is_pii": false, "is_business_key": false, "is_nullable": false},
+              {"name": "is_active", "data_type": "BOOLEAN", "is_primary_key": false, "is_pii": false, "is_business_key": false, "is_nullable": false},
+              {"name": "updated_at", "data_type": "TIMESTAMPTZ", "is_primary_key": false, "is_pii": false, "is_business_key": false, "is_nullable": false}
+            ]
+          }
+        ]
+      }
+    ],
+    "project_constraints": ["CAPACITY_LIMIT_F64", "CONTAINMENT_AI_TEST_FOLDER", "DATA_SOVEREIGNTY"],
+    "project_decisions": ["ADR-001-MEDALLION-ARCHITECTURE", "ADR-002-DELTA-LAKE-ACID-MERGE", "ADR-003-DIRECT-LAKE-SEMANTIC-MODEL"],
+    "applicable_standards": [
+      "Medallion Asset Naming Standard",
+      "Silver SCD2 & SHA-256 PII Governance",
+      "Gold Kimball Star Schema & Direct Lake"
+    ]
+  },
+  "governance_summary": {
+    "allowed_actions": [
+      "PROVISION_LAKEHOUSE",
+      "PROVISION_WAREHOUSE",
+      "GENERATE_PYSPARK_NOTEBOOK",
+      "GENERATE_DATA_PIPELINE",
+      "GENERATE_DIRECT_LAKE_MODEL",
+      "RUN_DATA_QUALITY_SUITE",
+      "RECORD_LINEAGE"
+    ],
+    "restricted_actions": ["DELETE_PRODUCTION_DATA", "CHANGE_WORKSPACE_ACCESS_POLICY"],
+    "approval_triggers": ["DROP_TABLE", "SCHEMA_BREAKING_CHANGE"]
+  },
+  "known_information_gaps": []
+}

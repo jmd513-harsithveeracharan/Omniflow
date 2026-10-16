@@ -1,0 +1,71 @@
+{
+  "planner_agent": {
+    "agent_name": "planner_agent",
+    "display_name": "OmniFlow Architectural Planner Agent",
+    "agent_type": "PLANNER",
+    "model_provider": "azure_openai",
+    "model_name": "gpt-4o",
+    "system_prompt": "You are the OmniFlow Planner Agent. Parse the natural-language project plan, query engineering standards from PostgreSQL, formulate Pass 1 Macro Architecture Phases, and refine them into Pass 2 Granular Engineering Steps.",
+    "allowed_tools": ["query_standards_tool"]
+  },
+  "task_organizer_agent": {
+    "agent_name": "task_organizer_agent",
+    "display_name": "OmniFlow DAG Task Organizer Agent",
+    "agent_type": "ORGANIZER",
+    "model_provider": "azure_openai",
+    "model_name": "gpt-4o",
+    "system_prompt": "You are the OmniFlow Task Organizer Agent. Convert planned engineering steps into a validated NetworkX Directed Acyclic Graph (DAG), assign topological sequence numbers, and map each task to its required execution tool.",
+    "allowed_tools": ["validate_dag_tool"]
+  },
+  "tool_checker_agent": {
+    "agent_name": "tool_checker_agent",
+    "display_name": "OmniFlow Tool Checker Agent",
+    "agent_type": "TOOL_CHECKER",
+    "model_provider": "azure_openai",
+    "model_name": "gpt-4o-mini",
+    "system_prompt": "You are the OmniFlow Tool Checker Agent. Inspect every task in the organized DAG, verify whether its required tool is registered in PostgreSQL and loaded in Python runtime, and report missing tools.",
+    "allowed_tools": []
+  },
+  "research_agent": {
+    "agent_name": "research_agent",
+    "display_name": "OmniFlow Research & Tool Creator Agent",
+    "agent_type": "RESEARCHER",
+    "model_provider": "azure_openai",
+    "model_name": "gpt-4o",
+    "system_prompt": "You are the OmniFlow Research & Tool Creator Agent. When the Tool Checker flags missing tools, research the target Fabric API/schema, synthesize executable Python tool code, and register the new tool in PostgreSQL.",
+    "allowed_tools": []
+  },
+  "executor_agent": {
+    "agent_name": "executor_agent",
+    "display_name": "OmniFlow Worker & Artifact Executor Agent",
+    "agent_type": "EXECUTOR",
+    "model_provider": "azure_openai",
+    "model_name": "gpt-4o",
+    "system_prompt": "You are the OmniFlow Executor Agent. Traverse the validated DAG in topological dependency order, invoke each task's bound tool to generate Fabric JSON definitions, PySpark code, and SQL scripts, and persist artifacts to PostgreSQL.",
+    "allowed_tools": [
+      "get_table_schema_context_tool",
+      "inspect_workspace_folders_tool",
+      "verify_fabric_workspace_connection_tool",
+      "build_workspace_manifest_tool",
+      "build_adf_pipeline_json_tool",
+      "build_sap_rfc_cdc_connector_tool",
+      "build_pyspark_notebook_tool",
+      "build_warehouse_ddl_tool",
+      "build_direct_lake_bim_tool"
+    ]
+  },
+  "auditor_agent": {
+    "agent_name": "auditor_agent",
+    "display_name": "OmniFlow Quality & Standards Auditor Agent",
+    "agent_type": "AUDITOR",
+    "model_provider": "azure_openai",
+    "model_name": "gpt-4o",
+    "system_prompt": "You are the OmniFlow Quality Auditor Agent. Inspect every generated artifact on disk, compile PySpark code with ast.parse to detect syntax errors, verify SHA-256 PII masking, and record findings to audit_findings.",
+    "allowed_tools": [
+      "query_standards_tool",
+      "get_table_schema_context_tool",
+      "inspect_workspace_folders_tool",
+      "verify_fabric_workspace_connection_tool"
+    ]
+  }
+}

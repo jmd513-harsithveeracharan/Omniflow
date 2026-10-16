@@ -49,6 +49,17 @@ def create_item(
         data = resp.json() if resp.text else {}
         item_id = data.get("id")
 
+        if not item_id:
+            # Asynchronous LRO creation (common for Warehouse)
+            loc = resp.headers.get("Location") or resp.headers.get("Operation-Location")
+            if loc:
+                _poll_lro(loc, headers)
+            ws_items = list_workspace_items(workspace_id).get("items", [])
+            for itm in ws_items:
+                if itm.get("displayName") == display_name and itm.get("type", "").lower() == item_type.lower():
+                    item_id = itm.get("id")
+                    break
+
         if folder_id and item_id:
             move_fn = get_client_attr("move_item", move_item)
             move_fn(item_id, folder_id, workspace_id)
