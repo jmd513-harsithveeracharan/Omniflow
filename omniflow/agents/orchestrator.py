@@ -88,18 +88,41 @@ class MultiAgentOrchestrator:
         if sources:
             for s in sources:
                 source_labels.append(s.get("source_name", "Source System"))
-                for tbl in s.get("tables", []):
-                    tname = tbl.get("table_name")
-                    pk = tbl.get("primary_key", "id")
-                    wm = tbl.get("watermark_column", "updated_at")
-                    cols = tbl.get("columns", [])
-                    t_pii = [c.get("name") for c in cols if c.get("is_pii")]
+                raw_tables = s.get("tables", [])
+                for tbl in raw_tables:
+                    if isinstance(tbl, str):
+                        tname = tbl
+                        tbl_dict: dict[str, Any] = {}
+                    else:
+                        tname = tbl.get("table_name", "entity")
+                        tbl_dict = tbl
+
+                    pk = tbl_dict.get("primary_key") or f"{tname.rstrip('s')}_id"
+                    wm = tbl_dict.get("watermark_column", "updated_at")
+                    cols = tbl_dict.get("columns", [])
+
+                    # Auto-resolve schema if user did not manually type columns
+                    if not cols:
+                        try:
+                            from omniflow.db.catalog_seeder import get_table_schema_context_from_db
+                            sc = get_table_schema_context_from_db([tname])
+                            if sc:
+                                cols = sc[0].get("columns", [])
+                                pk = sc[0].get("primary_key", pk)
+                                wm = sc[0].get("watermark_column", wm)
+                        except Exception:
+                            pass
+
+                    t_pii = [c.get("name") for c in cols if c.get("is_pii")] if cols else []
+                    if not t_pii and tbl_dict.get("pii_columns"):
+                        t_pii = tbl_dict.get("pii_columns")
+
                     pii_detected.extend(t_pii)
                     tables_meta[tname] = {
                         "primary_key": pk,
                         "watermark": wm,
                         "columns": cols,
-                        "row_count": tbl.get("row_count", 25000),
+                        "row_count": tbl_dict.get("row_count", 25000),
                         "pii_columns": t_pii,
                     }
         else:
@@ -236,6 +259,29 @@ class MultiAgentOrchestrator:
             item_display = f"{dep.get('item_type')}: {dep.get('display_name')}"
             status_label = "Active" if dep.get("already_existed") else "Provisioned"
             ui.check_item(item_display, status_label, f"ID: {dep.get('item_id')}")
+            # Record deployed item in fabric_items table
+            try:
+                self.db_logger.record_fabric_item(
+                    item_name=dep.get("display_name", ""),
+                    item_type=dep.get("item_type", ""),
+                    fabric_item_id=dep.get("item_id"),
+                    status="active",
+                )
+            except Exception:
+                pass
+
+        # Record blast zone impact, episodic memory, and final checkpoints
+        try:
+            self.db_logger.record_blast_zone_impact(project_id, table_names, risk_score=15)
+            self.db_logger.record_project_memory(
+                project_id=project_id,
+                title="Medallion Cloud Deployment Complete",
+                content=f"Successfully provisioned Medallion data platform in Microsoft Fabric inside AI_Test_Folder. Audit score: {audit_res['compliance_score_pct']}%.",
+                run_id=run_id,
+            )
+            self.db_logger.record_session_checkpoint(5, "deployment_complete", {"status": "completed", "artifacts": len(exec_out.artifacts_created)})
+        except Exception:
+            pass
 
         ui.divider()
 

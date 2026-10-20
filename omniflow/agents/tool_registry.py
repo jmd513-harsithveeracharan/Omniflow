@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from typing import Any
 import uuid
 import networkx as nx
@@ -35,6 +36,39 @@ def deploy_fabric_item_tool(
 def verify_fabric_workspace_connection_tool(workspace_id: str | None = None) -> dict[str, Any]:
     """Checks live Microsoft Fabric REST API connectivity using the active Azure CLI token."""
     return verify_fabric_workspace_connection(workspace_id)
+
+
+def execute_metadata_query_tool(query: str) -> dict[str, Any]:
+    """AI Dynamic Exploration Tool: Executes a read-only SQL query against the Neon PostgreSQL metadata catalog.
+    Enables the AI to inspect tables, columns, standards, ADRs, relationships, and runs freely at any phase.
+    """
+    clean_q = query.strip()
+    upper_q = clean_q.upper()
+    if not (upper_q.startswith("SELECT") or upper_q.startswith("WITH")):
+        return {"success": False, "error": "Only read-only SELECT or WITH statements are allowed."}
+
+    disallowed = ["DROP", "DELETE", "TRUNCATE", "ALTER", "UPDATE", "INSERT", "GRANT", "REVOKE"]
+    for word in disallowed:
+        if re.search(rf"\b{word}\b", upper_q):
+            return {"success": False, "error": f"Destructive or mutating SQL keyword '{word}' is blocked."}
+
+    try:
+        with psycopg2.connect(NEON_URI, connect_timeout=8) as conn, conn.cursor() as cur:
+            cur.execute(clean_q)
+            if not cur.description:
+                return {"success": True, "columns": [], "rows": [], "row_count": 0}
+            columns = [desc[0] for desc in cur.description]
+            raw_rows = cur.fetchall()
+            rows = [dict(zip(columns, r)) for r in raw_rows]
+            return {
+                "success": True,
+                "columns": columns,
+                "rows": rows[:100],  # safety cap
+                "row_count": len(rows),
+                "truncated": len(rows) > 100,
+            }
+    except Exception as e:
+        return {"success": False, "error": str(e)}
 
 
 
@@ -632,11 +666,17 @@ def record_lineage_graph_tool(
             for edge in lineage_data["edges"]:
                 cur.execute(
                     """
-                    INSERT INTO lineage_graph_edges (edge_id, from_node, to_node, relationship_type, metadata, created_at)
-                    VALUES (%s, %s, %s, %s, %s, NOW())
+                    INSERT INTO lineage_graph_edges
+                        (edge_id, transformation_type, transformation_logic, column_mapping_json, is_active, created_at)
+                    VALUES (%s, %s, %s, %s, true, NOW())
                     ON CONFLICT DO NOTHING;
                     """,
-                    (str(uuid.uuid4()), edge["from"], edge["to"], edge["rel"], Json({"project_code": project_code})),
+                    (
+                        str(uuid.uuid4()),
+                        edge.get("rel", "TRANSFORMS"),
+                        f"{edge['from']} -> {edge['to']}",
+                        Json({"from": edge["from"], "to": edge["to"], "project_code": project_code}),
+                    ),
                 )
             conn.commit()
     except Exception:

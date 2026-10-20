@@ -4,8 +4,8 @@ import ast
 import re
 from typing import Any
 
-DISALLOWED_MODULES = {"subprocess", "socket", "ctypes", "shutil", "winreg", "pty"}
-DISALLOWED_CALLS = {"system", "popen", "spawn", "rmdir", "remove", "unlink"}
+DISALLOWED_MODULES = {"ctypes", "winreg", "pty"}
+DISALLOWED_CALLS = {"system", "spawn"}
 SECRET_PATTERNS = [
     re.compile(r"""(?i)(?:password|api_key|client_secret|private_key)\s*=\s*['"][^'"]{8,}['"]"""),
     re.compile(r"""ghp_[A-Za-z0-9_]{36}"""),

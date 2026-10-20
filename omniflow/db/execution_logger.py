@@ -247,6 +247,94 @@ class ExecutionDatabaseLogger:
             conn.commit()
         return artifact_id
 
+    def record_fabric_item(
+        self,
+        item_name: str,
+        item_type: str,
+        fabric_item_id: str | None,
+        layer: str = "curated",
+        status: str = "active",
+        definition: dict[str, Any] | None = None,
+    ) -> None:
+        """Persists deployed Microsoft Fabric items into the fabric_items table."""
+        with self._connect() as conn, conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO fabric_items
+                    (item_id, item_name, item_type, fabric_item_id, layer, status, definition, created_at, updated_at)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, NOW(), NOW());
+                """,
+                (str(uuid.uuid4()), item_name, item_type, fabric_item_id, layer, status, Json(definition or {})),
+            )
+            conn.commit()
+
+    def record_blast_zone_impact(
+        self,
+        project_id: str | None,
+        impacted_tables: list[str],
+        risk_score: int = 15,
+        action: str = "MEDALLION_PROMOTION",
+    ) -> str:
+        """Logs downstream impact blast-zone reach in blast_zone_impacts table."""
+        impact_id = str(uuid.uuid4())
+        with self._connect() as conn, conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO blast_zone_impacts
+                    (impact_id, project_id, mutation_action, risk_score, impacted_downstream_tables,
+                     requires_human_approval, computed_at)
+                VALUES (%s, %s, %s, %s, %s, false, NOW());
+                """,
+                (impact_id, project_id, action, risk_score, impacted_tables),
+            )
+            conn.commit()
+        return impact_id
+
+    def record_project_memory(
+        self,
+        project_id: str,
+        title: str,
+        content: str,
+        run_id: str,
+        memory_type: str = "RUN_COMPLETION",
+        importance: int = 5,
+    ) -> str:
+        """Records episodic learnings and run summaries in project_memory table."""
+        mem_id = str(uuid.uuid4())
+        with self._connect() as conn, conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO project_memory
+                    (memory_id, project_id, memory_type, title, content, importance, confidence,
+                     source_run_id, status, created_at, updated_at)
+                VALUES (%s, %s, %s, %s, %s, %s, 1.0, %s, 'ACTIVE', NOW(), NOW());
+                """,
+                (mem_id, project_id, memory_type, title, content, importance, run_id),
+            )
+            conn.commit()
+        return mem_id
+
+    def record_session_checkpoint(
+        self,
+        step: int,
+        active_agent: str,
+        snapshot: dict[str, Any],
+    ) -> str:
+        """Records durable session checkpoints across agent stages."""
+        chk_id = str(uuid.uuid4())
+        with self._connect() as conn, conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO session_checkpoints
+                    (checkpoint_id, checkpoint_step, active_agent, state_snapshot,
+                     human_approval_required, created_at)
+                VALUES (%s, %s, %s, %s, false, NOW());
+                """,
+                (chk_id, step, active_agent, Json(snapshot)),
+            )
+            conn.commit()
+        return chk_id
+
     def fetch_run_verification_stats(self, run_id: str) -> dict[str, Any]:
         """Queries PostgreSQL to verify all records persisted for the given run_id."""
         with self._connect() as conn, conn.cursor() as cur:

@@ -106,6 +106,15 @@ CORE_AGENTS: list[dict[str, Any]] = [
 
 BASE_TOOLS: list[dict[str, Any]] = [
     {
+        "tool_name": "execute_metadata_query_tool",
+        "display_name": "PostgreSQL Dynamic SQL Metadata Explorer",
+        "description": "Executes dynamic, read-only SQL SELECT queries against Neon PostgreSQL metadata catalog, standards, and memory.",
+        "endpoint": "omniflow.agents.tool_registry.execute_metadata_query_tool",
+        "input_schema": {"type": "object", "properties": {"query": {"type": "string"}}, "required": ["query"]},
+        "output_schema": {"type": "object", "properties": {"columns": {"type": "array"}, "rows": {"type": "array"}}},
+        "agents": ["planner_agent", "executor_agent", "auditor_agent"],
+    },
+    {
         "tool_name": "query_standards_tool",
         "display_name": "PostgreSQL Engineering Standards Query Tool",
         "description": "Fetches active architecture and governance rules from the engineering_standards table.",
