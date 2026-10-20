@@ -53,7 +53,11 @@ def create_item(
     )
 
     if resp.status_code in (200, 201, 202):
-        data = resp.json() if resp.text else {}
+        try:
+            data = resp.json() if (resp.text and resp.text.strip() != "null") else {}
+        except Exception:
+            data = {}
+        data = data or {}
         item_id = data.get("id")
 
         if not item_id:
