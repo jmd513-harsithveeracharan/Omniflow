@@ -61,3 +61,8 @@ omniflow.zip
 omniflow/generated_artifacts/
 omniflow/test_run_result.json
 omniflow/agents/synthesized_tools.py
+
+*.xlsx
+database_design/
+database_migrations/
+fabric_workspace/
