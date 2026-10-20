@@ -10,6 +10,7 @@ into the AI_Test_Folder containment hierarchy.
 from __future__ import annotations
 
 import os
+import re
 import sys
 from typing import Any
 
@@ -64,6 +65,10 @@ def deploy_fabric_item(
 ) -> dict[str, Any]:
     """Single generic Microsoft Fabric REST API tool: provisions ANY item type."""
     ws_id = workspace_id or ALLOWED_WORKSPACE_ID
+    # Sanitize item name: Microsoft Fabric artifact names only allow alphanumeric and underscores
+    clean_name = re.sub(r"[^a-zA-Z0-9_]", "_", display_name)
+    clean_name = re.sub(r"_+", "_", clean_name).strip("_")
+    display_name = clean_name or display_name
     try:
         if definition and definition.get("parts"):
             res = provision_item_with_definition(
@@ -115,6 +120,9 @@ def deploy_medallion_architecture_to_fabric(
     5. Ingestion Pipeline (pl_<domain>_bronze_ingest)
     """
     ws_id = workspace_id or ALLOWED_WORKSPACE_ID
+    clean_domain = re.sub(r"[^a-zA-Z0-9_]", "_", domain)
+    clean_domain = re.sub(r"_+", "_", clean_domain).strip("_")
+    domain = clean_domain or "enterprise"
     results: dict[str, Any] = {"folder": None, "deployed_items": []}
 
     # 1. Resolve or create AI_Test_Folder

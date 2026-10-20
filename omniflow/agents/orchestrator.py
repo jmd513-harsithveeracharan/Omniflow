@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import sys
 from typing import Any
 
@@ -77,8 +78,12 @@ class MultiAgentOrchestrator:
 
         proj_name = req.project_name if req else p_summary.get("project_name", "Enterprise Autonomous Data Platform")
         bus_domain = p_summary.get("business_domain", "Operational Analytics")
-        domain_key = bus_domain.lower().replace(" ", "_").replace("-", "_")[:14]
-        proj_code = req.project_code if req else f"PRJ-{domain_key.upper().replace('_', '-')}"
+        intake_proj_code = p_summary.get("project_code")
+        clean_domain = re.sub(r"[^a-zA-Z0-9]", "_", bus_domain.lower())
+        clean_domain = re.sub(r"_+", "_", clean_domain).strip("_")[:16]
+        domain_key = clean_domain or "enterprise"
+        proj_code = req.project_code if req else (intake_proj_code or f"PRJ-{domain_key.upper().replace('_', '-')}")
+        proj_code = re.sub(r"[^a-zA-Z0-9_\-]", "", proj_code)
 
         tables_meta: dict[str, Any] = {}
         pii_detected: list[str] = []
@@ -307,8 +312,11 @@ class MultiAgentOrchestrator:
             },
         )
 
-        db_audit = self.db_logger.fetch_run_verification_stats(run_id)
-        final_bundle["postgres_verification"] = db_audit
+        try:
+            db_audit = self.db_logger.fetch_run_verification_stats(run_id)
+            final_bundle["postgres_verification"] = db_audit
+        except Exception as e:
+            final_bundle["postgres_verification"] = {"notice": f"Audit query notice: {e}"}
 
         # Executive completion summary
         ui.complete(run_id=run_id, artifact_path=artifacts_dir, live_deployed=True)

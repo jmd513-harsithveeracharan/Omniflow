@@ -4,6 +4,7 @@ app/fabric/items.py
 Item lifecycle and Base64 definition management in Microsoft Fabric.
 """
 
+import re
 import time
 from app.config import ALLOWED_WORKSPACE_ID, ALLOWED_WORKSPACE_NAME
 from app.fabric.core import (
@@ -29,6 +30,12 @@ def create_item(
     Returns {success, item_id, data} or {success: False, error}.
     """
     _assert_workspace(workspace_id)
+
+    # Sanitize item name: Microsoft Fabric artifact names only allow alphanumeric, underscores, and hyphens
+    clean_name = re.sub(r"[^a-zA-Z0-9_\- ]", "_", display_name)
+    clean_name = re.sub(r"_+", "_", clean_name).strip("_")
+    display_name = clean_name or display_name
+
     req = get_requests()
     headers = get_auth_headers()
 

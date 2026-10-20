@@ -374,28 +374,6 @@ class ExecutionDatabaseLogger:
             pass
         return log_id
 
-
-def log_llm_tokens(
-    model_name: str,
-    prompt_tokens: int,
-    completion_tokens: int,
-    agent_name: str = "llm_router",
-    run_id: str | None = None,
-    project_id: str | None = None,
-) -> None:
-    """Convenience helper to record token consumption from anywhere in the codebase."""
-    try:
-        ExecutionDatabaseLogger().record_token_usage(
-            model_name=model_name,
-            prompt_tokens=prompt_tokens,
-            completion_tokens=completion_tokens,
-            agent_name=agent_name,
-            run_id=run_id,
-            project_id=project_id,
-        )
-    except Exception:
-        pass
-
     def fetch_run_verification_stats(self, run_id: str) -> dict[str, Any]:
         """Queries PostgreSQL to verify all records persisted for the given run_id."""
         with self._connect() as conn, conn.cursor() as cur:
@@ -431,3 +409,26 @@ def log_llm_tokens(
                 "active_tools_in_registry": active_tools_total,
                 "active_agents_in_registry": active_agents,
             }
+
+
+def log_llm_tokens(
+    model_name: str,
+    prompt_tokens: int,
+    completion_tokens: int,
+    agent_name: str = "llm_router",
+    run_id: str | None = None,
+    project_id: str | None = None,
+) -> None:
+    """Convenience helper to record token consumption from anywhere in the codebase."""
+    try:
+        ExecutionDatabaseLogger().record_token_usage(
+            model_name=model_name,
+            prompt_tokens=prompt_tokens,
+            completion_tokens=completion_tokens,
+            agent_name=agent_name,
+            run_id=run_id,
+            project_id=project_id,
+        )
+    except Exception:
+        pass
+
