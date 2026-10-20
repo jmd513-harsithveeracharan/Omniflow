@@ -335,6 +335,67 @@ class ExecutionDatabaseLogger:
             conn.commit()
         return chk_id
 
+    def record_token_usage(
+        self,
+        model_name: str,
+        prompt_tokens: int,
+        completion_tokens: int,
+        agent_name: str = "agent",
+        run_id: str | None = None,
+        project_id: str | None = None,
+        cached_tokens: int = 0,
+        cost_usd: float = 0.0,
+    ) -> str:
+        """Persists LLM token consumption into the llm_token_logs table."""
+        log_id = str(uuid.uuid4())
+        try:
+            with self._connect() as conn, conn.cursor() as cur:
+                cur.execute(
+                    """
+                    INSERT INTO llm_token_logs
+                        (log_id, project_id, run_id, model_name, agent_name, prompt_tokens,
+                         completion_tokens, cached_tokens, total_cost_usd, created_at)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, NOW());
+                    """,
+                    (
+                        log_id,
+                        project_id,
+                        run_id,
+                        model_name,
+                        agent_name,
+                        prompt_tokens,
+                        completion_tokens,
+                        cached_tokens,
+                        cost_usd,
+                    ),
+                )
+                conn.commit()
+        except Exception:
+            pass
+        return log_id
+
+
+def log_llm_tokens(
+    model_name: str,
+    prompt_tokens: int,
+    completion_tokens: int,
+    agent_name: str = "llm_router",
+    run_id: str | None = None,
+    project_id: str | None = None,
+) -> None:
+    """Convenience helper to record token consumption from anywhere in the codebase."""
+    try:
+        ExecutionDatabaseLogger().record_token_usage(
+            model_name=model_name,
+            prompt_tokens=prompt_tokens,
+            completion_tokens=completion_tokens,
+            agent_name=agent_name,
+            run_id=run_id,
+            project_id=project_id,
+        )
+    except Exception:
+        pass
+
     def fetch_run_verification_stats(self, run_id: str) -> dict[str, Any]:
         """Queries PostgreSQL to verify all records persisted for the given run_id."""
         with self._connect() as conn, conn.cursor() as cur:

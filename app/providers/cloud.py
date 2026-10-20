@@ -96,6 +96,18 @@ def _call_azure_openai(messages: list, model: str | None = None, max_tokens: int
 
     resp.raise_for_status()
     data = resp.json()
+    usage = data.get("usage") or {}
+    if usage:
+        try:
+            from omniflow.db.execution_logger import log_llm_tokens
+            log_llm_tokens(
+                model_name=deployment,
+                prompt_tokens=usage.get("prompt_tokens", 0),
+                completion_tokens=usage.get("completion_tokens", 0),
+                agent_name="azure_openai_router",
+            )
+        except Exception:
+            pass
     return data["choices"][0]["message"]["content"]
 
 
