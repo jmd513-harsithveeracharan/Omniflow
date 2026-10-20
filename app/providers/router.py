@@ -51,8 +51,25 @@ def chat(
         try:
             result = fn()
             dur_ms = (time.perf_counter() - t0) * 1000.0
-            print(f"[LLM] Response from {name} ({complexity} complexity, {effort} effort, session={session_id or 'none'}).")
             prov, mdl = _parse_provider_and_model(name, target_model)
+
+            # High-visibility structured LLM execution insight
+            last_prompt_text = ""
+            if messages:
+                raw_content = messages[-1].get("content", "")
+                first_line = raw_content.strip().split("\n")[0][:85]
+                last_prompt_text = first_line
+
+            summary_preview = ""
+            if result:
+                clean_res_lines = [l.strip() for l in result.strip().split("\n") if l.strip()]
+                summary_preview = clean_res_lines[0][:85] if clean_res_lines else "Completed"
+
+            print(f"  ↳ [LLM: {mdl}] {int(dur_ms)}ms | {complexity.upper()}")
+            if last_prompt_text:
+                print(f"    • Prompt : {last_prompt_text}...")
+            if summary_preview:
+                print(f"    • Output : {summary_preview}...")
             try:
                 from app.token_tracker import record_token_usage
                 record_token_usage(
