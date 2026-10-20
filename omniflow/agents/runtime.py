@@ -566,10 +566,28 @@ You MUST respond ONLY with a single valid JSON object matching this exact schema
 
         for task in dag.tasks:
             file_path = os.path.join(output_dir, task.target_artifact_name)
-            # Smart resume: if artifact exists and has content, reuse it without re-calling LLM
-            if resume and os.path.exists(file_path) and os.path.getsize(file_path) > 0:
+            existing_candidate = None
+
+            # 1. Exact filename match
+            if os.path.exists(file_path) and os.path.getsize(file_path) > 0:
+                existing_candidate = file_path
+            # 2. Semantic prefix & extension match (e.g., '03_' and '.py') to match regardless of slight naming differences
+            elif resume and os.path.exists(output_dir):
+                step_prefix = task.target_artifact_name[:3]  # e.g., "01_", "02_", "03_"
+                ext = os.path.splitext(task.target_artifact_name)[1].lower()
+                for fname in os.listdir(output_dir):
+                    if fname.startswith(step_prefix) and fname.lower().endswith(ext):
+                        cand_path = os.path.join(output_dir, fname)
+                        if os.path.getsize(cand_path) > 0:
+                            existing_candidate = cand_path
+                            task.target_artifact_name = fname
+                            file_path = cand_path
+                            break
+
+            # Smart resume: if candidate artifact exists and has content, reuse it without re-calling LLM
+            if resume and existing_candidate:
                 try:
-                    with open(file_path, "r", encoding="utf-8") as f:
+                    with open(existing_candidate, "r", encoding="utf-8") as f:
                         content_str = f.read()
                     raw_bytes = content_str.encode("utf-8")
                     definition_obj = {}
@@ -592,7 +610,7 @@ You MUST respond ONLY with a single valid JSON object matching this exact schema
                         output_data={
                             "artifact_id": artifact_id,
                             "artifact_name": task.target_artifact_name,
-                            "file_path": file_path,
+                            "file_path": existing_candidate,
                             "sha256": def_hash,
                             "cached": True,
                         },
@@ -606,7 +624,7 @@ You MUST respond ONLY with a single valid JSON object matching this exact schema
                             artifact_name=task.target_artifact_name,
                             artifact_type=task.artifact_type,
                             tool_used="cache_reuse",
-                            file_path=file_path,
+                            file_path=existing_candidate,
                             definition_hash=def_hash,
                             execution_time_ms=5,
                             status="completed",
