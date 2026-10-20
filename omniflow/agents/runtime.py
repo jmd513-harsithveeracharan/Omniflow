@@ -550,7 +550,7 @@ You MUST respond ONLY with a single valid JSON object matching this exact schema
         )
         return output
 
-    def run_executor(self, dag: OrganizerDAGOutput, run_id: str, output_dir: str) -> ExecutorAgentOutput:
+    def run_executor(self, dag: OrganizerDAGOutput, run_id: str, output_dir: str, resume: bool = False) -> ExecutorAgentOutput:
         """Executes all DAG tasks in topological order, writes files + PostgreSQL artifacts/tool_runs."""
         self.reload_from_db()
         os.makedirs(output_dir, exist_ok=True)
@@ -565,6 +565,57 @@ You MUST respond ONLY with a single valid JSON object matching this exact schema
         )
 
         for task in dag.tasks:
+            file_path = os.path.join(output_dir, task.target_artifact_name)
+            # Smart resume: if artifact exists and has content, reuse it without re-calling LLM
+            if resume and os.path.exists(file_path) and os.path.getsize(file_path) > 0:
+                try:
+                    with open(file_path, "r", encoding="utf-8") as f:
+                        content_str = f.read()
+                    raw_bytes = content_str.encode("utf-8")
+                    definition_obj = {}
+                    if task.target_artifact_name.endswith(".json"):
+                        try:
+                            definition_obj = json.loads(content_str)
+                        except Exception:
+                            definition_obj = {}
+                    def_hash = hashlib.sha256(raw_bytes).hexdigest()
+                    artifact_id = self.db_logger.insert_artifact(
+                        run_id=run_id,
+                        task_id=task.task_id,
+                        artifact_type=task.artifact_type,
+                        artifact_name=task.target_artifact_name,
+                        definition=definition_obj,
+                        definition_hash=def_hash,
+                    )
+                    self.db_logger.complete_dag_task(
+                        task_id=task.task_id,
+                        output_data={
+                            "artifact_id": artifact_id,
+                            "artifact_name": task.target_artifact_name,
+                            "file_path": file_path,
+                            "sha256": def_hash,
+                            "cached": True,
+                        },
+                        status="completed",
+                    )
+                    created_artifacts.append(
+                        ExecutedArtifactItem(
+                            artifact_id=artifact_id,
+                            task_id=task.task_id,
+                            step_code=task.step_code,
+                            artifact_name=task.target_artifact_name,
+                            artifact_type=task.artifact_type,
+                            tool_used="cache_reuse",
+                            file_path=file_path,
+                            definition_hash=def_hash,
+                            execution_time_ms=5,
+                            status="completed",
+                        )
+                    )
+                    continue
+                except Exception:
+                    pass
+
             t0 = time.perf_counter()
             tool_res = self.execute_tool_call(task.required_tool, task.parameters, agent_run_id=agent_run_id)
             elapsed_ms = max(1, int((time.perf_counter() - t0) * 1000))

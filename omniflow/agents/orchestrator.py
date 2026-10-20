@@ -48,6 +48,7 @@ class MultiAgentOrchestrator:
         self,
         req: NaturalLanguagePlanRequest | None = None,
         intake_file: str | None = None,
+        resume: bool = False,
     ) -> dict[str, Any]:
         # Reset and sync core agent registry in Neon PostgreSQL
         reset_tools = req.reset_synthesized_tools if req else True
@@ -221,11 +222,12 @@ class MultiAgentOrchestrator:
             "generated_artifacts",
             req.project_code,
         )
-        exec_out = executor.run_executor(dag_out, run_id, artifacts_dir)
+        exec_out = executor.run_executor(dag_out, run_id, artifacts_dir, resume=resume)
 
         pyspark_code = None
         for art in exec_out.artifacts_created:
-            ui.check_item(art.artifact_name, "Generated", f"{art.execution_time_ms} ms")
+            status_tag = "Cached" if art.tool_used == "cache_reuse" else "Generated"
+            ui.check_item(art.artifact_name, status_tag, f"{art.execution_time_ms} ms")
             if art.artifact_name.endswith(".py") and "curate" in art.artifact_name:
                 p_file = os.path.join(artifacts_dir, art.artifact_name)
                 if os.path.exists(p_file):
