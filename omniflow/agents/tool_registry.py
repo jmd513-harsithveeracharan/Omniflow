@@ -73,32 +73,29 @@ def execute_metadata_query_tool(query: str) -> dict[str, Any]:
 
 
 def query_standards_tool(layer: str = "ALL") -> dict[str, Any]:
-    """Queries live engineering standards from Neon PostgreSQL engineering_standards table."""
-    with psycopg2.connect(NEON_URI, connect_timeout=8) as conn, conn.cursor() as cur:
-        if layer.upper() == "ALL":
-            cur.execute("SELECT standard_name, target_layer, rule_markdown FROM engineering_standards ORDER BY standard_name;")
-        else:
-            cur.execute("SELECT standard_name, target_layer, rule_markdown FROM engineering_standards WHERE target_layer IN (%s, 'ALL');", (layer.upper(),))
-        rows = cur.fetchall()
+    """Queries live engineering standards from Neon PostgreSQL via execute_metadata_query_tool."""
+    q = "SELECT standard_name, target_layer, rule_markdown FROM engineering_standards ORDER BY standard_name;"
+    if layer.upper() != "ALL":
+        q = f"SELECT standard_name, target_layer, rule_markdown FROM engineering_standards WHERE target_layer IN ('{layer.upper()}', 'ALL') ORDER BY standard_name;"
+    res = execute_metadata_query_tool(q)
+    rows = res.get("rows", [])
     return {
         "layer_filter": layer,
         "standards_count": len(rows),
-        "rules": [{"name": r[0], "layer": r[1], "rule": r[2]} for r in rows],
+        "rules": [{"name": r.get("standard_name"), "layer": r.get("target_layer"), "rule": r.get("rule_markdown")} for r in rows],
     }
 
 
 def search_database_catalog_tool(query: str = "ALL", domain: str = "ALL") -> dict[str, Any]:
-    """AI Context Tool: Discovers registered data sources and candidate tables from PostgreSQL catalog."""
-    with psycopg2.connect(NEON_URI, connect_timeout=8) as conn, conn.cursor() as cur:
-        cur.execute("SELECT source_name, source_type, system_name FROM data_sources WHERE status = 'active';")
-        sources = [{"source_name": r[0], "source_type": r[1], "system_name": r[2]} for r in cur.fetchall()]
-
-        cur.execute("SELECT table_name, layer, primary_key, watermark_column FROM tables WHERE status = 'active' ORDER BY table_name;")
-        tables = []
-        for r in cur.fetchall():
-            pk = r[2][0] if isinstance(r[2], (list, tuple)) and r[2] else (r[2] or "id")
-            tables.append({"table_name": r[0], "layer": r[1], "primary_key": pk, "watermark": r[3]})
-
+    """AI Context Tool: Discovers registered data sources and candidate tables via execute_metadata_query_tool."""
+    src_res = execute_metadata_query_tool("SELECT source_name, source_type, system_name FROM data_sources WHERE status = 'active';")
+    sources = src_res.get("rows", [])
+    tbl_res = execute_metadata_query_tool("SELECT table_name, layer, primary_key, watermark_column FROM tables WHERE status = 'active' ORDER BY table_name;")
+    tables = []
+    for r in tbl_res.get("rows", []):
+        pk = r.get("primary_key")
+        pk_val = pk[0] if isinstance(pk, (list, tuple)) and pk else (pk or "id")
+        tables.append({"table_name": r.get("table_name"), "layer": r.get("layer"), "primary_key": pk_val, "watermark": r.get("watermark_column")})
     return {
         "total_sources": len(sources),
         "data_sources": sources,
@@ -111,29 +108,28 @@ def search_database_catalog_tool(query: str = "ALL", domain: str = "ALL") -> dic
 def get_table_schema_and_lineage_tool(table_names: list[str]) -> dict[str, Any]:
     """AI Context Tool: Queries exact columns, data types, primary keys, PII sensitivity, and foreign keys."""
     schemas = get_table_schema_context_from_db(table_names, NEON_URI)
-    relationships = []
-    with psycopg2.connect(NEON_URI, connect_timeout=8) as conn, conn.cursor() as cur:
-        cur.execute(
-            """
-            SELECT pt.table_name, pc.column_name, ct.table_name, cc.column_name, r.relationship_type, r.cardinality
-            FROM relationships r
-            JOIN tables pt ON r.from_table_id = pt.table_id
-            JOIN columns pc ON r.from_column_id = pc.column_id
-            JOIN tables ct ON r.to_table_id = ct.table_id
-            JOIN columns cc ON r.to_column_id = cc.column_id
-            WHERE r.is_active = true;
-            """
-        )
-        for r in cur.fetchall():
-            relationships.append({
-                "from_table": r[0],
-                "from_column": r[1],
-                "to_table": r[2],
-                "to_column": r[3],
-                "type": r[4],
-                "cardinality": r[5],
-            })
-
+    rel_res = execute_metadata_query_tool(
+        """
+        SELECT pt.table_name, pc.column_name, ct.table_name, cc.column_name, r.relationship_type, r.cardinality
+        FROM relationships r
+        JOIN tables pt ON r.from_table_id = pt.table_id
+        JOIN columns pc ON r.from_column_id = pc.column_id
+        JOIN tables ct ON r.to_table_id = ct.table_id
+        JOIN columns cc ON r.to_column_id = cc.column_id
+        WHERE r.is_active = true;
+        """
+    )
+    relationships = [
+        {
+            "from_table": r.get("table_name"),
+            "from_column": r.get("column_name"),
+            "to_table": r.get("ct_table_name", r.get("table_name")),
+            "to_column": r.get("cc_column_name", r.get("column_name")),
+            "type": r.get("relationship_type"),
+            "cardinality": r.get("cardinality"),
+        }
+        for r in rel_res.get("rows", [])
+    ]
     return {
         "retrieved_tables_count": len(schemas),
         "schemas": schemas,
@@ -142,63 +138,60 @@ def get_table_schema_and_lineage_tool(table_names: list[str]) -> dict[str, Any]:
 
 
 def query_governance_and_compliance_policies_tool(project_code: str = "PRJ-GLOBAL-FIN-HUB") -> dict[str, Any]:
-    """AI Context Tool: Queries mandatory data governance policies and compliance standards from PostgreSQL."""
-    policies = []
-    with psycopg2.connect(NEON_URI, connect_timeout=8) as conn, conn.cursor() as cur:
-        cur.execute("SELECT policy_name, policy_type, description, rules_json, is_enforced FROM policies WHERE is_enforced = true;")
-        for r in cur.fetchall():
-            policies.append({
-                "policy_name": r[0],
-                "policy_type": r[1],
-                "description": r[2],
-                "rules": r[3],
-                "is_enforced": r[4],
-            })
+    """AI Context Tool: Queries mandatory data governance policies via execute_metadata_query_tool."""
+    res = execute_metadata_query_tool("SELECT policy_name, policy_type, description, rules_json, is_enforced FROM policies WHERE is_enforced = true;")
+    policies = [
+        {
+            "policy_name": r.get("policy_name"),
+            "policy_type": r.get("policy_type"),
+            "description": r.get("description"),
+            "rules": r.get("rules_json"),
+            "is_enforced": r.get("is_enforced"),
+        }
+        for r in res.get("rows", [])
+    ]
     return {"policies_count": len(policies), "policies": policies}
 
 
 def query_project_memory_and_decisions_tool(project_code: str = "PRJ-GLOBAL-FIN-HUB") -> dict[str, Any]:
-    """AI Context Tool: Queries previous Architectural Decisions (ADRs), constraints, and project memory."""
-    decisions = []
-    constraints = []
-    memory = []
-    with psycopg2.connect(NEON_URI, connect_timeout=8) as conn, conn.cursor() as cur:
-        cur.execute(
-            """
-            SELECT pd.decision_title, pd.decision, pd.reason, pd.decided_by
-            FROM project_decisions pd
-            JOIN projects p ON pd.project_id = p.project_id
-            WHERE p.project_code = %s AND pd.status = 'APPROVED';
-            """,
-            (project_code,),
-        )
-        for r in cur.fetchall():
-            decisions.append({"title": r[0], "decision": r[1], "reason": r[2], "decided_by": r[3]})
+    """AI Context Tool: Queries ADRs, constraints, and project memory via execute_metadata_query_tool."""
+    dec_res = execute_metadata_query_tool(
+        f"""
+        SELECT pd.decision_title, pd.decision, pd.reason, pd.decided_by
+        FROM project_decisions pd
+        JOIN projects p ON pd.project_id = p.project_id
+        WHERE p.project_code = '{project_code}' AND pd.status = 'APPROVED';
+        """
+    )
+    con_res = execute_metadata_query_tool(
+        f"""
+        SELECT pc.constraint_type, pc.description, pc.severity, pc.value
+        FROM project_constraints pc
+        JOIN projects p ON pc.project_id = p.project_id
+        WHERE p.project_code = '{project_code}' AND pc.is_active = true;
+        """
+    )
+    mem_res = execute_metadata_query_tool(
+        f"""
+        SELECT pm.memory_type, pm.title, pm.content, pm.importance
+        FROM project_memory pm
+        JOIN projects p ON pm.project_id = p.project_id
+        WHERE p.project_code = '{project_code}' AND pm.status = 'ACTIVE';
+        """
+    )
 
-        cur.execute(
-            """
-            SELECT pc.constraint_type, pc.description, pc.severity, pc.value
-            FROM project_constraints pc
-            JOIN projects p ON pc.project_id = p.project_id
-            WHERE p.project_code = %s AND pc.is_active = true;
-            """,
-            (project_code,),
-        )
-        for r in cur.fetchall():
-            constraints.append({"type": r[0], "description": r[1], "severity": r[2], "value": r[3]})
-
-        cur.execute(
-            """
-            SELECT pm.memory_type, pm.title, pm.content, pm.importance
-            FROM project_memory pm
-            JOIN projects p ON pm.project_id = p.project_id
-            WHERE p.project_code = %s AND pm.status = 'ACTIVE';
-            """,
-            (project_code,),
-        )
-        for r in cur.fetchall():
-            memory.append({"type": r[0], "title": r[1], "content": r[2], "importance": r[3]})
-
+    decisions = [
+        {"title": r.get("decision_title"), "decision": r.get("decision"), "reason": r.get("reason"), "decided_by": r.get("decided_by")}
+        for r in dec_res.get("rows", [])
+    ]
+    constraints = [
+        {"type": r.get("constraint_type"), "description": r.get("description"), "severity": r.get("severity"), "value": r.get("value")}
+        for r in con_res.get("rows", [])
+    ]
+    memory = [
+        {"type": r.get("memory_type"), "title": r.get("title"), "content": r.get("content"), "importance": r.get("importance")}
+        for r in mem_res.get("rows", [])
+    ]
     return {
         "decisions_count": len(decisions),
         "decisions": decisions,
@@ -207,6 +200,11 @@ def query_project_memory_and_decisions_tool(project_code: str = "PRJ-GLOBAL-FIN-
         "memory_count": len(memory),
         "memory": memory,
     }
+
+
+def get_table_schema_context_tool(table_names: list[str]) -> list[dict[str, Any]]:
+    """Legacy alias: queries Neon PostgreSQL catalog tables and columns via get_table_schema_and_lineage_tool."""
+    return get_table_schema_and_lineage_tool(table_names).get("schemas", [])
 
 
 def validate_dag_tool(steps: list[dict[str, Any]]) -> dict[str, Any]:
