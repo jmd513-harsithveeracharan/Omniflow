@@ -31,7 +31,6 @@ from app.api import (
     auth_router,
     connectors_router,
     governance_router,
-    omniflow_router,
     pipelines_router,
     skills_router,
     workflow_router,
@@ -82,7 +81,6 @@ app.include_router(connectors_router)
 app.include_router(workspaces_router)
 app.include_router(pipelines_router)
 app.include_router(governance_router)
-app.include_router(omniflow_router)
 
 
 
