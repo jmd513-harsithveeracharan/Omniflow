@@ -1,0 +1,155 @@
+{
+  "schema_version": "2.0",
+  "planner_type": "enterprise_data_engineering_planner",
+  "request_context": {
+    "run_id": null,
+    "project_id": null,
+    "user_id": "harsith.bheesetti@pelibiothermal.com",
+    "request_type": "new_end_to_end_data_engineering_solution",
+    "user_request": "Architect, provision, and deploy a complete Microsoft Fabric Medallion data engineering platform for our Order-to-Cash operational billing and sales transactions. Enforce Bronze raw batch ingestion, Silver Delta Lake deduplication with null-safe SHA-256 PII masking on customer contact details, a Gold Kimball star schema warehouse with surrogate keys, an analytical Direct Lake Power BI model, and an automated PySpark Data Quality reconciliation suite.",
+    "priority": "high",
+    "planning_mode": "autonomous_create"
+  },
+  "project_context": {
+    "project_summary": {
+      "project_name": "Order-to-Cash Revenue Platform",
+      "business_domain": "Commercial Revenue & Order-to-Cash Operations",
+      "business_objective": "Consolidate operational sales orders, line items, customer master accounts, and billing invoices into Microsoft Fabric OneLake Medallion architecture with automated quality reconciliation and sub-second Direct Lake Power BI reporting.",
+      "business_context": "Disparate transaction and billing databases currently cause delayed month-end revenue recognition, manual reconciliation variances, and unmasked customer PII exposure."
+    },
+    "platform_summary": {
+      "target_platform": "Microsoft Fabric",
+      "target_environment": "DEV",
+      "capacity_sku": "F64",
+      "primary_language": "PySpark / T-SQL",
+      "containment_folder": null
+    },
+    "solution_summary": {
+      "requirement": "Ingest operational O2C entities into Bronze lakehouse, curate with null-safe SHA-256 PII masking and Delta Lake ACID MERGE in Silver, construct Kimball dimensional warehouse star schema in Gold, bind Direct Lake semantic model, and execute automated data quality reconciliation tests.",
+      "expected_deliverables": [
+        "01_workspace_manifest.json",
+        "02_pl_raw_batch_ingest.json",
+        "03_nb_curated_pii_merge.py",
+        "04_warehouse_star_schema_ddl.sql",
+        "05_sm_direct_lake_model.bim.json",
+        "06_dq_reconciliation_suite.py",
+        "07_lineage_graph.json"
+      ],
+      "success_criteria": [
+        "Source-to-target row count reconciliation variance < 0.5%",
+        "100% of sensitive PII columns masked via null-safe SHA-256",
+        "Zero circular DAG dependencies (Acyclic NetworkX graph)",
+        "Delta Lake ACID MERGE upsert on primary keys with Z-Order compaction",
+        "100% Python AST syntax validation passing on PySpark notebooks",
+        "Kimball star schema surrogate keys (_sk) and SCD2 audit tracking in Gold",
+        "All cloud resources provisioned in Microsoft Fabric workspace according to project architecture"
+      ]
+    }
+  },
+  "retrieved_context": {
+    "data_sources": [
+      {
+        "source_name": "Commercial Commerce & Billing System",
+        "source_type": "Relational_DB",
+        "system_name": "o2c_operational_core",
+        "database_name": "o2c_billing_db",
+        "authentication_type": "Managed_Identity",
+        "tables": [
+          {
+            "table_name": "orders",
+            "description": "Commercial purchase orders and transaction headers",
+            "layer": "Bronze",
+            "primary_key": "order_id",
+            "watermark_column": "updated_at",
+            "is_incremental": true,
+            "columns": [
+              {"name": "order_id", "data_type": "BIGINT", "is_primary_key": true, "is_pii": false, "is_business_key": true, "is_nullable": false},
+              {"name": "customer_id", "data_type": "BIGINT", "is_primary_key": false, "is_pii": false, "is_business_key": false, "is_nullable": false},
+              {"name": "order_date", "data_type": "DATE", "is_primary_key": false, "is_pii": false, "is_business_key": false, "is_nullable": false},
+              {"name": "order_status", "data_type": "VARCHAR(32)", "is_primary_key": false, "is_pii": false, "is_business_key": false, "is_nullable": false},
+              {"name": "currency_code", "data_type": "VARCHAR(3)", "is_primary_key": false, "is_pii": false, "is_business_key": false, "is_nullable": false},
+              {"name": "total_amount", "data_type": "DECIMAL(18,2)", "is_primary_key": false, "is_pii": false, "is_business_key": false, "is_nullable": false},
+              {"name": "created_at", "data_type": "TIMESTAMPTZ", "is_primary_key": false, "is_pii": false, "is_business_key": false, "is_nullable": false},
+              {"name": "updated_at", "data_type": "TIMESTAMPTZ", "is_primary_key": false, "is_pii": false, "is_business_key": false, "is_nullable": false}
+            ]
+          },
+          {
+            "table_name": "order_items",
+            "description": "Order line item details, quantities, unit prices, and discounts",
+            "layer": "Bronze",
+            "primary_key": "order_item_id",
+            "watermark_column": "updated_at",
+            "is_incremental": true,
+            "columns": [
+              {"name": "order_item_id", "data_type": "BIGINT", "is_primary_key": true, "is_pii": false, "is_business_key": true, "is_nullable": false},
+              {"name": "order_id", "data_type": "BIGINT", "is_primary_key": false, "is_pii": false, "is_business_key": false, "is_nullable": false},
+              {"name": "product_id", "data_type": "BIGINT", "is_primary_key": false, "is_pii": false, "is_business_key": false, "is_nullable": false},
+              {"name": "quantity", "data_type": "INTEGER", "is_primary_key": false, "is_pii": false, "is_business_key": false, "is_nullable": false},
+              {"name": "unit_price", "data_type": "DECIMAL(18,2)", "is_primary_key": false, "is_pii": false, "is_business_key": false, "is_nullable": false},
+              {"name": "discount_amount", "data_type": "DECIMAL(18,2)", "is_primary_key": false, "is_pii": false, "is_business_key": false, "is_nullable": false},
+              {"name": "line_total", "data_type": "DECIMAL(18,2)", "is_primary_key": false, "is_pii": false, "is_business_key": false, "is_nullable": false},
+              {"name": "updated_at", "data_type": "TIMESTAMPTZ", "is_primary_key": false, "is_pii": false, "is_business_key": false, "is_nullable": false}
+            ]
+          },
+          {
+            "table_name": "customers",
+            "description": "Master customer entity with sensitive contact and billing attributes",
+            "layer": "Bronze",
+            "primary_key": "customer_id",
+            "watermark_column": "updated_at",
+            "is_incremental": true,
+            "columns": [
+              {"name": "customer_id", "data_type": "BIGINT", "is_primary_key": true, "is_pii": false, "is_business_key": true, "is_nullable": false},
+              {"name": "customer_name", "data_type": "VARCHAR(128)", "is_primary_key": false, "is_pii": true, "is_business_key": true, "is_nullable": false},
+              {"name": "customer_email", "data_type": "VARCHAR(128)", "is_primary_key": false, "is_pii": true, "is_business_key": false, "is_nullable": false},
+              {"name": "customer_phone", "data_type": "VARCHAR(32)", "is_primary_key": false, "is_pii": true, "is_business_key": false, "is_nullable": true},
+              {"name": "billing_address", "data_type": "VARCHAR(256)", "is_primary_key": false, "is_pii": true, "is_business_key": false, "is_nullable": true},
+              {"name": "credit_limit", "data_type": "DECIMAL(18,2)", "is_primary_key": false, "is_pii": false, "is_business_key": false, "is_nullable": false},
+              {"name": "is_active", "data_type": "BOOLEAN", "is_primary_key": false, "is_pii": false, "is_business_key": false, "is_nullable": false},
+              {"name": "updated_at", "data_type": "TIMESTAMPTZ", "is_primary_key": false, "is_pii": false, "is_business_key": false, "is_nullable": false}
+            ]
+          },
+          {
+            "table_name": "invoices",
+            "description": "Accounts receivable billing invoices and payment settlement status",
+            "layer": "Bronze",
+            "primary_key": "invoice_id",
+            "watermark_column": "updated_at",
+            "is_incremental": true,
+            "columns": [
+              {"name": "invoice_id", "data_type": "BIGINT", "is_primary_key": true, "is_pii": false, "is_business_key": true, "is_nullable": false},
+              {"name": "order_id", "data_type": "BIGINT", "is_primary_key": false, "is_pii": false, "is_business_key": false, "is_nullable": false},
+              {"name": "invoice_number", "data_type": "VARCHAR(64)", "is_primary_key": false, "is_pii": false, "is_business_key": true, "is_nullable": false},
+              {"name": "invoice_date", "data_type": "DATE", "is_primary_key": false, "is_pii": false, "is_business_key": false, "is_nullable": false},
+              {"name": "due_date", "data_type": "DATE", "is_primary_key": false, "is_pii": false, "is_business_key": false, "is_nullable": false},
+              {"name": "invoice_amount", "data_type": "DECIMAL(18,2)", "is_primary_key": false, "is_pii": false, "is_business_key": false, "is_nullable": false},
+              {"name": "payment_status", "data_type": "VARCHAR(32)", "is_primary_key": false, "is_pii": false, "is_business_key": false, "is_nullable": false},
+              {"name": "updated_at", "data_type": "TIMESTAMPTZ", "is_primary_key": false, "is_pii": false, "is_business_key": false, "is_nullable": false}
+            ]
+          }
+        ]
+      }
+    ],
+    "project_constraints": ["CAPACITY_LIMIT_F64", "DATA_RESIDENCY_US"],
+    "project_decisions": ["ADR-001-MEDALLION-ARCHITECTURE", "ADR-002-DELTA-LAKE-ACID-MERGE", "ADR-003-DIRECT-LAKE-SEMANTIC-MODEL"],
+    "applicable_standards": [
+      "Medallion Asset Naming Standard",
+      "Silver SCD2 & SHA-256 PII Governance",
+      "Gold Kimball Star Schema & Direct Lake"
+    ]
+  },
+  "governance_summary": {
+    "allowed_actions": [
+      "PROVISION_LAKEHOUSE",
+      "PROVISION_WAREHOUSE",
+      "GENERATE_PYSPARK_NOTEBOOK",
+      "GENERATE_DATA_PIPELINE",
+      "GENERATE_DIRECT_LAKE_MODEL",
+      "RUN_DATA_QUALITY_SUITE",
+      "RECORD_LINEAGE"
+    ],
+    "restricted_actions": ["DELETE_PRODUCTION_DATA", "CHANGE_WORKSPACE_ACCESS_POLICY"],
+    "approval_triggers": ["DROP_TABLE", "SCHEMA_BREAKING_CHANGE"]
+  },
+  "known_information_gaps": []
+}

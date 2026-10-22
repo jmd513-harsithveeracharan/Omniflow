@@ -1,0 +1,36 @@
+﻿# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+dist/
+build/
+*.egg-info/
+
+# Environment & Secrets
+.env
+*.env.local
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# OmniFlow Runtime Outputs & Generated Artifacts
+omniflow/generated_artifacts/
+omniflow/test_run_result.json
+omniflow/agents/synthesized_tools.py
+test_run_result.json
+generated_artifacts/
+
+# Logs & Traces
+*.log
+logs/

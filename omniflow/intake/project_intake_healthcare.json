@@ -1,0 +1,185 @@
+{
+  "schema_version": "2.0",
+  "planner_type": "enterprise_data_engineering_planner",
+  "request_context": {
+    "run_id": null,
+    "project_id": null,
+    "user_id": "harsith.bheesetti@pelibiothermal.com",
+    "request_type": "new_end_to_end_data_engineering_solution",
+    "user_request": "Architect, provision, and deploy a HIPAA-compliant Microsoft Fabric Medallion data platform for Healthcare Clinical Encounters and Insurance Claims. Enforce Bronze raw ingestion, Silver Delta Lake curation with strict null-safe SHA-256 masking on patient PHI/PII (SSN, MRN, phone, address), Gold Kimball dimensional star schema warehouse for clinical outcomes and claim denial analytics, Direct Lake Power BI semantic modeling, and Great Expectations automated reconciliation testing.",
+    "priority": "high",
+    "planning_mode": "autonomous_create"
+  },
+  "project_context": {
+    "project_summary": {
+      "project_name": "Healthcare Clinical & Claims Intelligence",
+      "project_code": "PRJ-HEALTHCARE-CLAIMS",
+      "business_domain": "Healthcare Operations & Claims Analytics",
+      "business_objective": "Consolidate patient admissions, physician encounters, pharmacy prescriptions, and insurance billing claims into Microsoft Fabric OneLake Medallion architecture to accelerate claims adjudication and patient readmission tracking while guaranteeing HIPAA compliance.",
+      "business_context": "Siloed Electronic Health Record (EHR) systems and third-party payer claims databases cause high claim denial rates, unmasked PHI exposure, and delayed clinical quality reporting."
+    },
+    "platform_summary": {
+      "target_platform": "Microsoft Fabric",
+      "target_environment": "DEV",
+      "capacity_sku": "F64",
+      "primary_language": "PySpark / T-SQL",
+      "containment_folder": null
+    },
+    "solution_summary": {
+      "requirement": "Ingest operational EHR tables into Bronze lakehouse, curate with null-safe SHA-256 HIPAA PHI masking and Delta Lake ACID MERGE in Silver, construct Kimball star schema (fact_claims, fact_encounters, dim_patient, dim_provider) in Gold, bind Direct Lake semantic model, and execute automated data quality reconciliation tests.",
+      "expected_deliverables": [
+        "01_workspace_manifest.json",
+        "02_pl_raw_batch_ingest.json",
+        "03_nb_curated_pii_merge.py",
+        "04_warehouse_star_schema_ddl.sql",
+        "05_sm_direct_lake_model.bim.json",
+        "06_dq_reconciliation_suite.py",
+        "07_lineage_graph.json"
+      ],
+      "success_criteria": [
+        "Patient encounter and claim row reconciliation variance < 0.2%",
+        "100% of sensitive PHI/PII (SSN, MRN, phone, address, email) masked via null-safe SHA-256",
+        "Zero circular DAG dependencies (Acyclic NetworkX graph)",
+        "Delta Lake ACID MERGE upsert on primary keys with Z-Order compaction",
+        "100% Python AST syntax validation passing on PySpark notebooks",
+        "Kimball star schema surrogate keys (_sk) and SCD2 audit tracking in Gold",
+        "All cloud resources provisioned in Microsoft Fabric workspace according to project architecture"
+      ]
+    }
+  },
+  "retrieved_context": {
+    "data_sources": [
+      {
+        "source_name": "Hospital EHR & Payer Claims Core",
+        "source_type": "Relational_DB",
+        "system_name": "ehr_claims_operational_core",
+        "database_name": "healthcare_clinical_db",
+        "authentication_type": "Managed_Identity",
+        "tables": [
+          {
+            "table_name": "patients",
+            "description": "Master patient demographic profile with sensitive HIPAA PHI and contact attributes",
+            "layer": "Bronze",
+            "primary_key": "patient_id",
+            "watermark_column": "updated_at",
+            "is_incremental": true,
+            "columns": [
+              {"name": "patient_id", "data_type": "BIGINT", "is_primary_key": true, "is_pii": false, "is_business_key": true, "is_nullable": false},
+              {"name": "mrn_number", "data_type": "VARCHAR(32)", "is_primary_key": false, "is_pii": true, "is_business_key": true, "is_nullable": false},
+              {"name": "ssn", "data_type": "VARCHAR(11)", "is_primary_key": false, "is_pii": true, "is_business_key": false, "is_nullable": false},
+              {"name": "full_name", "data_type": "VARCHAR(128)", "is_primary_key": false, "is_pii": true, "is_business_key": false, "is_nullable": false},
+              {"name": "date_of_birth", "data_type": "DATE", "is_primary_key": false, "is_pii": true, "is_business_key": false, "is_nullable": false},
+              {"name": "gender", "data_type": "VARCHAR(16)", "is_primary_key": false, "is_pii": false, "is_business_key": false, "is_nullable": false},
+              {"name": "phone_number", "data_type": "VARCHAR(32)", "is_primary_key": false, "is_pii": true, "is_business_key": false, "is_nullable": true},
+              {"name": "email", "data_type": "VARCHAR(128)", "is_primary_key": false, "is_pii": true, "is_business_key": false, "is_nullable": true},
+              {"name": "residential_address", "data_type": "VARCHAR(256)", "is_primary_key": false, "is_pii": true, "is_business_key": false, "is_nullable": true},
+              {"name": "insurance_payer", "data_type": "VARCHAR(64)", "is_primary_key": false, "is_pii": false, "is_business_key": false, "is_nullable": false},
+              {"name": "updated_at", "data_type": "TIMESTAMPTZ", "is_primary_key": false, "is_pii": false, "is_business_key": false, "is_nullable": false}
+            ]
+          },
+          {
+            "table_name": "encounters",
+            "description": "Clinical visits, inpatient hospital stays, outpatient checkups, and triage events",
+            "layer": "Bronze",
+            "primary_key": "encounter_id",
+            "watermark_column": "updated_at",
+            "is_incremental": true,
+            "columns": [
+              {"name": "encounter_id", "data_type": "BIGINT", "is_primary_key": true, "is_pii": false, "is_business_key": true, "is_nullable": false},
+              {"name": "patient_id", "data_type": "BIGINT", "is_primary_key": false, "is_pii": false, "is_business_key": false, "is_nullable": false},
+              {"name": "provider_id", "data_type": "BIGINT", "is_primary_key": false, "is_pii": false, "is_business_key": false, "is_nullable": false},
+              {"name": "encounter_type", "data_type": "VARCHAR(32)", "is_primary_key": false, "is_pii": false, "is_business_key": false, "is_nullable": false},
+              {"name": "admission_date", "data_type": "TIMESTAMPTZ", "is_primary_key": false, "is_pii": false, "is_business_key": false, "is_nullable": false},
+              {"name": "discharge_date", "data_type": "TIMESTAMPTZ", "is_primary_key": false, "is_pii": false, "is_business_key": false, "is_nullable": true},
+              {"name": "department_name", "data_type": "VARCHAR(64)", "is_primary_key": false, "is_pii": false, "is_business_key": false, "is_nullable": false},
+              {"name": "facility_code", "data_type": "VARCHAR(32)", "is_primary_key": false, "is_pii": false, "is_business_key": false, "is_nullable": false},
+              {"name": "primary_diagnosis_icd", "data_type": "VARCHAR(16)", "is_primary_key": false, "is_pii": false, "is_business_key": false, "is_nullable": false},
+              {"name": "updated_at", "data_type": "TIMESTAMPTZ", "is_primary_key": false, "is_pii": false, "is_business_key": false, "is_nullable": false}
+            ]
+          },
+          {
+            "table_name": "claims",
+            "description": "Insurance billing claims, reimbursement amounts, adjudication decisions, and denial codes",
+            "layer": "Bronze",
+            "primary_key": "claim_id",
+            "watermark_column": "updated_at",
+            "is_incremental": true,
+            "columns": [
+              {"name": "claim_id", "data_type": "BIGINT", "is_primary_key": true, "is_pii": false, "is_business_key": true, "is_nullable": false},
+              {"name": "encounter_id", "data_type": "BIGINT", "is_primary_key": false, "is_pii": false, "is_business_key": false, "is_nullable": false},
+              {"name": "patient_id", "data_type": "BIGINT", "is_primary_key": false, "is_pii": false, "is_business_key": false, "is_nullable": false},
+              {"name": "claim_number", "data_type": "VARCHAR(64)", "is_primary_key": false, "is_pii": false, "is_business_key": true, "is_nullable": false},
+              {"name": "service_date", "data_type": "DATE", "is_primary_key": false, "is_pii": false, "is_business_key": false, "is_nullable": false},
+              {"name": "billed_amount", "data_type": "DECIMAL(18,2)", "is_primary_key": false, "is_pii": false, "is_business_key": false, "is_nullable": false},
+              {"name": "covered_amount", "data_type": "DECIMAL(18,2)", "is_primary_key": false, "is_pii": false, "is_business_key": false, "is_nullable": false},
+              {"name": "patient_copay", "data_type": "DECIMAL(18,2)", "is_primary_key": false, "is_pii": false, "is_business_key": false, "is_nullable": false},
+              {"name": "claim_status", "data_type": "VARCHAR(32)", "is_primary_key": false, "is_pii": false, "is_business_key": false, "is_nullable": false},
+              {"name": "denial_code", "data_type": "VARCHAR(16)", "is_primary_key": false, "is_pii": false, "is_business_key": false, "is_nullable": true},
+              {"name": "updated_at", "data_type": "TIMESTAMPTZ", "is_primary_key": false, "is_pii": false, "is_business_key": false, "is_nullable": false}
+            ]
+          },
+          {
+            "table_name": "providers",
+            "description": "Physician credential records, National Provider Identifiers (NPI), and specialties",
+            "layer": "Bronze",
+            "primary_key": "provider_id",
+            "watermark_column": "updated_at",
+            "is_incremental": true,
+            "columns": [
+              {"name": "provider_id", "data_type": "BIGINT", "is_primary_key": true, "is_pii": false, "is_business_key": true, "is_nullable": false},
+              {"name": "npi_number", "data_type": "VARCHAR(10)", "is_primary_key": false, "is_pii": false, "is_business_key": true, "is_nullable": false},
+              {"name": "provider_name", "data_type": "VARCHAR(128)", "is_primary_key": false, "is_pii": true, "is_business_key": false, "is_nullable": false},
+              {"name": "medical_specialty", "data_type": "VARCHAR(64)", "is_primary_key": false, "is_pii": false, "is_business_key": false, "is_nullable": false},
+              {"name": "facility_id", "data_type": "BIGINT", "is_primary_key": false, "is_pii": false, "is_business_key": false, "is_nullable": false},
+              {"name": "is_in_network", "data_type": "BOOLEAN", "is_primary_key": false, "is_pii": false, "is_business_key": false, "is_nullable": false},
+              {"name": "contact_email", "data_type": "VARCHAR(128)", "is_primary_key": false, "is_pii": true, "is_business_key": false, "is_nullable": true},
+              {"name": "updated_at", "data_type": "TIMESTAMPTZ", "is_primary_key": false, "is_pii": false, "is_business_key": false, "is_nullable": false}
+            ]
+          },
+          {
+            "table_name": "prescriptions",
+            "description": "Clinical pharmacy medication orders, National Drug Codes (NDC), dosages, and refill counts",
+            "layer": "Bronze",
+            "primary_key": "prescription_id",
+            "watermark_column": "updated_at",
+            "is_incremental": true,
+            "columns": [
+              {"name": "prescription_id", "data_type": "BIGINT", "is_primary_key": true, "is_pii": false, "is_business_key": true, "is_nullable": false},
+              {"name": "encounter_id", "data_type": "BIGINT", "is_primary_key": false, "is_pii": false, "is_business_key": false, "is_nullable": false},
+              {"name": "patient_id", "data_type": "BIGINT", "is_primary_key": false, "is_pii": false, "is_business_key": false, "is_nullable": false},
+              {"name": "provider_id", "data_type": "BIGINT", "is_primary_key": false, "is_pii": false, "is_business_key": false, "is_nullable": false},
+              {"name": "ndc_code", "data_type": "VARCHAR(16)", "is_primary_key": false, "is_pii": false, "is_business_key": false, "is_nullable": false},
+              {"name": "medication_name", "data_type": "VARCHAR(128)", "is_primary_key": false, "is_pii": false, "is_business_key": false, "is_nullable": false},
+              {"name": "dosage_mg", "data_type": "INTEGER", "is_primary_key": false, "is_pii": false, "is_business_key": false, "is_nullable": false},
+              {"name": "quantity", "data_type": "INTEGER", "is_primary_key": false, "is_pii": false, "is_business_key": false, "is_nullable": false},
+              {"name": "refills_allowed", "data_type": "INTEGER", "is_primary_key": false, "is_pii": false, "is_business_key": false, "is_nullable": false},
+              {"name": "prescribed_date", "data_type": "DATE", "is_primary_key": false, "is_pii": false, "is_business_key": false, "is_nullable": false},
+              {"name": "updated_at", "data_type": "TIMESTAMPTZ", "is_primary_key": false, "is_pii": false, "is_business_key": false, "is_nullable": false}
+            ]
+          }
+        ]
+      }
+    ],
+    "project_constraints": ["CAPACITY_LIMIT_F64", "DATA_RESIDENCY_US", "HIPAA_COMPLIANCE"],
+    "project_decisions": ["ADR-001-MEDALLION-ARCHITECTURE", "ADR-002-DELTA-LAKE-ACID-MERGE", "ADR-003-DIRECT-LAKE-SEMANTIC-MODEL"],
+    "applicable_standards": [
+      "Medallion Asset Naming Standard",
+      "Silver SCD2 & SHA-256 PII Governance",
+      "Gold Kimball Star Schema & Direct Lake"
+    ]
+  },
+  "governance_summary": {
+    "allowed_actions": [
+      "PROVISION_LAKEHOUSE",
+      "PROVISION_WAREHOUSE",
+      "GENERATE_PYSPARK_NOTEBOOK",
+      "GENERATE_DATA_PIPELINE",
+      "GENERATE_DIRECT_LAKE_MODEL",
+      "RUN_DATA_QUALITY_SUITE",
+      "RECORD_LINEAGE"
+    ],
+    "restricted_actions": ["DELETE_PRODUCTION_DATA", "CHANGE_WORKSPACE_ACCESS_POLICY"],
+    "approval_triggers": ["DROP_TABLE", "SCHEMA_BREAKING_CHANGE"]
+  },
+  "known_information_gaps": []
+}
