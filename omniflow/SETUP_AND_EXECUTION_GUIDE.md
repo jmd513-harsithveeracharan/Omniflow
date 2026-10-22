@@ -108,7 +108,14 @@ AZURE_OPENAI_API_VERSION=2024-08-01-preview
 
 OmniFlow provides three flexible execution modes depending on your workflow:
 
-### Mode A: Full End-to-End Run with Project Intake Specification
+### Mode A: Standalone Web UI & Execution Console (Recommended)
+Launch the dedicated OmniFlow Web UI on port 8090:
+`ash
+python -m omniflow.server
+`
+Then open http://127.0.0.1:8090 in your browser to access the intake form, file upload, live agent stream, and database intelligence.
+
+### Mode B: Full End-to-End Run with Project Intake Specification
 Executes live PostgreSQL source schema introspection, 2-pass architectural planning, NetworkX DAG scheduling, dynamic tool verification/synthesis, fluid PySpark/SQL generation, compliance auditing, and Fabric cloud provisioning.
 
 ```bash

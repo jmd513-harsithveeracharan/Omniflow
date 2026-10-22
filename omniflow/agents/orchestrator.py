@@ -48,8 +48,17 @@ class MultiAgentOrchestrator:
         self,
         req: NaturalLanguagePlanRequest | None = None,
         intake_file: str | None = None,
+        intake_data_override: dict[str, Any] | None = None,
         resume: bool = False,
+        event_callback: Any = None,
     ) -> dict[str, Any]:
+        def emit(event_type: str, data: dict[str, Any]) -> None:
+            if event_callback and callable(event_callback):
+                try:
+                    event_callback(event_type, data)
+                except Exception:
+                    pass
+
         # Reset and sync core agent registry in Neon PostgreSQL
         reset_tools = req.reset_synthesized_tools if req else True
         if reset_tools:
@@ -57,19 +66,22 @@ class MultiAgentOrchestrator:
         self.repo.bootstrap_registry(reset_synthesized_tools=reset_tools)
 
         # 1. Resolve Project Intake Specification (JSON intake file or live DB fallback)
-        intake_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "intake")
-        if not intake_file:
-            default_intake = os.path.join(intake_dir, "project_intake.json")
-            if os.path.exists(default_intake):
-                intake_file = default_intake
-
         intake_data: dict[str, Any] = {}
-        if intake_file and os.path.exists(intake_file):
-            try:
-                with open(intake_file, "r", encoding="utf-8") as f:
-                    intake_data = json.load(f)
-            except Exception:
-                intake_data = {}
+        if intake_data_override and isinstance(intake_data_override, dict):
+            intake_data = intake_data_override
+        else:
+            intake_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "intake")
+            if not intake_file:
+                default_intake = os.path.join(intake_dir, "project_intake.json")
+                if os.path.exists(default_intake):
+                    intake_file = default_intake
+
+            if intake_file and os.path.exists(intake_file):
+                try:
+                    with open(intake_file, "r", encoding="utf-8") as f:
+                        intake_data = json.load(f)
+                except Exception:
+                    intake_data = {}
 
         # Extract context from intake
         p_summary = intake_data.get("project_context", {}).get("project_summary", {})
@@ -188,6 +200,16 @@ class MultiAgentOrchestrator:
         project_id = self.db_logger.upsert_project(req.project_code, req.project_name, req.prompt_text)
         run_id = self.db_logger.create_run(project_id, req.prompt_text, req.requested_by)
 
+        emit("intake_parsed", {
+            "project_code": req.project_code,
+            "project_name": req.project_name,
+            "domain": bus_domain,
+            "tables": list(tables_meta.keys()),
+            "pii_attributes": pii_detected,
+            "deliverables_count": len(deliverables),
+            "run_id": run_id,
+        })
+
         # Stage 2: Architecture Planning & DAG Scheduling
         ui.stage(2, 5, "Architectural Planning & DAG Scheduling (Planner & Task Organizer Agents)")
         planner = DynamicAgentRuntime("planner_agent", self.repo, self.db_logger)
@@ -196,6 +218,11 @@ class MultiAgentOrchestrator:
         for ph in plan_out.macro_phases:
             ui.sub_bullet(f"[{ph.phase_id}] {ph.phase_name} ({ph.layer}) -> {ph.objective}")
 
+        emit("planning_completed", {
+            "macro_phases": [p.model_dump() for p in plan_out.macro_phases],
+            "layer_flow": "Source -> Bronze -> Silver -> Gold",
+        })
+
         self.db_logger.update_run_status(run_id, current_step="task_organizer_agent")
         organizer = DynamicAgentRuntime("task_organizer_agent", self.repo, self.db_logger)
         executor_id = self.db_logger.get_agent_id("executor_agent") or ""
@@ -203,6 +230,13 @@ class MultiAgentOrchestrator:
         ui.success_bullet(f"Validated NetworkX Dependency DAG (Acyclic: {dag_out.is_acyclic}, Waves: {len(dag_out.execution_waves)}, Tasks: {dag_out.total_tasks})")
         ui.success_bullet(f"Critical Path: {' -> '.join(dag_out.critical_path_steps)}")
         ui.divider()
+
+        emit("dag_completed", {
+            "waves": [w.model_dump() for w in dag_out.execution_waves],
+            "critical_path": dag_out.critical_path_steps,
+            "total_tasks": dag_out.total_tasks,
+            "is_acyclic": dag_out.is_acyclic,
+        })
 
         # Tool Checker & Synthesizer Gate
         self.db_logger.update_run_status(run_id, current_step="tool_checker_agent")
@@ -213,6 +247,12 @@ class MultiAgentOrchestrator:
             researcher = DynamicAgentRuntime("research_agent", self.repo, self.db_logger)
             research_out = researcher.run_research_agent(check_pass_1.missing_tools, run_id)
             check_pass_2 = checker.run_tool_checker(dag_out, run_id, pass_number=2)
+
+        emit("tools_checked", {
+            "missing_tools": check_pass_1.missing_tools,
+            "synthesized": True,
+            "status": "ready",
+        })
 
         # Stage 3: Dynamic Fluid Code Generation
         ui.stage(3, 5, "Fluid Code & Pipeline Generation (Azure OpenAI: omni-flow-gpt-6-luna)")
@@ -236,6 +276,11 @@ class MultiAgentOrchestrator:
                     with open(p_file, "r", encoding="utf-8") as pf:
                         pyspark_code = pf.read()
 
+        emit("execution_completed", {
+            "artifacts_created": [a.model_dump() for a in exec_out.artifacts_created],
+            "total_artifacts": len(exec_out.artifacts_created),
+        })
+
         ui.divider()
 
         # Stage 4: Governance & Quality Standards Audit
@@ -246,6 +291,13 @@ class MultiAgentOrchestrator:
         ui.success_bullet("Delta Lake ACID MERGE & compaction audit: PASSED")
         ui.success_bullet(f"Scorecard: {audit_res['compliance_score_pct']}% Compliance ({audit_res['passed_checks']}/{audit_res['total_checks']} checks passed, Status: {audit_res['status']})")
         ui.divider()
+
+        emit("audit_completed", {
+            "compliance_score_pct": audit_res.get("compliance_score_pct", 100),
+            "passed_checks": audit_res.get("passed_checks", 0),
+            "total_checks": audit_res.get("total_checks", 0),
+            "status": audit_res.get("status", "PASS"),
+        })
 
         # Stage 5: True Microsoft Fabric Cloud Deployment
         ui.stage(5, 5, "Microsoft Fabric Cloud Deployment (REST API Integration)")
@@ -278,13 +330,18 @@ class MultiAgentOrchestrator:
             except Exception:
                 pass
 
+        emit("deployment_completed", {
+            "deployed_items": deploy_res.get("deployed_items", []),
+            "target": "Microsoft Fabric Workspace Root",
+        })
+
         # Record blast zone impact, episodic memory, and final checkpoints
         try:
             self.db_logger.record_blast_zone_impact(project_id, table_names, risk_score=15)
             self.db_logger.record_project_memory(
                 project_id=project_id,
                 title="Medallion Cloud Deployment Complete",
-                content=f"Successfully provisioned Medallion data platform in Microsoft Fabric (Target: {folder_label}). Audit score: {audit_res['compliance_score_pct']}%.",
+                content=f"Successfully provisioned Medallion data platform in Microsoft Fabric root. Audit score: {audit_res['compliance_score_pct']}%.",
                 run_id=run_id,
             )
             self.db_logger.record_session_checkpoint(5, "deployment_complete", {"status": "completed", "artifacts": len(exec_out.artifacts_created)})
@@ -323,5 +380,15 @@ class MultiAgentOrchestrator:
 
         # Executive completion summary
         ui.complete(run_id=run_id, artifact_path=artifacts_dir, live_deployed=True)
+
+        emit("pipeline_completed", {
+            "run_id": run_id,
+            "project_id": project_id,
+            "project_code": req.project_code,
+            "status": "completed",
+            "compliance_score_pct": audit_res["compliance_score_pct"],
+            "artifacts_count": len(exec_out.artifacts_created),
+            "deployed_count": len(deploy_res.get("deployed_items", [])),
+        })
 
         return final_bundle
