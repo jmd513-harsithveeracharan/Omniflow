@@ -1,0 +1,182 @@
+{
+  "schema_version": "2.0",
+  "planner_type": "enterprise_data_engineering_planner",
+  "request_context": {
+    "run_id": null,
+    "project_id": null,
+    "user_id": "harsith.bheesetti@pelibiothermal.com",
+    "request_type": "new_end_to_end_data_engineering_solution",
+    "user_request": "Architect, provision, and deploy a robust Microsoft Fabric Medallion data engineering solution for our Global Supply Chain & Inventory Fulfillment operations. Enforce Bronze raw batch ingestion, Silver Delta Lake deduplication with null-safe SHA-256 PII masking on vendor contacts and tax IDs, a Gold Kimball star schema warehouse with surrogate keys for inventory and logistics tracking, an analytical Direct Lake Power BI model, and an automated PySpark Data Quality reconciliation suite.",
+    "priority": "high",
+    "planning_mode": "autonomous_create"
+  },
+  "project_context": {
+    "project_summary": {
+      "project_name": "Global Supply Chain & Inventory Fulfillment",
+      "project_code": "PRJ-SUPPLYCHAIN-OPS",
+      "business_domain": "Logistics, Procurement & Inventory Operations",
+      "business_objective": "Unify warehouse inventory snapshots, inbound purchase orders, supplier master profiles, and outbound logistics shipments into Microsoft Fabric OneLake Medallion architecture for real-time stockout prevention and carrier performance analytics.",
+      "business_context": "Disparate ERP warehouse management systems and supplier portals currently result in fragmented inventory visibility, unmasked supplier tax/contact data, and delayed fulfillment tracking."
+    },
+    "platform_summary": {
+      "target_platform": "Microsoft Fabric",
+      "target_environment": "DEV",
+      "capacity_sku": "F64",
+      "primary_language": "PySpark / T-SQL",
+      "containment_folder": null
+    },
+    "solution_summary": {
+      "requirement": "Ingest operational supply chain tables into Bronze lakehouse, curate with null-safe SHA-256 PII masking and Delta Lake ACID MERGE in Silver, construct Kimball dimensional warehouse star schema (fact_inventory_snapshot, fact_shipments, dim_warehouse, dim_supplier) in Gold, bind Direct Lake semantic model, and execute automated data quality reconciliation tests.",
+      "expected_deliverables": [
+        "01_workspace_manifest.json",
+        "02_pl_raw_batch_ingest.json",
+        "03_nb_curated_pii_merge.py",
+        "04_warehouse_star_schema_ddl.sql",
+        "05_sm_direct_lake_model.bim.json",
+        "06_dq_reconciliation_suite.py",
+        "07_lineage_graph.json"
+      ],
+      "success_criteria": [
+        "Inventory snapshot and shipment count reconciliation variance < 0.5%",
+        "100% of sensitive PII (tax identifiers, emails, phones) masked via null-safe SHA-256",
+        "Zero circular DAG dependencies (Acyclic NetworkX graph)",
+        "Delta Lake ACID MERGE upsert on primary keys with Z-Order compaction",
+        "100% Python AST syntax validation passing on PySpark notebooks",
+        "Kimball star schema surrogate keys (_sk) and SCD2 audit tracking in Gold",
+        "All cloud resources provisioned in Microsoft Fabric workspace according to project architecture"
+      ]
+    }
+  },
+  "retrieved_context": {
+    "data_sources": [
+      {
+        "source_name": "Enterprise Logistics & ERP Warehouse System",
+        "source_type": "Relational_DB",
+        "system_name": "scm_operational_core",
+        "database_name": "supply_chain_db",
+        "authentication_type": "Managed_Identity",
+        "tables": [
+          {
+            "table_name": "inventory_snapshots",
+            "description": "Daily stock on hand, safety stock levels, and replenishment thresholds per warehouse SKU",
+            "layer": "Bronze",
+            "primary_key": "snapshot_id",
+            "watermark_column": "updated_at",
+            "is_incremental": true,
+            "columns": [
+              {"name": "snapshot_id", "data_type": "BIGINT", "is_primary_key": true, "is_pii": false, "is_business_key": true, "is_nullable": false},
+              {"name": "warehouse_id", "data_type": "BIGINT", "is_primary_key": false, "is_pii": false, "is_business_key": false, "is_nullable": false},
+              {"name": "sku_code", "data_type": "VARCHAR(64)", "is_primary_key": false, "is_pii": false, "is_business_key": true, "is_nullable": false},
+              {"name": "quantity_on_hand", "data_type": "INTEGER", "is_primary_key": false, "is_pii": false, "is_business_key": false, "is_nullable": false},
+              {"name": "safety_stock_level", "data_type": "INTEGER", "is_primary_key": false, "is_pii": false, "is_business_key": false, "is_nullable": false},
+              {"name": "reorder_threshold", "data_type": "INTEGER", "is_primary_key": false, "is_pii": false, "is_business_key": false, "is_nullable": false},
+              {"name": "snapshot_date", "data_type": "DATE", "is_primary_key": false, "is_pii": false, "is_business_key": false, "is_nullable": false},
+              {"name": "updated_at", "data_type": "TIMESTAMPTZ", "is_primary_key": false, "is_pii": false, "is_business_key": false, "is_nullable": false}
+            ]
+          },
+          {
+            "table_name": "warehouses",
+            "description": "Master facility attributes, regional hubs, and facility managers",
+            "layer": "Bronze",
+            "primary_key": "warehouse_id",
+            "watermark_column": "updated_at",
+            "is_incremental": true,
+            "columns": [
+              {"name": "warehouse_id", "data_type": "BIGINT", "is_primary_key": true, "is_pii": false, "is_business_key": true, "is_nullable": false},
+              {"name": "warehouse_code", "data_type": "VARCHAR(32)", "is_primary_key": false, "is_pii": false, "is_business_key": true, "is_nullable": false},
+              {"name": "warehouse_name", "data_type": "VARCHAR(128)", "is_primary_key": false, "is_pii": false, "is_business_key": false, "is_nullable": false},
+              {"name": "country_code", "data_type": "VARCHAR(3)", "is_primary_key": false, "is_pii": false, "is_business_key": false, "is_nullable": false},
+              {"name": "region", "data_type": "VARCHAR(64)", "is_primary_key": false, "is_pii": false, "is_business_key": false, "is_nullable": false},
+              {"name": "manager_name", "data_type": "VARCHAR(128)", "is_primary_key": false, "is_pii": true, "is_business_key": false, "is_nullable": true},
+              {"name": "manager_email", "data_type": "VARCHAR(128)", "is_primary_key": false, "is_pii": true, "is_business_key": false, "is_nullable": true},
+              {"name": "total_capacity_sqft", "data_type": "INTEGER", "is_primary_key": false, "is_pii": false, "is_business_key": false, "is_nullable": false},
+              {"name": "is_active", "data_type": "BOOLEAN", "is_primary_key": false, "is_pii": false, "is_business_key": false, "is_nullable": false},
+              {"name": "updated_at", "data_type": "TIMESTAMPTZ", "is_primary_key": false, "is_pii": false, "is_business_key": false, "is_nullable": false}
+            ]
+          },
+          {
+            "table_name": "purchase_orders",
+            "description": "Inbound supplier procurement orders and delivery commitments",
+            "layer": "Bronze",
+            "primary_key": "po_id",
+            "watermark_column": "updated_at",
+            "is_incremental": true,
+            "columns": [
+              {"name": "po_id", "data_type": "BIGINT", "is_primary_key": true, "is_pii": false, "is_business_key": true, "is_nullable": false},
+              {"name": "po_number", "data_type": "VARCHAR(64)", "is_primary_key": false, "is_pii": false, "is_business_key": true, "is_nullable": false},
+              {"name": "supplier_id", "data_type": "BIGINT", "is_primary_key": false, "is_pii": false, "is_business_key": false, "is_nullable": false},
+              {"name": "warehouse_id", "data_type": "BIGINT", "is_primary_key": false, "is_pii": false, "is_business_key": false, "is_nullable": false},
+              {"name": "order_date", "data_type": "DATE", "is_primary_key": false, "is_pii": false, "is_business_key": false, "is_nullable": false},
+              {"name": "expected_delivery_date", "data_type": "DATE", "is_primary_key": false, "is_pii": false, "is_business_key": false, "is_nullable": false},
+              {"name": "po_status", "data_type": "VARCHAR(32)", "is_primary_key": false, "is_pii": false, "is_business_key": false, "is_nullable": false},
+              {"name": "total_amount", "data_type": "DECIMAL(18,2)", "is_primary_key": false, "is_pii": false, "is_business_key": false, "is_nullable": false},
+              {"name": "currency_code", "data_type": "VARCHAR(3)", "is_primary_key": false, "is_pii": false, "is_business_key": false, "is_nullable": false},
+              {"name": "updated_at", "data_type": "TIMESTAMPTZ", "is_primary_key": false, "is_pii": false, "is_business_key": false, "is_nullable": false}
+            ]
+          },
+          {
+            "table_name": "shipments",
+            "description": "Outbound freight dispatches, carrier details, transit dates, and delivery status",
+            "layer": "Bronze",
+            "primary_key": "shipment_id",
+            "watermark_column": "updated_at",
+            "is_incremental": true,
+            "columns": [
+              {"name": "shipment_id", "data_type": "BIGINT", "is_primary_key": true, "is_pii": false, "is_business_key": true, "is_nullable": false},
+              {"name": "tracking_number", "data_type": "VARCHAR(64)", "is_primary_key": false, "is_pii": false, "is_business_key": true, "is_nullable": false},
+              {"name": "po_id", "data_type": "BIGINT", "is_primary_key": false, "is_pii": false, "is_business_key": false, "is_nullable": false},
+              {"name": "carrier_name", "data_type": "VARCHAR(64)", "is_primary_key": false, "is_pii": false, "is_business_key": false, "is_nullable": false},
+              {"name": "origin_warehouse_id", "data_type": "BIGINT", "is_primary_key": false, "is_pii": false, "is_business_key": false, "is_nullable": false},
+              {"name": "destination_city", "data_type": "VARCHAR(128)", "is_primary_key": false, "is_pii": false, "is_business_key": false, "is_nullable": false},
+              {"name": "dispatch_date", "data_type": "DATE", "is_primary_key": false, "is_pii": false, "is_business_key": false, "is_nullable": false},
+              {"name": "delivery_date", "data_type": "DATE", "is_primary_key": false, "is_pii": false, "is_business_key": false, "is_nullable": true},
+              {"name": "shipment_status", "data_type": "VARCHAR(32)", "is_primary_key": false, "is_pii": false, "is_business_key": false, "is_nullable": false},
+              {"name": "freight_cost", "data_type": "DECIMAL(18,2)", "is_primary_key": false, "is_pii": false, "is_business_key": false, "is_nullable": false},
+              {"name": "updated_at", "data_type": "TIMESTAMPTZ", "is_primary_key": false, "is_pii": false, "is_business_key": false, "is_nullable": false}
+            ]
+          },
+          {
+            "table_name": "suppliers",
+            "description": "Vendor master records, tax IDs, and sensitive procurement contact details",
+            "layer": "Bronze",
+            "primary_key": "supplier_id",
+            "watermark_column": "updated_at",
+            "is_incremental": true,
+            "columns": [
+              {"name": "supplier_id", "data_type": "BIGINT", "is_primary_key": true, "is_pii": false, "is_business_key": true, "is_nullable": false},
+              {"name": "supplier_name", "data_type": "VARCHAR(128)", "is_primary_key": false, "is_pii": false, "is_business_key": true, "is_nullable": false},
+              {"name": "tax_identifier", "data_type": "VARCHAR(64)", "is_primary_key": false, "is_pii": true, "is_business_key": false, "is_nullable": false},
+              {"name": "contact_email", "data_type": "VARCHAR(128)", "is_primary_key": false, "is_pii": true, "is_business_key": false, "is_nullable": false},
+              {"name": "contact_phone", "data_type": "VARCHAR(32)", "is_primary_key": false, "is_pii": true, "is_business_key": false, "is_nullable": true},
+              {"name": "lead_time_days", "data_type": "INTEGER", "is_primary_key": false, "is_pii": false, "is_business_key": false, "is_nullable": false},
+              {"name": "payment_terms", "data_type": "VARCHAR(32)", "is_primary_key": false, "is_pii": false, "is_business_key": false, "is_nullable": false},
+              {"name": "is_preferred", "data_type": "BOOLEAN", "is_primary_key": false, "is_pii": false, "is_business_key": false, "is_nullable": false},
+              {"name": "updated_at", "data_type": "TIMESTAMPTZ", "is_primary_key": false, "is_pii": false, "is_business_key": false, "is_nullable": false}
+            ]
+          }
+        ]
+      }
+    ],
+    "project_constraints": ["CAPACITY_LIMIT_F64", "DATA_RESIDENCY_US"],
+    "project_decisions": ["ADR-001-MEDALLION-ARCHITECTURE", "ADR-002-DELTA-LAKE-ACID-MERGE", "ADR-003-DIRECT-LAKE-SEMANTIC-MODEL"],
+    "applicable_standards": [
+      "Medallion Asset Naming Standard",
+      "Silver SCD2 & SHA-256 PII Governance",
+      "Gold Kimball Star Schema & Direct Lake"
+    ]
+  },
+  "governance_summary": {
+    "allowed_actions": [
+      "PROVISION_LAKEHOUSE",
+      "PROVISION_WAREHOUSE",
+      "GENERATE_PYSPARK_NOTEBOOK",
+      "GENERATE_DATA_PIPELINE",
+      "GENERATE_DIRECT_LAKE_MODEL",
+      "RUN_DATA_QUALITY_SUITE",
+      "RECORD_LINEAGE"
+    ],
+    "restricted_actions": ["DELETE_PRODUCTION_DATA", "CHANGE_WORKSPACE_ACCESS_POLICY"],
+    "approval_triggers": ["DROP_TABLE", "SCHEMA_BREAKING_CHANGE"]
+  },
+  "known_information_gaps": []
+}
