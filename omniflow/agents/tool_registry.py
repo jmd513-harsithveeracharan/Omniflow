@@ -8,9 +8,20 @@ import uuid
 import networkx as nx
 import psycopg2
 
+try:
+    from app.llm_router import chat
+except ImportError:
+    from omniflow.config.llm_adapter import chat
+
 from omniflow.db.catalog_seeder import get_table_schema_context_from_db
 from omniflow.db.postgres_repo import NEON_URI
 from omniflow.tools.fabric_deployer import deploy_fabric_item, verify_fabric_workspace_connection
+from omniflow.tools.fabric_executor import (
+    debug_and_heal_notebook_failure,
+    execute_fabric_job_and_poll,
+    poll_fabric_job_status,
+    trigger_fabric_job,
+)
 
 
 def deploy_fabric_item_tool(
@@ -238,19 +249,23 @@ def build_workspace_manifest_tool(
     raw_layer: str = "raw",
     curated_layer: str = "curated",
     analytical_layer: str = "analytics",
+    containment_folder: str | None = None,
     **_: Any,
 ) -> dict[str, Any]:
+    provisioned_items: list[dict[str, str]] = []
+    if containment_folder:
+        provisioned_items.append({"item_type": "Folder", "display_name": containment_folder})
+    provisioned_items.extend([
+        {"item_type": "Lakehouse", "display_name": f"lh_{domain}_{raw_layer}", "tier": "raw_ingestion"},
+        {"item_type": "Lakehouse", "display_name": f"lh_{domain}_{curated_layer}", "tier": "curated_harmonized"},
+        {"item_type": "Warehouse", "display_name": f"wh_{domain}_{analytical_layer}", "tier": "analytical_serving"},
+    ])
     manifest = {
         "$schema": "https://developer.microsoft.com/json-schemas/fabric/workspace-provisioning/v1.json",
         "project_code": project_code,
-        "containment_folder": "AI_Test_Folder",
+        "containment_folder": containment_folder or "Workspace Root",
         "capacity_sku": capacity_sku,
-        "provisioned_items": [
-            {"item_type": "Folder", "display_name": "AI_Test_Folder"},
-            {"item_type": "Lakehouse", "display_name": f"lh_{domain}_{raw_layer}", "tier": "raw_ingestion"},
-            {"item_type": "Lakehouse", "display_name": f"lh_{domain}_{curated_layer}", "tier": "curated_harmonized"},
-            {"item_type": "Warehouse", "display_name": f"wh_{domain}_{analytical_layer}", "tier": "analytical_serving"},
-        ],
+        "provisioned_items": provisioned_items,
     }
     return {"file_extension": "json", "content_str": None, "definition": manifest}
 
@@ -322,7 +337,6 @@ def build_pyspark_notebook_tool(
 
     code_str = None
     try:
-        from app.llm_router import chat
         llm_prompt = (
             f"You are a Principal Microsoft Fabric Data Engineer.\n"
             f"Write an enterprise PySpark Synapse Delta Lake notebook to curate Bronze raw data into the Silver lakehouse.\n"
@@ -444,7 +458,6 @@ def build_warehouse_ddl_tool(
     sql_str = None
 
     try:
-        from app.llm_router import chat
         llm_prompt = (
             f"You are a Principal Data Warehouse Architect specializing in Microsoft Fabric T-SQL and Kimball Star Schemas.\n"
             f"Generate an enterprise T-SQL DDL script for Gold warehouse 'wh_{domain}_{analytical_layer}' for project '{project_code}'.\n"
@@ -561,7 +574,6 @@ def build_data_quality_suite_tool(
 
     code_str = None
     try:
-        from app.llm_router import chat
         prompt = (
             f"You are a Senior Data Quality & Governance Engineer for Microsoft Fabric.\n"
             f"Write an automated PySpark Data Quality & Reconciliation suite script for project '{project_code}'.\n"
@@ -685,5 +697,63 @@ def record_lineage_graph_tool(
         "content_str": None,
         "definition": lineage_data,
     }
+
+
+def trigger_fabric_job_tool(
+    item_id: str,
+    item_type: str = "Notebook",
+    parameters: dict[str, Any] | None = None,
+    workspace_id: str | None = None,
+) -> dict[str, Any]:
+    """Triggers an asynchronous job execution for a Notebook, DataPipeline, or SemanticModel in Microsoft Fabric."""
+    return trigger_fabric_job(item_id=item_id, item_type=item_type, parameters=parameters, workspace_id=workspace_id)
+
+
+def poll_fabric_job_status_tool(
+    item_id: str,
+    job_id: str,
+    workspace_id: str | None = None,
+) -> dict[str, Any]:
+    """Polls the status of an active Fabric job instance."""
+    return poll_fabric_job_status(item_id=item_id, job_id=job_id, workspace_id=workspace_id)
+
+
+def execute_fabric_job_and_poll_tool(
+    item_id: str,
+    item_type: str = "Notebook",
+    parameters: dict[str, Any] | None = None,
+    timeout_seconds: int = 300,
+    poll_interval_seconds: int = 5,
+    workspace_id: str | None = None,
+) -> dict[str, Any]:
+    """Executes a Fabric item (Notebook, Pipeline) and actively polls its status until completion or failure."""
+    return execute_fabric_job_and_poll(
+        item_id=item_id,
+        item_type=item_type,
+        parameters=parameters,
+        timeout_seconds=timeout_seconds,
+        poll_interval_seconds=poll_interval_seconds,
+        workspace_id=workspace_id,
+    )
+
+
+def debug_failed_notebook_tool(
+    item_id: str,
+    notebook_name: str,
+    original_code: str,
+    error_message: str,
+    lakehouse_name: str,
+    workspace_id: str | None = None,
+) -> dict[str, Any]:
+    """Autonomous Self-Healing: Diagnoses Fabric job failure, fixes PySpark code with LLM, compiles, and updates Fabric definition."""
+    return debug_and_heal_notebook_failure(
+        item_id=item_id,
+        notebook_name=notebook_name,
+        original_code=original_code,
+        error_message=error_message,
+        lakehouse_name=lakehouse_name,
+        workspace_id=workspace_id,
+    )
+
 
 

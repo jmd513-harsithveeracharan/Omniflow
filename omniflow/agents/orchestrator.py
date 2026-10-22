@@ -4,7 +4,7 @@ omniflow/agents/orchestrator.py
 Master multi-agent orchestrator for OmniFlow.
 Coordinates live PostgreSQL database introspection, dynamic Azure OpenAI planning,
 NetworkX DAG scheduling, fluid code generation, compliance auditing, and live
-Microsoft Fabric REST API deployment inside AI_Test_Folder.
+Microsoft Fabric REST API deployment with dynamic workspace containment.
 """
 
 from __future__ import annotations
@@ -37,7 +37,7 @@ class MultiAgentOrchestrator:
     4. Tool Verification & Dynamic AST Synthesis (PostgreSQL tool registry)
     5. Fluid LLM Code Execution (Azure OpenAI writes PySpark, SQL DDL, and Pipelines)
     6. Quality & Compliance Audit (AST verification + SHA-256 PII audit)
-    7. Microsoft Fabric Cloud Deployment (REST API provisioning inside AI_Test_Folder)
+    7. Microsoft Fabric Cloud Deployment (REST API provisioning in dynamic folder or workspace root)
     """
 
     def __init__(self) -> None:
@@ -161,11 +161,15 @@ class MultiAgentOrchestrator:
             )
 
         # Print Executive Banner
+        ws_name = os.getenv("ALLOWED_WORKSPACE_NAME") or os.getenv("FABRIC_ALLOWED_WORKSPACE_NAME") or "Fabric Workspace"
+        target_folder = plat_summary.get("containment_folder") or os.getenv("FABRIC_CONTAINMENT_FOLDER")
+        folder_label = target_folder if (target_folder and target_folder.strip().lower() not in ("none", "null", "root", "")) else "Workspace Root"
+
         ui.banner(
             project_name=req.project_name,
             project_code=req.project_code,
             source_info=f"{', '.join(source_labels) if source_labels else 'Relational System'} ({len(table_names)} entities)",
-            target_info=f"Microsoft Fabric (Workspace: PBT_DATA_AGENT, Folder: {plat_summary.get('containment_folder', 'AI_Test_Folder')})",
+            target_info=f"Microsoft Fabric (Workspace: {ws_name}, Folder: {folder_label})",
             llm_model="Azure OpenAI (omni-flow-gpt-6-luna)",
         )
 
@@ -257,10 +261,14 @@ class MultiAgentOrchestrator:
             domain=domain_key,
             project_code=req.project_code,
             pyspark_notebook_code=pyspark_code,
+            containment_folder=target_folder,
         )
 
         folder_info = deploy_res.get("folder") or {}
-        ui.success_bullet(f"Containment folder verified: {folder_info.get('name', 'AI_Test_Folder')} (ID: {folder_info.get('id')})")
+        if folder_info.get("id"):
+            ui.success_bullet(f"Containment folder verified: {folder_info.get('name', target_folder)} (ID: {folder_info.get('id')})")
+        else:
+            ui.success_bullet("Deploying directly into Microsoft Fabric workspace root (zero forced folder containment)")
 
         for dep in deploy_res.get("deployed_items", []):
             item_display = f"{dep.get('item_type')}: {dep.get('display_name')}"
@@ -283,7 +291,7 @@ class MultiAgentOrchestrator:
             self.db_logger.record_project_memory(
                 project_id=project_id,
                 title="Medallion Cloud Deployment Complete",
-                content=f"Successfully provisioned Medallion data platform in Microsoft Fabric inside AI_Test_Folder. Audit score: {audit_res['compliance_score_pct']}%.",
+                content=f"Successfully provisioned Medallion data platform in Microsoft Fabric (Target: {folder_label}). Audit score: {audit_res['compliance_score_pct']}%.",
                 run_id=run_id,
             )
             self.db_logger.record_session_checkpoint(5, "deployment_complete", {"status": "completed", "artifacts": len(exec_out.artifacts_created)})

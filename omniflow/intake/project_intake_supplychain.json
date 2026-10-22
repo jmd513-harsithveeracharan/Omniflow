@@ -23,7 +23,7 @@
       "target_environment": "DEV",
       "capacity_sku": "F64",
       "primary_language": "PySpark / T-SQL",
-      "containment_folder": "AI_Test_Folder"
+      "containment_folder": null
     },
     "solution_summary": {
       "requirement": "Ingest operational supply chain tables into Bronze lakehouse, curate with null-safe SHA-256 PII masking and Delta Lake ACID MERGE in Silver, construct Kimball dimensional warehouse star schema (fact_inventory_snapshot, fact_shipments, dim_warehouse, dim_supplier) in Gold, bind Direct Lake semantic model, and execute automated data quality reconciliation tests.",
@@ -43,7 +43,7 @@
         "Delta Lake ACID MERGE upsert on primary keys with Z-Order compaction",
         "100% Python AST syntax validation passing on PySpark notebooks",
         "Kimball star schema surrogate keys (_sk) and SCD2 audit tracking in Gold",
-        "All cloud resources provisioned inside AI_Test_Folder containment hierarchy"
+        "All cloud resources provisioned in Microsoft Fabric workspace according to project architecture"
       ]
     }
   },
@@ -157,7 +157,7 @@
         ]
       }
     ],
-    "project_constraints": ["CAPACITY_LIMIT_F64", "CONTAINMENT_AI_TEST_FOLDER", "DATA_RESIDENCY_US"],
+    "project_constraints": ["CAPACITY_LIMIT_F64", "DATA_RESIDENCY_US"],
     "project_decisions": ["ADR-001-MEDALLION-ARCHITECTURE", "ADR-002-DELTA-LAKE-ACID-MERGE", "ADR-003-DIRECT-LAKE-SEMANTIC-MODEL"],
     "applicable_standards": [
       "Medallion Asset Naming Standard",

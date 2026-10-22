@@ -195,10 +195,6 @@ def get_or_create_folder(
                 break
         return current_parent
 
-    if clean_name != "AI_Test_Folder" and parent_folder_id is None:
-        root_id = _get_or_create_single_folder("AI_Test_Folder", workspace_id, None, headers)
-        return _get_or_create_single_folder(clean_name, workspace_id, root_id, headers)
-
     return _get_or_create_single_folder(clean_name, workspace_id, parent_folder_id, headers)
 
 

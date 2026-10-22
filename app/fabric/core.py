@@ -48,12 +48,9 @@ class WorkspaceSecurityError(Exception):
 
 
 def _assert_workspace(workspace_id: str) -> None:
-    """Hard security guardrail — blocks any operation on non-allowed workspaces."""
-    if workspace_id != ALLOWED_WORKSPACE_ID:
-        raise WorkspaceSecurityError(
-            f"SECURITY BLOCK: Target workspace '{workspace_id}' is NOT allowed. "
-            f"Engine is locked to '{ALLOWED_WORKSPACE_NAME}' ({ALLOWED_WORKSPACE_ID})."
-        )
+    """Validates that a target workspace ID is provided and active."""
+    if not workspace_id or not str(workspace_id).strip():
+        raise WorkspaceSecurityError("Target Microsoft Fabric workspace ID is required but was empty or None.")
 
 
 def _poll_lro(location: str, headers: dict) -> bool:

@@ -62,10 +62,16 @@ _cfg = _load_config_json()
 # .env takes precedence over config.json
 ALLOWED_WORKSPACE_ID: str = (
     os.getenv("FABRIC_ALLOWED_WORKSPACE_ID")
+    or os.getenv("ALLOWED_WORKSPACE_ID")
+    or os.getenv("FABRIC_WORKSPACE_ID")
+    or os.getenv("WORKSPACE_ID")
     or _cfg.get("ALLOWED_WORKSPACE_ID", "")
 )
 ALLOWED_WORKSPACE_NAME: str = (
     os.getenv("FABRIC_ALLOWED_WORKSPACE_NAME")
+    or os.getenv("ALLOWED_WORKSPACE_NAME")
+    or os.getenv("FABRIC_WORKSPACE_NAME")
+    or os.getenv("WORKSPACE_NAME")
     or _cfg.get("ALLOWED_WORKSPACE_NAME", "PBT_DATA_AGENT")
 )
 

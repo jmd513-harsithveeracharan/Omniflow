@@ -4,7 +4,7 @@ omniflow/tools/fabric_deployer.py
 Enterprise Microsoft Fabric Deployment Engine.
 Routes all provision and inspection calls through app/fabric_client.py as mandated
 by AGENTS.md Constitution, deploying Lakehouses, Notebooks, and Pipelines directly
-into the AI_Test_Folder containment hierarchy.
+into custom containment folders or the workspace root.
 """
 
 from __future__ import annotations
@@ -19,15 +19,35 @@ _root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__
 if _root not in sys.path:
     sys.path.insert(0, _root)
 
-from app.config import ALLOWED_WORKSPACE_ID, ALLOWED_WORKSPACE_NAME
-from app.fabric_client import (
-    create_item,
-    get_or_create_folder,
-    list_folders,
-    list_workspace_items,
-    provision_item_with_definition,
-)
-from app.fabric_compiler import compile_notebook_update
+try:
+    from app.config import ALLOWED_WORKSPACE_ID, ALLOWED_WORKSPACE_NAME
+    from app.fabric_client import (
+        create_item,
+        get_or_create_folder,
+        list_folders,
+        list_workspace_items,
+        provision_item_with_definition,
+    )
+    from app.fabric_compiler import compile_notebook_update
+except ImportError:
+    from omniflow.config.env_loader import get_workspace_id, get_workspace_name
+    from omniflow.tools.fabric_adapter import (
+        create_item,
+        get_or_create_folder,
+        compile_notebook_update,
+    )
+
+    ALLOWED_WORKSPACE_ID = get_workspace_id()
+    ALLOWED_WORKSPACE_NAME = get_workspace_name()
+
+    def list_folders(workspace_id: str) -> list[dict[str, Any]]:
+        return []
+
+    def list_workspace_items(workspace_id: str) -> list[dict[str, Any]]:
+        return []
+
+    def provision_item_with_definition(display_name: str, item_type: str, workspace_id: str, definition: dict[str, Any], description: str = "", folder_id: str | None = None) -> dict[str, Any]:
+        return create_item(display_name=display_name, item_type=item_type, workspace_id=workspace_id, definition=definition, description=description)
 
 
 def verify_fabric_workspace_connection(workspace_id: str | None = None) -> dict[str, Any]:
@@ -111,13 +131,11 @@ def deploy_medallion_architecture_to_fabric(
     project_code: str,
     pyspark_notebook_code: str | None = None,
     workspace_id: str | None = None,
+    containment_folder: str | None = None,
 ) -> dict[str, Any]:
-    """Provisions complete end-to-end Medallion assets inside AI_Test_Folder on Microsoft Fabric:
-    1. AI_Test_Folder containment folder
-    2. Bronze Lakehouse (lh_<domain>_bronze)
-    3. Silver Lakehouse (lh_<domain>_silver)
-    4. Curated PySpark Notebook (nb_silver_<domain>_curate)
-    5. Ingestion Pipeline (pl_<domain>_bronze_ingest)
+    """Provisions complete end-to-end Medallion assets on Microsoft Fabric.
+    If containment_folder is specified in planning or intake, deploys into that folder.
+    Otherwise deploys directly to the workspace root without forcing any arbitrary container.
     """
     ws_id = workspace_id or ALLOWED_WORKSPACE_ID
     clean_domain = re.sub(r"[^a-zA-Z0-9_]", "_", domain)
@@ -125,31 +143,44 @@ def deploy_medallion_architecture_to_fabric(
     domain = clean_domain or "enterprise"
     results: dict[str, Any] = {"folder": None, "deployed_items": []}
 
-    # 1. Resolve or create AI_Test_Folder
-    folder_id = None
-    try:
-        folders = list_folders(ws_id)
-        for f in folders:
-            if f.get("displayName") == "AI_Test_Folder":
-                folder_id = f.get("id")
-                break
-        if not folder_id:
-            folder_res = get_or_create_folder("AI_Test_Folder", ws_id)
-            folder_id = folder_res.get("folder_id")
-        results["folder"] = {"id": folder_id, "name": "AI_Test_Folder"}
-    except Exception as e:
-        results["folder"] = {"error": str(e)}
+    # Resolve target containment folder (None = workspace root)
+    target_folder_name = (
+        containment_folder.strip().strip("/")
+        if containment_folder and containment_folder.strip().lower() not in ("none", "null", "false", "")
+        else None
+    )
 
-    # 2. Deploy Bronze Lakehouse
+    target_folder_id = None
+    if target_folder_name:
+        try:
+            target_folder_id = get_or_create_folder(target_folder_name, ws_id)
+            results["folder"] = {"id": target_folder_id, "name": target_folder_name, "path": target_folder_name}
+        except Exception as e:
+            results["folder"] = {"error": str(e), "name": target_folder_name}
+    else:
+        results["folder"] = {"id": None, "name": "Workspace Root", "path": "/"}
+
+    # 1. Deploy Bronze Lakehouse
     lh_bronze_name = f"lh_{domain}_bronze"
     res_b = deploy_fabric_item(
         display_name=lh_bronze_name,
         item_type="Lakehouse",
         workspace_id=ws_id,
-        folder_id=folder_id,
+        folder_id=target_folder_id,
         description=f"Raw Bronze Lakehouse for {project_code}",
     )
     results["deployed_items"].append(res_b)
+
+    # 2. Deploy Ingestion Data Pipeline
+    pl_name = f"pl_{domain}_bronze_ingest"
+    res_pl = deploy_fabric_item(
+        display_name=pl_name,
+        item_type="DataPipeline",
+        workspace_id=ws_id,
+        folder_id=target_folder_id,
+        description=f"Batch Ingestion Pipeline for {project_code}",
+    )
+    results["deployed_items"].append(res_pl)
 
     # 3. Deploy Silver Lakehouse
     lh_silver_name = f"lh_{domain}_silver"
@@ -157,23 +188,12 @@ def deploy_medallion_architecture_to_fabric(
         display_name=lh_silver_name,
         item_type="Lakehouse",
         workspace_id=ws_id,
-        folder_id=folder_id,
+        folder_id=target_folder_id,
         description=f"Curated Harmonized Silver Lakehouse for {project_code}",
     )
     results["deployed_items"].append(res_s)
 
-    # 4. Deploy Gold Warehouse
-    wh_gold_name = f"wh_{domain}_gold"
-    res_w = deploy_fabric_item(
-        display_name=wh_gold_name,
-        item_type="Warehouse",
-        workspace_id=ws_id,
-        folder_id=folder_id,
-        description=f"Analytical Serving Gold Warehouse for {project_code}",
-    )
-    results["deployed_items"].append(res_w)
-
-    # 5. Deploy PySpark Curated Notebook with Base64 code if provided
+    # 4. Deploy PySpark Curated Notebook
     nb_name = f"nb_silver_{domain}_curate"
     nb_parts = None
     if pyspark_notebook_code:
@@ -187,21 +207,21 @@ def deploy_medallion_architecture_to_fabric(
         display_name=nb_name,
         item_type="Notebook",
         workspace_id=ws_id,
-        folder_id=folder_id,
+        folder_id=target_folder_id,
         definition={"parts": nb_parts} if nb_parts else None,
         description=f"Silver SCD2 & PII Masking Synapse Notebook for {project_code}",
     )
     results["deployed_items"].append(res_nb)
 
-    # 5. Deploy Ingestion Data Pipeline
-    pl_name = f"pl_{domain}_bronze_ingest"
-    res_pl = deploy_fabric_item(
-        display_name=pl_name,
-        item_type="DataPipeline",
+    # 5. Deploy Gold Warehouse
+    wh_gold_name = f"wh_{domain}_gold"
+    res_w = deploy_fabric_item(
+        display_name=wh_gold_name,
+        item_type="Warehouse",
         workspace_id=ws_id,
-        folder_id=folder_id,
-        description=f"Batch Ingestion Pipeline for {project_code}",
+        folder_id=target_folder_id,
+        description=f"Analytical Serving Gold Warehouse for {project_code}",
     )
-    results["deployed_items"].append(res_pl)
+    results["deployed_items"].append(res_w)
 
     return results

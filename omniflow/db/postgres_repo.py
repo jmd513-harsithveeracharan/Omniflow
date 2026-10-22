@@ -10,19 +10,27 @@ from psycopg2.extras import Json
 
 from omniflow.db.seed_data import BASE_TOOLS, CORE_AGENTS, CORE_STANDARDS
 
-NEON_URI = os.getenv(
-    "DATABASE_URL",
-    "postgresql://neondb_owner:npg_o2FUwbtRgqA8@ep-summer-field-b50f50p0-pooler.c-7.us-east-2.aws.neon.tech/neondb?sslmode=require",
+NEON_URI = (
+    os.getenv("NEON_DATABASE_URL")
+    or os.getenv("DATABASE_URL")
+    or os.getenv("POSTGRES_URI")
+    or ""
 )
 
 
 class PostgresRepository:
     """Unified PostgreSQL repository for OmniFlow dynamic agents, tools, tasks, runs, and artifacts."""
 
-    def __init__(self, db_uri: str = NEON_URI):
-        self.db_uri = db_uri
+    def __init__(self, db_uri: str = ""):
+        self.db_uri = db_uri or NEON_URI or os.getenv("NEON_DATABASE_URL", "") or os.getenv("DATABASE_URL", "")
 
     def _connect(self):
+        if not self.db_uri:
+            raise ValueError(
+                "CRITICAL: PostgreSQL connection string not configured!\n"
+                "Please set NEON_DATABASE_URL or DATABASE_URL in your .env or omniflow/.env file."
+            )
+        return psycopg2.connect(self.db_uri, connect_timeout=8)
         return psycopg2.connect(self.db_uri, connect_timeout=8)
 
     def bootstrap_registry(self, reset_synthesized_tools: bool = True) -> dict[str, int]:

@@ -276,5 +276,72 @@ BASE_TOOLS: list[dict[str, Any]] = [
         "output_schema": {"type": "object", "properties": {"total_nodes": {"type": "integer"}, "total_edges": {"type": "integer"}}},
         "agents": ["executor_agent", "auditor_agent"],
     },
+    {
+        "tool_name": "trigger_fabric_job_tool",
+        "display_name": "Fabric Job Instance Execution Trigger",
+        "description": "Triggers an asynchronous cloud job execution for a Notebook, DataPipeline, or SemanticModel in Microsoft Fabric.",
+        "endpoint": "omniflow.agents.tool_registry.trigger_fabric_job_tool",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "item_id": {"type": "string"},
+                "item_type": {"type": "string"},
+                "parameters": {"type": "object"},
+            },
+            "required": ["item_id"],
+        },
+        "output_schema": {"type": "object", "properties": {"success": {"type": "boolean"}, "job_id": {"type": "string"}}},
+        "agents": ["executor_agent"],
+    },
+    {
+        "tool_name": "poll_fabric_job_status_tool",
+        "display_name": "Fabric Job Status Poller",
+        "description": "Polls the live execution status, start/end timestamps, and failure reasons of an active Fabric job instance.",
+        "endpoint": "omniflow.agents.tool_registry.poll_fabric_job_status_tool",
+        "input_schema": {
+            "type": "object",
+            "properties": {"item_id": {"type": "string"}, "job_id": {"type": "string"}},
+            "required": ["item_id", "job_id"],
+        },
+        "output_schema": {"type": "object", "properties": {"status": {"type": "string"}, "failure_reason": {"type": "object"}}},
+        "agents": ["executor_agent"],
+    },
+    {
+        "tool_name": "execute_fabric_job_and_poll_tool",
+        "display_name": "Fabric Job Run & Active Poller",
+        "description": "Executes a Fabric item (Notebook, Pipeline) and actively polls its status until completion or failure with timeout handling.",
+        "endpoint": "omniflow.agents.tool_registry.execute_fabric_job_and_poll_tool",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "item_id": {"type": "string"},
+                "item_type": {"type": "string"},
+                "timeout_seconds": {"type": "integer"},
+                "poll_interval_seconds": {"type": "integer"},
+            },
+            "required": ["item_id"],
+        },
+        "output_schema": {"type": "object", "properties": {"success": {"type": "boolean"}, "status": {"type": "string"}}},
+        "agents": ["executor_agent"],
+    },
+    {
+        "tool_name": "debug_failed_notebook_tool",
+        "display_name": "Autonomous Self-Healing Notebook Debugger",
+        "description": "Diagnoses Fabric PySpark job failure trace using LLM, synthesizes corrected code, compiles, and updates Fabric notebook definition in-place.",
+        "endpoint": "omniflow.agents.tool_registry.debug_failed_notebook_tool",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "item_id": {"type": "string"},
+                "notebook_name": {"type": "string"},
+                "original_code": {"type": "string"},
+                "error_message": {"type": "string"},
+                "lakehouse_name": {"type": "string"},
+            },
+            "required": ["item_id", "notebook_name", "original_code", "error_message"],
+        },
+        "output_schema": {"type": "object", "properties": {"success": {"type": "boolean"}, "diagnosis": {"type": "string"}, "corrected_code": {"type": "string"}}},
+        "agents": ["executor_agent"],
+    },
 ]
 

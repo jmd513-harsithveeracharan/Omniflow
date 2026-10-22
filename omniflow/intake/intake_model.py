@@ -26,7 +26,7 @@ class PlatformSummary(BaseModel):
     target_environment: str = "DEV"
     capacity_sku: str = "F64"
     primary_language: str = "PySpark / T-SQL"
-    containment_folder: str = "AI_Test_Folder"
+    containment_folder: str | None = None
 
 
 class SolutionSummary(BaseModel):

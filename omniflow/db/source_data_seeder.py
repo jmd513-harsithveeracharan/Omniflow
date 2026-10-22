@@ -14,15 +14,18 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-DB_URI = os.getenv(
-    "DATABASE_URL",
-    "postgresql://neondb_owner:npg_o2FUwbtRgqA8@ep-summer-field-b50f50p0-pooler.c-7.us-east-2.aws.neon.tech/neondb?sslmode=require",
-)
+DB_URI = os.getenv("NEON_DATABASE_URL") or os.getenv("DATABASE_URL", "")
 
 
-def seed_live_source_crm(db_uri: str = DB_URI) -> dict[str, int]:
+def seed_live_source_crm(db_uri: str = "") -> dict[str, int]:
     """Provisions schema 'source_crm' and populates 4 realistic tables with sample business data."""
-    conn = psycopg2.connect(db_uri, connect_timeout=10)
+    target_uri = db_uri or DB_URI or os.getenv("NEON_DATABASE_URL", "") or os.getenv("DATABASE_URL", "")
+    if not target_uri:
+        raise ValueError(
+            "CRITICAL: PostgreSQL connection string not configured!\n"
+            "Please set NEON_DATABASE_URL or DATABASE_URL in your .env or omniflow/.env file."
+        )
+    conn = psycopg2.connect(target_uri, connect_timeout=10)
     counts = {"customers": 0, "products": 0, "orders": 0, "order_items": 0}
 
     try:

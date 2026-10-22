@@ -72,7 +72,10 @@ from omniflow.agents.schemas import (
     ToolCheckerOutput,
     ToolCheckItem,
 )
-from app.llm_router import chat, chat_json
+try:
+    from app.llm_router import chat, chat_json
+except ImportError:
+    from omniflow.config.llm_adapter import chat, chat_json
 from omniflow.agents.tool_synthesizer import synthesize_and_register_tool
 from omniflow.db.execution_logger import ExecutionDatabaseLogger
 from omniflow.db.postgres_repo import NEON_URI, PostgresRepository
@@ -287,7 +290,7 @@ Given the project context and discovered database catalog, formulate an end-to-e
 PROJECT BRIEF:
 - Code: {req.project_code}
 - Name: {req.project_name}
-- Target Platform: Microsoft Fabric ({capacity_sku}) inside AI_Test_Folder
+- Target Platform: Microsoft Fabric ({capacity_sku})
 - Business Request: {req.prompt_text}
 
 AUTONOMOUS DISCOVERED CONTEXT FROM NEON POSTGRESQL:
@@ -391,7 +394,7 @@ You MUST respond ONLY with a single valid JSON object matching this exact schema
                 MacroPhase(phase_id="PH-5", phase_name="Quality & Lineage Governance", layer="Governance", objective="Automate data quality test suite and record lineage DAG.", estimated_mins=15),
             ]
             detailed_steps = [
-                PlannedStep(step_code="STEP-01", phase_id="PH-1", step_name="Provision Fabric Containment & Medallion Storage", task_type="INFRA_PROVISION", description=f"Generate workspace manifest for AI_Test_Folder and lakehouses on {capacity_sku}.", depends_on_steps=[], required_tool="build_workspace_manifest_tool", artifact_type="WORKSPACE_MANIFEST_JSON", target_artifact_name="01_workspace_manifest.json", parameters={"project_code": req.project_code, "domain": domain, "capacity_sku": capacity_sku}),
+                PlannedStep(step_code="STEP-01", phase_id="PH-1", step_name="Provision Fabric Workspace & Medallion Storage", task_type="INFRA_PROVISION", description=f"Generate workspace manifest and storage architecture on {capacity_sku}.", depends_on_steps=[], required_tool="build_workspace_manifest_tool", artifact_type="WORKSPACE_MANIFEST_JSON", target_artifact_name="01_workspace_manifest.json", parameters={"project_code": req.project_code, "domain": domain, "capacity_sku": capacity_sku}),
                 PlannedStep(step_code="STEP-02", phase_id="PH-2", step_name="Build Batch Ingestion Pipeline", task_type="RAW_BATCH_INGEST", description=f"Create Fabric Data Factory Copy Pipeline JSON for {discovered_tables}.", depends_on_steps=["STEP-01"], required_tool="build_adf_pipeline_json_tool", artifact_type="DATA_PIPELINE_JSON", target_artifact_name="02_pl_raw_batch_ingest.json", parameters={"project_code": req.project_code, "domain": domain, "sources": detected_sources, "tables": discovered_tables}),
                 PlannedStep(step_code="STEP-03", phase_id="PH-3", step_name="Generate Curated PySpark Cleansing & PII Masking Notebook", task_type="CURATED_PYSPARK_NOTEBOOK", description=f"PySpark notebook deduplicating raw tables, masking PII ({all_pii}), and executing Delta MERGE.", depends_on_steps=["STEP-02"], required_tool="build_pyspark_notebook_tool", artifact_type="PYSPARK_NOTEBOOK_PY", target_artifact_name="03_nb_curated_pii_merge.py", parameters={"project_code": req.project_code, "domain": domain, "tables": discovered_tables, "pii_columns": all_pii}),
                 PlannedStep(step_code="STEP-04", phase_id="PH-4", step_name="Generate Analytical Star Schema T-SQL DDL", task_type="ANALYTICAL_WAREHOUSE_DDL", description="Generate T-SQL DDL scripts for dimensional modeling.", depends_on_steps=["STEP-03"], required_tool="build_warehouse_ddl_tool", artifact_type="WAREHOUSE_TSQL_DDL", target_artifact_name="04_warehouse_star_schema_ddl.sql", parameters={"project_code": req.project_code, "domain": domain, "dimensions": [f"dim_{t}" for t in discovered_tables[:2]], "facts": [f"fact_{domain}"]}),
