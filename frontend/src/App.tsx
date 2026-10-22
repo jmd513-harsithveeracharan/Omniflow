@@ -15,6 +15,7 @@ import { SkillsView } from './components/SkillsView';
 import { ProjectsView } from './components/ProjectsView';
 import { WorkspaceExplorerView } from './components/WorkspaceExplorerView';
 import { IngestionStudioView } from './components/IngestionStudioView';
+import { OmniFlowStudioView } from './components/omniflow/OmniFlowStudioView';
 import {
   fetchFabricStatus,
   streamChatTurn,
@@ -444,6 +445,10 @@ export const App: React.FC = () => {
           <IngestionStudioView
             onPlanGenerated={handlePlanGenerated}
           />
+        )}
+
+        {activeView === 'omniflow' && (
+          <OmniFlowStudioView fabricStatus={status} />
         )}
 
         {activeView === 'chat' && (

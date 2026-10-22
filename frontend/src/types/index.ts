@@ -246,3 +246,70 @@ export interface ProjectRecord {
 }
 
 
+
+export interface OmniFlowTemplate {
+  filename: string;
+  project_name: string;
+  project_code: string;
+  domain: string;
+  deliverables_count: number;
+}
+
+export interface OmniFlowTask {
+  task_id: string;
+  step_code: string;
+  sequence_no: number;
+  task_name: string;
+  task_type: string;
+  required_tool: string;
+  status: string;
+  execution_time_ms?: number;
+  artifact_name?: string;
+}
+
+export interface OmniFlowArtifact {
+  artifact_id: string;
+  artifact_name: string;
+  artifact_type: string;
+  definition?: Record<string, unknown>;
+  content_str?: string;
+  created_at?: string;
+}
+
+export interface OmniFlowDeployedItem {
+  item_type: string;
+  display_name: string;
+  item_id: string;
+  already_existed?: boolean;
+}
+
+export interface OmniFlowOrchestrationResult {
+  project_code: string;
+  project_name: string;
+  run_id: string;
+  workspace_id?: string;
+  waves_count?: number;
+  tasks_count?: number;
+  artifacts_count?: number;
+  deployed_items?: OmniFlowDeployedItem[];
+  compliance_score?: number;
+  tasks?: OmniFlowTask[];
+  artifacts?: OmniFlowArtifact[];
+}
+
+export interface OmniFlowRunRecord {
+  run_id: string;
+  project_code: string;
+  project_name: string;
+  status: string;
+  started_at?: string;
+  completed_at?: string;
+  total_tasks: number;
+  completed_tasks: number;
+}
+
+export interface OmniFlowChatResponse {
+  query: string;
+  answer: string;
+  sources_inspected: string[];
+}

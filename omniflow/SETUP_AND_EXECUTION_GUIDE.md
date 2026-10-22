@@ -92,12 +92,7 @@ NEON_DATABASE_URL=postgresql://neondb_owner:npg_o2FUwbtRgqA8@ep-summer-field-b50
 ALLOWED_WORKSPACE_ID=db7344c1-ecd9-44d6-849f-f2de49484f9f
 ALLOWED_WORKSPACE_NAME=PBT_DATA_AGENT
 
-# 3. Dynamic Containment Folder (Optional)
-# - Leave BLANK to deploy items directly into the Workspace Root.
-# - Or specify a folder name (e.g. PRJ-HEALTHCARE-CLAIMS) to group items inside a folder.
-FABRIC_CONTAINMENT_FOLDER=
-
-# 4. Azure OpenAI / LLM Credentials (For multi-agent planning & code generation)
+# 3. Azure OpenAI / LLM Credentials (For multi-agent planning & code generation)
 AZURE_OPENAI_ENDPOINT=https://your-openai-resource.openai.azure.com/
 AZURE_OPENAI_API_KEY=your-azure-openai-api-key
 AZURE_OPENAI_DEPLOYMENT=omni-flow-gpt-6-luna
@@ -171,7 +166,4 @@ After every run, OmniFlow outputs comprehensive deliverables:
 - **Error: `WorkspaceSecurityError` or `Fabric REST API 401/403`**
   - Run `az login` to refresh your Azure token.
   - Verify that your user account has *Contributor* or *Admin* permissions on the Fabric workspace defined in `ALLOWED_WORKSPACE_ID`.
-- **Targeting Workspace Root vs Custom Folders**:
-  - To deploy into a specific folder, set `containment_folder` in the intake JSON or `FABRIC_CONTAINMENT_FOLDER=My_Folder` in `.env`.
-  - To deploy directly to workspace root, set `"containment_folder": null` in intake JSON and leave `FABRIC_CONTAINMENT_FOLDER=` blank in `.env`.
-
+- **Workspace Deployment**: All items (Bronze/Silver Lakehouses, Gold Warehouse, Data Pipelines, Notebooks) deploy directly into your target Fabric Workspace root.

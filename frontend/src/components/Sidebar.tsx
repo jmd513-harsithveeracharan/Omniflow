@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   Plus,
+  Cpu,
   FolderTree,
   BookOpen,
   LayoutGrid,
@@ -294,6 +295,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <Plus width={18} height={18} />
           </span>
           <span>New Chat</span>
+        </button>
+
+        <button
+          className={`nav-item ${activeView === 'omniflow' ? 'active' : ''}`}
+          onClick={() => onSelectView('omniflow')}
+          style={{ background: activeView === 'omniflow' ? 'rgba(99, 102, 241, 0.15)' : undefined }}
+        >
+          <span className="nav-item-icon">
+            <Cpu width={18} height={18} color="#818cf8" />
+          </span>
+          <span style={{ fontWeight: 600, color: activeView === 'omniflow' ? '#a5b4fc' : undefined }}>OmniFlow Studio</span>
         </button>
 
         <button

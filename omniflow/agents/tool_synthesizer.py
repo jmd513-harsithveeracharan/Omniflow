@@ -37,7 +37,6 @@ def build_sap_rfc_cdc_connector_tool(project_code: str, sap_tables: list[str] | 
             for t in sap_tables
         ],
         "sink_lakehouse": f"lh_{domain}_raw",
-        "folder": kwargs.get("containment_folder") or "Workspace Root",
     }
     return {
         "file_extension": "json",

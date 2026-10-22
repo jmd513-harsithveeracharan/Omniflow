@@ -249,21 +249,16 @@ def build_workspace_manifest_tool(
     raw_layer: str = "raw",
     curated_layer: str = "curated",
     analytical_layer: str = "analytics",
-    containment_folder: str | None = None,
     **_: Any,
 ) -> dict[str, Any]:
-    provisioned_items: list[dict[str, str]] = []
-    if containment_folder:
-        provisioned_items.append({"item_type": "Folder", "display_name": containment_folder})
-    provisioned_items.extend([
+    provisioned_items = [
         {"item_type": "Lakehouse", "display_name": f"lh_{domain}_{raw_layer}", "tier": "raw_ingestion"},
         {"item_type": "Lakehouse", "display_name": f"lh_{domain}_{curated_layer}", "tier": "curated_harmonized"},
         {"item_type": "Warehouse", "display_name": f"wh_{domain}_{analytical_layer}", "tier": "analytical_serving"},
-    ])
+    ]
     manifest = {
         "$schema": "https://developer.microsoft.com/json-schemas/fabric/workspace-provisioning/v1.json",
         "project_code": project_code,
-        "containment_folder": containment_folder or "Workspace Root",
         "capacity_sku": capacity_sku,
         "provisioned_items": provisioned_items,
     }

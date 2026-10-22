@@ -133,32 +133,13 @@ def deploy_medallion_architecture_to_fabric(
     workspace_id: str | None = None,
     containment_folder: str | None = None,
 ) -> dict[str, Any]:
-    """Provisions complete end-to-end Medallion assets on Microsoft Fabric.
-    If containment_folder is specified in planning or intake, deploys into that folder.
-    Otherwise deploys directly to the workspace root without forcing any arbitrary container.
-    """
+    """Provisions complete end-to-end Medallion assets directly on Microsoft Fabric workspace root."""
     ws_id = workspace_id or ALLOWED_WORKSPACE_ID
     clean_domain = re.sub(r"[^a-zA-Z0-9_]", "_", domain)
     clean_domain = re.sub(r"_+", "_", clean_domain).strip("_")
     domain = clean_domain or "enterprise"
     results: dict[str, Any] = {"folder": None, "deployed_items": []}
-
-    # Resolve target containment folder (None = workspace root)
-    target_folder_name = (
-        containment_folder.strip().strip("/")
-        if containment_folder and containment_folder.strip().lower() not in ("none", "null", "false", "")
-        else None
-    )
-
     target_folder_id = None
-    if target_folder_name:
-        try:
-            target_folder_id = get_or_create_folder(target_folder_name, ws_id)
-            results["folder"] = {"id": target_folder_id, "name": target_folder_name, "path": target_folder_name}
-        except Exception as e:
-            results["folder"] = {"error": str(e), "name": target_folder_name}
-    else:
-        results["folder"] = {"id": None, "name": "Workspace Root", "path": "/"}
 
     # 1. Deploy Bronze Lakehouse
     lh_bronze_name = f"lh_{domain}_bronze"

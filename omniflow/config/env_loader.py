@@ -54,12 +54,6 @@ def get_workspace_name() -> str:
 
 
 def get_containment_folder() -> str | None:
-    """Resolves optional containment folder. Returns None if deploying to workspace root."""
-    folder = os.getenv("FABRIC_CONTAINMENT_FOLDER") or os.getenv("CONTAINMENT_FOLDER")
-    if folder:
-        clean = folder.strip().strip("/")
-        if clean.lower() in ("none", "null", "root", "", "false"):
-            return None
-        return clean
+    """Always returns None — deployment goes directly into workspace root."""
     return None
 
