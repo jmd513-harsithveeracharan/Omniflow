@@ -233,7 +233,7 @@ async def chat_with_database(req: ChatbotQueryRequest) -> dict[str, Any]:
             standards = [{"name": r[0], "layer": r[1], "rule": r[2]} for r in cur.fetchall()]
 
             # 3. Get active deployed Fabric items
-            cur.execute("SELECT display_name, item_type, status, workspace_id FROM fabric_items LIMIT 10;")
+            cur.execute("SELECT item_name, item_type, status, workspace_id FROM fabric_items LIMIT 10;")
             items = [{"name": r[0], "type": r[1], "status": r[2], "ws": r[3]} for r in cur.fetchall()]
 
             db_context = {
@@ -269,3 +269,4 @@ async def chat_with_database(req: ChatbotQueryRequest) -> dict[str, Any]:
             "answer": f"Unable to reach LLM provider: {err}. Context found: {len(db_context)} tables.",
             "sources_inspected": [],
         }
+
