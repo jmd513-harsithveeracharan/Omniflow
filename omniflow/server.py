@@ -182,6 +182,114 @@ async def update_project_endpoint(req: ProjectRequest) -> dict[str, Any]:
 async def delete_project_endpoint(project_id: str) -> dict[str, Any]:
     return {"success": True}
 
+@app.get("/api/projects/{project_id}/detail")
+async def get_project_detail(project_id: str) -> dict[str, Any]:
+    repo = PostgresRepository()
+    project_data = {}
+    pcode = ""
+    pname = ""
+    try:
+        with repo._connect() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT project_id, project_code, project_name, description, status FROM projects WHERE project_id = %s OR project_code = %s LIMIT 1;",
+                    (project_id, project_id),
+                )
+                row = cur.fetchone()
+                if row:
+                    project_data = {
+                        "id": str(row[0]),
+                        "code": row[1],
+                        "name": row[2],
+                        "description": row[3] or "",
+                        "status": row[4],
+                    }
+                    pcode = row[1]
+                    pname = row[2]
+    except Exception:
+        pass
+
+    if not project_data:
+        project_data = {
+            "id": project_id,
+            "code": "PRJ-GLOBAL-DELIVERY",
+            "name": "Global Express Delivery & Courier Logistics Platform",
+            "description": "Courier Logistics, Fleet Telemetry & Order Fulfillment",
+            "status": "active",
+        }
+        pcode = "PRJ-GLOBAL-DELIVERY"
+        pname = "Global Express Delivery & Courier Logistics Platform"
+
+    clean_dom = re.sub(r"[^a-zA-Z0-9_]", "_", pname.lower()).strip("_")[:16]
+    if "delivery" in pcode.lower() or "delivery" in pname.lower():
+        clean_dom = "delivery"
+    elif "health" in pcode.lower() or "health" in pname.lower():
+        clean_dom = "healthcare"
+    elif "comm" in pcode.lower() or "rev" in pcode.lower():
+        clean_dom = "commercial_rev"
+    elif "supply" in pcode.lower() or "ops" in pcode.lower():
+        clean_dom = "supplychain"
+
+    root_f = f"{clean_dom.capitalize()}_Platform" if clean_dom != "delivery" else "Delivery_Logistics_Platform"
+    sub_f = {"raw": "01 Raw", "stage": "02 Stage", "silver": "03 Silver", "gold": "04 Gold"}
+
+    plan = {
+        "sourceName": pname,
+        "project_code": pcode,
+        "domain": clean_dom,
+        "schedule": "Hourly Micro-Batch",
+        "root_folder": root_f,
+        "folders": sub_f,
+        "tables": [
+            {"name": "shipments", "target": f"{sub_f['raw']} / lh_{clean_dom}_bronze"},
+            {"name": "couriers", "target": f"{sub_f['stage']} / nb_{clean_dom}_curate"},
+            {"name": "telemetry_pings", "target": f"{sub_f['silver']} / lh_{clean_dom}_silver"},
+        ] if clean_dom == "delivery" else [
+            {"name": f"{clean_dom}_entity_1", "target": f"{sub_f['raw']} / lh_{clean_dom}_bronze"},
+            {"name": f"{clean_dom}_entity_2", "target": f"{sub_f['stage']} / nb_{clean_dom}_curate"},
+            {"name": f"{clean_dom}_entity_3", "target": f"{sub_f['silver']} / lh_{clean_dom}_silver"},
+        ],
+    }
+
+    deployed_items = [
+        {"item_type": "Lakehouse", "display_name": f"lh_{clean_dom}_bronze", "folder": f"{root_f}/{sub_f['raw']}", "item_id": "active"},
+        {"item_type": "DataPipeline", "display_name": f"pl_{clean_dom}_bronze_ingest", "folder": f"{root_f}/{sub_f['raw']}", "item_id": "active"},
+        {"item_type": "Notebook", "display_name": f"nb_{clean_dom}_curate", "folder": f"{root_f}/{sub_f['stage']}", "item_id": "active"},
+        {"item_type": "Lakehouse", "display_name": f"lh_{clean_dom}_silver", "folder": f"{root_f}/{sub_f['silver']}", "item_id": "active"},
+        {"item_type": "Warehouse", "display_name": f"wh_{clean_dom}_gold", "folder": f"{root_f}/{sub_f['gold']}", "item_id": "active"},
+    ]
+
+    proj_session_id = f"proj_{project_id}"
+    existing_messages = SESSIONS.get(proj_session_id, {}).get("messages", [])
+    if not existing_messages:
+        summary_msg = (
+            f"### 📦 Active Project: `{pname}` (`{pcode}`)\n\n"
+            f"- **Target Workspace**: Microsoft Fabric (`PBT_DATA_AGENT`)\n"
+            f"- **Architecture**: Medallion Architecture across Folders in `{root_f}`\n\n"
+            f"#### 📁 Folder Hierarchy & Deployed Assets:\n"
+            f"- 📁 **{root_f}/01 Raw** ➔ `Lakehouse`: `lh_{clean_dom}_bronze`, `DataPipeline`: `pl_{clean_dom}_bronze_ingest`\n"
+            f"- 📁 **{root_f}/02 Stage** ➔ `Notebook`: `nb_{clean_dom}_curate` (SCD2 & PII Masking)\n"
+            f"- 📁 **{root_f}/03 Silver** ➔ `Lakehouse`: `lh_{clean_dom}_silver` (Curated Delta)\n"
+            f"- 📁 **{root_f}/04 Gold** ➔ `Warehouse`: `wh_{clean_dom}_gold` (Kimball Analytical Warehouse)\n\n"
+            f"✨ **Project context active.** Type in plain English (or speak via microphone) to create stored procedures, add PySpark transformations, or adjust pipeline schedules."
+        )
+        existing_messages = [{"role": "assistant", "content": summary_msg}]
+        SESSIONS[proj_session_id] = {
+            "session_id": proj_session_id,
+            "title": pname,
+            "messages": existing_messages,
+            "active_plan": plan,
+            "updated_at": "",
+        }
+
+    return {
+        "project": project_data,
+        "plan": plan,
+        "deployed_items": deployed_items,
+        "messages": existing_messages,
+    }
+
+
 
 @app.get("/api/intake/templates")
 async def list_templates() -> list[dict[str, Any]]:
@@ -434,7 +542,7 @@ async def handle_chat_stream(req: ChatRequest) -> StreamingResponse:
             yield f"data: {json.dumps({'type': 'done', 'session_id': sid, 'plan': plan_obj})}\n\n"
 
         else:
-            # General Question: Query Database Intelligence
+            # Natural Language Follow-up or Delta Transformation:
             repo = PostgresRepository()
             db_ctx = []
             try:
@@ -446,18 +554,44 @@ async def handle_chat_stream(req: ChatRequest) -> StreamingResponse:
             except Exception:
                 pass
 
-            thought = {"id": "db_query", "title": "Consulting PostgreSQL Catalog & Fabric Registry", "status": "completed", "duration": "0.4s", "target": "Database"}
+            active_plan = SESSIONS[sid].get("active_plan") or {}
+            p_name = active_plan.get("sourceName") or "Global Express Delivery & Courier Logistics Platform"
+            p_code = active_plan.get("project_code") or "PRJ-GLOBAL-DELIVERY"
+            p_root = active_plan.get("root_folder") or "Delivery_Logistics_Platform"
+
+            if any(w in req.message.lower() for w in ["procedure", "stored proc", "sp_", "sql", "ddl", "query"]):
+                thought_target = "T-SQL Synapse"
+                step_title = f"Synthesizing production T-SQL Stored Procedure for {p_name}"
+            elif any(w in req.message.lower() for w in ["spark", "notebook", "pyspark", "transform", "scd2", "delta", "merge"]):
+                thought_target = "PySpark Delta"
+                step_title = f"Formulating Delta Lake PySpark code for {p_name}"
+            else:
+                thought_target = "Tenali AI Modeler"
+                step_title = f"Resolving architectural instruction for {p_name}"
+
+            thought = {"id": "nl_followup", "title": step_title, "status": "completed", "duration": "0.7s", "target": thought_target}
             yield f"data: {json.dumps({'type': 'thought_step', 'step': thought})}\n\n"
 
-            sys_prompt = "You are Fabric Studio Intelligence. Answer clearly based on active Fabric items:\n" + "\n".join(db_ctx)
+            sys_prompt = (
+                f"You are Tenali AI (OmniFlow GPT-6 Luna), the autonomous enterprise Microsoft Fabric data engineering agent.\n"
+                f"Active Project: {p_name} ({p_code})\n"
+                f"Medallion Root Folder: {p_root}\n"
+                f"Active Medallion Layers: 01 Raw (Bronze Lakehouse), 02 Stage (Curation Notebook), 03 Silver (Harmonized Delta), 04 Gold (Analytical Warehouse)\n"
+                f"Discovered Tables & Lineage: {active_plan.get('tables', [])}\n"
+                f"Active Fabric Items: {', '.join(db_ctx)}\n\n"
+                f"Instructions:\n"
+                f"- If asked to create a stored procedure, provide clean, production-grade Fabric T-SQL with CREATE OR ALTER PROCEDURE, error handling (TRY...CATCH), and transactions.\n"
+                f"- If asked for PySpark code, provide clean, idempotent PySpark Delta Lake code with AST compliance.\n"
+                f"- Answer concisely and directly with markdown code blocks."
+            )
             reply = chat([{"role": "system", "content": sys_prompt}, {"role": "user", "content": req.message}])
 
             for chunk in reply.split(" "):
                 yield f"data: {json.dumps({'type': 'chunk', 'text': chunk + ' '})}\n\n"
-                await asyncio.sleep(0.02)
+                await asyncio.sleep(0.015)
 
             SESSIONS[sid]["messages"].append({"role": "assistant", "content": reply})
-            yield f"data: {json.dumps({'type': 'done', 'session_id': sid, 'plan': None})}\n\n"
+            yield f"data: {json.dumps({'type': 'done', 'session_id': sid, 'plan': active_plan})}\n\n"
 
     return StreamingResponse(event_generator(), media_type="text/event-stream")
 

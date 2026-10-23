@@ -55,11 +55,23 @@ def chat(
         or os.getenv("AZURE_OPENAI_CHAT_DEPLOYMENT_NAME")
         or "omni-flow-gpt-6-luna"
     )
-    resp = client.chat.completions.create(
-        model=model,
-        messages=messages,  # type: ignore
-        temperature=kwargs.get("temperature", 0.1),
-    )
+    call_kwargs: dict[str, Any] = {
+        "model": model,
+        "messages": messages,  # type: ignore
+    }
+    if "luna" not in model.lower() and "o1" not in model.lower() and "o3" not in model.lower():
+        if "temperature" in kwargs:
+            call_kwargs["temperature"] = kwargs["temperature"]
+
+    try:
+        resp = client.chat.completions.create(**call_kwargs)
+    except Exception as e:
+        if "temperature" in str(e).lower() and "temperature" in call_kwargs:
+            del call_kwargs["temperature"]
+            resp = client.chat.completions.create(**call_kwargs)
+        else:
+            raise
+
     return resp.choices[0].message.content or ""
 
 

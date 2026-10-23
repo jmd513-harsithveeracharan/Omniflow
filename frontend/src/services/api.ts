@@ -362,6 +362,17 @@ export async function deleteProject(id: string): Promise<boolean> {
   return Boolean(data.success);
 }
 
+export async function fetchProjectDetail(id: string): Promise<{
+  project: import('../types').ProjectRecord;
+  plan: import('../types').IngestionPlan | null;
+  deployed_items: Array<{ item_type: string; display_name: string; folder: string; item_id: string }>;
+  messages: Array<{ role: 'user' | 'assistant'; content: string }>;
+}> {
+  const res = await fetch(`${API_BASE}/projects/${id}/detail`);
+  if (!res.ok) throw new Error(`Failed to fetch project detail: ${res.statusText}`);
+  return await res.json();
+}
+
 export async function fetchFabricWorkspaces(): Promise<{
   activeWorkspaceId: string;
   activeWorkspaceName: string;

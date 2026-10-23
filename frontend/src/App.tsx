@@ -23,6 +23,7 @@ import {
   deleteSession,
   renameSession,
   fetchProjects,
+  fetchProjectDetail,
   updateProject,
   deleteProject,
 } from './services/api';
@@ -75,6 +76,8 @@ export const App: React.FC = () => {
       const projs = await fetchProjects();
       if (projs && projs.length > 0) {
         setProjects(projs);
+        const defaultProj = projs.find((p) => p.name.toLowerCase().includes('delivery')) || projs[0];
+        handleSelectProject(defaultProj.id);
       }
     } catch (e) {
       console.error('Failed to load projects', e);
@@ -151,11 +154,42 @@ export const App: React.FC = () => {
   };
 
   // Projects Handlers
-  const handleSelectProject = (projectId: string) => {
+  const handleSelectProject = async (projectId: string) => {
     setActiveProjectId(projectId);
-    const target = projects.find((p) => p.id === projectId);
-    if (target) {
+    if (projectId === 'playground') {
+      setCurrentPlan(null);
       setActiveView('chat');
+      setSessionId('sess_playground');
+      setMessages([
+        {
+          role: 'assistant',
+          content: '### 🚀 OmniFlow Playground Active\n\nThis is your scratchpad for rapid experimentation. You can attach an intake spec using the **Intake Spec** button or type any natural language data engineering prompt below.',
+        },
+      ]);
+      return;
+    }
+
+    try {
+      setIsLoadingSession(true);
+      setActiveView('chat');
+      const detail = await fetchProjectDetail(projectId);
+      if (detail) {
+        if (detail.plan) {
+          setCurrentPlan(detail.plan);
+          setIsWorkbenchOpen(true);
+        }
+        if (detail.messages && detail.messages.length > 0) {
+          setMessages(detail.messages.map((m) => ({ role: m.role, content: m.content })));
+        } else {
+          setMessages([]);
+        }
+        setSessionId(`proj_${projectId}`);
+      }
+    } catch (e) {
+      console.error('Failed to load project detail', e);
+      setActiveView('chat');
+    } finally {
+      setIsLoadingSession(false);
     }
   };
 
