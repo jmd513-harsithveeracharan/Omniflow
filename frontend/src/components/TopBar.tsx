@@ -71,12 +71,12 @@ export const TopBar: React.FC<TopBarProps> = ({
           </div>
         )}
 
-        {/* Visual Medallion Canvas Toggle Button */}
+        {/* Visual Architecture Canvas Toggle Button */}
         <button
           type="button"
           className={`topbar-tool-icon ${isWorkbenchOpen ? 'active' : ''}`}
           onClick={onToggleWorkbench}
-          title="Visual Medallion Canvas"
+          title="Visual Architecture Canvas"
         >
           <Workflow width={16} height={16} />
         </button>

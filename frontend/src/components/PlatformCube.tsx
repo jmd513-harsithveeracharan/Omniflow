@@ -38,3 +38,4 @@ export const PlatformCube: React.FC<PlatformCubeProps> = ({
     </svg>
   );
 };
+

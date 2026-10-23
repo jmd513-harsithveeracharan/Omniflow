@@ -53,14 +53,13 @@ interface PlatformConfig {
   name: string;
   platformName: string;
   flowColor: string;
-  icon: string;
 }
 
 const PLATFORMS: PlatformConfig[] = [
-  { id: 'fabric', name: 'Microsoft Fabric', platformName: 'Fabric', flowColor: '#10b981', icon: '/assets/logos/abstract-shape(1).png' },
-  { id: 'databricks', name: 'Databricks Lakehouse', platformName: 'Databricks', flowColor: '#ff3621', icon: '/assets/logos/abstract-shape-databricks.png' },
-  { id: 'snowflake', name: 'Snowflake Cortex', platformName: 'Snowflake', flowColor: '#29b5e8', icon: '/assets/logos/abstract-shape-snowflake.png' },
-  { id: 'dbt', name: 'dbt Core & Cloud', platformName: 'dbt', flowColor: '#ff694b', icon: '/assets/logos/abstract-shape-dbt.png' },
+  { id: 'fabric', name: 'Microsoft Fabric', platformName: 'Fabric', flowColor: '#10b981' },
+  { id: 'databricks', name: 'Databricks Lakehouse', platformName: 'Databricks', flowColor: '#ff3621' },
+  { id: 'snowflake', name: 'Snowflake Cortex', platformName: 'Snowflake', flowColor: '#29b5e8' },
+  { id: 'dbt', name: 'dbt Core & Cloud', platformName: 'dbt', flowColor: '#ff694b' },
 ];
 
 export const Sidebar: React.FC<SidebarProps> = ({
