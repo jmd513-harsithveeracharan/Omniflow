@@ -1,10 +1,8 @@
 import React from 'react';
 import {
   PanelLeftOpen,
-  Split,
-  Plus,
+  Workflow,
   RefreshCw,
-  Maximize2,
 } from 'lucide-react';
 import { FabricStatus } from '../types';
 
@@ -14,7 +12,7 @@ interface TopBarProps {
   onToggleSidebar: () => void;
   isWorkbenchOpen: boolean;
   onToggleWorkbench: () => void;
-  onNewSession: () => void;
+  onNewSession?: () => void;
   onRefreshWorkspace: () => void;
   status?: FabricStatus | null;
   onOpenFabricConnection?: () => void;
@@ -26,11 +24,15 @@ export const TopBar: React.FC<TopBarProps> = ({
   onToggleSidebar,
   isWorkbenchOpen,
   onToggleWorkbench,
-  onNewSession,
   onRefreshWorkspace,
   status,
   onOpenFabricConnection,
 }) => {
+  const wsDisplayName =
+    status?.workspaceName ||
+    (status as Record<string, unknown> | undefined)?.['workspace_name'] ||
+    (status?.workspaceId ? 'PBT_DATA_AGENT' : 'Workspace');
+
   return (
     <header className="studio-topbar">
       <div className="topbar-left">
@@ -68,28 +70,21 @@ export const TopBar: React.FC<TopBarProps> = ({
             title="Manage Microsoft Fabric Connection"
           >
             <span className="w-2 h-2 rounded-full bg-[#10b981] animate-pulse" />
-            <span>Fabric: {status.workspaceId.slice(0, 8)}...</span>
+            <span>Fabric: {String(wsDisplayName)}</span>
           </div>
         )}
 
+        {/* Visual Medallion Canvas Toggle Button */}
         <button
           type="button"
           className={`topbar-tool-icon ${isWorkbenchOpen ? 'active' : ''}`}
           onClick={onToggleWorkbench}
-          title="Visual Canvas / Split View"
+          title="Visual Medallion Canvas"
         >
-          <Split width={15} height={15} />
+          <Workflow width={16} height={16} />
         </button>
 
-        <button
-          type="button"
-          className="topbar-tool-icon"
-          onClick={onNewSession}
-          title="New Chat"
-        >
-          <Plus width={15} height={15} />
-        </button>
-
+        {/* Sync Workspace Items */}
         <button
           type="button"
           className="topbar-tool-icon"
@@ -97,14 +92,6 @@ export const TopBar: React.FC<TopBarProps> = ({
           title="Sync Fabric Items"
         >
           <RefreshCw width={15} height={15} />
-        </button>
-
-        <button
-          type="button"
-          className="topbar-tool-icon"
-          title="Fullscreen Workbench"
-        >
-          <Maximize2 width={15} height={15} />
         </button>
       </div>
     </header>

@@ -69,6 +69,8 @@ export interface ChatMessage {
 export interface ChatSession {
   sessionId: string;
   workspaceId: string;
+  workspaceName?: string;
+  workspace_name?: string;
   title: string;
   messageCount: number;
   runCount: number;
@@ -115,6 +117,8 @@ export interface TranspileResult {
 export interface FabricStatus {
   authenticated: boolean;
   workspaceId: string;
+  workspaceName?: string;
+  workspace_name?: string;
   targetFolder: string;
   workspacesCount: number;
   message: string;

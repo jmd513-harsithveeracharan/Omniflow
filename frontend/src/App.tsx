@@ -176,7 +176,6 @@ export const App: React.FC = () => {
       if (detail) {
         if (detail.plan) {
           setCurrentPlan(detail.plan);
-          setIsWorkbenchOpen(true);
         }
         if (detail.messages && detail.messages.length > 0) {
           setMessages(detail.messages.map((m) => ({ role: m.role, content: m.content })));

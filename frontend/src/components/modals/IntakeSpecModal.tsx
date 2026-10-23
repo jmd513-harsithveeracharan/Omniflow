@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import ReactDOM from 'react-dom';
 import {
   FileCode,
   X,
@@ -330,7 +331,7 @@ export const IntakeSpecModal: React.FC<IntakeSpecModalProps> = ({ isOpen, onClos
       alert('Please correct JSON syntax errors before running.');
       return;
     }
-    // Always default to resume mode (true) so existing assets are reused
+    // Fast Resume Mode is always enabled by default
     onSubmit(jsonText, true);
     onClose();
   };
@@ -369,20 +370,21 @@ export const IntakeSpecModal: React.FC<IntakeSpecModalProps> = ({ isOpen, onClos
 
   const lines = jsonText.split('\n');
 
-  return (
+  // Render via portal to document.body for true viewport centering and blur effect
+  const modalContent = (
     <div
       className="sso-modal-backdrop"
       style={{
         display: 'flex',
         position: 'fixed',
         inset: 0,
-        background: 'rgba(5, 7, 12, 0.82)',
-        backdropFilter: 'blur(12px)',
-        WebkitBackdropFilter: 'blur(12px)',
-        zIndex: 10050,
+        background: 'rgba(0, 0, 0, 0.55)',
+        backdropFilter: 'blur(8px)',
+        WebkitBackdropFilter: 'blur(8px)',
+        zIndex: 99999,
         alignItems: 'center',
         justifyContent: 'center',
-        padding: '24px',
+        padding: '20px',
         boxSizing: 'border-box',
       }}
       onClick={onClose}
@@ -409,7 +411,7 @@ export const IntakeSpecModal: React.FC<IntakeSpecModalProps> = ({ isOpen, onClos
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            padding: '20px 24px 14px 24px',
+            padding: '18px 24px 10px 24px',
             background: 'transparent',
           }}
         >
@@ -458,8 +460,8 @@ export const IntakeSpecModal: React.FC<IntakeSpecModalProps> = ({ isOpen, onClos
           </button>
         </div>
 
-        {/* Modal Body */}
-        <div style={{ padding: '6px 24px 18px 24px', display: 'flex', flexDirection: 'column', gap: '14px', overflowY: 'auto' }}>
+        {/* Modal Body (Tightened vertical spacing) */}
+        <div style={{ padding: '8px 24px 12px 24px', display: 'flex', flexDirection: 'column', gap: '12px', overflowY: 'auto' }}>
           {/* Controls Bar */}
           <div
             style={{
@@ -569,13 +571,13 @@ export const IntakeSpecModal: React.FC<IntakeSpecModalProps> = ({ isOpen, onClos
                 </button>
               </div>
 
-              {/* Upload JSON Button (Clean grey icon) */}
+              {/* Upload JSON Button */}
               <label
                 style={{
                   display: 'inline-flex',
                   alignItems: 'center',
                   gap: '6px',
-                  height: '34px',
+                  height: '32px',
                   padding: '0 12px',
                   background: '#141822',
                   border: '1px solid rgba(255, 255, 255, 0.08)',
@@ -586,14 +588,14 @@ export const IntakeSpecModal: React.FC<IntakeSpecModalProps> = ({ isOpen, onClos
                   cursor: 'pointer',
                   transition: 'background 0.15s ease',
                 }}
-                title="Upload JSON"
+                title="Upload JSON file"
               >
                 <Upload width={13} height={13} style={{ color: '#94a3b8' }} />
                 <span>Upload</span>
                 <input type="file" accept=".json" onChange={handleFileUpload} style={{ display: 'none' }} />
               </label>
 
-              {/* Format Button (Clean grey icon) */}
+              {/* Format Button */}
               <button
                 type="button"
                 onClick={handleFormat}
@@ -601,7 +603,7 @@ export const IntakeSpecModal: React.FC<IntakeSpecModalProps> = ({ isOpen, onClos
                   display: 'inline-flex',
                   alignItems: 'center',
                   gap: '6px',
-                  height: '34px',
+                  height: '32px',
                   padding: '0 12px',
                   background: '#141822',
                   border: '1px solid rgba(255, 255, 255, 0.08)',
@@ -612,7 +614,7 @@ export const IntakeSpecModal: React.FC<IntakeSpecModalProps> = ({ isOpen, onClos
                   cursor: 'pointer',
                   transition: 'background 0.15s ease',
                 }}
-                title="Format JSON"
+                title="Format JSON structure"
               >
                 <Sparkles width={13} height={13} style={{ color: '#94a3b8' }} />
                 <span>Format</span>
@@ -738,7 +740,7 @@ export const IntakeSpecModal: React.FC<IntakeSpecModalProps> = ({ isOpen, onClos
               </div>
             </div>
 
-            {/* Embedded Bottom Status Bar (Status & line count moved to the right) */}
+            {/* Embedded Bottom Status Bar (Valid JSON & lines count on right) */}
             <div
               style={{
                 display: 'flex',
@@ -767,59 +769,70 @@ export const IntakeSpecModal: React.FC<IntakeSpecModalProps> = ({ isOpen, onClos
           </div>
         </div>
 
-        {/* Modal Footer (No divider border-top) */}
+        {/* Modal Footer (No divider border-top, balanced bottom-left status) */}
         <div
           style={{
             display: 'flex',
             alignItems: 'center',
-            justifyContent: 'flex-end',
-            gap: '10px',
-            padding: '10px 24px 20px 24px',
+            justifyContent: 'space-between',
+            padding: '8px 24px 18px 24px',
             background: 'transparent',
           }}
         >
-          <button
-            type="button"
-            onClick={onClose}
-            style={{
-              padding: '8px 16px',
-              background: 'transparent',
-              border: '1px solid rgba(255, 255, 255, 0.1)',
-              borderRadius: '8px',
-              color: '#94a3b8',
-              fontSize: '12px',
-              fontWeight: 500,
-              cursor: 'pointer',
-              transition: 'all 0.15s ease',
-            }}
-          >
-            Cancel
-          </button>
+          {/* Subtle bottom-left indicator so it never feels empty */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
+            <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#10b981', display: 'inline-block' }} />
+            <span style={{ fontSize: '11.5px', color: '#94a3b8', fontWeight: 500 }}>
+              Microsoft Fabric Medallion Engine Ready
+            </span>
+          </div>
 
-          <button
-            type="button"
-            onClick={handleSubmit}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '6px',
-              padding: '8px 22px',
-              background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-              border: 'none',
-              borderRadius: '8px',
-              color: '#ffffff',
-              fontSize: '12px',
-              fontWeight: 600,
-              cursor: 'pointer',
-              boxShadow: '0 4px 14px rgba(16, 185, 129, 0.35)',
-              transition: 'transform 0.1s ease',
-            }}
-          >
-            <Play width={12} height={12} fill="#ffffff" />
-            <span>Launch</span>
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <button
+              type="button"
+              onClick={onClose}
+              style={{
+                padding: '8px 16px',
+                background: 'transparent',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                borderRadius: '8px',
+                color: '#94a3b8',
+                fontSize: '12px',
+                fontWeight: 500,
+                cursor: 'pointer',
+                transition: 'all 0.15s ease',
+              }}
+            >
+              Cancel
+            </button>
+
+            <button
+              type="button"
+              onClick={handleSubmit}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '8px 22px',
+                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                border: 'none',
+                borderRadius: '8px',
+                color: '#ffffff',
+                fontSize: '12px',
+                fontWeight: 600,
+                cursor: 'pointer',
+                boxShadow: '0 4px 14px rgba(16, 185, 129, 0.35)',
+                transition: 'transform 0.1s ease',
+              }}
+            >
+              <Play width={12} height={12} fill="#ffffff" />
+              <span>Launch</span>
+            </button>
+          </div>
         </div>
       </div>
     </div>
   );
+
+  return typeof document !== 'undefined' ? ReactDOM.createPortal(modalContent, document.body) : modalContent;
 };
