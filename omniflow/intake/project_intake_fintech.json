@@ -4,83 +4,290 @@
       "project_code": "PRJ-FINTECH-PAYMENTS",
       "project_name": "Global Cross-Border Payments & Fraud Intelligence Platform",
       "business_domain": "Fintech, International Wire Settlement & Anti-Money Laundering (AML)",
+      "enterprise_tier": "Tier-1 Mission Critical",
       "sla_target_minutes": 5,
-      "compliance_frameworks": ["PCI-DSS Level 1", "SOC2 Type II", "GDPR", "FinCEN Travel Rule"]
+      "target_rpo_minutes": 1,
+      "target_rto_minutes": 15,
+      "compliance_frameworks": [
+        "PCI-DSS v4.0 Level 1",
+        "SOC2 Type II",
+        "GDPR Article 32 (PII Pseudonymization)",
+        "FinCEN Travel Rule (Bank Secrecy Act)",
+        "ISO 20022 Financial Messaging Standard"
+      ],
+      "data_classification": "Confidential / Highly Restricted Financial & PII"
     },
     "solution_summary": {
-      "target_architecture": "Microsoft Fabric Medallion Architecture (Bronze -> Stage -> Silver -> Gold)",
+      "target_architecture": "Microsoft Fabric Medallion Architecture (Bronze Ingestion -> Stage Curation -> Silver Harmonization -> Gold Analytics)",
       "target_folder_structure": {
         "root_folder": "Fintech_Payments_Platform",
         "subfolders": {
-          "raw": "01 Raw",
-          "stage": "02 Stage",
-          "silver": "03 Silver",
-          "gold": "04 Gold"
+          "raw": "01 Raw Ingestion",
+          "stage": "02 Stage & Curation",
+          "silver": "03 Silver Harmonized",
+          "gold": "04 Gold Star Schema",
+          "semantic": "05 Semantic & Reporting"
         }
       },
       "expected_deliverables": [
-        "Fabric Raw Lakehouse (lh_fintech_raw_bronze in '01 Raw')",
-        "Fabric Wire Ingestion Pipeline (pl_fintech_swift_ingest in '01 Raw')",
-        "PySpark PII Masking & Deduplication Notebook (nb_fintech_pii_masking in '02 Stage')",
-        "Real-time Sanctions & OFAC Screening Notebook (nb_fintech_aml_screening in '02 Stage')",
-        "Fabric Curated Delta Lakehouse (lh_fintech_curated_silver in '03 Silver')",
-        "Great Expectations Data Quality Reconciliation Suite ('03 Silver')",
-        "Fabric Gold Analytical Warehouse (wh_fintech_analytics_gold in '04 Gold')",
-        "Kimball Star Schema DDL with FactSettlement & Conformed Dimensions ('04 Gold')",
-        "Power BI Direct Lake Semantic Model (sm_fintech_direct_lake in '04 Gold')",
-        "NetworkX Column Lineage & Blast-Zone Dependency DAG"
-      ]
+        "Fabric Raw Lakehouse (lh_fintech_raw_bronze in '01 Raw Ingestion')",
+        "Fabric Eventstream & ADF Ingestion Pipeline (pl_fintech_swift_wire_batch in '01 Raw Ingestion')",
+        "PySpark SHA-256 PII Masking & Data Sanitization Notebook (nb_fintech_pii_masking in '02 Stage & Curation')",
+        "PySpark Sanctions & OFAC Screening Fuzzy Matcher (nb_fintech_aml_screening in '02 Stage & Curation')",
+        "PySpark SCD-Type 2 Account History Tracker (nb_fintech_account_scd2 in '02 Stage & Curation')",
+        "Fabric Curated Delta Lakehouse (lh_fintech_curated_silver in '03 Silver Harmonized')",
+        "Great Expectations Data Quality Reconciliation Suite (ge_fintech_quality_suite in '03 Silver Harmonized')",
+        "Fabric Gold Analytical Warehouse (wh_fintech_analytics_gold in '04 Gold Star Schema')",
+        "T-SQL Kimball Star Schema DDL with FactWireSettlement & Conformed Dimensions (ddl_fintech_star_schema.sql)",
+        "T-SQL Stored Procedure for Daily Net Settlement Balancing (sp_fintech_daily_net_settlement in '04 Gold Star Schema')",
+        "Power BI Direct Lake Semantic Model (sm_fintech_payments_direct_lake in '05 Semantic & Reporting')",
+        "NetworkX Column Lineage Graph & Blast-Zone Risk Matrix (dag_fintech_lineage.json)"
+      ],
+      "delta_lake_optimization": {
+        "liquid_clustering_keys": ["settlement_date", "currency_pair", "sending_institution_bic"],
+        "z_order_columns": ["uetr_transaction_id", "sender_account_id", "aml_risk_score"],
+        "vacuum_retention_hours": 168,
+        "auto_compact_enabled": true,
+        "optimize_write_enabled": true
+      }
     }
   },
   "retrieved_context": {
     "data_sources": [
       {
         "source_name": "SWIFT Alliance Gateway & ISO 20022 Financial Switch",
+        "source_type": "Real-time Message Broker & Streaming Store",
+        "protocol": "AMQP / Kafka Event Hubs",
+        "ingestion_frequency": "Continuous Micro-Batch (60 seconds)",
         "tables": [
           {
             "table_name": "wire_transfers",
             "primary_key": "uetr_transaction_id",
             "watermark_column": "settlement_timestamp",
             "row_count": 18500000,
-            "pii_columns": ["sender_iban", "receiver_iban", "beneficiary_name", "remittance_details"]
-          },
-          {
-            "table_name": "customer_accounts",
-            "primary_key": "account_id",
-            "watermark_column": "updated_at",
-            "row_count": 320000,
-            "pii_columns": ["account_holder_name", "tax_identifier_ssn", "phone_number", "billing_address", "email"]
-          },
-          {
-            "table_name": "aml_risk_signals",
-            "primary_key": "signal_id",
-            "watermark_column": "detected_at",
-            "row_count": 640000,
-            "pii_columns": []
-          },
-          {
-            "table_name": "sanction_entities",
-            "primary_key": "entity_id",
-            "watermark_column": "last_reviewed_date",
-            "row_count": 85000,
-            "pii_columns": ["entity_legal_name", "alias_names"]
+            "pii_columns": ["sender_iban", "receiver_iban", "beneficiary_name", "remittance_details"],
+            "columns": [
+              { "name": "uetr_transaction_id", "type": "string", "is_pk": true, "description": "Unique End-to-End Transaction Reference (UUIDv4)" },
+              { "name": "message_type", "type": "string", "description": "ISO 20022 message type: pacs.008, pacs.009, or MT103" },
+              { "name": "sender_account_id", "type": "string", "description": "Internal customer account identifier" },
+              { "name": "sender_iban", "type": "string", "is_pii": true, "masking": "SHA-256", "description": "Debtor International Bank Account Number" },
+              { "name": "sender_bic", "type": "string", "description": "Ordering Institution BIC (Bank Identifier Code)" },
+              { "name": "receiver_iban", "type": "string", "is_pii": true, "masking": "SHA-256", "description": "Creditor International Bank Account Number" },
+              { "name": "receiver_bic", "type": "string", "description": "Beneficiary Institution BIC" },
+              { "name": "beneficiary_name", "type": "string", "is_pii": true, "masking": "HASH_WITH_SALT", "description": "Legal Name of the Beneficiary Entity" },
+              { "name": "instructed_amount", "type": "decimal(18,4)", "description": "Gross wire transfer value in originating currency" },
+              { "name": "instructed_currency", "type": "string", "description": "ISO 4217 3-letter currency code (e.g. USD, EUR, GBP)" },
+              { "name": "settlement_amount_usd", "type": "decimal(18,4)", "description": "Standardized equivalent amount in USD" },
+              { "name": "exchange_rate_applied", "type": "decimal(12,6)", "description": "FX spot rate applied at execution timestamp" },
+              { "name": "remittance_details", "type": "string", "is_pii": true, "masking": "REDACT_REGEX", "description": "Unstructured payment narrative & invoice references" },
+              { "name": "clearing_channel", "type": "string", "description": "Fedwire, CHIPS, TARGET2, or SEPA Instant" },
+              { "name": "status", "type": "string", "description": "SETTLED, PENDING_AML, REJECTED, or INVESTIGATION" },
+              { "name": "created_at", "type": "timestamp", "description": "Initial message ingress timestamp" },
+              { "name": "settlement_timestamp", "type": "timestamp", "description": "Final ledger clearing timestamp" }
+            ]
           },
           {
             "table_name": "settlement_batches",
             "primary_key": "batch_id",
             "watermark_column": "cleared_at",
             "row_count": 420000,
-            "pii_columns": []
+            "pii_columns": [],
+            "columns": [
+              { "name": "batch_id", "type": "string", "is_pk": true, "description": "Clearing house net batch identifier" },
+              { "name": "clearing_network", "type": "string", "description": "Network name: Fedwire, CHIPS, or TARGET2" },
+              { "name": "total_wire_count", "type": "integer", "description": "Number of transactions aggregated in this batch" },
+              { "name": "gross_debit_amount_usd", "type": "decimal(20,4)", "description": "Total outgoing debits in USD" },
+              { "name": "gross_credit_amount_usd", "type": "decimal(20,4)", "description": "Total incoming credits in USD" },
+              { "name": "net_settlement_amount_usd", "type": "decimal(20,4)", "description": "Net liquidity movement with central clearing bank" },
+              { "name": "reconciliation_status", "type": "string", "description": "BALANCED, DISCREPANCY_FLAGGED, or PENDING" },
+              { "name": "cleared_at", "type": "timestamp", "description": "Federal clearing confirmation timestamp" }
+            ]
+          }
+        ]
+      },
+      {
+        "source_name": "Core Banking Ledger & Customer RDBMS (Oracle Exadata)",
+        "source_type": "Relational Database Management System",
+        "protocol": "JDBC / Log-based Change Data Capture (CDC)",
+        "ingestion_frequency": "Hourly Micro-Batch",
+        "tables": [
+          {
+            "table_name": "customer_accounts",
+            "primary_key": "account_id",
+            "watermark_column": "updated_at",
+            "row_count": 320000,
+            "pii_columns": ["account_holder_name", "tax_identifier_ssn", "phone_number", "billing_address", "email"],
+            "columns": [
+              { "name": "account_id", "type": "string", "is_pk": true, "description": "Primary internal bank account number" },
+              { "name": "customer_cif_id", "type": "string", "description": "Customer Information File (CIF) master identifier" },
+              { "name": "account_holder_name", "type": "string", "is_pii": true, "masking": "HASH_WITH_SALT", "description": "Full legal name of account owner" },
+              { "name": "account_type", "type": "string", "description": "COMMERCIAL_CHECKING, NOSTRO, VOSTRO, or TREASURY" },
+              { "name": "tax_identifier_ssn", "type": "string", "is_pii": true, "masking": "FULL_MASK", "description": "SSN or Tax Identification Number" },
+              { "name": "domicile_country_code", "type": "string", "description": "ISO 3166-1 alpha-2 jurisdiction code" },
+              { "name": "kyc_status", "type": "string", "description": "VERIFIED, ENHANCED_DUE_DILIGENCE, or SUSPENDED" },
+              { "name": "risk_tier", "type": "string", "description": "LOW, MEDIUM, HIGH, PEP_ASSOCIATED" },
+              { "name": "current_balance_usd", "type": "decimal(18,4)", "description": "Real-time ledger balance in USD" },
+              { "name": "credit_limit_usd", "type": "decimal(18,4)", "description": "Authorized intraday overdraft credit limit" },
+              { "name": "phone_number", "type": "string", "is_pii": true, "masking": "REDACT_REGEX", "description": "Verified contact phone" },
+              { "name": "billing_address", "type": "string", "is_pii": true, "masking": "REDACT_REGEX", "description": "Primary registered address" },
+              { "name": "email", "type": "string", "is_pii": true, "masking": "PARTIAL_MASK", "description": "Operational email address" },
+              { "name": "created_at", "type": "timestamp", "description": "Account opening timestamp" },
+              { "name": "updated_at", "type": "timestamp", "description": "Last profile alteration timestamp" }
+            ]
           },
+          {
+            "table_name": "general_ledger_entries",
+            "primary_key": "journal_entry_id",
+            "watermark_column": "posted_at",
+            "row_count": 48000000,
+            "pii_columns": [],
+            "columns": [
+              { "name": "journal_entry_id", "type": "string", "is_pk": true, "description": "Double-entry accounting journal UUID" },
+              { "name": "account_id", "type": "string", "description": "Associated customer or internal ledger account" },
+              { "name": "gl_account_code", "type": "string", "description": "Chart of accounts code (e.g. 10100 Cash, 20100 Wire Payable)" },
+              { "name": "entry_type", "type": "string", "description": "DEBIT or CREDIT" },
+              { "name": "amount_usd", "type": "decimal(18,4)", "description": "Monetary value in USD" },
+              { "name": "source_reference_id", "type": "string", "description": "Foreign reference: uetr_transaction_id or batch_id" },
+              { "name": "posted_at", "type": "timestamp", "description": "Ledger posting timestamp" }
+            ]
+          }
+        ]
+      },
+      {
+        "source_name": "Sanctions Screening & Watchlist Regulatory Feed (OFAC / UN / EU)",
+        "source_type": "External Government & Regulatory SFTP Stream",
+        "protocol": "SFTP / Secure XML Parser",
+        "ingestion_frequency": "Every 4 Hours",
+        "tables": [
+          {
+            "table_name": "sanction_entities",
+            "primary_key": "entity_id",
+            "watermark_column": "last_reviewed_date",
+            "row_count": 85000,
+            "pii_columns": ["entity_legal_name", "alias_names"],
+            "columns": [
+              { "name": "entity_id", "type": "string", "is_pk": true, "description": "OFAC SDN or EU Sanction Entity Identifier" },
+              { "name": "entity_legal_name", "type": "string", "is_pii": true, "description": "Designated individual or institutional legal name" },
+              { "name": "alias_names", "type": "string", "is_pii": true, "description": "Comma-separated known aliases (AKAs)" },
+              { "name": "sanction_program", "type": "string", "description": "SDNT, UKRAINE-EO14024, CYBER2, or TERRORISM" },
+              { "name": "country_of_origin", "type": "string", "description": "Country of nationality or primary domicile" },
+              { "name": "date_of_birth_or_inc", "type": "string", "description": "Date of birth or corporate incorporation" },
+              { "name": "listing_date", "type": "date", "description": "Date added to active global sanction list" },
+              { "name": "last_reviewed_date", "type": "timestamp", "description": "Regulatory list version refresh timestamp" }
+            ]
+          }
+        ]
+      },
+      {
+        "source_name": "Real-time AML Fraud Signals & Device Telemetry (Event Hubs)",
+        "source_type": "Distributed Streaming Telemetry",
+        "protocol": "Azure Event Hubs Kafka Protocol",
+        "ingestion_frequency": "Sub-Second Real-Time",
+        "tables": [
+          {
+            "table_name": "aml_risk_signals",
+            "primary_key": "signal_id",
+            "watermark_column": "detected_at",
+            "row_count": 640000,
+            "pii_columns": [],
+            "columns": [
+              { "name": "signal_id", "type": "string", "is_pk": true, "description": "Risk rule evaluation trigger identifier" },
+              { "name": "uetr_transaction_id", "type": "string", "description": "Associated wire transaction identifier" },
+              { "name": "risk_rule_name", "type": "string", "description": "VELOCITY_SPIKE, STRUCTURING_SMURFING, or HIGH_RISK_GEO" },
+              { "name": "risk_score", "type": "integer", "description": "Calculated ML risk probability (0 to 100)" },
+              { "name": "sanction_match_confidence", "type": "decimal(5,2)", "description": "Jaro-Winkler string similarity percentage on beneficiary" },
+              { "name": "client_ip_country", "type": "string", "description": "GeoIP country code of the initiating terminal" },
+              { "name": "recommended_action", "type": "string", "description": "AUTO_APPROVE, HOLD_FOR_REVIEW, or IMMEDIATE_BLOCK" },
+              { "name": "detected_at", "type": "timestamp", "description": "Signal generation timestamp" }
+            ]
+          }
+        ]
+      },
+      {
+        "source_name": "Global Foreign Exchange Market Rates (Refinitiv FX Feed)",
+        "source_type": "Market Data Stream",
+        "protocol": "WebSocket FIX / REST API",
+        "ingestion_frequency": "Every 15 Seconds",
+        "tables": [
           {
             "table_name": "fx_spot_rates",
             "primary_key": "currency_pair_id",
             "watermark_column": "quote_timestamp",
             "row_count": 9500000,
-            "pii_columns": []
+            "pii_columns": [],
+            "columns": [
+              { "name": "currency_pair_id", "type": "string", "is_pk": true, "description": "Base and quote currency string (e.g. EURUSD, GBPUSD)" },
+              { "name": "bid_price", "type": "decimal(12,6)", "description": "Institutional bid rate" },
+              { "name": "ask_price", "type": "decimal(12,6)", "description": "Institutional ask rate" },
+              { "name": "mid_market_rate", "type": "decimal(12,6)", "description": "Calculated mid-market reference exchange rate" },
+              { "name": "market_source", "type": "string", "description": "Reuters, Bloomberg, or Internal FX Desk" },
+              { "name": "quote_timestamp", "type": "timestamp", "description": "Tick quote timestamp" }
+            ]
           }
         ]
       }
+    ]
+  },
+  "data_quality_reconciliation": {
+    "suite_name": "Fintech_Wire_Settlement_Audit_Suite",
+    "strict_mode": true,
+    "rules": [
+      {
+        "target_table": "wire_transfers",
+        "assertion": "expect_column_values_to_not_be_null",
+        "column": "uetr_transaction_id",
+        "tolerance": 0.0
+      },
+      {
+        "target_table": "wire_transfers",
+        "assertion": "expect_column_values_to_be_between",
+        "column": "instructed_amount",
+        "min_value": 0.01,
+        "max_value": 100000000.0,
+        "action_on_failure": "QUARANTINE_ROW"
+      },
+      {
+        "target_table": "customer_accounts",
+        "assertion": "expect_column_values_to_match_regex",
+        "column": "tax_identifier_ssn",
+        "regex": "^[A-Fa-f0-9]{64}$",
+        "description": "Ensure 100% of SSNs in Silver/Gold are SHA-256 hashed before ingestion"
+      },
+      {
+        "target_table": "settlement_batches",
+        "assertion": "expect_column_values_to_be_in_set",
+        "column": "reconciliation_status",
+        "value_set": ["BALANCED", "DISCREPANCY_FLAGGED", "PENDING"]
+      }
+    ]
+  },
+  "analytical_gold_models": {
+    "fact_tables": [
+      {
+        "name": "Fact_WireSettlement",
+        "grain": "One row per settled or attempted wire transaction",
+        "primary_key": "SettlementKey",
+        "foreign_keys": ["CustomerKey", "SanctionKey", "CurrencyKey", "DateKey"],
+        "measures": [
+          "SettlementAmountUSD",
+          "InstructedAmount",
+          "ExchangeRateApplied",
+          "AMLScore",
+          "ProcessingLatencySeconds"
+        ]
+      }
+    ],
+    "dimension_tables": [
+      { "name": "Dim_CustomerAccount", "type": "SCD Type 2", "surrogate_key": "CustomerKey", "natural_key": "account_id" },
+      { "name": "Dim_SanctionEntity", "type": "SCD Type 1", "surrogate_key": "SanctionKey", "natural_key": "entity_id" },
+      { "name": "Dim_CurrencyPair", "type": "SCD Type 1", "surrogate_key": "CurrencyKey", "natural_key": "currency_pair_id" },
+      { "name": "Dim_Date", "type": "Conformed Role-Playing", "surrogate_key": "DateKey", "natural_key": "calendar_date" }
+    ],
+    "power_bi_dax_kpis": [
+      { "name": "Total Settlement Volume USD", "expression": "SUM(Fact_WireSettlement[SettlementAmountUSD])", "format": "$#,##0.00" },
+      { "name": "AML Block Rate %", "expression": "DIVIDE(CALCULATE(COUNTROWS(Fact_WireSettlement), Fact_WireSettlement[Status] = \"REJECTED\"), COUNTROWS(Fact_WireSettlement)) * 100", "format": "0.00%" },
+      { "name": "Average Processing Time Sec", "expression": "AVERAGE(Fact_WireSettlement[ProcessingLatencySeconds])", "format": "#,##0.0s" },
+      { "name": "5-Min SLA Compliance %", "expression": "DIVIDE(CALCULATE(COUNTROWS(Fact_WireSettlement), Fact_WireSettlement[ProcessingLatencySeconds] <= 300), COUNTROWS(Fact_WireSettlement)) * 100", "format": "0.00%" }
     ]
   }
 }
