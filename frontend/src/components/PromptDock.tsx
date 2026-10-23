@@ -490,7 +490,7 @@ export const PromptDock: React.FC<PromptDockProps> = ({
           </div>
         </div>
       </div>
-      <div className="dock-disclaimer">Fabric.AI can make mistakes. Please double-check responses.</div>
+      <div className="dock-disclaimer">Omniflow can make mistakes. Please double-check responses.</div>
 
       {/* Project Intake Specification Modal */}
       <IntakeSpecModal

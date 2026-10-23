@@ -239,7 +239,6 @@ const TEMPLATES = [
 export const IntakeSpecModal: React.FC<IntakeSpecModalProps> = ({ isOpen, onClose, onSubmit }) => {
   const [selectedTemplateIndex, setSelectedTemplateIndex] = useState(0);
   const [jsonText, setJsonText] = useState('');
-  const [resume, setResume] = useState(false);
   const [isValid, setIsValid] = useState(true);
   const [lineCount, setLineCount] = useState(0);
   const [viewMode, setViewMode] = useState<'preview' | 'edit'>('preview');
@@ -331,7 +330,8 @@ export const IntakeSpecModal: React.FC<IntakeSpecModalProps> = ({ isOpen, onClos
       alert('Please correct JSON syntax errors before running.');
       return;
     }
-    onSubmit(jsonText, resume);
+    // Always default to resume mode (true) so existing assets are reused
+    onSubmit(jsonText, true);
     onClose();
   };
 
@@ -403,97 +403,64 @@ export const IntakeSpecModal: React.FC<IntakeSpecModalProps> = ({ isOpen, onClos
         }}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header */}
+        {/* Header (No divider border-bottom) */}
         <div
           style={{
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            padding: '16px 24px',
-            borderBottom: '1px solid rgba(255, 255, 255, 0.07)',
-            background: 'rgba(255, 255, 255, 0.015)',
+            padding: '20px 24px 14px 24px',
+            background: 'transparent',
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <div
               style={{
-                width: '38px',
-                height: '38px',
-                borderRadius: '10px',
+                width: '36px',
+                height: '36px',
+                borderRadius: '9px',
                 background: 'rgba(16, 185, 129, 0.12)',
-                border: '1px solid rgba(16, 185, 129, 0.25)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
               }}
             >
-              <FileCode width={20} height={20} style={{ color: '#10b981' }} />
+              <FileCode width={19} height={19} style={{ color: '#10b981' }} />
             </div>
             <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <h3 style={{ fontSize: '15px', fontWeight: 600, color: '#f8fafc', margin: 0, letterSpacing: '-0.01em' }}>
-                  Project Intake Specification
-                </h3>
-                <span
-                  style={{
-                    fontSize: '10.5px',
-                    fontFamily: '"JetBrains Mono", monospace',
-                    fontWeight: 500,
-                    padding: '2px 8px',
-                    borderRadius: '20px',
-                    background: 'rgba(16, 185, 129, 0.12)',
-                    color: '#34d399',
-                    border: '1px solid rgba(16, 185, 129, 0.25)',
-                  }}
-                >
-                  Tenali AI Engine
-                </span>
-              </div>
+              <h3 style={{ fontSize: '15px', fontWeight: 600, color: '#f8fafc', margin: 0, letterSpacing: '-0.01em' }}>
+                Project Intake Specification
+              </h3>
               <p style={{ fontSize: '11.5px', color: '#94a3b8', margin: '2px 0 0 0' }}>
                 Define source schemas, project metadata, and target Medallion folder hierarchy.
               </p>
             </div>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span
-              style={{
-                fontSize: '10.5px',
-                fontFamily: '"JetBrains Mono", monospace',
-                padding: '3px 7px',
-                borderRadius: '6px',
-                background: 'rgba(255, 255, 255, 0.05)',
-                border: '1px solid rgba(255, 255, 255, 0.08)',
-                color: '#64748b',
-              }}
-            >
-              ESC
-            </span>
-            <button
-              type="button"
-              onClick={onClose}
-              style={{
-                background: 'rgba(255, 255, 255, 0.04)',
-                border: '1px solid rgba(255, 255, 255, 0.08)',
-                borderRadius: '8px',
-                color: '#94a3b8',
-                cursor: 'pointer',
-                padding: '6px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                transition: 'all 0.15s ease',
-              }}
-              title="Close modal"
-            >
-              <X width={16} height={16} />
-            </button>
-          </div>
+          {/* Clean minimal close button without background or border */}
+          <button
+            type="button"
+            onClick={onClose}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: '#94a3b8',
+              cursor: 'pointer',
+              padding: '6px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'color 0.15s ease',
+            }}
+            title="Close"
+          >
+            <X width={18} height={18} />
+          </button>
         </div>
 
         {/* Modal Body */}
-        <div style={{ padding: '18px 24px', display: 'flex', flexDirection: 'column', gap: '14px', overflowY: 'auto' }}>
-          {/* Controls Bar (Cleaned Up & Tidy) */}
+        <div style={{ padding: '6px 24px 18px 24px', display: 'flex', flexDirection: 'column', gap: '14px', overflowY: 'auto' }}>
+          {/* Controls Bar */}
           <div
             style={{
               display: 'flex',
@@ -514,7 +481,7 @@ export const IntakeSpecModal: React.FC<IntakeSpecModalProps> = ({ isOpen, onClos
                   appearance: 'none',
                   WebkitAppearance: 'none',
                   background: '#141822',
-                  border: '1px solid rgba(255, 255, 255, 0.12)',
+                  border: '1px solid rgba(255, 255, 255, 0.1)',
                   borderRadius: '8px',
                   color: '#f1f5f9',
                   fontSize: '12px',
@@ -522,7 +489,6 @@ export const IntakeSpecModal: React.FC<IntakeSpecModalProps> = ({ isOpen, onClos
                   padding: '0 32px 0 12px',
                   outline: 'none',
                   cursor: 'pointer',
-                  transition: 'border-color 0.15s ease',
                 }}
               >
                 {TEMPLATES.map((t, idx) => (
@@ -554,7 +520,7 @@ export const IntakeSpecModal: React.FC<IntakeSpecModalProps> = ({ isOpen, onClos
                   background: '#141822',
                   padding: '2px',
                   borderRadius: '8px',
-                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  border: '1px solid rgba(255, 255, 255, 0.08)',
                 }}
               >
                 <button
@@ -566,8 +532,8 @@ export const IntakeSpecModal: React.FC<IntakeSpecModalProps> = ({ isOpen, onClos
                     borderRadius: '6px',
                     fontSize: '11px',
                     fontWeight: 500,
-                    background: viewMode === 'preview' ? 'rgba(16, 185, 129, 0.18)' : 'transparent',
-                    color: viewMode === 'preview' ? '#34d399' : '#94a3b8',
+                    background: viewMode === 'preview' ? 'rgba(255, 255, 255, 0.08)' : 'transparent',
+                    color: viewMode === 'preview' ? '#f1f5f9' : '#94a3b8',
                     border: 'none',
                     display: 'flex',
                     alignItems: 'center',
@@ -576,7 +542,7 @@ export const IntakeSpecModal: React.FC<IntakeSpecModalProps> = ({ isOpen, onClos
                     transition: 'all 0.15s ease',
                   }}
                 >
-                  <Code2 width={13} height={13} />
+                  <Code2 width={13} height={13} style={{ color: '#94a3b8' }} />
                   <span>Preview</span>
                 </button>
                 <button
@@ -588,8 +554,8 @@ export const IntakeSpecModal: React.FC<IntakeSpecModalProps> = ({ isOpen, onClos
                     borderRadius: '6px',
                     fontSize: '11px',
                     fontWeight: 500,
-                    background: viewMode === 'edit' ? 'rgba(16, 185, 129, 0.18)' : 'transparent',
-                    color: viewMode === 'edit' ? '#34d399' : '#94a3b8',
+                    background: viewMode === 'edit' ? 'rgba(255, 255, 255, 0.08)' : 'transparent',
+                    color: viewMode === 'edit' ? '#f1f5f9' : '#94a3b8',
                     border: 'none',
                     display: 'flex',
                     alignItems: 'center',
@@ -598,12 +564,12 @@ export const IntakeSpecModal: React.FC<IntakeSpecModalProps> = ({ isOpen, onClos
                     transition: 'all 0.15s ease',
                   }}
                 >
-                  <Edit3 width={13} height={13} />
+                  <Edit3 width={13} height={13} style={{ color: '#94a3b8' }} />
                   <span>Edit</span>
                 </button>
               </div>
 
-              {/* Upload JSON Button */}
+              {/* Upload JSON Button (Clean grey icon) */}
               <label
                 style={{
                   display: 'inline-flex',
@@ -612,22 +578,22 @@ export const IntakeSpecModal: React.FC<IntakeSpecModalProps> = ({ isOpen, onClos
                   height: '34px',
                   padding: '0 12px',
                   background: '#141822',
-                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  border: '1px solid rgba(255, 255, 255, 0.08)',
                   borderRadius: '8px',
-                  color: '#e2e8f0',
+                  color: '#94a3b8',
                   fontSize: '11.5px',
                   fontWeight: 500,
                   cursor: 'pointer',
                   transition: 'background 0.15s ease',
                 }}
-                title="Upload custom project_intake.json"
+                title="Upload JSON"
               >
-                <Upload width={13} height={13} style={{ color: '#38bdf8' }} />
+                <Upload width={13} height={13} style={{ color: '#94a3b8' }} />
                 <span>Upload</span>
                 <input type="file" accept=".json" onChange={handleFileUpload} style={{ display: 'none' }} />
               </label>
 
-              {/* Format Button */}
+              {/* Format Button (Clean grey icon) */}
               <button
                 type="button"
                 onClick={handleFormat}
@@ -638,48 +604,23 @@ export const IntakeSpecModal: React.FC<IntakeSpecModalProps> = ({ isOpen, onClos
                   height: '34px',
                   padding: '0 12px',
                   background: '#141822',
-                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  border: '1px solid rgba(255, 255, 255, 0.08)',
                   borderRadius: '8px',
-                  color: '#e2e8f0',
+                  color: '#94a3b8',
                   fontSize: '11.5px',
                   fontWeight: 500,
                   cursor: 'pointer',
                   transition: 'background 0.15s ease',
                 }}
-                title="Re-format JSON structure"
+                title="Format JSON"
               >
-                <Sparkles width={13} height={13} style={{ color: '#fbbf24' }} />
+                <Sparkles width={13} height={13} style={{ color: '#94a3b8' }} />
                 <span>Format</span>
-              </button>
-
-              {/* Copy Button */}
-              <button
-                type="button"
-                onClick={handleCopy}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  height: '34px',
-                  padding: '0 12px',
-                  background: '#141822',
-                  border: '1px solid rgba(255, 255, 255, 0.1)',
-                  borderRadius: '8px',
-                  color: copied ? '#34d399' : '#e2e8f0',
-                  fontSize: '11.5px',
-                  fontWeight: 500,
-                  cursor: 'pointer',
-                  transition: 'all 0.15s ease',
-                }}
-                title="Copy JSON to clipboard"
-              >
-                {copied ? <Check width={13} height={13} /> : <Copy width={13} height={13} style={{ color: '#94a3b8' }} />}
-                <span>{copied ? 'Copied' : 'Copy'}</span>
               </button>
             </div>
           </div>
 
-          {/* IDE Editor Frame with Line Numbers & Embedded Status Bar */}
+          {/* IDE Editor Frame with Line Numbers & Floating Copy Button */}
           <div
             style={{
               position: 'relative',
@@ -690,11 +631,39 @@ export const IntakeSpecModal: React.FC<IntakeSpecModalProps> = ({ isOpen, onClos
               boxShadow: 'inset 0 2px 8px rgba(0, 0, 0, 0.6)',
             }}
           >
+            {/* Floating Copy Button in JSON Body */}
+            <button
+              type="button"
+              onClick={handleCopy}
+              style={{
+                position: 'absolute',
+                top: '10px',
+                right: '12px',
+                zIndex: 10,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '5px',
+                padding: '4px 8px',
+                background: 'rgba(20, 24, 34, 0.85)',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                backdropFilter: 'blur(4px)',
+                borderRadius: '6px',
+                color: copied ? '#34d399' : '#94a3b8',
+                fontSize: '11px',
+                cursor: 'pointer',
+                transition: 'all 0.15s ease',
+              }}
+              title="Copy JSON"
+            >
+              {copied ? <Check width={12} height={12} /> : <Copy width={12} height={12} />}
+              <span>{copied ? 'Copied' : 'Copy'}</span>
+            </button>
+
             {/* Editor Workspace (Line Gutter + Code) */}
             <div
               style={{
                 display: 'flex',
-                height: '320px',
+                height: '350px',
                 overflow: 'hidden',
                 fontFamily: '"JetBrains Mono", "Fira Code", Consolas, monospace',
                 fontSize: '12px',
@@ -769,12 +738,12 @@ export const IntakeSpecModal: React.FC<IntakeSpecModalProps> = ({ isOpen, onClos
               </div>
             </div>
 
-            {/* Embedded Bottom Status Bar */}
+            {/* Embedded Bottom Status Bar (Status & line count moved to the right) */}
             <div
               style={{
                 display: 'flex',
                 alignItems: 'center',
-                justifyContent: 'space-between',
+                justifyContent: 'flex-end',
                 padding: '8px 14px',
                 background: '#0b0d14',
                 borderTop: '1px solid rgba(255, 255, 255, 0.06)',
@@ -794,157 +763,61 @@ export const IntakeSpecModal: React.FC<IntakeSpecModalProps> = ({ isOpen, onClos
                 <span style={{ color: '#475569' }}>•</span>
                 <span style={{ color: '#94a3b8' }}>{lineCount} lines</span>
               </div>
-
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  color: '#94a3b8',
-                  fontSize: '10.5px',
-                  fontFamily: '"JetBrains Mono", monospace',
-                }}
-              >
-                <span>Target:</span>
-                <span
-                  style={{
-                    padding: '2px 7px',
-                    borderRadius: '4px',
-                    background: 'rgba(56, 189, 248, 0.08)',
-                    color: '#38bdf8',
-                    border: '1px solid rgba(56, 189, 248, 0.15)',
-                  }}
-                >
-                  01 Raw → 02 Stage → 03 Silver → 04 Gold
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* Fast Resume Mode Option Card */}
-          <div
-            onClick={() => setResume(!resume)}
-            style={{
-              background: 'rgba(255, 255, 255, 0.02)',
-              border: '1px solid rgba(255, 255, 255, 0.06)',
-              borderRadius: '10px',
-              padding: '12px 16px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              gap: '12px',
-              cursor: 'pointer',
-              transition: 'background 0.15s ease',
-            }}
-          >
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span style={{ fontSize: '12.5px', fontWeight: 600, color: '#f8fafc' }}>
-                  Fast Resume Mode
-                </span>
-                <span
-                  style={{
-                    fontSize: '10px',
-                    padding: '1px 6px',
-                    borderRadius: '4px',
-                    background: 'rgba(148, 163, 184, 0.1)',
-                    color: '#94a3b8',
-                  }}
-                >
-                  Reuse Cached Models
-                </span>
-              </div>
-              <div style={{ fontSize: '11px', color: '#64748b', marginTop: '2px' }}>
-                Skips re-synthesizing unchanged star schemas and tools, accelerating iterative testing.
-              </div>
-            </div>
-
-            {/* Custom Sliding Toggle Pill */}
-            <div
-              style={{
-                width: '38px',
-                height: '22px',
-                borderRadius: '11px',
-                background: resume ? '#10b981' : 'rgba(255, 255, 255, 0.12)',
-                position: 'relative',
-                transition: 'background 0.2s ease',
-                flexShrink: 0,
-              }}
-            >
-              <div
-                style={{
-                  width: '16px',
-                  height: '16px',
-                  borderRadius: '50%',
-                  background: '#ffffff',
-                  position: 'absolute',
-                  top: '3px',
-                  left: resume ? '19px' : '3px',
-                  transition: 'left 0.2s ease',
-                  boxShadow: '0 1px 3px rgba(0, 0, 0, 0.4)',
-                }}
-              />
             </div>
           </div>
         </div>
 
-        {/* Modal Footer */}
+        {/* Modal Footer (No divider border-top) */}
         <div
           style={{
             display: 'flex',
             alignItems: 'center',
-            justifyContent: 'space-between',
-            padding: '14px 24px',
-            borderTop: '1px solid rgba(255, 255, 255, 0.07)',
-            background: 'rgba(255, 255, 255, 0.015)',
+            justifyContent: 'flex-end',
+            gap: '10px',
+            padding: '10px 24px 20px 24px',
+            background: 'transparent',
           }}
         >
-          <span style={{ fontSize: '11px', color: '#64748b' }}>
-            Multi-agent synthesis automatically validates Python AST & PII masking.
-          </span>
+          <button
+            type="button"
+            onClick={onClose}
+            style={{
+              padding: '8px 16px',
+              background: 'transparent',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
+              borderRadius: '8px',
+              color: '#94a3b8',
+              fontSize: '12px',
+              fontWeight: 500,
+              cursor: 'pointer',
+              transition: 'all 0.15s ease',
+            }}
+          >
+            Cancel
+          </button>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <button
-              type="button"
-              onClick={onClose}
-              style={{
-                padding: '8px 16px',
-                background: 'transparent',
-                border: '1px solid rgba(255, 255, 255, 0.1)',
-                borderRadius: '8px',
-                color: '#94a3b8',
-                fontSize: '12px',
-                fontWeight: 500,
-                cursor: 'pointer',
-                transition: 'all 0.15s ease',
-              }}
-            >
-              Cancel
-            </button>
-
-            <button
-              type="button"
-              onClick={handleSubmit}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '7px',
-                padding: '8px 18px',
-                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                border: 'none',
-                borderRadius: '8px',
-                color: '#ffffff',
-                fontSize: '12px',
-                fontWeight: 600,
-                cursor: 'pointer',
-                boxShadow: '0 4px 14px rgba(16, 185, 129, 0.35)',
-                transition: 'transform 0.1s ease',
-              }}
-            >
-              <Play width={13} height={13} fill="#ffffff" />
-              <span>Launch Autonomous Pipeline</span>
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={handleSubmit}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '8px 22px',
+              background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+              border: 'none',
+              borderRadius: '8px',
+              color: '#ffffff',
+              fontSize: '12px',
+              fontWeight: 600,
+              cursor: 'pointer',
+              boxShadow: '0 4px 14px rgba(16, 185, 129, 0.35)',
+              transition: 'transform 0.1s ease',
+            }}
+          >
+            <Play width={12} height={12} fill="#ffffff" />
+            <span>Launch</span>
+          </button>
         </div>
       </div>
     </div>

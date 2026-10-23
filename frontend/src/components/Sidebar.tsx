@@ -47,11 +47,19 @@ interface SidebarProps {
   onRefreshStatus?: () => void;
 }
 
-const PLATFORMS = [
-  { id: 'fabric', name: 'Fabric.AI', icon: '/assets/logos/abstract-shape(1).png' },
-  { id: 'databricks', name: 'Databricks.AI', icon: '/assets/logos/abstract-shape-databricks.png' },
-  { id: 'snowflake', name: 'Snowflake.AI', icon: '/assets/logos/abstract-shape-snowflake.png' },
-  { id: 'dbt', name: 'dbt.AI', icon: '/assets/logos/abstract-shape-dbt.png' },
+interface PlatformConfig {
+  id: string;
+  name: string;
+  platformName: string;
+  flowColor: string;
+  icon: string;
+}
+
+const PLATFORMS: PlatformConfig[] = [
+  { id: 'fabric', name: 'Microsoft Fabric', platformName: 'Fabric', flowColor: '#10b981', icon: '/assets/logos/abstract-shape(1).png' },
+  { id: 'databricks', name: 'Databricks Lakehouse', platformName: 'Databricks', flowColor: '#ff3621', icon: '/assets/logos/abstract-shape-databricks.png' },
+  { id: 'snowflake', name: 'Snowflake Cortex', platformName: 'Snowflake', flowColor: '#29b5e8', icon: '/assets/logos/abstract-shape-snowflake.png' },
+  { id: 'dbt', name: 'dbt Core & Cloud', platformName: 'dbt', flowColor: '#ff694b', icon: '/assets/logos/abstract-shape-dbt.png' },
 ];
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -180,9 +188,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
               )}
             </div>
             <div className="brand-text">
-              <span className="brand-title">
-                {activePlatformObj.name.split('.')[0]}
-                <span className="brand-accent">.{activePlatformObj.name.split('.')[1]}</span>
+              <span className="brand-title" style={{ fontSize: '15px', fontWeight: 700, letterSpacing: '-0.02em', color: '#f8fafc' }}>
+                Omni<span className="brand-accent" style={{ color: activePlatformObj.flowColor || '#10b981', fontWeight: 700 }}>flow</span>
               </span>
             </div>
             <ChevronDown className="brand-chevron" width={11} height={11} />
@@ -201,7 +208,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   }}
                 >
                   <img src={p.icon} className="dropdown-brand-img" alt={p.name} />
-                  <span className="dropdown-brand-name">{p.name}</span>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', lineHeight: 1.2 }}>
+                    <span className="dropdown-brand-name" style={{ fontWeight: 600 }}>
+                      Omni<span style={{ color: p.flowColor }}>flow</span>
+                    </span>
+                    <span style={{ fontSize: '10px', color: '#71717a' }}>{p.name}</span>
+                  </div>
                   {selectedPlatform === p.id && <span className="dropdown-check">✓</span>}
                 </button>
               ))}
