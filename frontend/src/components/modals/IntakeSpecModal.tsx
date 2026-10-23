@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FileCode, X, Upload, Sparkles, Check, AlertCircle, Play } from 'lucide-react';
+import { FileCode, X, Upload, Sparkles, Check, AlertCircle, Play, Eye, Edit3 } from 'lucide-react';
 
 interface IntakeSpecModalProps {
   isOpen: boolean;
@@ -8,6 +8,72 @@ interface IntakeSpecModalProps {
 }
 
 const TEMPLATES = [
+  {
+    name: 'Global Express Delivery & Fleet Logistics Platform',
+    file: 'project_intake_delivery.json',
+    json: {
+      project_context: {
+        project_summary: {
+          project_code: 'PRJ-GLOBAL-DELIVERY',
+          project_name: 'Global Express Delivery & Courier Logistics Platform',
+          business_domain: 'Courier Logistics, Fleet Telemetry & Order Fulfillment',
+          sla_target_minutes: 15,
+        },
+        solution_summary: {
+          target_architecture: 'Microsoft Fabric Medallion Architecture (Bronze -> Silver -> Gold)',
+          target_folder_structure: {
+            root_folder: 'Delivery_Logistics_Platform',
+            subfolders: {
+              raw: '01 Raw',
+              stage: '02 Stage',
+              silver: '03 Silver',
+              gold: '04 Gold',
+            },
+          },
+          expected_deliverables: [
+            "Fabric Raw Lakehouse (lh_delivery_raw_bronze in '01 Raw')",
+            "Fabric Batch Ingestion Pipeline (pl_delivery_raw_batch in '01 Raw')",
+            "PySpark Staging & Deduplication Notebook (nb_delivery_curation in '02 Stage')",
+            "Fabric Curated Lakehouse (lh_delivery_curated_silver in '03 Silver')",
+            "Fabric Gold Analytical Warehouse (wh_delivery_analytics_gold in '04 Gold')",
+            "Power BI Direct Lake Semantic Model (sm_delivery_direct_lake in '04 Gold')",
+            'Great Expectations Data Quality Reconciliation Suite',
+            'NetworkX Column Lineage DAG',
+          ],
+        },
+      },
+      retrieved_context: {
+        data_sources: [
+          {
+            source_name: 'Express Delivery & Fleet Management System',
+            tables: [
+              {
+                table_name: 'shipments',
+                primary_key: 'shipment_id',
+                watermark_column: 'updated_at',
+                row_count: 850000,
+                pii_columns: [],
+              },
+              {
+                table_name: 'couriers',
+                primary_key: 'courier_id',
+                watermark_column: 'updated_at',
+                row_count: 12500,
+                pii_columns: ['full_name', 'phone_number', 'email_address'],
+              },
+              {
+                table_name: 'telemetry_pings',
+                primary_key: 'ping_id',
+                watermark_column: 'ping_time',
+                row_count: 4200000,
+                pii_columns: [],
+              },
+            ],
+          },
+        ],
+      },
+    },
+  },
   {
     name: 'Healthcare Clinical & Claims Analytics',
     file: 'project_intake_healthcare.json',
@@ -137,6 +203,7 @@ export const IntakeSpecModal: React.FC<IntakeSpecModalProps> = ({ isOpen, onClos
   const [resume, setResume] = useState(false);
   const [isValid, setIsValid] = useState(true);
   const [lineCount, setLineCount] = useState(0);
+  const [viewMode, setViewMode] = useState<'preview' | 'edit'>('preview');
 
   useEffect(() => {
     if (isOpen) {
@@ -188,6 +255,7 @@ export const IntakeSpecModal: React.FC<IntakeSpecModalProps> = ({ isOpen, onClos
         setJsonText(formatted);
         setIsValid(true);
         setLineCount(formatted.split('\n').length);
+        setViewMode('preview');
       } catch (err) {
         alert('File is not valid JSON: ' + (err instanceof Error ? err.message : String(err)));
       }
@@ -216,6 +284,32 @@ export const IntakeSpecModal: React.FC<IntakeSpecModalProps> = ({ isOpen, onClos
     onClose();
   };
 
+  // Syntax highlighting parser
+  const renderSyntaxHighlighted = (code: string) => {
+    const tokens = code.replace(
+      /("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g,
+      (match) => {
+        let color = '#fbbf24'; // number in amber
+        let weight = '400';
+        if (/^"/.test(match)) {
+          if (/:$/.test(match)) {
+            color = '#38bdf8'; // JSON key in sky blue
+            weight = '600';
+          } else {
+            color = '#34d399'; // string in emerald green
+          }
+        } else if (/true|false/.test(match)) {
+          color = '#c084fc'; // boolean in purple
+          weight = '600';
+        } else if (/null/.test(match)) {
+          color = '#f87171'; // null in rose red
+        }
+        return `<span style="color:${color};font-weight:${weight}">${match}</span>`;
+      }
+    );
+    return { __html: tokens };
+  };
+
   return (
     <div
       className="sso-modal-backdrop"
@@ -223,8 +317,8 @@ export const IntakeSpecModal: React.FC<IntakeSpecModalProps> = ({ isOpen, onClos
         display: 'flex',
         position: 'fixed',
         inset: 0,
-        background: 'rgba(0,0,0,0.75)',
-        backdropFilter: 'blur(8px)',
+        background: 'rgba(0,0,0,0.78)',
+        backdropFilter: 'blur(10px)',
         zIndex: 1200,
         alignItems: 'center',
         justifyContent: 'center',
@@ -234,13 +328,13 @@ export const IntakeSpecModal: React.FC<IntakeSpecModalProps> = ({ isOpen, onClos
       <div
         className="connections-modal-card"
         style={{
-          width: '680px',
-          maxWidth: '92vw',
-          background: '#121215',
+          width: '740px',
+          maxWidth: '94vw',
+          background: '#0f1117',
           border: '1px solid rgba(255,255,255,0.12)',
-          borderRadius: '14px',
+          borderRadius: '16px',
           overflow: 'hidden',
-          boxShadow: '0 24px 48px rgba(0,0,0,0.65)',
+          boxShadow: '0 30px 60px rgba(0,0,0,0.75)',
         }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -250,17 +344,19 @@ export const IntakeSpecModal: React.FC<IntakeSpecModalProps> = ({ isOpen, onClos
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            padding: '16px 20px',
+            padding: '18px 24px',
             borderBottom: '1px solid rgba(255,255,255,0.08)',
+            background: 'rgba(255,255,255,0.015)',
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <div
               style={{
-                width: '36px',
-                height: '36px',
-                borderRadius: '8px',
+                width: '38px',
+                height: '38px',
+                borderRadius: '10px',
                 background: 'rgba(16, 185, 129, 0.15)',
+                border: '1px solid rgba(16, 185, 129, 0.3)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -270,54 +366,57 @@ export const IntakeSpecModal: React.FC<IntakeSpecModalProps> = ({ isOpen, onClos
             </div>
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <h3 style={{ fontSize: '15px', fontWeight: 600, color: '#fff', margin: 0 }}>
+                <h3 style={{ fontSize: '15px', fontWeight: 600, color: '#f8fafc', margin: 0, letterSpacing: '-0.01em' }}>
                   Project Intake Specification
                 </h3>
                 <span
                   style={{
-                    fontSize: '10.5px',
-                    fontFamily: 'monospace',
-                    padding: '2px 7px',
-                    borderRadius: '4px',
+                    fontSize: '10px',
+                    fontFamily: '"JetBrains Mono", monospace',
+                    fontWeight: 600,
+                    padding: '2px 8px',
+                    borderRadius: '12px',
                     background: 'rgba(16, 185, 129, 0.15)',
                     color: '#34d399',
                     border: '1px solid rgba(16, 185, 129, 0.3)',
                   }}
                 >
-                  Autonomous Engine
+                  Tenali AI Engine
                 </span>
               </div>
-              <p style={{ fontSize: '11.5px', color: '#71717a', margin: '2px 0 0 0' }}>
-                Load a template, upload a JSON spec, or paste your requirements directly.
+              <p style={{ fontSize: '11.5px', color: '#94a3b8', margin: '2px 0 0 0' }}>
+                Structured architectural input for autonomous Medallion engineering and folder containment.
               </p>
             </div>
           </div>
           <button
             type="button"
             onClick={onClose}
-            style={{ background: 'none', border: 'none', color: '#71717a', cursor: 'pointer', padding: '4px' }}
+            style={{ background: 'none', border: 'none', color: '#71717a', cursor: 'pointer', padding: '6px' }}
           >
             <X width={18} height={18} />
           </button>
         </div>
 
         {/* Body */}
-        <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+        <div style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
           {/* Controls bar */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
-            <div style={{ flex: 1 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', flexWrap: 'wrap' }}>
+            <div style={{ flex: 1, minWidth: '260px' }}>
               <select
                 value={selectedTemplateIndex}
                 onChange={(e) => handleTemplateChange(Number(e.target.value))}
                 style={{
                   width: '100%',
-                  background: '#1a1b20',
+                  background: '#181b22',
                   border: '1px solid rgba(255,255,255,0.12)',
-                  borderRadius: '8px',
-                  color: '#fff',
+                  borderRadius: '9px',
+                  color: '#f8fafc',
                   fontSize: '12px',
-                  padding: '7px 10px',
+                  fontWeight: 500,
+                  padding: '8px 12px',
                   outline: 'none',
+                  cursor: 'pointer',
                 }}
               >
                 {TEMPLATES.map((t, idx) => (
@@ -328,94 +427,177 @@ export const IntakeSpecModal: React.FC<IntakeSpecModalProps> = ({ isOpen, onClos
               </select>
             </div>
 
-            <label
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '6px',
-                padding: '7px 12px',
-                background: '#1a1b20',
-                border: '1px solid rgba(255,255,255,0.12)',
-                borderRadius: '8px',
-                color: '#e4e4e7',
-                fontSize: '12px',
-                cursor: 'pointer',
-              }}
-            >
-              <Upload width={13} height={13} style={{ color: '#38bdf8' }} />
-              <span>Upload JSON</span>
-              <input type="file" accept=".json" onChange={handleFileUpload} style={{ display: 'none' }} />
-            </label>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              {/* Toggle View Mode */}
+              <div style={{ display: 'inline-flex', background: '#181b22', padding: '3px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.08)' }}>
+                <button
+                  type="button"
+                  onClick={() => setViewMode('preview')}
+                  style={{
+                    padding: '4px 10px',
+                    borderRadius: '6px',
+                    fontSize: '11px',
+                    fontWeight: 500,
+                    background: viewMode === 'preview' ? 'rgba(16, 185, 129, 0.2)' : 'none',
+                    color: viewMode === 'preview' ? '#34d399' : '#94a3b8',
+                    border: 'none',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    cursor: 'pointer',
+                  }}
+                >
+                  <Eye width={12} height={12} /> Colors
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setViewMode('edit')}
+                  style={{
+                    padding: '4px 10px',
+                    borderRadius: '6px',
+                    fontSize: '11px',
+                    fontWeight: 500,
+                    background: viewMode === 'edit' ? 'rgba(16, 185, 129, 0.2)' : 'none',
+                    color: viewMode === 'edit' ? '#34d399' : '#94a3b8',
+                    border: 'none',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    cursor: 'pointer',
+                  }}
+                >
+                  <Edit3 width={12} height={12} /> Edit
+                </button>
+              </div>
 
-            <button
-              type="button"
-              onClick={handleFormat}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '6px',
-                padding: '7px 12px',
-                background: '#1a1b20',
-                border: '1px solid rgba(255,255,255,0.12)',
-                borderRadius: '8px',
-                color: '#e4e4e7',
-                fontSize: '12px',
-                cursor: 'pointer',
-              }}
-            >
-              <Sparkles width={13} height={13} style={{ color: '#fbbf24' }} />
-              <span>Format</span>
-            </button>
+              <label
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '7px 12px',
+                  background: '#181b22',
+                  border: '1px solid rgba(255,255,255,0.12)',
+                  borderRadius: '9px',
+                  color: '#e2e8f0',
+                  fontSize: '11.5px',
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                }}
+              >
+                <Upload width={13} height={13} style={{ color: '#38bdf8' }} />
+                <span>Upload JSON</span>
+                <input type="file" accept=".json" onChange={handleFileUpload} style={{ display: 'none' }} />
+              </label>
+
+              <button
+                type="button"
+                onClick={handleFormat}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '7px 12px',
+                  background: '#181b22',
+                  border: '1px solid rgba(255,255,255,0.12)',
+                  borderRadius: '9px',
+                  color: '#e2e8f0',
+                  fontSize: '11.5px',
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                }}
+              >
+                <Sparkles width={13} height={13} style={{ color: '#fbbf24' }} />
+                <span>Format</span>
+              </button>
+            </div>
           </div>
 
           {/* Validation Header */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '11px', color: '#71717a' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '11px', color: '#94a3b8' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               {isValid ? (
-                <span style={{ color: '#34d399', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <span style={{ color: '#34d399', display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 500 }}>
                   <Check width={12} height={12} /> Valid JSON Syntax
                 </span>
               ) : (
-                <span style={{ color: '#f87171', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <span style={{ color: '#f87171', display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 500 }}>
                   <AlertCircle width={12} height={12} /> Invalid JSON Syntax
                 </span>
               )}
               <span>• {lineCount} lines</span>
             </div>
-            <span>Target: Microsoft Fabric Workspace Root</span>
+            <span style={{ fontFamily: '"JetBrains Mono", monospace', fontSize: '10.5px', color: '#38bdf8' }}>
+              Target: Workspace Root & Medallion Folders
+            </span>
           </div>
 
-          {/* JSON Textarea */}
-          <textarea
-            value={jsonText}
-            onChange={(e) => handleTextChange(e.target.value)}
-            spellCheck={false}
+          {/* JSON Body: Color Highlighted Preview OR Interactive Textarea */}
+          <div
             style={{
-              width: '100%',
-              height: '240px',
-              background: '#0d0e12',
+              position: 'relative',
+              borderRadius: '12px',
               border: `1px solid ${isValid ? 'rgba(255,255,255,0.1)' : 'rgba(239,68,68,0.5)'}`,
-              borderRadius: '10px',
-              color: '#e2e8f0',
-              fontFamily: '"JetBrains Mono", Consolas, monospace',
-              fontSize: '11.5px',
-              lineHeight: '1.5',
-              padding: '12px',
-              outline: 'none',
-              resize: 'vertical',
+              background: '#07090e',
+              overflow: 'hidden',
             }}
-          />
+          >
+            {viewMode === 'preview' ? (
+              <pre
+                style={{
+                  margin: 0,
+                  padding: '14px 18px',
+                  height: '250px',
+                  overflowY: 'auto',
+                  fontFamily: '"JetBrains Mono", "Fira Code", Consolas, monospace',
+                  fontSize: '12px',
+                  lineHeight: '1.6',
+                  color: '#e2e8f0',
+                  letterSpacing: '0.01em',
+                  whiteSpace: 'pre-wrap',
+                }}
+                dangerouslySetInnerHTML={renderSyntaxHighlighted(jsonText)}
+              />
+            ) : (
+              <textarea
+                value={jsonText}
+                onChange={(e) => handleTextChange(e.target.value)}
+                spellCheck={false}
+                style={{
+                  width: '100%',
+                  height: '250px',
+                  background: 'transparent',
+                  border: 'none',
+                  color: '#e2e8f0',
+                  fontFamily: '"JetBrains Mono", "Fira Code", Consolas, monospace',
+                  fontSize: '12px',
+                  lineHeight: '1.6',
+                  padding: '14px 18px',
+                  outline: 'none',
+                  resize: 'none',
+                  letterSpacing: '0.01em',
+                }}
+              />
+            )}
+          </div>
 
-          {/* Options */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: '4px' }}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '12px', color: '#a1a1aa' }}>
+          {/* Options: Fast Resume Mode with clear explanation */}
+          <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '10px', padding: '10px 14px' }}>
+            <label style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', cursor: 'pointer' }}>
               <input
                 type="checkbox"
                 checked={resume}
                 onChange={(e) => setResume(e.target.checked)}
-                style={{ accentColor: '#10b981', cursor: 'pointer' }}
+                style={{ accentColor: '#10b981', cursor: 'pointer', marginTop: '2px' }}
               />
-              <span>Fast Resume Mode (Reuse Cached Planning Models)</span>
+              <div>
+                <div style={{ fontSize: '12px', fontWeight: 500, color: '#f8fafc' }}>
+                  Fast Resume Mode (Reuse Cached Planning Models)
+                </div>
+                <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '1px' }}>
+                  Skips re-generating already synthesized star schemas and tools, accelerating iterative testing.
+                </div>
+              </div>
             </label>
           </div>
         </div>
@@ -426,8 +608,8 @@ export const IntakeSpecModal: React.FC<IntakeSpecModalProps> = ({ isOpen, onClos
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'flex-end',
-            gap: '10px',
-            padding: '14px 20px',
+            gap: '12px',
+            padding: '16px 24px',
             borderTop: '1px solid rgba(255,255,255,0.08)',
             background: 'rgba(255,255,255,0.02)',
           }}
@@ -436,12 +618,13 @@ export const IntakeSpecModal: React.FC<IntakeSpecModalProps> = ({ isOpen, onClos
             type="button"
             onClick={onClose}
             style={{
-              padding: '7px 14px',
+              padding: '8px 16px',
               background: 'none',
               border: '1px solid rgba(255,255,255,0.12)',
-              borderRadius: '8px',
-              color: '#a1a1aa',
+              borderRadius: '9px',
+              color: '#94a3b8',
               fontSize: '12px',
+              fontWeight: 500,
               cursor: 'pointer',
             }}
           >
@@ -454,16 +637,16 @@ export const IntakeSpecModal: React.FC<IntakeSpecModalProps> = ({ isOpen, onClos
             style={{
               display: 'inline-flex',
               alignItems: 'center',
-              gap: '6px',
-              padding: '7px 18px',
+              gap: '7px',
+              padding: '8px 20px',
               background: '#10b981',
               border: 'none',
-              borderRadius: '8px',
+              borderRadius: '9px',
               color: '#09090b',
               fontSize: '12px',
               fontWeight: 600,
               cursor: 'pointer',
-              boxShadow: '0 4px 14px rgba(16, 185, 129, 0.35)',
+              boxShadow: '0 4px 16px rgba(16, 185, 129, 0.35)',
             }}
           >
             <Play width={13} height={13} fill="#09090b" />

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Loader2, Globe, Layers, FileJson } from 'lucide-react';
+import { Loader2, Globe, Layers, Paperclip } from 'lucide-react';
 import { IntakeSpecModal } from './modals/IntakeSpecModal';
 
 interface PromptDockProps {
@@ -14,7 +14,7 @@ export const PromptDock: React.FC<PromptDockProps> = ({
   const [input, setInput] = useState('');
   const [chatMode, setChatMode] = useState<'general' | 'project'>('project');
   const [isFlipping, setIsFlipping] = useState(false);
-  const [selectedModel, setSelectedModel] = useState('Gemini 3.6 Flash');
+  const [selectedModel, setSelectedModel] = useState('Tenali AI');
   const [selectedEffort, setSelectedEffort] = useState('Medium');
   const [isModelDropdownOpen, setIsModelDropdownOpen] = useState(false);
   const [activeSubmenu, setActiveSubmenu] = useState<'none' | 'effort' | 'models'>('none');
@@ -157,6 +157,7 @@ export const PromptDock: React.FC<PromptDockProps> = ({
   };
 
   const ALL_MODELS = [
+    { id: 'tenali-ai', name: 'Tenali AI', desc: 'OmniFlow GPT-6 Luna • Multi-Agent Core Engine (Default)', tag: 'Active' },
     { id: 'gemini-3.6-flash', name: 'Gemini 3.6 Flash', desc: 'Most efficient for everyday tasks', tag: '' },
     { id: 'gemini-1.5-pro', name: 'Gemini 1.5 Pro', desc: '1M+ context window for complex DAGs', tag: 'Pro' },
     { id: 'groq-120b', name: 'Groq 120B', desc: '70B parameter open weights with deep reasoning', tag: 'Pro' },
@@ -211,25 +212,28 @@ export const PromptDock: React.FC<PromptDockProps> = ({
               </svg>
             </button>
 
-            {/* Project Intake JSON Spec Button */}
+            {/* Project Intake JSON Spec Attachment Button */}
             <button
               type="button"
               className={`dock-tool-pill ${isIntakeModalOpen ? 'active' : ''}`}
               id="btnIntakeJson"
               onClick={() => setIsIntakeModalOpen(true)}
-              title="Upload or Paste Project Intake JSON Spec"
+              title="Attach, Upload, or Edit Project Intake JSON Spec"
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',
-                gap: '5px',
-                padding: '4px 10px',
+                gap: '6px',
+                padding: '4px 11px',
                 color: isIntakeModalOpen ? '#10b981' : '#e4e4e7',
+                background: isIntakeModalOpen ? 'rgba(16, 185, 129, 0.15)' : 'rgba(255, 255, 255, 0.04)',
+                border: isIntakeModalOpen ? '1px solid rgba(16, 185, 129, 0.4)' : '1px solid rgba(255, 255, 255, 0.1)',
                 borderRadius: '8px',
-                fontSize: '11px',
+                fontSize: '11.5px',
                 fontWeight: 500,
+                cursor: 'pointer',
               }}
             >
-              <FileJson width={13} height={13} style={{ color: '#10b981' }} />
+              <Paperclip width={13} height={13} style={{ color: '#10b981' }} />
               <span>Intake Spec</span>
             </button>
 
@@ -318,16 +322,16 @@ export const PromptDock: React.FC<PromptDockProps> = ({
                     className="dock-model-primary-option"
                     id="btnModelOptionPrimary"
                     onClick={() => {
-                      setSelectedModel('Gemini 3.6 Flash');
+                      setSelectedModel('Tenali AI');
                       setIsModelDropdownOpen(false);
                       setActiveSubmenu('none');
                     }}
                   >
                     <div className="dock-model-info">
-                      <span className="dock-model-name" id="menuPrimaryModelName">Gemini 3.6 Flash</span>
-                      <span className="dock-model-desc" id="menuPrimaryModelDesc">Most efficient for everyday tasks</span>
+                      <span className="dock-model-name" id="menuPrimaryModelName">Tenali AI</span>
+                      <span className="dock-model-desc" id="menuPrimaryModelDesc">OmniFlow GPT-6 Luna • Multi-Agent Core Engine (Default)</span>
                     </div>
-                    {selectedModel === 'Gemini 3.6 Flash' && <span className="dock-model-check">✓</span>}
+                    {selectedModel === 'Tenali AI' && <span className="dock-model-check">✓</span>}
                   </div>
 
                   <div className="dock-model-divider" />

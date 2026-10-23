@@ -50,6 +50,7 @@ class MultiAgentOrchestrator:
         intake_file: str | None = None,
         intake_data_override: dict[str, Any] | None = None,
         resume: bool = False,
+        deploy: bool = False,
         event_callback: Any = None,
     ) -> dict[str, Any]:
         def emit(event_type: str, data: dict[str, Any]) -> None:
@@ -232,7 +233,7 @@ class MultiAgentOrchestrator:
         ui.divider()
 
         emit("dag_completed", {
-            "waves": [w.model_dump() for w in dag_out.execution_waves],
+            "waves": [w if isinstance(w, list) else (w.model_dump() if hasattr(w, "model_dump") else list(w)) for w in dag_out.execution_waves],
             "critical_path": dag_out.critical_path_steps,
             "total_tasks": dag_out.total_tasks,
             "is_acyclic": dag_out.is_acyclic,
@@ -307,28 +308,48 @@ class MultiAgentOrchestrator:
         else:
             ui.success_bullet("Operating with active Fabric token credentials")
 
-        deploy_res = deploy_medallion_architecture_to_fabric(
-            domain=domain_key,
-            project_code=req.project_code,
-            pyspark_notebook_code=pyspark_code,
-        )
+        target_folders = sol_summary.get("target_folder_structure")
+        root_f = (target_folders or {}).get("root_folder") or (target_folders or {}).get("root") or f"{domain_key.capitalize()}_Platform"
 
-        ui.success_bullet("Deploying directly into Microsoft Fabric workspace root (zero folder containment)")
+        if deploy:
+            deploy_res = deploy_medallion_architecture_to_fabric(
+                domain=domain_key,
+                project_code=req.project_code,
+                pyspark_notebook_code=pyspark_code,
+                target_folders=target_folders,
+            )
 
-        for dep in deploy_res.get("deployed_items", []):
-            item_display = f"{dep.get('item_type')}: {dep.get('display_name')}"
-            status_label = "Active" if dep.get("already_existed") else "Provisioned"
-            ui.check_item(item_display, status_label, f"ID: {dep.get('item_id')}")
-            # Record deployed item in fabric_items table
-            try:
-                self.db_logger.record_fabric_item(
-                    item_name=dep.get("display_name", ""),
-                    item_type=dep.get("item_type", ""),
-                    fabric_item_id=dep.get("item_id"),
-                    status="active",
-                )
-            except Exception:
-                pass
+            if target_folders:
+                ui.success_bullet(f"Deployed into structured Medallion folders under '{root_f}' (01 Raw, 02 Stage, 03 Silver, 04 Gold)")
+            else:
+                ui.success_bullet("Deploying directly into Microsoft Fabric workspace root (zero folder containment)")
+
+            for dep in deploy_res.get("deployed_items", []):
+                item_display = f"{dep.get('item_type')}: {dep.get('display_name')}"
+                status_label = "Active" if dep.get("already_existed") else "Provisioned"
+                ui.check_item(item_display, status_label, f"ID: {dep.get('item_id')}")
+                try:
+                    self.db_logger.record_fabric_item(
+                        item_name=dep.get("display_name", ""),
+                        item_type=dep.get("item_type", ""),
+                        fabric_item_id=dep.get("item_id"),
+                        status="active",
+                    )
+                except Exception:
+                    pass
+        else:
+            deploy_res = {
+                "folder_hierarchy": target_folders,
+                "status": "AWAITING_USER_DEPLOY_GATE",
+                "deployed_items": [
+                    {"item_type": "Lakehouse", "display_name": f"lh_{domain_key}_bronze", "status": "Ready", "target_folder": f"{root_f}/01 Raw"},
+                    {"item_type": "DataPipeline", "display_name": f"pl_{domain_key}_bronze_ingest", "status": "Ready", "target_folder": f"{root_f}/01 Raw"},
+                    {"item_type": "Notebook", "display_name": f"nb_{domain_key}_curate", "status": "Ready", "target_folder": f"{root_f}/02 Stage"},
+                    {"item_type": "Lakehouse", "display_name": f"lh_{domain_key}_silver", "status": "Ready", "target_folder": f"{root_f}/03 Silver"},
+                    {"item_type": "Warehouse", "display_name": f"wh_{domain_key}_gold", "status": "Ready", "target_folder": f"{root_f}/04 Gold"},
+                ]
+            }
+            ui.success_bullet(f"Target Medallion structure verified under '{root_f}' (Awaiting Deploy button confirmation)")
 
         emit("deployment_completed", {
             "deployed_items": deploy_res.get("deployed_items", []),

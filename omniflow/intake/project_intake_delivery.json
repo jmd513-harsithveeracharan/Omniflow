@@ -1,0 +1,105 @@
+{
+  "request_context": {
+    "user_id": "bheesetti.harsith@pelibiothermal.com",
+    "timestamp": "2026-10-23T11:00:00Z",
+    "environment": "production"
+  },
+  "project_context": {
+    "project_summary": {
+      "project_code": "PRJ-GLOBAL-DELIVERY",
+      "project_name": "Global Express Delivery & Courier Logistics Platform",
+      "business_domain": "Courier Logistics, Fleet Telemetry & Order Fulfillment",
+      "sla_target_minutes": 15
+    },
+    "solution_summary": {
+      "target_architecture": "Microsoft Fabric Medallion Architecture (Bronze -> Silver -> Gold)",
+      "target_folder_structure": {
+        "root_folder": "Delivery_Logistics_Platform",
+        "subfolders": {
+          "raw": "01 Raw",
+          "stage": "02 Stage",
+          "silver": "03 Silver",
+          "gold": "04 Gold"
+        }
+      },
+      "expected_deliverables": [
+        "Fabric Raw Lakehouse (lh_delivery_raw_bronze in '01 Raw')",
+        "Fabric Batch Ingestion Pipeline (pl_delivery_raw_batch in '01 Raw')",
+        "PySpark Staging & Deduplication Notebook (nb_delivery_curation in '02 Stage')",
+        "Fabric Curated Lakehouse (lh_delivery_curated_silver in '03 Silver')",
+        "Fabric Gold Analytical Warehouse (wh_delivery_analytics_gold in '04 Gold')",
+        "Power BI Direct Lake Semantic Model (sm_delivery_direct_lake in '04 Gold')",
+        "Great Expectations Data Quality Reconciliation Suite",
+        "NetworkX Column Lineage DAG"
+      ]
+    },
+    "platform_summary": {
+      "target_workspace": "PBT_DATA_AGENT",
+      "primary_engine": "Microsoft Fabric Spark & T-SQL Synapse",
+      "storage_format": "Delta Lake (Parquet with V-Order & Compaction)"
+    }
+  },
+  "retrieved_context": {
+    "data_sources": [
+      {
+        "source_name": "Express Delivery & Fleet Management System",
+        "system_type": "PostgreSQL / Cloud SQL",
+        "tables": [
+          {
+            "table_name": "shipments",
+            "primary_key": "shipment_id",
+            "watermark_column": "updated_at",
+            "row_count": 850000,
+            "columns": [
+              { "name": "shipment_id", "type": "VARCHAR(64)", "is_pk": true },
+              { "name": "tracking_number", "type": "VARCHAR(32)", "is_pk": false },
+              { "name": "sender_id", "type": "VARCHAR(64)", "is_pk": false },
+              { "name": "recipient_id", "type": "VARCHAR(64)", "is_pk": false },
+              { "name": "origin_hub", "type": "VARCHAR(64)", "is_pk": false },
+              { "name": "destination_hub", "type": "VARCHAR(64)", "is_pk": false },
+              { "name": "package_weight_kg", "type": "DECIMAL(10,2)", "is_pk": false },
+              { "name": "status", "type": "VARCHAR(32)", "is_pk": false },
+              { "name": "delivery_timestamp", "type": "TIMESTAMP", "is_pk": false },
+              { "name": "updated_at", "type": "TIMESTAMP", "is_pk": false }
+            ],
+            "pii_columns": []
+          },
+          {
+            "table_name": "couriers",
+            "primary_key": "courier_id",
+            "watermark_column": "updated_at",
+            "row_count": 12500,
+            "columns": [
+              { "name": "courier_id", "type": "VARCHAR(64)", "is_pk": true },
+              { "name": "full_name", "type": "VARCHAR(128)", "is_pk": false, "is_pii": true },
+              { "name": "phone_number", "type": "VARCHAR(32)", "is_pk": false, "is_pii": true },
+              { "name": "email_address", "type": "VARCHAR(128)", "is_pk": false, "is_pii": true },
+              { "name": "vehicle_type", "type": "VARCHAR(32)", "is_pk": false },
+              { "name": "assigned_hub", "type": "VARCHAR(64)", "is_pk": false },
+              { "name": "is_active", "type": "BOOLEAN", "is_pk": false },
+              { "name": "updated_at", "type": "TIMESTAMP", "is_pk": false }
+            ],
+            "pii_columns": ["full_name", "phone_number", "email_address"]
+          },
+          {
+            "table_name": "telemetry_pings",
+            "primary_key": "ping_id",
+            "watermark_column": "ping_time",
+            "row_count": 4200000,
+            "columns": [
+              { "name": "ping_id", "type": "VARCHAR(64)", "is_pk": true },
+              { "name": "shipment_id", "type": "VARCHAR(64)", "is_pk": false },
+              { "name": "courier_id", "type": "VARCHAR(64)", "is_pk": false },
+              { "name": "latitude", "type": "DECIMAL(10,6)", "is_pk": false },
+              { "name": "longitude", "type": "DECIMAL(10,6)", "is_pk": false },
+              { "name": "speed_kmh", "type": "DECIMAL(5,1)", "is_pk": false },
+              { "name": "battery_level_pct", "type": "INT", "is_pk": false },
+              { "name": "ping_time", "type": "TIMESTAMP", "is_pk": false }
+            ],
+            "pii_columns": []
+          }
+        ]
+      }
+    ]
+  }
+}

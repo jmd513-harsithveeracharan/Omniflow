@@ -132,75 +132,107 @@ def deploy_medallion_architecture_to_fabric(
     pyspark_notebook_code: str | None = None,
     workspace_id: str | None = None,
     containment_folder: str | None = None,
+    target_folders: dict[str, str] | None = None,
 ) -> dict[str, Any]:
-    """Provisions complete end-to-end Medallion assets directly on Microsoft Fabric workspace root."""
+    """Provisions complete end-to-end Medallion assets directly on Microsoft Fabric workspace root or organized folders."""
     ws_id = workspace_id or ALLOWED_WORKSPACE_ID
     clean_domain = re.sub(r"[^a-zA-Z0-9_]", "_", domain)
     clean_domain = re.sub(r"_+", "_", clean_domain).strip("_")
     domain = clean_domain or "enterprise"
     results: dict[str, Any] = {"folder": None, "deployed_items": []}
-    target_folder_id = None
 
-    # 1. Deploy Bronze Lakehouse
+    raw_folder_id = None
+    stage_folder_id = None
+    silver_folder_id = None
+    gold_folder_id = None
+
+    if target_folders and isinstance(target_folders, dict):
+        root = target_folders.get("root") or target_folders.get("root_folder") or f"{domain.capitalize()}_Platform"
+        subs = target_folders.get("subfolders") if isinstance(target_folders.get("subfolders"), dict) else {}
+        raw_sub = target_folders.get("raw") or subs.get("raw") or "01 Raw"
+        stage_sub = target_folders.get("stage") or subs.get("stage") or "02 Stage"
+        silver_sub = target_folders.get("silver") or subs.get("silver") or "03 Silver"
+        gold_sub = target_folders.get("gold") or subs.get("gold") or "04 Gold"
+
+        try:
+            f_raw = get_or_create_folder(f"{root}/{raw_sub}", workspace_id=ws_id)
+            f_stage = get_or_create_folder(f"{root}/{stage_sub}", workspace_id=ws_id)
+            f_silver = get_or_create_folder(f"{root}/{silver_sub}", workspace_id=ws_id)
+            f_gold = get_or_create_folder(f"{root}/{gold_sub}", workspace_id=ws_id)
+            raw_folder_id = f_raw.get("id") if isinstance(f_raw, dict) else f_raw
+            stage_folder_id = f_stage.get("id") if isinstance(f_stage, dict) else f_stage
+            silver_folder_id = f_silver.get("id") if isinstance(f_silver, dict) else f_silver
+            gold_folder_id = f_gold.get("id") if isinstance(f_gold, dict) else f_gold
+            results["folder_hierarchy"] = {
+                "root": root,
+                "01_raw": f"{root}/{raw_sub}",
+                "02_stage": f"{root}/{stage_sub}",
+                "03_silver": f"{root}/{silver_sub}",
+                "04_gold": f"{root}/{gold_sub}",
+            }
+        except Exception as e:
+            print(f"[FABRIC] Folder hierarchy creation notice: {e}")
+
+    # 1. Deploy Bronze Lakehouse into 01 Raw folder
     lh_bronze_name = f"lh_{domain}_bronze"
     res_b = deploy_fabric_item(
         display_name=lh_bronze_name,
         item_type="Lakehouse",
         workspace_id=ws_id,
-        folder_id=target_folder_id,
+        folder_id=raw_folder_id,
         description=f"Raw Bronze Lakehouse for {project_code}",
     )
     results["deployed_items"].append(res_b)
 
-    # 2. Deploy Ingestion Data Pipeline
+    # 2. Deploy Ingestion Data Pipeline into 01 Raw folder
     pl_name = f"pl_{domain}_bronze_ingest"
     res_pl = deploy_fabric_item(
         display_name=pl_name,
         item_type="DataPipeline",
         workspace_id=ws_id,
-        folder_id=target_folder_id,
+        folder_id=raw_folder_id,
         description=f"Batch Ingestion Pipeline for {project_code}",
     )
     results["deployed_items"].append(res_pl)
 
-    # 3. Deploy Silver Lakehouse
-    lh_silver_name = f"lh_{domain}_silver"
-    res_s = deploy_fabric_item(
-        display_name=lh_silver_name,
-        item_type="Lakehouse",
-        workspace_id=ws_id,
-        folder_id=target_folder_id,
-        description=f"Curated Harmonized Silver Lakehouse for {project_code}",
-    )
-    results["deployed_items"].append(res_s)
-
-    # 4. Deploy PySpark Curated Notebook
-    nb_name = f"nb_silver_{domain}_curate"
+    # 3. Deploy PySpark Curated Notebook into 02 Stage folder
+    nb_name = f"nb_{domain}_curate"
     nb_parts = None
     if pyspark_notebook_code:
         nb_parts = compile_notebook_update(
             pyspark_code=pyspark_notebook_code,
             display_name=nb_name,
-            lakehouse_name=lh_silver_name,
+            lakehouse_name=f"lh_{domain}_silver",
         )
 
     res_nb = deploy_fabric_item(
         display_name=nb_name,
         item_type="Notebook",
         workspace_id=ws_id,
-        folder_id=target_folder_id,
+        folder_id=stage_folder_id,
         definition={"parts": nb_parts} if nb_parts else None,
         description=f"Silver SCD2 & PII Masking Synapse Notebook for {project_code}",
     )
     results["deployed_items"].append(res_nb)
 
-    # 5. Deploy Gold Warehouse
+    # 4. Deploy Silver Lakehouse into 03 Silver folder
+    lh_silver_name = f"lh_{domain}_silver"
+    res_s = deploy_fabric_item(
+        display_name=lh_silver_name,
+        item_type="Lakehouse",
+        workspace_id=ws_id,
+        folder_id=silver_folder_id,
+        description=f"Curated Harmonized Silver Lakehouse for {project_code}",
+    )
+    results["deployed_items"].append(res_s)
+
+    # 5. Deploy Gold Warehouse into 04 Gold folder
     wh_gold_name = f"wh_{domain}_gold"
     res_w = deploy_fabric_item(
         display_name=wh_gold_name,
         item_type="Warehouse",
         workspace_id=ws_id,
-        folder_id=target_folder_id,
+        folder_id=gold_folder_id,
         description=f"Analytical Serving Gold Warehouse for {project_code}",
     )
     results["deployed_items"].append(res_w)
