@@ -142,7 +142,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     return dateB - dateA;
   });
 
-  const limit = 5;
+  const limit = 20;
   const visibleProjects = isProjectsExpanded ? sortedProjects : sortedProjects.slice(0, limit);
   const hasMoreProjects = sortedProjects.length > limit;
 
@@ -362,6 +362,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   {visibleProjects.map((p) => {
                     const isPinned = Boolean(p.is_pinned);
                     const isActive = activeProjectId === p.id;
+                    const hasLocalFolder = Boolean(p.local_path || p.metadata?.localPath);
                     return (
                       <div
                         key={p.id}
@@ -387,6 +388,35 @@ export const Sidebar: React.FC<SidebarProps> = ({
                           )}
                         </span>
                         <span className="sidebar-project-name">{p.name}</span>
+                        {!hasLocalFolder && (
+                          <span
+                            className="sidebar-unlinked-badge"
+                            title="Local storage folder not mapped — click to link folder"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onEditProject?.(p);
+                            }}
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              width: '15px',
+                              height: '15px',
+                              borderRadius: '50%',
+                              background: 'rgba(245, 158, 11, 0.18)',
+                              color: '#f59e0b',
+                              fontSize: '10px',
+                              fontWeight: 700,
+                              cursor: 'pointer',
+                              marginLeft: 'auto',
+                              marginRight: '4px',
+                              flexShrink: 0,
+                              border: '1px solid rgba(245, 158, 11, 0.45)',
+                            }}
+                          >
+                            !
+                          </span>
+                        )}
                         <button
                           type="button"
                           className="sidebar-project-more-btn"

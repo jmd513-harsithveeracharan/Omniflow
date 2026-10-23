@@ -324,7 +324,30 @@ export const ChatTimeline: React.FC<ChatTimelineProps> = ({
 
               {/* Assistant Message Actions Toolbar */}
               {cleanContent && (
-                <div className="chat-bubble-actions assistant-actions">
+                <div className="chat-bubble-actions assistant-actions" style={{ display: 'flex', alignItems: 'center' }}>
+                  {liveThoughtMeta?.elapsed && liveThoughtMeta.elapsed !== '0.0' && (
+                    <span
+                      style={{
+                        fontSize: '11px',
+                        color: '#71717a',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        marginRight: 'auto',
+                        paddingLeft: '2px',
+                        fontWeight: 500,
+                      }}
+                      title={`Execution completed in ${liveThoughtMeta.elapsed} seconds`}
+                    >
+                      <span style={{ color: '#10b981' }}>⚡</span>
+                      <span>
+                        Worked for {Number(liveThoughtMeta.elapsed) >= 60
+                          ? `${Math.floor(Number(liveThoughtMeta.elapsed) / 60)}m ${Math.round(Number(liveThoughtMeta.elapsed) % 60)}s`
+                          : `${liveThoughtMeta.elapsed}s`}
+                      </span>
+                    </span>
+                  )}
+
                   <button
                     type="button"
                     onClick={() => handleCopy(cleanContent, idx)}

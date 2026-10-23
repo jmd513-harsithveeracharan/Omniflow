@@ -123,11 +123,21 @@ export const ThoughtTrace: React.FC<ThoughtTraceProps> = ({ meta, isStreaming = 
   const steps = meta.steps || [];
   if (steps.length === 0 && !isStreaming) return null;
 
+  const formatTime = (secs: number | string) => {
+    const n = Number(secs) || 0;
+    if (n >= 60) {
+      const mins = Math.floor(n / 60);
+      const rem = Math.round(n % 60);
+      return `${mins}m ${rem}s`;
+    }
+    return typeof secs === 'string' && secs.includes('.') ? `${secs}s` : `${n}s`;
+  };
+
   const displayTime = isStreaming
-    ? `${elapsedSeconds}s`
+    ? formatTime(elapsedSeconds)
     : meta.elapsed
-    ? `${meta.elapsed}s`
-    : `${Math.max(1, elapsedSeconds)}s`;
+    ? formatTime(meta.elapsed)
+    : formatTime(Math.max(1, elapsedSeconds));
 
   return (
     <div

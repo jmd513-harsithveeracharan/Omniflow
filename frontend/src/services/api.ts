@@ -308,6 +308,7 @@ export async function fetchProjects(): Promise<import('../types').ProjectRecord[
     id: String(p.id || ''),
     name: String(p.name || ''),
     description: String(p.description || ''),
+    local_path: String(p.local_path || ''),
     is_pinned: Number(p.is_pinned || 0),
     is_archived: Number(p.is_archived || 0),
     created_at: String(p.created_at || ''),
@@ -319,12 +320,13 @@ export async function fetchProjects(): Promise<import('../types').ProjectRecord[
 export async function createProject(
   name: string,
   description = '',
-  metadata?: import('../types').ProjectMetadata
+  metadata?: import('../types').ProjectMetadata,
+  local_path = ''
 ): Promise<import('../types').ProjectRecord> {
   const res = await fetch(`${API_BASE}/projects/new`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name, description, metadata: metadata || {} }),
+    body: JSON.stringify({ name, description, local_path, metadata: metadata || {} }),
   });
   if (!res.ok) throw new Error(`Failed to create project: ${res.statusText}`);
   const data = await res.json();
@@ -336,6 +338,7 @@ export async function updateProject(
   updates: {
     name?: string;
     description?: string;
+    local_path?: string;
     is_pinned?: number;
     is_archived?: number;
     metadata?: import('../types').ProjectMetadata;

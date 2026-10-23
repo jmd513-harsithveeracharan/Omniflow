@@ -1,0 +1,86 @@
+{
+  "project_context": {
+    "project_summary": {
+      "project_code": "PRJ-FINTECH-PAYMENTS",
+      "project_name": "Global Cross-Border Payments & Fraud Intelligence Platform",
+      "business_domain": "Fintech, International Wire Settlement & Anti-Money Laundering (AML)",
+      "sla_target_minutes": 5,
+      "compliance_frameworks": ["PCI-DSS Level 1", "SOC2 Type II", "GDPR", "FinCEN Travel Rule"]
+    },
+    "solution_summary": {
+      "target_architecture": "Microsoft Fabric Medallion Architecture (Bronze -> Stage -> Silver -> Gold)",
+      "target_folder_structure": {
+        "root_folder": "Fintech_Payments_Platform",
+        "subfolders": {
+          "raw": "01 Raw",
+          "stage": "02 Stage",
+          "silver": "03 Silver",
+          "gold": "04 Gold"
+        }
+      },
+      "expected_deliverables": [
+        "Fabric Raw Lakehouse (lh_fintech_raw_bronze in '01 Raw')",
+        "Fabric Wire Ingestion Pipeline (pl_fintech_swift_ingest in '01 Raw')",
+        "PySpark PII Masking & Deduplication Notebook (nb_fintech_pii_masking in '02 Stage')",
+        "Real-time Sanctions & OFAC Screening Notebook (nb_fintech_aml_screening in '02 Stage')",
+        "Fabric Curated Delta Lakehouse (lh_fintech_curated_silver in '03 Silver')",
+        "Great Expectations Data Quality Reconciliation Suite ('03 Silver')",
+        "Fabric Gold Analytical Warehouse (wh_fintech_analytics_gold in '04 Gold')",
+        "Kimball Star Schema DDL with FactSettlement & Conformed Dimensions ('04 Gold')",
+        "Power BI Direct Lake Semantic Model (sm_fintech_direct_lake in '04 Gold')",
+        "NetworkX Column Lineage & Blast-Zone Dependency DAG"
+      ]
+    }
+  },
+  "retrieved_context": {
+    "data_sources": [
+      {
+        "source_name": "SWIFT Alliance Gateway & ISO 20022 Financial Switch",
+        "tables": [
+          {
+            "table_name": "wire_transfers",
+            "primary_key": "uetr_transaction_id",
+            "watermark_column": "settlement_timestamp",
+            "row_count": 18500000,
+            "pii_columns": ["sender_iban", "receiver_iban", "beneficiary_name", "remittance_details"]
+          },
+          {
+            "table_name": "customer_accounts",
+            "primary_key": "account_id",
+            "watermark_column": "updated_at",
+            "row_count": 320000,
+            "pii_columns": ["account_holder_name", "tax_identifier_ssn", "phone_number", "billing_address", "email"]
+          },
+          {
+            "table_name": "aml_risk_signals",
+            "primary_key": "signal_id",
+            "watermark_column": "detected_at",
+            "row_count": 640000,
+            "pii_columns": []
+          },
+          {
+            "table_name": "sanction_entities",
+            "primary_key": "entity_id",
+            "watermark_column": "last_reviewed_date",
+            "row_count": 85000,
+            "pii_columns": ["entity_legal_name", "alias_names"]
+          },
+          {
+            "table_name": "settlement_batches",
+            "primary_key": "batch_id",
+            "watermark_column": "cleared_at",
+            "row_count": 420000,
+            "pii_columns": []
+          },
+          {
+            "table_name": "fx_spot_rates",
+            "primary_key": "currency_pair_id",
+            "watermark_column": "quote_timestamp",
+            "row_count": 9500000,
+            "pii_columns": []
+          }
+        ]
+      }
+    ]
+  }
+}

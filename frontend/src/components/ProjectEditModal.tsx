@@ -1,12 +1,12 @@
-import React, { useState, useEffect } from 'react';
-import { X, FolderGit2 } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { X, FolderGit2, FolderOpen, HardDrive, AlertCircle } from 'lucide-react';
 import { ProjectRecord } from '../types';
 
 interface ProjectEditModalProps {
   isOpen: boolean;
   onClose: () => void;
   project: ProjectRecord | null;
-  onSave: (projectId: string, updates: { name: string; description: string }) => Promise<void>;
+  onSave: (projectId: string, updates: { name: string; description: string; local_path?: string }) => Promise<void>;
 }
 
 export const ProjectEditModal: React.FC<ProjectEditModalProps> = ({
@@ -17,13 +17,16 @@ export const ProjectEditModal: React.FC<ProjectEditModalProps> = ({
 }) => {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
+  const [localPath, setLocalPath] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const folderInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (project) {
       setName(project.name);
       setDescription(project.description || '');
+      setLocalPath(project.local_path || project.metadata?.localPath || '');
       setError(null);
     }
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -37,6 +40,26 @@ export const ProjectEditModal: React.FC<ProjectEditModalProps> = ({
 
   if (!isOpen || !project) return null;
 
+  const handleFolderPicked = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (files && files.length > 0) {
+      // In webkitdirectory, files[0].webkitRelativePath has relative root
+      const relPath = (files[0] as unknown as { path?: string; webkitRelativePath?: string });
+      if (relPath.path) {
+        // Electron / local path
+        const parentDir = relPath.path.substring(0, relPath.path.lastIndexOf('\\'));
+        setLocalPath(parentDir);
+      } else {
+        const rootDir = (relPath.webkitRelativePath || '').split('/')[0];
+        setLocalPath(`C:\\Harsith_Work\\Fabric_AI\\projects\\${rootDir || project.id}`);
+      }
+    }
+  };
+
+  const handleUseDefault = () => {
+    setLocalPath(`C:\\Harsith_Work\\Fabric_AI\\omniflow\\generated_artifacts\\${project.id}`);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) {
@@ -46,7 +69,11 @@ export const ProjectEditModal: React.FC<ProjectEditModalProps> = ({
     try {
       setIsSaving(true);
       setError(null);
-      await onSave(project.id, { name: name.trim(), description: description.trim() });
+      await onSave(project.id, {
+        name: name.trim(),
+        description: description.trim(),
+        local_path: localPath.trim(),
+      });
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to update project');
@@ -180,6 +207,101 @@ export const ProjectEditModal: React.FC<ProjectEditModalProps> = ({
                 resize: 'vertical',
               }}
             />
+          </div>
+
+          {/* Local Hard Disk / Storage Directory Mapping */}
+          <div style={{ background: 'rgba(255, 255, 255, 0.02)', border: '1px solid #27272a', borderRadius: '10px', padding: '12px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+              <label
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  color: '#e4e4e7',
+                }}
+              >
+                <HardDrive width={14} height={14} style={{ color: '#10b981' }} />
+                <span>Local Project Storage Location</span>
+              </label>
+              <button
+                type="button"
+                onClick={handleUseDefault}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: '#10b981',
+                  fontSize: '11px',
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                  padding: '2px 6px',
+                }}
+              >
+                Use Default Path
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <input
+                type="text"
+                value={localPath}
+                onChange={(e) => setLocalPath(e.target.value)}
+                placeholder="e.g. C:\Harsith_Work\Fabric_AI\projects\PRJ-GLOBAL-DELIVERY"
+                style={{
+                  flex: 1,
+                  background: '#131314',
+                  border: `1px solid ${localPath ? '#333538' : 'rgba(245, 158, 11, 0.5)'}`,
+                  borderRadius: '8px',
+                  padding: '8px 12px',
+                  color: '#e3e3e3',
+                  fontSize: '12px',
+                  fontFamily: 'monospace',
+                  outline: 'none',
+                }}
+              />
+              <input
+                ref={folderInputRef}
+                type="file"
+                // @ts-expect-error webkitdirectory is standard for folder picking
+                webkitdirectory=""
+                directory=""
+                style={{ display: 'none' }}
+                onChange={handleFolderPicked}
+              />
+              <button
+                type="button"
+                onClick={() => folderInputRef.current?.click()}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  padding: '8px 12px',
+                  background: '#27272a',
+                  border: '1px solid #3f3f46',
+                  borderRadius: '8px',
+                  color: '#f4f4f5',
+                  fontSize: '11.5px',
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                <FolderOpen width={13} height={13} />
+                <span>Browse</span>
+              </button>
+            </div>
+
+            {!localPath ? (
+              <p style={{ margin: '8px 0 0 0', fontSize: '11px', color: '#f59e0b', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                <AlertCircle width={12} height={12} />
+                <span>No folder linked. An amber <strong>!</strong> warning mark will indicate this project needs a local folder.</span>
+              </p>
+            ) : (
+              <p style={{ margin: '8px 0 0 0', fontSize: '11px', color: '#71717a' }}>
+                Target directory on hard disk for synthesized PySpark notebooks and Star-schema DDLs.
+              </p>
+            )}
           </div>
 
           <div

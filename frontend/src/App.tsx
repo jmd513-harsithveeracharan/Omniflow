@@ -237,13 +237,19 @@ export const App: React.FC = () => {
 
   const handleSaveEditedProject = async (
     projectId: string,
-    updates: { name: string; description: string }
+    updates: { name: string; description: string; local_path?: string }
   ) => {
     await updateProject(projectId, updates);
     setProjects((prev) =>
       prev.map((p) =>
         p.id === projectId
-          ? { ...p, name: updates.name, description: updates.description, updated_at: new Date().toISOString() }
+          ? {
+              ...p,
+              name: updates.name,
+              description: updates.description,
+              local_path: updates.local_path,
+              updated_at: new Date().toISOString(),
+            }
           : p
       )
     );
@@ -261,6 +267,7 @@ export const App: React.FC = () => {
       setActiveView('chat');
     }
 
+    const startTime = Date.now();
     const userMsg: ChatMessage = { role: 'user', content: text };
     const placeholderAssistantMsg: ChatMessage = {
       role: 'assistant',
@@ -289,14 +296,14 @@ export const App: React.FC = () => {
       },
       (plan) => {
         setIsStreaming(false);
+        const elapsedSec = ((Date.now() - startTime) / 1000).toFixed(1);
         setMessages((prev) => {
           const last = prev[prev.length - 1];
           if (last && last.role === 'assistant') {
-            return [...prev.slice(0, -1), { ...last, isStreaming: false }];
             const closedSteps = (last.thoughtSteps || []).map((s) =>
               s.status === 'in_progress' ? { ...s, status: 'completed' as const } : s
             );
-            return [...prev.slice(0, -1), { ...last, isStreaming: false, thoughtSteps: closedSteps }];
+            return [...prev.slice(0, -1), { ...last, isStreaming: false, thoughtElapsed: elapsedSec, thoughtSteps: closedSteps }];
           }
           return prev;
         });
@@ -308,15 +315,15 @@ export const App: React.FC = () => {
       },
       (err) => {
         console.error('Stream error:', err);
+        const elapsedSec = ((Date.now() - startTime) / 1000).toFixed(1);
         setMessages((prev) => {
           const last = prev[prev.length - 1];
           const errMsg = `⚠️ Error communicating with agent: ${err}`;
           if (last && last.role === 'assistant') {
-            return [...prev.slice(0, -1), { ...last, content: errMsg, isStreaming: false }];
             const closedSteps = (last.thoughtSteps || []).map((s) =>
               s.status === 'in_progress' ? { ...s, status: 'failed' as const } : s
             );
-            return [...prev.slice(0, -1), { ...last, content: errMsg, isStreaming: false, thoughtSteps: closedSteps }];
+            return [...prev.slice(0, -1), { ...last, content: errMsg, isStreaming: false, thoughtElapsed: elapsedSec, thoughtSteps: closedSteps }];
           }
           return [...prev, { role: 'assistant', content: errMsg }];
         });

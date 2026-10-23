@@ -229,6 +229,7 @@ export interface ProjectMember {
 
 export interface ProjectMetadata {
   fabricFolder?: string;
+  localPath?: string;
   badge?: string;
   members?: ProjectMember[];
   targetWorkspace?: string;
@@ -240,6 +241,7 @@ export interface ProjectRecord {
   id: string;
   name: string;
   description: string;
+  local_path?: string;
   is_pinned?: number;
   is_archived?: number;
   created_at?: string;
