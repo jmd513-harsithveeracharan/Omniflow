@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Loader2, Globe, Layers } from 'lucide-react';
+import { Loader2, Globe, Layers, FileJson } from 'lucide-react';
+import { IntakeSpecModal } from './modals/IntakeSpecModal';
 
 interface PromptDockProps {
   onSendMessage: (text: string, model?: string, effort?: string, mode?: 'auto' | 'general' | 'project') => void;
@@ -18,8 +19,21 @@ export const PromptDock: React.FC<PromptDockProps> = ({
   const [isModelDropdownOpen, setIsModelDropdownOpen] = useState(false);
   const [activeSubmenu, setActiveSubmenu] = useState<'none' | 'effort' | 'models'>('none');
   const [isTuningOpen, setIsTuningOpen] = useState(false);
+  const [isIntakeModalOpen, setIsIntakeModalOpen] = useState(false);
   const [temperature, setTemperature] = useState(0.2);
   const [isListening, setIsListening] = useState(false);
+
+  const handleIntakeSubmit = (intakeJson: string, resume: boolean) => {
+    try {
+      const parsed = JSON.parse(intakeJson);
+      const pName = parsed.project_context?.project_summary?.project_name || 'Enterprise Medallion Platform';
+      const pCode = parsed.project_context?.project_summary?.project_code || 'PRJ-FABRIC';
+      const prompt = `Deploy Microsoft Fabric Medallion Architecture for ${pName} (${pCode})${resume ? ' with --resume mode' : ''} based on intake specification:\n\`\`\`json\n${intakeJson}\n\`\`\``;
+      onSendMessage(prompt, selectedModel, selectedEffort.toLowerCase(), 'project');
+    } catch {
+      onSendMessage(intakeJson, selectedModel, selectedEffort.toLowerCase(), 'project');
+    }
+  };
 
   const handleToggleMode = () => {
     setIsFlipping(true);
@@ -195,6 +209,28 @@ export const PromptDock: React.FC<PromptDockProps> = ({
                 <line x1="9" y1="8" x2="15" y2="8" />
                 <line x1="17" y1="16" x2="23" y2="16" />
               </svg>
+            </button>
+
+            {/* Project Intake JSON Spec Button */}
+            <button
+              type="button"
+              className={`dock-tool-pill ${isIntakeModalOpen ? 'active' : ''}`}
+              id="btnIntakeJson"
+              onClick={() => setIsIntakeModalOpen(true)}
+              title="Upload or Paste Project Intake JSON Spec"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '5px',
+                padding: '4px 10px',
+                color: isIntakeModalOpen ? '#10b981' : '#e4e4e7',
+                borderRadius: '8px',
+                fontSize: '11px',
+                fontWeight: 500,
+              }}
+            >
+              <FileJson width={13} height={13} style={{ color: '#10b981' }} />
+              <span>Intake Spec</span>
             </button>
 
             {/* Tuning Popover */}
@@ -451,6 +487,13 @@ export const PromptDock: React.FC<PromptDockProps> = ({
         </div>
       </div>
       <div className="dock-disclaimer">Fabric.AI can make mistakes. Please double-check responses.</div>
+
+      {/* Project Intake Specification Modal */}
+      <IntakeSpecModal
+        isOpen={isIntakeModalOpen}
+        onClose={() => setIsIntakeModalOpen(false)}
+        onSubmit={handleIntakeSubmit}
+      />
     </div>
   );
 };
