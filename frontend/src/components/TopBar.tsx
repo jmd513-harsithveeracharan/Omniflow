@@ -1,4 +1,5 @@
 import React from 'react';
+import { PlatformCube } from './PlatformCube';
 import {
   PanelLeftOpen,
   Workflow,
@@ -43,11 +44,7 @@ export const TopBar: React.FC<TopBarProps> = ({
             onClick={onToggleSidebar}
             title="Expand Sidebar"
           >
-            <img
-              src="/assets/logos/abstract-shape(1).png"
-              alt="Logo"
-              className="brand-logo-img"
-            />
+            <PlatformCube platformId="fabric" size={18} />
           </button>
         )}
         <button

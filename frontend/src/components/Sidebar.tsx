@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { PlatformCube } from './PlatformCube';
 import {
   Plus,
   Sparkles,
@@ -177,15 +178,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             onClick={() => setIsPlatformMenuOpen(!isPlatformMenuOpen)}
           >
             <div className="brand-logo-icon-wrap" style={{ width: '22px', height: '22px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-              {selectedPlatform === 'fabric' ? (
-                <svg width="20" height="20" viewBox="0 0 32 32" fill="none">
-                  <path d="M16 3L3 10.5V21.5L16 29L29 21.5V10.5L16 3Z" fill="#008272"/>
-                  <path d="M16 3L29 10.5V21.5L16 29V3Z" fill="#00A88F"/>
-                  <path d="M16 3L29 10.5L16 18L3 10.5L16 3Z" fill="#00D2A0"/>
-                </svg>
-              ) : (
-                <img src={activePlatformObj.icon} alt={activePlatformObj.name} className="brand-logo-img" />
-              )}
+              <PlatformCube platformId={selectedPlatform} size={20} />
             </div>
             <div className="brand-text">
               <span className="brand-title" style={{ fontSize: '15px', fontWeight: 700, letterSpacing: '-0.02em', color: '#f8fafc' }}>
@@ -207,7 +200,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     setIsPlatformMenuOpen(false);
                   }}
                 >
-                  <img src={p.icon} className="dropdown-brand-img" alt={p.name} />
+                  <PlatformCube platformId={p.id} size={20} />
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', lineHeight: 1.2 }}>
                     <span className="dropdown-brand-name" style={{ fontWeight: 600 }}>
                       Omni<span style={{ color: p.flowColor }}>flow</span>

@@ -434,7 +434,7 @@ export const IntakeSpecModal: React.FC<IntakeSpecModalProps> = ({ isOpen, onClos
                 Project Intake Specification
               </h3>
               <p style={{ fontSize: '11.5px', color: '#94a3b8', margin: '2px 0 0 0' }}>
-                Define source schemas, project metadata, and target Medallion folder hierarchy.
+                Define project metadata, data sources, and architecture targets.
               </p>
             </div>
           </div>
@@ -783,7 +783,7 @@ export const IntakeSpecModal: React.FC<IntakeSpecModalProps> = ({ isOpen, onClos
           <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
             <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#10b981', display: 'inline-block' }} />
             <span style={{ fontSize: '11.5px', color: '#94a3b8', fontWeight: 500 }}>
-              Microsoft Fabric Medallion Engine Ready
+              Omniflow Autonomous Engine Ready
             </span>
           </div>
 
