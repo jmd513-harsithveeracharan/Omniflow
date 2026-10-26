@@ -29,6 +29,7 @@ from omniflow.tools.fabric_deployer import (
     deploy_medallion_architecture_to_fabric,
     verify_fabric_workspace_connection,
 )
+from omniflow.auth import auth_router, init_auth_db
 
 app = FastAPI(
     title="Fabric Studio — OmniFlow Autonomous Engine",
@@ -43,6 +44,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(auth_router)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DIST_DIR = os.path.join(BASE_DIR, "dist")
@@ -140,6 +143,7 @@ FABRIC_STATUS_CACHE_TIME: float = time.time()
 async def on_startup():
     import threading
     threading.Thread(target=fetch_projects_cached, args=(True,), daemon=True).start()
+    threading.Thread(target=init_auth_db, daemon=True).start()
 
 
 def fetch_projects_cached(force_refresh: bool = False) -> list[dict[str, Any]]:

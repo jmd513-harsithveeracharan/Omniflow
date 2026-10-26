@@ -18,6 +18,7 @@ import {
   Pin,
   Archive,
   Users,
+  Shield,
 } from 'lucide-react';
 import { ChatSession, ProjectRecord } from '../types';
 import { logoutFabric } from '../services/api';
@@ -46,6 +47,7 @@ interface SidebarProps {
   onArchiveProject?: (projectId: string) => void;
   onDeleteProject?: (projectId: string) => void;
   onRefreshStatus?: () => void;
+  onOpenAuthModal?: () => void;
 }
 
 interface PlatformConfig {
@@ -79,6 +81,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onArchiveProject,
   onDeleteProject,
   onRefreshStatus,
+  onOpenAuthModal,
 }) => {
   const [selectedPlatform, setSelectedPlatform] = useState('fabric');
   const [isPlatformMenuOpen, setIsPlatformMenuOpen] = useState(false);
@@ -519,6 +522,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 </div>
               </div>
               <div className="dock-model-divider" />
+              <button
+                className="profile-menu-item"
+                onClick={() => {
+                  setIsProfileMenuOpen(false);
+                  onOpenAuthModal?.();
+                }}
+              >
+                <Shield width={14} height={14} />
+                <span>OmniFlow Account & RBAC</span>
+              </button>
               <button
                 className="profile-menu-item"
                 onClick={() => {

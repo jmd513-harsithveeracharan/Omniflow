@@ -218,13 +218,25 @@ export interface FabricWorkspaceSummary {
   isActive?: boolean;
 }
 
+export interface UserProfile {
+  id: string;
+  email: string;
+  name: string;
+  avatar_color: string;
+  created_at?: string;
+}
+
 export interface ProjectMember {
   id: string;
+  project_id?: string;
+  user_id?: string;
   name: string;
   email: string;
-  role?: string;
+  role?: 'owner' | 'contributor' | 'viewer' | string;
   avatar?: string;
+  avatar_color?: string;
   avatarBg?: string;
+  joined_at?: string;
 }
 
 export interface ProjectMetadata {

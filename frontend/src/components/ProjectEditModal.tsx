@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, FolderGit2, FolderOpen, HardDrive, AlertCircle } from 'lucide-react';
+import { X, FolderGit2, FolderOpen, HardDrive, AlertCircle, Users, Settings } from 'lucide-react';
 import { ProjectRecord } from '../types';
+import { ProjectTeamTab } from './project/ProjectTeamTab';
 
 interface ProjectEditModalProps {
   isOpen: boolean;
@@ -20,6 +21,7 @@ export const ProjectEditModal: React.FC<ProjectEditModalProps> = ({
   const [localPath, setLocalPath] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [activeModalTab, setActiveModalTab] = useState<'general' | 'team'>('general');
   const folderInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -130,6 +132,63 @@ export const ProjectEditModal: React.FC<ProjectEditModalProps> = ({
           </button>
         </div>
 
+        {/* Tab Switcher */}
+        <div
+          style={{
+            display: 'flex',
+            background: '#181b22',
+            padding: '3px',
+            borderRadius: '8px',
+            marginBottom: '16px',
+            gap: '4px',
+          }}
+        >
+          <button
+            type="button"
+            onClick={() => setActiveModalTab('general')}
+            style={{
+              flex: 1,
+              padding: '6px 0',
+              fontSize: '12px',
+              fontWeight: 600,
+              borderRadius: '6px',
+              border: 'none',
+              cursor: 'pointer',
+              background: activeModalTab === 'general' ? '#252936' : 'transparent',
+              color: activeModalTab === 'general' ? '#f8fafc' : '#94a3b8',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '6px',
+            }}
+          >
+            <Settings width={13} height={13} />
+            General & Storage
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveModalTab('team')}
+            style={{
+              flex: 1,
+              padding: '6px 0',
+              fontSize: '12px',
+              fontWeight: 600,
+              borderRadius: '6px',
+              border: 'none',
+              cursor: 'pointer',
+              background: activeModalTab === 'team' ? '#252936' : 'transparent',
+              color: activeModalTab === 'team' ? '#f8fafc' : '#94a3b8',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '6px',
+            }}
+          >
+            <Users width={13} height={13} />
+            Team & RBAC
+          </button>
+        </div>
+
         {error && (
           <div
             style={{
@@ -146,7 +205,10 @@ export const ProjectEditModal: React.FC<ProjectEditModalProps> = ({
           </div>
         )}
 
-        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+        {activeModalTab === 'team' ? (
+          <ProjectTeamTab projectId={project.id} />
+        ) : (
+          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
           <div>
             <label
               style={{
@@ -351,6 +413,7 @@ export const ProjectEditModal: React.FC<ProjectEditModalProps> = ({
             </button>
           </div>
         </form>
+        )}
       </div>
     </div>
   );

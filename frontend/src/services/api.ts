@@ -463,4 +463,82 @@ export async function logoutFabric(): Promise<void> {
   await fetch(`${API_BASE}/auth/logout`, { method: 'POST' });
 }
 
+// ----------------------------------------------------------------------------
+// User Authentication & RBAC APIs
+// ----------------------------------------------------------------------------
+
+export async function registerUser(email: string, password: string, name: string): Promise<{ success: boolean; user: import('../types').UserProfile }> {
+  const res = await fetch(`${API_BASE}/auth/register`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password, name }),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.detail || `Registration failed: ${res.statusText}`);
+  }
+  return res.json();
+}
+
+export async function loginUser(email: string, password: string): Promise<{ success: boolean; user: import('../types').UserProfile }> {
+  const res = await fetch(`${API_BASE}/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password }),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.detail || `Login failed: ${res.statusText}`);
+  }
+  return res.json();
+}
+
+export async function searchUsers(query: string = ''): Promise<import('../types').UserProfile[]> {
+  try {
+    const res = await fetch(`${API_BASE}/users/search?q=${encodeURIComponent(query)}`);
+    if (!res.ok) return [];
+    const data = await res.json();
+    return data.users || [];
+  } catch (err) {
+    console.warn('searchUsers failed:', err);
+    return [];
+  }
+}
+
+export async function fetchProjectMembers(projectId: string): Promise<import('../types').ProjectMember[]> {
+  try {
+    const res = await fetch(`${API_BASE}/projects/${projectId}/members`);
+    if (!res.ok) return [];
+    const data = await res.json();
+    return data.members || [];
+  } catch (err) {
+    console.warn('fetchProjectMembers failed:', err);
+    return [];
+  }
+}
+
+export async function addProjectMember(projectId: string, userId: string, role: string = 'contributor'): Promise<import('../types').ProjectMember> {
+  const res = await fetch(`${API_BASE}/projects/${projectId}/members/add`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ user_id: userId, role }),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.detail || `Failed to add member: ${res.statusText}`);
+  }
+  const data = await res.json();
+  return data.member;
+}
+
+export async function removeProjectMember(projectId: string, userId: string): Promise<boolean> {
+  const res = await fetch(`${API_BASE}/projects/${projectId}/members/remove`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ user_id: userId }),
+  });
+  return res.ok;
+}
+
+
 

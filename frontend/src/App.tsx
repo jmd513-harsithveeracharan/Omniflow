@@ -11,6 +11,7 @@ import { GovernanceModal } from './components/GovernanceModal';
 import { SettingsModal } from './components/SettingsModal';
 import { FabricConnectionModal } from './components/modals/FabricConnectionModal';
 import { ProjectEditModal } from './components/ProjectEditModal';
+import { AuthModal } from './components/auth/AuthModal';
 import { SkillsView } from './components/SkillsView';
 import { ProjectsView } from './components/ProjectsView';
 import { WorkspaceExplorerView } from './components/WorkspaceExplorerView';
@@ -27,7 +28,7 @@ import {
   updateProject,
   deleteProject,
 } from './services/api';
-import { FabricStatus, ChatMessage, IngestionPlan, WorkspaceItem, ChatSession, ProjectRecord } from './types';
+import { FabricStatus, ChatMessage, IngestionPlan, WorkspaceItem, ChatSession, ProjectRecord, UserProfile } from './types';
 
 export const App: React.FC = () => {
   const [activeView, setActiveView] = useState<string>('chat');
@@ -46,6 +47,31 @@ export const App: React.FC = () => {
   const [isLoadingProjects, setIsLoadingProjects] = useState<boolean>(true);
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
   const [editingProject, setEditingProject] = useState<ProjectRecord | null>(null);
+
+  // User Auth & RBAC State
+  const [currentUser, setCurrentUser] = useState<UserProfile | null>(() => {
+    try {
+      const saved = localStorage.getItem('omniflow_active_user');
+      return saved ? JSON.parse(saved) : {
+        id: 'usr_lead',
+        name: 'Bheesetti Harsith',
+        email: 'bheesetti.harsith@fabric.ai',
+        avatar_color: '#10b981',
+      };
+    } catch {
+      return null;
+    }
+  });
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
+
+  const handleUserChanged = (user: UserProfile | null) => {
+    setCurrentUser(user);
+    if (user) {
+      localStorage.setItem('omniflow_active_user', JSON.stringify(user));
+    } else {
+      localStorage.removeItem('omniflow_active_user');
+    }
+  };
 
   // Modals
   const [isSkillsModalOpen, setIsSkillsModalOpen] = useState<boolean>(false);
@@ -423,8 +449,8 @@ export const App: React.FC = () => {
         onSelectSession={handleSelectSession}
         onDeleteSession={handleDeleteSession}
         onRenameSession={handleRenameSession}
-        userName={status?.userIdentity ? status.userIdentity.split('@')[0].replace('.', ' ') : 'Harsith Veer'}
-        userEmail={status?.userIdentity || 'Bheesetti.Harsith@Pelibiothermal.com'}
+        userName={currentUser ? currentUser.name : (status?.userIdentity ? status.userIdentity.split('@')[0].replace('.', ' ') : 'Harsith Veer')}
+        userEmail={currentUser ? currentUser.email : (status?.userIdentity || 'bheesetti.harsith@fabric.ai')}
         projects={projects}
         isLoadingProjects={isLoadingProjects}
         activeProjectId={activeProjectId}
@@ -434,6 +460,7 @@ export const App: React.FC = () => {
         onArchiveProject={handleArchiveProject}
         onDeleteProject={handleDeleteProject}
         onRefreshStatus={() => fetchFabricStatus().then(setStatus)}
+        onOpenAuthModal={() => setIsAuthModalOpen(true)}
       />
 
       {/* 2. Main Studio Canvas */}
@@ -571,6 +598,13 @@ export const App: React.FC = () => {
         onClose={() => setIsFabricConnectionModalOpen(false)}
         status={status}
         onRefreshStatus={() => fetchFabricStatus().then(setStatus)}
+      />
+
+      <AuthModal
+        isOpen={isAuthModalOpen}
+        onClose={() => setIsAuthModalOpen(false)}
+        currentUser={currentUser}
+        onUserChanged={handleUserChanged}
       />
     </div>
   );
