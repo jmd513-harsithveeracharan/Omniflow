@@ -4,8 +4,8 @@
 
 :root {
     /* Google AI Studio Palette - Uniform Seamless Dark Theme */
-    --bg-base: #131314;              /* Main canvas, topbar, and sidebar uniform dark background */
-    --bg-sidebar: #131314;           /* Perfectly matched to chat panel */
+    --bg-base: #252525;              /* Main canvas, topbar, and sidebar uniform dark background */
+    --bg-sidebar: #1e1e1e;           /* Perfectly matched to chat panel */
     --bg-surface: #1e1f20;           /* Cards, input docks, dropdowns */
     --bg-surface-raised: #282a2c;    /* Nested containers, button cards, chips */
     --bg-surface-active: #2d2e30;    /* Active menu items, pressed pills */

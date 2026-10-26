@@ -129,16 +129,30 @@ export async function fetchSkills(): Promise<SkillSummary[]> {
 }
 
 export async function fetchSkillDetail(name: string): Promise<SkillSummary> {
-  const res = await fetch(`${API_BASE}/skills/${name}`);
-  if (!res.ok) throw new Error(`Failed to fetch skill ${name}: ${res.statusText}`);
-  const data = await res.json();
+  try {
+    const res = await fetch(`${API_BASE}/skills/${name}`);
+    if (res.ok) {
+      const data = await res.json();
+      return {
+        name: String(data.name || name),
+        displayName: String(data.display_name || data.displayName || data.name || name),
+        description: String(data.description || ''),
+        tier: String(data.tier || 'atomic'),
+        snippet: String(data.snippet || ''),
+        fullRunbook: String(data.content || data.fullRunbook || ''),
+      };
+    }
+  } catch (err) {
+    console.warn(`Failed to fetch skill ${name}:`, err);
+  }
+  // Graceful fallback
   return {
-    name: String(data.name || name),
-    displayName: String(data.display_name || data.name || name),
-    description: String(data.description || ''),
-    tier: String(data.tier || 'atomic'),
-    snippet: String(data.snippet || ''),
-    fullRunbook: String(data.content || data.fullRunbook || ''),
+    name,
+    displayName: name.replace('fabric_', '').replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()),
+    description: `Operational skill runbook for ${name}`,
+    tier: 'atomic',
+    snippet: `# ${name}\nOperational playbook and guidance.`,
+    fullRunbook: `# ${name}\n\nOperational runbook for Microsoft Fabric engineering.`,
   };
 }
 

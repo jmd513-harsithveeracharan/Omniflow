@@ -518,12 +518,85 @@ async def get_workspace_tree() -> dict[str, Any]:
 
 @app.get("/api/skills")
 async def get_skills_list() -> list[dict[str, Any]]:
+    try:
+        from app.skill_loader import get_skill_index
+        index = get_skill_index()
+        if index:
+            return [
+                {
+                    "name": s["name"],
+                    "display_name": s.get("displayName", s["name"]),
+                    "description": s.get("description", ""),
+                    "tier": s.get("tier", "atomic"),
+                    "snippet": s.get("snippet", ""),
+                }
+                for s in index
+            ]
+    except Exception as e:
+        print(f"[Skills list error]: {e}")
     return [
+        {"name": "using_fabric_skills", "display_name": "Using Fabric Skills", "description": "Meta-skill orchestrator for Microsoft Fabric data engineering.", "tier": "orchestrator"},
         {"name": "fabric_medallion_architecture", "display_name": "Medallion Architecture Designer", "description": "Bronze, Silver, Gold Lakehouse design and Kimball modeling.", "tier": "workflow"},
         {"name": "sql_transpilation_and_lineage", "display_name": "SQLGlot AST Transpilation", "description": "Cross-dialect SQL to PySpark Spark SQL AST transpilation.", "tier": "atomic"},
         {"name": "fabric_data_quality_and_testing", "display_name": "Delta Lake Quality & Great Expectations", "description": "Automated data contracts, PII masking, and constraint enforcement.", "tier": "atomic"},
+        {"name": "fabric_governance_and_safe_delete", "display_name": "Governance & Safe Delete", "description": "Blast-zone impact analysis and safety gates.", "tier": "workflow"},
         {"name": "fabric_deployer", "display_name": "Fabric REST API Deployer", "description": "Live cloud deployment directly to workspace root.", "tier": "atomic"},
     ]
+
+
+@app.get("/api/skills/{skill_name}")
+async def get_skill_detail(skill_name: str) -> dict[str, Any]:
+    skills_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".agents", "skills")
+    target_md = None
+    if os.path.exists(skills_dir):
+        for root, _, files in os.walk(skills_dir):
+            if "SKILL.md" in files:
+                folder_name = os.path.basename(root)
+                if folder_name.lower() == skill_name.lower() or skill_name.lower() in folder_name.lower():
+                    target_md = os.path.join(root, "SKILL.md")
+                    break
+
+    content = ""
+    clean_title = skill_name.replace("fabric_", "").replace("_", " ").title()
+    display_name = clean_title
+    description = f"Operational runbook for {clean_title}"
+    tier = "atomic"
+    snippet = ""
+
+    if target_md and os.path.exists(target_md):
+        try:
+            with open(target_md, "r", encoding="utf-8", errors="replace") as f:
+                content = f.read()
+            import re
+            fm_match = re.match(r"^---\s*\n(.*?)\n---\s*\n", content, re.DOTALL)
+            if fm_match:
+                for line in fm_match.group(1).splitlines():
+                    if ":" in line:
+                        k, v = line.split(":", 1)
+                        if k.strip().lower() == "name":
+                            display_name = v.strip().strip("\"'")
+                        elif k.strip().lower() == "description":
+                            description = v.strip().strip("\"'")
+            if skill_name == "using_fabric_skills":
+                tier = "orchestrator"
+                snippet = "User Request Arrives\n  ├── Architecture / Lakehouse? ──→ fabric_medallion_architecture\n  ├── Ingesting Tables / Schedules? ─→ fabric_ingestion_and_scheduling\n  ├── SQL / AST / Lineage? ──────────→ sql_transpilation_and_lineage\n  └── Delete / Governance? ──────────→ fabric_governance_and_safe_delete"
+            elif skill_name in ["fabric_medallion_architecture", "fabric_ingestion_and_scheduling", "fabric_governance_and_safe_delete"]:
+                tier = "workflow"
+        except Exception as e:
+            print(f"[Skill read error]: {e}")
+
+    if not content:
+        content = f"# {display_name}\n\n{description}\n\nOperational runbook and guidance for Microsoft Fabric autonomous operations."
+
+    return {
+        "name": skill_name,
+        "display_name": display_name,
+        "description": description,
+        "tier": tier,
+        "snippet": snippet,
+        "content": content,
+        "fullRunbook": content,
+    }
 
 
 @app.get("/api/connectors")
