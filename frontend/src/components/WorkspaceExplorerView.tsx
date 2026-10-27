@@ -32,54 +32,8 @@ export const WorkspaceExplorerView: React.FC<WorkspaceExplorerViewProps> = ({
       if (data && Array.isArray(data.folders)) {
         setFolders(data.folders);
       }
-      if (data && Array.isArray(data.items) && data.items.length > 0) {
+      if (data && Array.isArray(data.items)) {
         setItems(data.items);
-      } else {
-        // Dynamic workspace inventory
-        setItems([
-          {
-            id: 'lh_enterprise_bronze',
-            displayName: 'lh_enterprise_bronze',
-            type: 'Lakehouse',
-            description: 'Raw immutable delta ingestion layer',
-            folderId: 'AI_Test_Folder',
-          },
-          {
-            id: 'lh_enterprise_silver',
-            displayName: 'lh_enterprise_silver',
-            type: 'Lakehouse',
-            description: 'Cleaned deduplicated delta layer with MERGE upsert',
-            folderId: 'AI_Test_Folder',
-          },
-          {
-            id: 'lh_enterprise_gold',
-            displayName: 'lh_enterprise_gold',
-            type: 'Lakehouse',
-            description: 'Star schema facts and dimensions for Power BI Direct Lake',
-            folderId: 'AI_Test_Folder',
-          },
-          {
-            id: 'nb_sales_silver_merge',
-            displayName: 'nb_sales_silver_merge',
-            type: 'Notebook',
-            description: 'PySpark Delta MERGE SCD-1/2 processor',
-            folderId: 'AI_Test_Folder',
-          },
-          {
-            id: 'pl_daily_medallion_sync',
-            displayName: 'pl_daily_medallion_sync',
-            type: 'DataPipeline',
-            description: 'Data Factory pipeline scheduled daily at 02:00 UTC',
-            folderId: 'AI_Test_Folder',
-          },
-          {
-            id: 'agent_pbt_data_orchestrator',
-            displayName: 'PBT_Data_Agent',
-            type: 'DataAgent',
-            description: 'Sovereign Claude Code / Gemini reasoning mesh',
-            folderId: 'Workspace Root',
-          },
-        ]);
       }
     } catch (e) {
       console.error('Failed to load workspace items', e);

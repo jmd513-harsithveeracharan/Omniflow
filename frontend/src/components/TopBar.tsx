@@ -4,7 +4,6 @@ import {
   PanelLeftOpen,
   Workflow,
   RefreshCw,
-  Mic,
 } from 'lucide-react';
 import { FabricStatus } from '../types';
 
@@ -28,15 +27,7 @@ export const TopBar: React.FC<TopBarProps> = ({
   isWorkbenchOpen,
   onToggleWorkbench,
   onRefreshWorkspace,
-  status,
-  onOpenFabricConnection,
-  onOpenVoiceMode,
 }) => {
-  const wsDisplayName =
-    status?.workspaceName ||
-    (status as Record<string, unknown> | undefined)?.['workspace_name'] ||
-    (status?.workspaceId ? 'PBT_DATA_AGENT' : 'Workspace');
-
   return (
     <header className="studio-topbar">
       <div className="topbar-left">
@@ -62,18 +53,6 @@ export const TopBar: React.FC<TopBarProps> = ({
       </div>
 
       <div className="topbar-right">
-        {status?.authenticated && (
-          <div
-            onClick={onOpenFabricConnection}
-            style={{ cursor: 'pointer' }}
-            className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#1e1f20] border border-[#2d2e31] text-[11px] font-mono text-[#10b981] mr-2 hover:border-[#10b981]/50 transition-all"
-            title="Manage Microsoft Fabric Connection"
-          >
-            <span className="w-2 h-2 rounded-full bg-[#10b981] animate-pulse" />
-            <span>Fabric: {String(wsDisplayName)}</span>
-          </div>
-        )}
-
         {/* Visual Architecture Canvas Toggle Button */}
         <button
           type="button"
@@ -83,19 +62,6 @@ export const TopBar: React.FC<TopBarProps> = ({
         >
           <Workflow width={16} height={16} />
         </button>
-
-        {/* Live ChatGPT Voice Mode */}
-        {onOpenVoiceMode && (
-          <button
-            type="button"
-            className="topbar-tool-icon"
-            onClick={onOpenVoiceMode}
-            title="Start ChatGPT Voice Mode (Hands-Free)"
-            style={{ color: '#10b981' }}
-          >
-            <Mic width={16} height={16} />
-          </button>
-        )}
 
         {/* Sync Workspace Items */}
         <button

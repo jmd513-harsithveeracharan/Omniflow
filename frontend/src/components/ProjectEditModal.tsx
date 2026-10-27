@@ -85,10 +85,14 @@ export const ProjectEditModal: React.FC<ProjectEditModalProps> = ({
   };
 
   return (
-    <div className="modal-backdrop" onClick={onClose}>
+    <div
+      className="sso-modal-backdrop"
+      style={{ display: 'flex', zIndex: 10006 }}
+      onClick={onClose}
+    >
       <div
         className="modal-container glass-card"
-        style={{ maxWidth: '480px', width: '90%', padding: '24px' }}
+        style={{ maxWidth: '480px', width: '90%', padding: '24px', background: '#18191c', border: '1px solid #333538', borderRadius: '14px', boxShadow: '0 20px 50px rgba(0,0,0,0.7)' }}
         onClick={(e) => e.stopPropagation()}
       >
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '18px' }}>
