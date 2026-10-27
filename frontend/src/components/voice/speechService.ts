@@ -184,3 +184,40 @@ export const stopSpeaking = (): void => {
     window.speechSynthesis.cancel();
   }
 };
+
+let activeAecStream: MediaStream | null = null;
+
+/**
+ * Engages browser and OS-level hardware Acoustic Echo Cancellation (AEC)
+ * via WebRTC getUserMedia. This prevents the microphone from capturing
+ * the audio played through the speakers during speech synthesis.
+ */
+export const enableEchoCancellation = async (): Promise<boolean> => {
+  if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia) return false;
+  try {
+    if (!activeAecStream) {
+      activeAecStream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        },
+      });
+    }
+    return true;
+  } catch (err) {
+    console.warn('[VoiceMode] Notice: Audio echo cancellation fallback engaged:', err);
+    return false;
+  }
+};
+
+/**
+ * Disables the WebRTC AEC media stream track when exiting voice mode.
+ */
+export const disableEchoCancellation = (): void => {
+  if (activeAecStream) {
+    activeAecStream.getTracks().forEach((track) => track.stop());
+    activeAecStream = null;
+  }
+};
+

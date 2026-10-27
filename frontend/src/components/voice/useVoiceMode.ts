@@ -1,34 +1,34 @@
 /**
  * frontend/src/components/voice/useVoiceMode.ts
  * -----------------------------------------------
- * Clean React hook managing the hands-free conversational voice loop:
- * - Continuous Speech Recognition with Silence Detection (auto-turn taking)
- * - Barge-in Interruption: cuts off Tenali's speech the moment user speaks
- * - High-Fidelity Natural Neural TTS playback
- * - Zero external cost ($0.00)
+ * Hands-free conversational voice mode hook with:
+ * 1. Low-latency sentence-by-sentence streaming TTS playback
+ * 2. True hands-free Barge-In (interrupt by speaking alone, zero clicks needed)
+ * 3. Continuous microphone listening with WebRTC Acoustic Echo Cancellation (AEC)
+ * 4. Dual-layer Echo Filter (prevents AI from interrupting itself)
  */
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { VoiceModeState } from './FloatingVoiceOrb';
 import {
   createSpeechRecognition,
-  speakNaturalVoice,
   stopSpeaking,
   isSpeechRecognitionSupported,
+  enableEchoCancellation,
+  disableEchoCancellation,
 } from './speechService';
+import { StreamingSpeechQueue } from './streamingQueue';
 
 interface UseVoiceModeProps {
   isActive: boolean;
   onSendMessage: (text: string) => void;
-  lastAssistantMessage?: string;
-  isStreaming: boolean;
+  isStreaming?: boolean;
 }
 
 export function useVoiceMode({
   isActive,
   onSendMessage,
-  lastAssistantMessage,
-  isStreaming,
+  isStreaming: _isStreaming,
 }: UseVoiceModeProps) {
   const [voiceState, setVoiceState] = useState<VoiceModeState>('listening');
   const [voiceTranscript, setVoiceTranscript] = useState<string>('');
@@ -36,11 +36,41 @@ export function useVoiceMode({
 
   const recognitionRef = useRef<ReturnType<typeof createSpeechRecognition> | null>(null);
   const silenceTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const lastSpokenMsgRef = useRef<string>('');
+  const restartTimerRef = useRef<NodeJS.Timeout | null>(null);
   const isComponentMounted = useRef<boolean>(true);
+
+  // Streaming speech playback queue
+  const queueRef = useRef<StreamingSpeechQueue>(
+    new StreamingSpeechQueue({
+      onStartSpeaking: () => {
+        if (isComponentMounted.current) setVoiceState('speaking');
+      },
+      onFinishedAll: () => {
+        if (isComponentMounted.current && !isMuted) {
+          setVoiceState('listening');
+        }
+      },
+      onInterrupted: () => {
+        if (isComponentMounted.current) setVoiceState('listening');
+      },
+    })
+  );
+
+  // Feeds token chunks directly from SSE into the speech queue
+  const feedStreamingChunk = useCallback((chunk: string) => {
+    if (!isActive || isMuted) return;
+    queueRef.current.push(chunk);
+  }, [isActive, isMuted]);
+
+  // Signals that LLM stream completed
+  const finishStreaming = useCallback(() => {
+    if (!isActive || isMuted) return;
+    queueRef.current.flush();
+  }, [isActive, isMuted]);
 
   // Interrupt / stop speech
   const interrupt = useCallback(() => {
+    queueRef.current.cancel();
     stopSpeaking();
     if (voiceState === 'speaking') {
       setVoiceState('listening');
@@ -52,6 +82,7 @@ export function useVoiceMode({
     setIsMuted((prev) => {
       const next = !prev;
       if (next) {
+        queueRef.current.cancel();
         stopSpeaking();
         if (recognitionRef.current) {
           try {
@@ -75,47 +106,27 @@ export function useVoiceMode({
     });
   }, []);
 
-  // When a new assistant message completes streaming, read it aloud with natural voice
+  // WebRTC Hardware Acoustic Echo Cancellation (AEC) Lifecycle
   useEffect(() => {
-    if (!isActive) return;
-
-    if (isStreaming) {
-      setVoiceState('thinking');
-      return;
+    if (isActive) {
+      enableEchoCancellation();
+    } else {
+      disableEchoCancellation();
     }
+    return () => {
+      disableEchoCancellation();
+    };
+  }, [isActive]);
 
-    if (
-      lastAssistantMessage &&
-      lastAssistantMessage !== lastSpokenMsgRef.current &&
-      lastAssistantMessage.trim().length > 0
-    ) {
-      lastSpokenMsgRef.current = lastAssistantMessage;
-      setVoiceState('speaking');
-
-      speakNaturalVoice(
-        lastAssistantMessage,
-        () => {
-          if (isComponentMounted.current) setVoiceState('speaking');
-        },
-        () => {
-          if (isComponentMounted.current && !isMuted) {
-            setVoiceState('listening');
-          }
-        },
-        () => {
-          if (isComponentMounted.current) setVoiceState('listening');
-        }
-      );
-    }
-  }, [isActive, isStreaming, lastAssistantMessage, isMuted]);
-
-  // Setup Continuous Speech Recognition
+  // Setup Continuous Speech Recognition & Hands-Free Barge-In
   useEffect(() => {
     isComponentMounted.current = true;
 
     if (!isActive) {
+      queueRef.current.cancel();
       stopSpeaking();
       if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
+      if (restartTimerRef.current) clearTimeout(restartTimerRef.current);
       if (recognitionRef.current) {
         try {
           recognitionRef.current.abort();
@@ -135,50 +146,77 @@ export function useVoiceMode({
     if (!rec) return;
 
     rec.onstart = () => {
-      if (!isMuted) setVoiceState('listening');
+      if (!isMuted && !queueRef.current.getIsPlaying()) {
+        setVoiceState('listening');
+      }
     };
 
     rec.onresult = (event) => {
-      // ⚡ BARGE-IN INTERRUPTION: If Tenali is currently speaking and user speaks, immediately cut off speech!
-      if (typeof window !== 'undefined' && 'speechSynthesis' in window && window.speechSynthesis.speaking) {
-        stopSpeaking();
-        setVoiceState('listening');
-      }
-
       let interim = '';
       for (let i = event.resultIndex; i < event.results.length; ++i) {
         interim += event.results[i][0].transcript;
       }
+      const spoken = interim.trim();
+      if (spoken.length === 0) return;
 
-      if (interim.trim().length > 0) {
-        setVoiceTranscript(interim);
+      // ⚡ SMART BARGE-IN INTERRUPTION:
+      // If Tenali is currently speaking and user speaks, test for real speech vs echo
+      const isCurrentlySpeaking =
+        queueRef.current.getIsPlaying() ||
+        (typeof window !== 'undefined' && Boolean(window.speechSynthesis?.speaking));
 
-        // Auto-commit on silence (1.1s pause)
-        if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
-        silenceTimerRef.current = setTimeout(() => {
-          if (interim.trim().length > 1) {
-            onSendMessage(interim.trim());
-            setVoiceTranscript('');
-            setVoiceState('thinking');
-          }
-        }, 1100);
+      if (isCurrentlySpeaking) {
+        const curSentence = queueRef.current.getCurrentSentence().toLowerCase();
+        const spokenLower = spoken.toLowerCase();
+
+        // Echo filter: Check if mic captured Tenali's own words from speaker
+        const isEcho =
+          curSentence.length > 0 &&
+          (curSentence.includes(spokenLower) ||
+            spokenLower.split(/\s+/).every((w) => w.length > 2 && curSentence.includes(w)));
+
+        if (!isEcho && spoken.length >= 2) {
+          // Real user vocal interruption! Immediately silence AI mid-sentence.
+          queueRef.current.cancel();
+          stopSpeaking();
+          setVoiceState('listening');
+        } else {
+          // Ignore echo loopback
+          return;
+        }
       }
+
+      setVoiceTranscript(spoken);
+
+      // Auto-commit on silence (1.0s pause)
+      if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
+      silenceTimerRef.current = setTimeout(() => {
+        if (spoken.length > 1) {
+          queueRef.current.reset();
+          onSendMessage(spoken);
+          setVoiceTranscript('');
+          setVoiceState('thinking');
+        }
+      }, 1000);
     };
 
     rec.onerror = (e) => {
       if (e.error !== 'no-speech') {
-        console.warn('[VoiceMode] Notice:', e.error);
+        console.warn('[VoiceMode] Speech recognition notice:', e.error);
       }
     };
 
     rec.onend = () => {
-      // Automatically keep listening in background if still active and not muted
+      // Auto-restart continuous listening safely
       if (isActive && !isMuted && isComponentMounted.current) {
-        try {
-          rec.start();
-        } catch {
-          // pass
-        }
+        if (restartTimerRef.current) clearTimeout(restartTimerRef.current);
+        restartTimerRef.current = setTimeout(() => {
+          try {
+            rec.start();
+          } catch {
+            // Already active or transitioning
+          }
+        }, 120);
       }
     };
 
@@ -191,8 +229,10 @@ export function useVoiceMode({
 
     return () => {
       isComponentMounted.current = false;
+      queueRef.current.cancel();
       stopSpeaking();
       if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
+      if (restartTimerRef.current) clearTimeout(restartTimerRef.current);
       try {
         rec.abort();
       } catch {
@@ -207,5 +247,7 @@ export function useVoiceMode({
     isMuted,
     toggleMute,
     interrupt,
+    feedStreamingChunk,
+    finishStreaming,
   };
 }

@@ -284,6 +284,9 @@ export const App: React.FC = () => {
     );
   };
 
+  const feedStreamingChunkRef = React.useRef<((chunk: string) => void) | null>(null);
+  const finishStreamingRef = React.useRef<(() => void) | null>(null);
+
   const handleSendMessage = async (
     text: string,
     model?: string,
@@ -315,6 +318,9 @@ export const App: React.FC = () => {
       sessionId,
       (chunk) => {
         assistantContent += chunk;
+        if (isVoiceModeActive && feedStreamingChunkRef.current) {
+          feedStreamingChunkRef.current(chunk);
+        }
         setMessages((prev) => {
           const last = prev[prev.length - 1];
           if (last && last.role === 'assistant') {
@@ -325,6 +331,9 @@ export const App: React.FC = () => {
       },
       (plan) => {
         setIsStreaming(false);
+        if (isVoiceModeActive && finishStreamingRef.current) {
+          finishStreamingRef.current();
+        }
         const elapsedSec = ((Date.now() - startTime) / 1000).toFixed(1);
         setMessages((prev) => {
           const last = prev[prev.length - 1];
@@ -344,6 +353,9 @@ export const App: React.FC = () => {
       },
       (err) => {
         console.error('Stream error:', err);
+        if (isVoiceModeActive && finishStreamingRef.current) {
+          finishStreamingRef.current();
+        }
         const elapsedSec = ((Date.now() - startTime) / 1000).toFixed(1);
         setMessages((prev) => {
           const last = prev[prev.length - 1];
@@ -393,18 +405,21 @@ export const App: React.FC = () => {
   };
 
   // ChatGPT-Style Hands-Free Voice Mode Hook
-  const lastAssistantMessage = messages.filter((m) => m.role === 'assistant').slice(-1)[0]?.content;
   const {
     voiceState,
     voiceTranscript,
     toggleMute: toggleVoiceMute,
     interrupt: interruptVoice,
+    feedStreamingChunk,
+    finishStreaming,
   } = useVoiceMode({
     isActive: isVoiceModeActive,
     onSendMessage: handleSendMessage,
-    lastAssistantMessage,
     isStreaming,
   });
+
+  feedStreamingChunkRef.current = feedStreamingChunk;
+  finishStreamingRef.current = finishStreaming;
 
   const handleSelectView = (view: string) => {
     if (view === 'settings') {

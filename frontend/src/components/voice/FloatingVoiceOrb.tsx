@@ -62,3 +62,4 @@ export const FloatingVoiceOrb: React.FC<FloatingVoiceOrbProps> = ({
     </div>
   );
 };
+
