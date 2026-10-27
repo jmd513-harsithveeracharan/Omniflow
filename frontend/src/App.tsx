@@ -564,7 +564,7 @@ export const App: React.FC = () => {
             <div
               className={`bolt-chat-pane ${messages.length === 0 && !isVoiceModeActive ? 'is-landing' : 'in-chat'} ${
                 isWorkbenchOpen ? 'with-workbench' : 'full-width'
-              }`}
+              } ${isVoiceModeActive ? 'voice-active' : ''}`}
             >
               {isLoadingSession ? (
                 <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: '14px', minHeight: '320px' }}>
