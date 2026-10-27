@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { X, FolderGit2, FolderOpen, HardDrive, AlertCircle, Users, Settings } from 'lucide-react';
 import { ProjectRecord } from '../types';
 import { ProjectTeamTab } from './project/ProjectTeamTab';
+import { ProjectGitTab } from './project/ProjectGitTab';
 
 interface ProjectEditModalProps {
   isOpen: boolean;
@@ -21,7 +22,7 @@ export const ProjectEditModal: React.FC<ProjectEditModalProps> = ({
   const [localPath, setLocalPath] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [activeModalTab, setActiveModalTab] = useState<'general' | 'team'>('general');
+  const [activeModalTab, setActiveModalTab] = useState<'general' | 'team' | 'git'>('general');
   const folderInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -92,7 +93,7 @@ export const ProjectEditModal: React.FC<ProjectEditModalProps> = ({
     >
       <div
         className="modal-container glass-card"
-        style={{ maxWidth: '480px', width: '90%', padding: '24px', background: '#18191c', border: '1px solid #333538', borderRadius: '14px', boxShadow: '0 20px 50px rgba(0,0,0,0.7)' }}
+        style={{ maxWidth: '520px', width: '92%', maxHeight: '88vh', overflowY: 'auto', padding: '24px', background: '#18191c', border: '1px solid #333538', borderRadius: '14px', boxShadow: '0 20px 50px rgba(0,0,0,0.7)' }}
         onClick={(e) => e.stopPropagation()}
       >
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '18px' }}>
@@ -189,7 +190,29 @@ export const ProjectEditModal: React.FC<ProjectEditModalProps> = ({
             }}
           >
             <Users width={13} height={13} />
-            Team & RBAC
+            Team
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveModalTab('git')}
+            style={{
+              flex: 1,
+              padding: '6px 0',
+              fontSize: '12px',
+              fontWeight: 600,
+              borderRadius: '6px',
+              border: 'none',
+              cursor: 'pointer',
+              background: activeModalTab === 'git' ? '#252936' : 'transparent',
+              color: activeModalTab === 'git' ? '#f8fafc' : '#94a3b8',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '6px',
+            }}
+          >
+            <FolderGit2 width={13} height={13} />
+            Git & Cloud
           </button>
         </div>
 
@@ -209,9 +232,15 @@ export const ProjectEditModal: React.FC<ProjectEditModalProps> = ({
           </div>
         )}
 
-        {activeModalTab === 'team' ? (
+        {activeModalTab === 'team' && (
           <ProjectTeamTab projectId={project.id} />
-        ) : (
+        )}
+
+        {activeModalTab === 'git' && (
+          <ProjectGitTab project={project} localPath={localPath} />
+        )}
+
+        {activeModalTab === 'general' && (
           <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
           <div>
             <label

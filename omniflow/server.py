@@ -30,6 +30,7 @@ from omniflow.tools.fabric_deployer import (
     verify_fabric_workspace_connection,
 )
 from omniflow.auth import auth_router, init_auth_db
+from omniflow.git_service import git_router
 from omniflow.intent_router import (
     classify_prompt_intent,
     build_general_chat_prompt,
@@ -52,6 +53,7 @@ app.add_middleware(
 )
 
 app.include_router(auth_router)
+app.include_router(git_router)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DIST_DIR = os.path.join(BASE_DIR, "dist")
