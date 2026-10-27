@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Loader2, Globe, Layers, Paperclip, X, Plus, Mic, MicOff } from 'lucide-react';
 import { IntakeSpecModal } from './modals/IntakeSpecModal';
 import { FloatingVoiceOrb, VoiceModeState } from './voice/FloatingVoiceOrb';
-import { unlockSpeechEngine } from './voice/speechService';
+import { unlockSpeechEngine, isSpeechRecognitionSupported } from './voice/speechService';
 
 interface PromptDockProps {
   onSendMessage: (text: string, model?: string, effort?: string, mode?: 'auto' | 'general' | 'project') => void;
@@ -39,6 +39,12 @@ export const PromptDock: React.FC<PromptDockProps> = ({
   const [temperature, setTemperature] = useState(0.2);
 
   const handleLaunchVoiceMode = () => {
+    if (!isSpeechRecognitionSupported()) {
+      alert(
+        'Zen Browser and Firefox (Gecko engine) do not support the Web Speech Recognition API.\n\nPlease open OmniFlow in Google Chrome or Microsoft Edge to use Hands-Free Voice Mode.'
+      );
+      return;
+    }
     unlockSpeechEngine();
     if (onToggleVoiceMode) {
       onToggleVoiceMode();
