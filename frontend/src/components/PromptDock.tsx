@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Loader2, Globe, Layers, Paperclip, X, Plus, Mic, MicOff } from 'lucide-react';
 import { IntakeSpecModal } from './modals/IntakeSpecModal';
 import { FloatingVoiceOrb, VoiceModeState } from './voice/FloatingVoiceOrb';
+import { unlockSpeechEngine } from './voice/speechService';
 
 interface PromptDockProps {
   onSendMessage: (text: string, model?: string, effort?: string, mode?: 'auto' | 'general' | 'project') => void;
@@ -36,7 +37,13 @@ export const PromptDock: React.FC<PromptDockProps> = ({
   const [isTuningOpen, setIsTuningOpen] = useState(false);
   const [isIntakeModalOpen, setIsIntakeModalOpen] = useState(false);
   const [temperature, setTemperature] = useState(0.2);
-  const [isListening, setIsListening] = useState(false);
+
+  const handleLaunchVoiceMode = () => {
+    unlockSpeechEngine();
+    if (onToggleVoiceMode) {
+      onToggleVoiceMode();
+    }
+  };
 
   const handleIntakeSubmit = (intakeJson: string, resume: boolean) => {
     try {
@@ -111,65 +118,7 @@ export const PromptDock: React.FC<PromptDockProps> = ({
     }
   };
 
-  const handleVoiceToggle = () => {
-    // Type definition for speech recognition API
-    type WebkitWindow = Window & {
-      webkitSpeechRecognition?: new () => {
-        continuous: boolean;
-        interimResults: boolean;
-        lang: string;
-        onstart: () => void;
-        onend: () => void;
-        onerror: () => void;
-        onresult: (event: { results: Array<Array<{ transcript: string }>> }) => void;
-        start: () => void;
-      };
-      SpeechRecognition?: new () => {
-        continuous: boolean;
-        interimResults: boolean;
-        lang: string;
-        onstart: () => void;
-        onend: () => void;
-        onerror: () => void;
-        onresult: (event: { results: Array<Array<{ transcript: string }>> }) => void;
-        start: () => void;
-      };
-    };
 
-    const w = window as unknown as WebkitWindow;
-    const SpeechRecognitionClass = w.SpeechRecognition || w.webkitSpeechRecognition;
-
-    if (!SpeechRecognitionClass) {
-      alert('Speech recognition is not supported in this browser.');
-      return;
-    }
-
-    if (isListening) {
-      setIsListening(false);
-      return;
-    }
-
-    try {
-      const recognition = new SpeechRecognitionClass();
-      recognition.continuous = false;
-      recognition.interimResults = false;
-      recognition.lang = 'en-US';
-
-      recognition.onstart = () => setIsListening(true);
-      recognition.onend = () => setIsListening(false);
-      recognition.onerror = () => setIsListening(false);
-      recognition.onresult = (event: { results: Array<Array<{ transcript: string }>> }) => {
-        const transcript = event.results[0]?.[0]?.transcript;
-        if (transcript) {
-          setInput((prev) => (prev ? `${prev} ${transcript}` : transcript));
-        }
-      };
-      recognition.start();
-    } catch (err) {
-      console.error('Speech recognition error:', err);
-      setIsListening(false);
-    }
-  };
 
   const ALL_MODELS = [
     { id: 'tenali-ai', name: 'Tenali AI', desc: 'OmniFlow GPT-6 Luna • Multi-Agent Core Engine (Default)', tag: 'Active' },
@@ -501,10 +450,10 @@ export const PromptDock: React.FC<PromptDockProps> = ({
                 {/* Voice Input Mic */}
                 <button
                   type="button"
-                  className={`dock-icon-btn ${isListening ? 'recording' : ''}`}
+                  className="dock-icon-btn"
                   id="btnVoiceInput"
-                  title="Voice Input"
-                  onClick={handleVoiceToggle}
+                  title="Start Voice Mode (Hands-Free)"
+                  onClick={handleLaunchVoiceMode}
                 >
                   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
@@ -548,7 +497,7 @@ export const PromptDock: React.FC<PromptDockProps> = ({
                     className="dock-icon-btn"
                     id="btnAudioWave"
                     title="Start ChatGPT Voice Mode (Hands-Free)"
-                    onClick={onToggleVoiceMode}
+                    onClick={handleLaunchVoiceMode}
                   >
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                       <line x1="4" y1="9" x2="4" y2="15" />

@@ -14,6 +14,7 @@ import {
   createSpeechRecognition,
   stopSpeaking,
   isSpeechRecognitionSupported,
+  unlockSpeechEngine,
 } from './speechService';
 import { StreamingSpeechQueue } from './streamingQueue';
 import { isLikelyEcho, countWords } from './echoFilter';
@@ -216,6 +217,7 @@ export function useVoiceMode({
     const rec = createSpeechRecognition();
     if (!rec) return;
 
+    unlockSpeechEngine();
     turnStartIndexRef.current = 0;
     lastResultsLenRef.current = 0;
     carryOverTextRef.current = '';
@@ -322,7 +324,9 @@ export function useVoiceMode({
     };
 
     rec.onerror = (e) => {
-      if (e.error !== 'no-speech' && e.error !== 'aborted') {
+      if (e.error === 'not-allowed') {
+        console.error('[VoiceMode] Microphone access is blocked. Allow microphone permission in browser settings.');
+      } else if (e.error !== 'no-speech' && e.error !== 'aborted') {
         console.warn('[VoiceMode] SpeechRecognition notice:', e.error);
       }
     };
