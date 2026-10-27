@@ -1,14 +1,17 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Loader2, Globe, Layers, Paperclip, X } from 'lucide-react';
+import { Loader2, Globe, Layers, Paperclip, X, Plus, Mic, MicOff } from 'lucide-react';
 import { IntakeSpecModal } from './modals/IntakeSpecModal';
+import { FloatingVoiceOrb, VoiceModeState } from './voice/FloatingVoiceOrb';
 
 interface PromptDockProps {
   onSendMessage: (text: string, model?: string, effort?: string, mode?: 'auto' | 'general' | 'project') => void;
   isStreaming: boolean;
   isVoiceModeActive?: boolean;
   onToggleVoiceMode?: () => void;
-  isVoiceListening?: boolean;
+  voiceState?: VoiceModeState;
+  isVoiceMuted?: boolean;
   onToggleVoiceMute?: () => void;
+  onInterruptVoice?: () => void;
   voiceTranscript?: string;
 }
 
@@ -17,8 +20,10 @@ export const PromptDock: React.FC<PromptDockProps> = ({
   isStreaming,
   isVoiceModeActive = false,
   onToggleVoiceMode,
-  isVoiceListening = false,
+  voiceState = 'listening',
+  isVoiceMuted = false,
   onToggleVoiceMute,
+  onInterruptVoice,
   voiceTranscript = '',
 }) => {
   const [input, setInput] = useState('');
@@ -180,292 +185,326 @@ export const PromptDock: React.FC<PromptDockProps> = ({
   ];
 
   return (
-    <div className="chat-dock-container" id="chatDockContainer">
-      <div className="google-prompt-dock">
-        {/* Text Input Wrapper */}
-        <div className="dock-textarea-wrapper">
-          <textarea
-            ref={textareaRef}
-            id="chatInput"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder={
-              isVoiceModeActive
-                ? (voiceTranscript ? `"${voiceTranscript}"` : "Listening... (Speak anytime, or type below)")
-                : "Start typing a prompt to see what our models can do..."
-            }
-            rows={1}
-            disabled={isStreaming}
+    <div className={`chat-dock-container ${isVoiceModeActive ? 'voice-mode-active' : ''}`} id="chatDockContainer">
+      {isVoiceModeActive ? (
+        <>
+          <FloatingVoiceOrb
+            state={voiceState}
+            transcript={voiceTranscript}
+            onClick={onToggleVoiceMute}
+            onInterrupt={onInterruptVoice}
           />
-        </div>
-
-        {/* Dock Controls Row */}
-        <div className="dock-controls-row">
-          <div className="dock-left-controls" ref={leftControlsRef} style={{ position: 'relative' }}>
-            {/* Model Tuning Button */}
+          <div className="voice-mode-pill-dock">
             <button
               type="button"
-              className={`dock-tool-pill ${isTuningOpen ? 'active' : ''}`}
-              id="btnTuneModel"
-              onClick={() => {
-                setIsTuningOpen(!isTuningOpen);
-              }}
-              title="System Prompt & Model Tuning"
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <line x1="4" y1="21" x2="4" y2="14" />
-                <line x1="4" y1="10" x2="4" y2="3" />
-                <line x1="12" y1="21" x2="12" y2="12" />
-                <line x1="12" y1="8" x2="12" y2="3" />
-                <line x1="20" y1="21" x2="20" y2="16" />
-                <line x1="20" y1="12" x2="20" y2="3" />
-                <line x1="1" y1="14" x2="7" y2="14" />
-                <line x1="9" y1="8" x2="15" y2="8" />
-                <line x1="17" y1="16" x2="23" y2="16" />
-              </svg>
-            </button>
-
-            {/* Project Intake JSON Spec Attachment Button */}
-            <button
-              type="button"
-              className={`dock-tool-pill ${isIntakeModalOpen ? 'active' : ''}`}
-              id="btnIntakeJson"
+              className="voice-dock-plus-btn"
               onClick={() => setIsIntakeModalOpen(true)}
-              title="Attach, Upload, or Edit Project Intake JSON Spec"
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '6px',
-                padding: '4px 11px',
-                color: isIntakeModalOpen ? '#10b981' : '#e4e4e7',
-                background: isIntakeModalOpen ? 'rgba(16, 185, 129, 0.15)' : 'rgba(255, 255, 255, 0.04)',
-                border: isIntakeModalOpen ? '1px solid rgba(16, 185, 129, 0.4)' : '1px solid rgba(255, 255, 255, 0.1)',
-                borderRadius: '8px',
-                fontSize: '11.5px',
-                fontWeight: 500,
-                cursor: 'pointer',
+              title="Attach Project Intake Spec"
+            >
+              <Plus width={18} height={18} />
+            </button>
+            <input
+              type="text"
+              className="voice-dock-input"
+              id="voiceChatInput"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  handleSubmit();
+                }
               }}
-            >
-              <Paperclip width={13} height={13} style={{ color: '#10b981' }} />
-              <span>Intake Spec</span>
-            </button>
-
-            {/* Tuning Popover */}
-            {isTuningOpen && (
-              <div
-                style={{
-                  position: 'absolute',
-                  bottom: '44px',
-                  left: 0,
-                  width: '280px',
-                  background: '#1e1f20',
-                  border: '1px solid rgba(255,255,255,0.12)',
-                  borderRadius: '12px',
-                  padding: '14px',
-                  boxShadow: '0 16px 36px rgba(0,0,0,0.65)',
-                  zIndex: 100,
-                }}
-              >
-                <div style={{ fontSize: '12.5px', fontWeight: 600, color: '#fff', marginBottom: '8px' }}>
-                  Model Temperature: {temperature}
-                </div>
-                <input
-                  type="range"
-                  min="0"
-                  max="1"
-                  step="0.05"
-                  value={temperature}
-                  onChange={(e) => setTemperature(parseFloat(e.target.value))}
-                  style={{ width: '100%', accentColor: '#38bdf8', marginBottom: '10px' }}
-                />
-                <div style={{ fontSize: '11px', color: '#9ca3af', lineHeight: 1.4 }}>
-                  Lower temperature produces deterministic, idempotent PySpark code. Higher values increase creative exploration.
-                </div>
-              </div>
-            )}
-
-            {/* Single Mode Toggle Button with Flip Animation (General vs Project) */}
-            <button
-              type="button"
-              className={`dock-mode-toggle-pill ${chatMode} ${isFlipping ? 'flipping' : ''}`}
-              id="btnDockModeToggle"
-              onClick={handleToggleMode}
-              title={`Active: ${chatMode === 'project' ? 'Project' : 'General'} Mode — Click to switch to ${chatMode === 'project' ? 'General' : 'Project'} Mode`}
-            >
-              <div className="mode-toggle-inner">
-                {chatMode === 'project' ? (
-                  <>
-                    <Layers size={13} strokeWidth={1.8} className="mode-icon" />
-                    <span className="mode-label">Project</span>
-                  </>
-                ) : (
-                  <>
-                    <Globe size={13} strokeWidth={1.8} className="mode-icon" />
-                    <span className="mode-label">General</span>
-                  </>
-                )}
-              </div>
-            </button>
-          </div>
-
-          <div className="dock-right-controls">
-            {/* Model & Effort Selector Pill (Exact Previous Iteration Layout) */}
-            <div className="dock-model-pill-wrapper" ref={modelPillWrapperRef}>
+              placeholder={voiceTranscript ? voiceTranscript : 'Type'}
+              disabled={isStreaming}
+            />
+            <div className="voice-dock-actions">
               <button
                 type="button"
-                className={`dock-model-pill ${isModelDropdownOpen ? 'dropdown-open' : ''}`}
-                id="btnDockModelSelect"
-                onClick={() => {
-                  setIsModelDropdownOpen(!isModelDropdownOpen);
-                  setActiveSubmenu('none');
-                }}
-                title="Select Model & Effort"
+                className={`voice-dock-mic-btn ${isVoiceMuted ? 'is-muted' : 'is-listening'}`}
+                id="btnVoiceMuteToggle"
+                title={isVoiceMuted ? 'Unmute Microphone' : 'Mute Microphone'}
+                onClick={onToggleVoiceMute}
               >
-                <span className="model-pill-name" id="dockModelName">{selectedModel}</span>
-                <span className="model-pill-effort" id="dockModelEffort">{selectedEffort}</span>
-                <svg className="pill-chevron" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                  <polyline points="6 9 12 15 18 9" />
-                </svg>
+                {isVoiceMuted ? <MicOff width={16} height={16} /> : <Mic width={16} height={16} />}
               </button>
+              <button
+                type="button"
+                className="btn-voice-exit"
+                id="btnExitVoiceMode"
+                title="End Voice Mode"
+                onClick={onToggleVoiceMode}
+              >
+                <X width={16} height={16} />
+              </button>
+            </div>
+          </div>
+        </>
+      ) : (
+        <>
+          <div className="google-prompt-dock">
+            {/* Text Input Wrapper */}
+            <div className="dock-textarea-wrapper">
+              <textarea
+                ref={textareaRef}
+                id="chatInput"
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder="Start typing a prompt to see what our models can do..."
+                rows={1}
+                disabled={isStreaming}
+              />
+            </div>
 
-              {/* Main Model Dropdown Menu */}
-              {isModelDropdownOpen && (
-                <div className="dock-model-dropdown" id="dockModelDropdown">
+            {/* Dock Controls Row */}
+            <div className="dock-controls-row">
+              <div className="dock-left-controls" ref={leftControlsRef} style={{ position: 'relative' }}>
+                {/* Model Tuning Button */}
+                <button
+                  type="button"
+                  className={`dock-tool-pill ${isTuningOpen ? 'active' : ''}`}
+                  id="btnTuneModel"
+                  onClick={() => {
+                    setIsTuningOpen(!isTuningOpen);
+                  }}
+                  title="System Prompt & Model Tuning"
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <line x1="4" y1="21" x2="4" y2="14" />
+                    <line x1="4" y1="10" x2="4" y2="3" />
+                    <line x1="12" y1="21" x2="12" y2="12" />
+                    <line x1="12" y1="8" x2="12" y2="3" />
+                    <line x1="20" y1="21" x2="20" y2="16" />
+                    <line x1="20" y1="12" x2="20" y2="3" />
+                    <line x1="1" y1="14" x2="7" y2="14" />
+                    <line x1="9" y1="8" x2="15" y2="8" />
+                    <line x1="17" y1="16" x2="23" y2="16" />
+                  </svg>
+                </button>
+
+                {/* Project Intake JSON Spec Attachment Button */}
+                <button
+                  type="button"
+                  className={`dock-tool-pill ${isIntakeModalOpen ? 'active' : ''}`}
+                  id="btnIntakeJson"
+                  onClick={() => setIsIntakeModalOpen(true)}
+                  title="Attach, Upload, or Edit Project Intake JSON Spec"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '4px 11px',
+                    color: isIntakeModalOpen ? '#10b981' : '#e4e4e7',
+                    background: isIntakeModalOpen ? 'rgba(16, 185, 129, 0.15)' : 'rgba(255, 255, 255, 0.04)',
+                    border: isIntakeModalOpen ? '1px solid rgba(16, 185, 129, 0.4)' : '1px solid rgba(255, 255, 255, 0.1)',
+                    borderRadius: '8px',
+                    fontSize: '11.5px',
+                    fontWeight: 500,
+                    cursor: 'pointer',
+                  }}
+                >
+                  <Paperclip width={13} height={13} style={{ color: '#10b981' }} />
+                  <span>Intake Spec</span>
+                </button>
+
+                {/* Tuning Popover */}
+                {isTuningOpen && (
                   <div
-                    className="dock-model-primary-option"
-                    id="btnModelOptionPrimary"
-                    onClick={() => {
-                      setSelectedModel('Tenali AI');
-                      setIsModelDropdownOpen(false);
-                      setActiveSubmenu('none');
+                    style={{
+                      position: 'absolute',
+                      bottom: '44px',
+                      left: 0,
+                      width: '280px',
+                      background: '#1e1f20',
+                      border: '1px solid rgba(255,255,255,0.12)',
+                      borderRadius: '12px',
+                      padding: '14px',
+                      boxShadow: '0 16px 36px rgba(0,0,0,0.65)',
+                      zIndex: 100,
                     }}
                   >
-                    <div className="dock-model-info">
-                      <span className="dock-model-name" id="menuPrimaryModelName">Tenali AI</span>
-                      <span className="dock-model-desc" id="menuPrimaryModelDesc">OmniFlow GPT-6 Luna • Multi-Agent Core Engine (Default)</span>
+                    <div style={{ fontSize: '12.5px', fontWeight: 600, color: '#fff', marginBottom: '8px' }}>
+                      Model Temperature: {temperature}
                     </div>
-                    {selectedModel === 'Tenali AI' && <span className="dock-model-check">✓</span>}
-                  </div>
-
-                  <div className="dock-model-divider" />
-
-                  {/* Effort Row */}
-                  <div
-                    className="dock-model-row-item"
-                    id="btnModelEffortRow"
-                    onClick={() => setActiveSubmenu(activeSubmenu === 'effort' ? 'none' : 'effort')}
-                  >
-                    <span>Effort</span>
-                    <span className="dock-row-val">
-                      <span id="menuEffortVal">{selectedEffort}</span>
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <polyline points="9 18 15 12 9 6" />
-                      </svg>
-                    </span>
-                  </div>
-
-                  {/* Effort Attached Flyout Submenu */}
-                  {activeSubmenu === 'effort' && (
-                    <div className="dock-model-submenu dock-effort-submenu" id="dockModelEffortSubmenu">
-                      <div className="submenu-model-list">
-                        {['High', 'Medium', 'Low'].map((eff) => (
-                          <div
-                            key={eff}
-                            className={`submenu-model-item ${selectedEffort === eff ? 'active' : ''}`}
-                            onClick={() => {
-                              setSelectedEffort(eff);
-                              setActiveSubmenu('none');
-                            }}
-                          >
-                            <div className="submenu-item-left">
-                              <span className="submenu-item-name">{eff}</span>
-                            </div>
-                            <span className="submenu-item-check">✓</span>
-                          </div>
-                        ))}
-                      </div>
+                    <input
+                      type="range"
+                      min="0"
+                      max="1"
+                      step="0.05"
+                      value={temperature}
+                      onChange={(e) => setTemperature(parseFloat(e.target.value))}
+                      style={{ width: '100%', accentColor: '#38bdf8', marginBottom: '10px' }}
+                    />
+                    <div style={{ fontSize: '11px', color: '#9ca3af', lineHeight: 1.4 }}>
+                      Lower temperature produces deterministic, idempotent PySpark code. Higher values increase creative exploration.
                     </div>
-                  )}
-
-                  {/* More Models Row */}
-                  <div
-                    className="dock-model-row-item"
-                    id="btnMoreModelsRow"
-                    onClick={() => setActiveSubmenu(activeSubmenu === 'models' ? 'none' : 'models')}
-                  >
-                    <span>More models</span>
-                    <span className="dock-row-val">
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <polyline points="9 18 15 12 9 6" />
-                      </svg>
-                    </span>
                   </div>
+                )}
 
-                  {/* More Models Attached Flyout Submenu */}
-                  {activeSubmenu === 'models' && (
-                    <div className="dock-model-submenu" id="dockModelSubmenu">
-                      <div className="submenu-model-list" id="submenuModelList">
-                        {ALL_MODELS.map((m) => (
-                          <div
-                            key={m.id}
-                            className={`submenu-model-item ${selectedModel === m.name ? 'active' : ''}`}
-                            onClick={() => {
-                              setSelectedModel(m.name);
-                              setIsModelDropdownOpen(false);
-                              setActiveSubmenu('none');
-                            }}
-                          >
-                            <div className="submenu-item-left">
-                              <span className="submenu-item-name">{m.name}</span>
-                              {m.tag && (
-                                <span
-                                  className="submenu-tag-pro"
-                                  style={
-                                    m.tag === 'Mix'
-                                      ? { background: 'rgba(139, 92, 246, 0.2)', color: '#c4b5fd', border: '1px solid rgba(139, 92, 246, 0.4)' }
-                                      : undefined
-                                  }
-                                >
-                                  {m.tag}
-                                </span>
-                              )}
-                            </div>
-                            <span className="submenu-item-check">✓</span>
-                          </div>
-                        ))}
+                {/* Single Mode Toggle Button with Flip Animation (General vs Project) */}
+                <button
+                  type="button"
+                  className={`dock-mode-toggle-pill ${chatMode} ${isFlipping ? 'flipping' : ''}`}
+                  id="btnDockModeToggle"
+                  onClick={handleToggleMode}
+                  title={`Active: ${chatMode === 'project' ? 'Project' : 'General'} Mode — Click to switch to ${chatMode === 'project' ? 'General' : 'Project'} Mode`}
+                >
+                  <div className="mode-toggle-inner">
+                    {chatMode === 'project' ? (
+                      <>
+                        <Layers size={13} strokeWidth={1.8} className="mode-icon" />
+                        <span className="mode-label">Project</span>
+                      </>
+                    ) : (
+                      <>
+                        <Globe size={13} strokeWidth={1.8} className="mode-icon" />
+                        <span className="mode-label">General</span>
+                      </>
+                    )}
+                  </div>
+                </button>
+              </div>
+
+              <div className="dock-right-controls">
+                {/* Model & Effort Selector Pill (Exact Previous Iteration Layout) */}
+                <div className="dock-model-pill-wrapper" ref={modelPillWrapperRef}>
+                  <button
+                    type="button"
+                    className={`dock-model-pill ${isModelDropdownOpen ? 'dropdown-open' : ''}`}
+                    id="btnDockModelSelect"
+                    onClick={() => {
+                      setIsModelDropdownOpen(!isModelDropdownOpen);
+                      setActiveSubmenu('none');
+                    }}
+                    title="Select Model & Effort"
+                  >
+                    <span className="model-pill-name" id="dockModelName">{selectedModel}</span>
+                    <span className="model-pill-effort" id="dockModelEffort">{selectedEffort}</span>
+                    <svg className="pill-chevron" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                      <polyline points="6 9 12 15 18 9" />
+                    </svg>
+                  </button>
+
+                  {/* Main Model Dropdown Menu */}
+                  {isModelDropdownOpen && (
+                    <div className="dock-model-dropdown" id="dockModelDropdown">
+                      <div
+                        className="dock-model-primary-option"
+                        id="btnModelOptionPrimary"
+                        onClick={() => {
+                          setSelectedModel('Tenali AI');
+                          setIsModelDropdownOpen(false);
+                          setActiveSubmenu('none');
+                        }}
+                      >
+                        <div className="dock-model-info">
+                          <span className="dock-model-name" id="menuPrimaryModelName">Tenali AI</span>
+                          <span className="dock-model-desc" id="menuPrimaryModelDesc">OmniFlow GPT-6 Luna • Multi-Agent Core Engine (Default)</span>
+                        </div>
+                        {selectedModel === 'Tenali AI' && <span className="dock-model-check">✓</span>}
                       </div>
+
+                      <div className="dock-model-divider" />
+
+                      {/* Effort Row */}
+                      <div
+                        className="dock-model-row-item"
+                        id="btnModelEffortRow"
+                        onClick={() => setActiveSubmenu(activeSubmenu === 'effort' ? 'none' : 'effort')}
+                      >
+                        <span>Effort</span>
+                        <span className="dock-row-val">
+                          <span id="menuEffortVal">{selectedEffort}</span>
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <polyline points="9 18 15 12 9 6" />
+                          </svg>
+                        </span>
+                      </div>
+
+                      {/* Effort Attached Flyout Submenu */}
+                      {activeSubmenu === 'effort' && (
+                        <div className="dock-model-submenu dock-effort-submenu" id="dockModelEffortSubmenu">
+                          <div className="submenu-model-list">
+                            {['High', 'Medium', 'Low'].map((eff) => (
+                              <div
+                                key={eff}
+                                className={`submenu-model-item ${selectedEffort === eff ? 'active' : ''}`}
+                                onClick={() => {
+                                  setSelectedEffort(eff);
+                                  setActiveSubmenu('none');
+                                }}
+                              >
+                                <div className="submenu-item-left">
+                                  <span className="submenu-item-name">{eff}</span>
+                                </div>
+                                <span className="submenu-item-check">✓</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* More Models Row */}
+                      <div
+                        className="dock-model-row-item"
+                        id="btnMoreModelsRow"
+                        onClick={() => setActiveSubmenu(activeSubmenu === 'models' ? 'none' : 'models')}
+                      >
+                        <span>More models</span>
+                        <span className="dock-row-val">
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <polyline points="9 18 15 12 9 6" />
+                          </svg>
+                        </span>
+                      </div>
+
+                      {/* More Models Attached Flyout Submenu */}
+                      {activeSubmenu === 'models' && (
+                        <div className="dock-model-submenu" id="dockModelSubmenu">
+                          <div className="submenu-model-list" id="submenuModelList">
+                            {ALL_MODELS.map((m) => (
+                              <div
+                                key={m.id}
+                                className={`submenu-model-item ${selectedModel === m.name ? 'active' : ''}`}
+                                onClick={() => {
+                                  setSelectedModel(m.name);
+                                  setIsModelDropdownOpen(false);
+                                  setActiveSubmenu('none');
+                                }}
+                              >
+                                <div className="submenu-item-left">
+                                  <span className="submenu-item-name">{m.name}</span>
+                                  {m.tag && (
+                                    <span
+                                      className="submenu-tag-pro"
+                                      style={
+                                        m.tag === 'Mix'
+                                          ? { background: 'rgba(139, 92, 246, 0.2)', color: '#c4b5fd', border: '1px solid rgba(139, 92, 246, 0.4)' }
+                                          : undefined
+                                      }
+                                    >
+                                      {m.tag}
+                                    </span>
+                                  )}
+                                </div>
+                                <span className="submenu-item-check">✓</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
-              )}
-            </div>
 
-            {/* Voice Input Mic */}
-            <button
-              type="button"
-              className={`dock-icon-btn ${isListening ? 'recording' : ''}`}
-              id="btnVoiceInput"
-              title="Voice Input"
-              onClick={handleVoiceToggle}
-            >
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
-                <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-                <line x1="12" y1="19" x2="12" y2="23" />
-                <line x1="8" y1="23" x2="16" y2="23" />
-              </svg>
-            </button>
-
-            {/* Send Button or Live Audio Waveform */}
-            {isVoiceModeActive ? (
-              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                {/* Voice Input Mic */}
                 <button
                   type="button"
-                  className={`dock-icon-btn ${isVoiceListening ? 'recording' : ''}`}
-                  id="btnVoiceMuteToggle"
-                  title={isVoiceListening ? "Mute Microphone" : "Unmute Microphone"}
-                  onClick={onToggleVoiceMute}
+                  className={`dock-icon-btn ${isListening ? 'recording' : ''}`}
+                  id="btnVoiceInput"
+                  title="Voice Input"
+                  onClick={handleVoiceToggle}
                 >
                   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
@@ -474,64 +513,58 @@ export const PromptDock: React.FC<PromptDockProps> = ({
                     <line x1="8" y1="23" x2="16" y2="23" />
                   </svg>
                 </button>
-                <button
-                  type="button"
-                  className="btn-voice-exit"
-                  id="btnExitVoiceMode"
-                  title="Close Voice Mode"
-                  onClick={onToggleVoiceMode}
-                >
-                  <X width={15} height={15} />
-                </button>
-              </div>
-            ) : input.trim().length > 0 || isStreaming ? (
-              <button
-                type="button"
-                onClick={() => handleSubmit()}
-                disabled={!input.trim() || isStreaming}
-                className="dock-icon-btn btn-chat-send"
-                id="btnChatSend"
-                title="Send Prompt (Enter)"
-                style={{
-                  background: '#ffffff',
-                  color: '#09090b',
-                  borderRadius: '50%',
-                  width: '32px',
-                  height: '32px',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                {isStreaming ? (
-                  <Loader2 width={14} height={14} className="animate-spin" />
+
+                {/* Send Button or Live Audio Waveform */}
+                {input.trim().length > 0 || isStreaming ? (
+                  <button
+                    type="button"
+                    onClick={() => handleSubmit()}
+                    disabled={!input.trim() || isStreaming}
+                    className="dock-icon-btn btn-chat-send"
+                    id="btnChatSend"
+                    title="Send Prompt (Enter)"
+                    style={{
+                      background: '#ffffff',
+                      color: '#09090b',
+                      borderRadius: '50%',
+                      width: '32px',
+                      height: '32px',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    {isStreaming ? (
+                      <Loader2 width={14} height={14} className="animate-spin" />
+                    ) : (
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                        <polyline points="18 15 12 9 6 15" />
+                      </svg>
+                    )}
+                  </button>
                 ) : (
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                    <polyline points="18 15 12 9 6 15" />
-                  </svg>
+                  <button
+                    type="button"
+                    className="dock-icon-btn"
+                    id="btnAudioWave"
+                    title="Start ChatGPT Voice Mode (Hands-Free)"
+                    onClick={onToggleVoiceMode}
+                  >
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <line x1="4" y1="9" x2="4" y2="15" />
+                      <line x1="8" y1="5" x2="8" y2="19" />
+                      <line x1="12" y1="2" x2="12" y2="22" />
+                      <line x1="16" y1="5" x2="16" y2="19" />
+                      <line x1="20" y1="9" x2="20" y2="15" />
+                    </svg>
+                  </button>
                 )}
-              </button>
-            ) : (
-              <button
-                type="button"
-                className="dock-icon-btn"
-                id="btnAudioWave"
-                title="Start ChatGPT Voice Mode (Hands-Free)"
-                onClick={onToggleVoiceMode}
-              >
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <line x1="4" y1="9" x2="4" y2="15" />
-                  <line x1="8" y1="5" x2="8" y2="19" />
-                  <line x1="12" y1="2" x2="12" y2="22" />
-                  <line x1="16" y1="5" x2="16" y2="19" />
-                  <line x1="20" y1="9" x2="20" y2="15" />
-                </svg>
-              </button>
-            )}
+              </div>
+            </div>
           </div>
-        </div>
-      </div>
-      <div className="dock-disclaimer">Omniflow can make mistakes. Please double-check responses.</div>
+          <div className="dock-disclaimer">Omniflow can make mistakes. Please double-check responses.</div>
+        </>
+      )}
 
       {/* Project Intake Specification Modal */}
       <IntakeSpecModal

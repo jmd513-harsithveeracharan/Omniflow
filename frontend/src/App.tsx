@@ -12,7 +12,6 @@ import { SettingsModal } from './components/SettingsModal';
 import { FabricConnectionModal } from './components/modals/FabricConnectionModal';
 import { ProjectEditModal } from './components/ProjectEditModal';
 import { AuthModal } from './components/auth/AuthModal';
-import { FloatingVoiceOrb } from './components/voice/FloatingVoiceOrb';
 import { useVoiceMode } from './components/voice/useVoiceMode';
 import { SkillsView } from './components/SkillsView';
 import { ProjectsView } from './components/ProjectsView';
@@ -286,6 +285,7 @@ export const App: React.FC = () => {
     );
   };
 
+  const startVoiceResponseRef = React.useRef<(() => void) | null>(null);
   const feedStreamingChunkRef = React.useRef<((chunk: string) => void) | null>(null);
   const finishStreamingRef = React.useRef<(() => void) | null>(null);
 
@@ -299,6 +299,10 @@ export const App: React.FC = () => {
 
     if (activeView !== 'chat') {
       setActiveView('chat');
+    }
+
+    if (isVoiceModeActive && startVoiceResponseRef.current) {
+      startVoiceResponseRef.current();
     }
 
     const startTime = Date.now();
@@ -410,8 +414,10 @@ export const App: React.FC = () => {
   const {
     voiceState,
     voiceTranscript,
+    isMuted: isVoiceMuted,
     toggleMute: toggleVoiceMute,
     interrupt: interruptVoice,
+    startVoiceResponse,
     feedStreamingChunk,
     finishStreaming,
   } = useVoiceMode({
@@ -420,6 +426,7 @@ export const App: React.FC = () => {
     isStreaming,
   });
 
+  startVoiceResponseRef.current = startVoiceResponse;
   feedStreamingChunkRef.current = feedStreamingChunk;
   finishStreamingRef.current = finishStreaming;
 
@@ -548,7 +555,7 @@ export const App: React.FC = () => {
         {activeView === 'chat' && (
           <div className={`bolt-workspace-split ${isWorkbenchOpen ? 'split-active' : ''}`}>
             <div
-              className={`bolt-chat-pane ${messages.length === 0 ? 'is-landing' : 'in-chat'} ${
+              className={`bolt-chat-pane ${messages.length === 0 && !isVoiceModeActive ? 'is-landing' : 'in-chat'} ${
                 isWorkbenchOpen ? 'with-workbench' : 'full-width'
               }`}
             >
@@ -557,7 +564,7 @@ export const App: React.FC = () => {
                   <div className="agent-working-spinner" style={{ width: '28px', height: '28px', borderTopColor: '#10b981' }} />
                   <span style={{ fontSize: '13px', color: '#a1a1aa' }}>Loading conversation history...</span>
                 </div>
-              ) : messages.length === 0 ? (
+              ) : messages.length === 0 && !isVoiceModeActive ? (
                 <PlaygroundHome onSelectPrompt={handleSendMessage} />
               ) : (
                 <ChatTimeline
@@ -574,22 +581,15 @@ export const App: React.FC = () => {
                 />
               )}
 
-              {/* ChatGPT Floating Voice Orb (Inline Over Chat Timeline) */}
-              {isVoiceModeActive && (
-                <FloatingVoiceOrb
-                  state={voiceState}
-                  transcript={voiceTranscript}
-                  onInterrupt={interruptVoice}
-                />
-              )}
-
               <PromptDock
                 onSendMessage={handleSendMessage}
                 isStreaming={isStreaming}
                 isVoiceModeActive={isVoiceModeActive}
                 onToggleVoiceMode={() => setIsVoiceModeActive((prev) => !prev)}
-                isVoiceListening={voiceState === 'listening'}
+                voiceState={voiceState}
+                isVoiceMuted={isVoiceMuted}
                 onToggleVoiceMute={toggleVoiceMute}
+                onInterruptVoice={interruptVoice}
                 voiceTranscript={voiceTranscript}
               />
             </div>

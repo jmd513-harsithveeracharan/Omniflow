@@ -1,8 +1,8 @@
 /**
  * frontend/src/components/voice/FloatingVoiceOrb.tsx
  * ----------------------------------------------------
- * ChatGPT-style floating interactive voice orb that hovers directly
- * above the chat input bar. Exactly matches the ChatGPT web voice mode UI.
+ * ChatGPT-style inline sky-and-cloud fluid orb positioned directly above
+ * the bottom input dock in normal flex layout (never overlaps the input bar).
  */
 
 import React from 'react';
@@ -24,7 +24,9 @@ export const FloatingVoiceOrb: React.FC<FloatingVoiceOrbProps> = ({
 }) => {
   const handleClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (state === 'speaking' && onInterrupt) {
+    if (state === 'muted' && onClick) {
+      onClick();
+    } else if (onInterrupt) {
       onInterrupt();
     } else if (onClick) {
       onClick();
@@ -33,33 +35,31 @@ export const FloatingVoiceOrb: React.FC<FloatingVoiceOrbProps> = ({
 
   return (
     <div className="chatgpt-floating-orb-wrapper" onClick={handleClick}>
-      {/* Live transcript pill hovering just above the orb */}
       {transcript && transcript.trim().length > 0 && (
         <div className="floating-orb-transcript-pill">
           <span>{transcript}</span>
         </div>
       )}
 
-      {/* Outer ambient glow ring */}
-      <div className={`floating-orb-glow state-${state}`} />
-
-      {/* The 3D Fluid Gradient Sphere (matching ChatGPT screenshot) */}
       <div
         className={`floating-orb-sphere state-${state}`}
         title={
           state === 'speaking'
-            ? 'Tenali is speaking (Click or speak to interrupt)'
+            ? 'Tenali is speaking — speak or click to interrupt'
             : state === 'thinking'
             ? 'Tenali is thinking...'
             : state === 'muted'
-            ? 'Microphone muted (Click to unmute)'
+            ? 'Microphone muted — click to unmute'
+            : transcript && transcript.trim().length > 0
+            ? 'Listening... (Click orb to send immediately)'
             : 'Listening... (Speak anytime)'
         }
       >
-        <div className="floating-orb-highlight" />
-        {state === 'thinking' && <div className="floating-orb-spinner" />}
+        <div className="orb-cloud-base" />
+        <div className="orb-cloud-wisp orb-cloud-1" />
+        <div className="orb-cloud-wisp orb-cloud-2" />
+        <div className="orb-cloud-wisp orb-cloud-3" />
       </div>
     </div>
   );
 };
-

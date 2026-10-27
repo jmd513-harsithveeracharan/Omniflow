@@ -136,43 +136,54 @@ export const getBestSpeechVoice = (): SpeechSynthesisVoice | null => {
 };
 
 /**
- * Speaks text using the best natural browser voice.
+ * Speaks one sentence with the best natural voice and calls onDone exactly once
+ * when it finishes, errors, or is cancelled.
+ *
+ * Notes on browser quirks this guards against:
+ * - We never call cancel() right before speak(); Chrome can silently drop the
+ *   utterance when the two happen back to back.
+ * - Chrome sometimes never fires onend. A watchdog completes the sentence once
+ *   the engine reports it is no longer speaking.
  */
-export const speakNaturalVoice = (
-  text: string,
-  onStart?: () => void,
-  onEnd?: () => void,
-  onError?: () => void
-): SpeechSynthesisUtterance | null => {
+export const speakSentence = (text: string, onDone: () => void): SpeechSynthesisUtterance | null => {
   if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
-    onEnd?.();
+    onDone();
     return null;
   }
-
-  stopSpeaking();
-  const clean = cleanTextForSpeech(text);
-  if (!clean) {
-    onEnd?.();
-    return null;
-  }
-
-  const utter = new SpeechSynthesisUtterance(clean);
+  const synth = window.speechSynthesis;
+  const utter = new SpeechSynthesisUtterance(text);
   const voice = getBestSpeechVoice();
-  if (voice) utter.voice = voice;
-  utter.rate = 1.04; // Natural human cadence
+  if (voice) {
+    utter.voice = voice;
+    utter.lang = voice.lang;
+  }
+  utter.rate = 1.05;
   utter.pitch = 1.0;
 
-  utter.onstart = () => {
-    onStart?.();
-  };
-  utter.onend = () => {
-    onEnd?.();
-  };
-  utter.onerror = () => {
-    onError?.();
-  };
+  let finished = false;
+  let started = false;
+  const queuedAt = Date.now();
+  const watchdog = window.setInterval(() => {
+    if (finished) return;
+    if (started && !synth.speaking && !synth.pending) done();
+    else if (!started && Date.now() - queuedAt > 6000) done();
+  }, 400);
 
-  window.speechSynthesis.speak(utter);
+  function done(): void {
+    if (finished) return;
+    finished = true;
+    window.clearInterval(watchdog);
+    onDone();
+  }
+
+  utter.onstart = () => {
+    started = true;
+  };
+  utter.onend = done;
+  utter.onerror = done;
+
+  if (synth.paused) synth.resume();
+  synth.speak(utter);
   return utter;
 };
 
@@ -184,40 +195,3 @@ export const stopSpeaking = (): void => {
     window.speechSynthesis.cancel();
   }
 };
-
-let activeAecStream: MediaStream | null = null;
-
-/**
- * Engages browser and OS-level hardware Acoustic Echo Cancellation (AEC)
- * via WebRTC getUserMedia. This prevents the microphone from capturing
- * the audio played through the speakers during speech synthesis.
- */
-export const enableEchoCancellation = async (): Promise<boolean> => {
-  if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia) return false;
-  try {
-    if (!activeAecStream) {
-      activeAecStream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-        },
-      });
-    }
-    return true;
-  } catch (err) {
-    console.warn('[VoiceMode] Notice: Audio echo cancellation fallback engaged:', err);
-    return false;
-  }
-};
-
-/**
- * Disables the WebRTC AEC media stream track when exiting voice mode.
- */
-export const disableEchoCancellation = (): void => {
-  if (activeAecStream) {
-    activeAecStream.getTracks().forEach((track) => track.stop());
-    activeAecStream = null;
-  }
-};
-

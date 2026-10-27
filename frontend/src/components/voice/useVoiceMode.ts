@@ -1,11 +1,11 @@
 /**
  * frontend/src/components/voice/useVoiceMode.ts
  * -----------------------------------------------
- * Hands-free conversational voice mode hook with:
- * 1. Low-latency sentence-by-sentence streaming TTS playback
- * 2. True hands-free Barge-In (interrupt by speaking alone, zero clicks needed)
- * 3. Continuous microphone listening with WebRTC Acoustic Echo Cancellation (AEC)
- * 4. Dual-layer Echo Filter (prevents AI from interrupting itself)
+ * Hands-free conversational voice mode hook:
+ * - Stable SpeechRecognition lifecycle (never tears down on transcript re-renders)
+ * - Full-utterance transcript accumulation across interim + final segments
+ * - Sentence-by-sentence streaming TTS playback via StreamingSpeechQueue
+ * - Hands-free vocal barge-in with longest-common-run echo filtering
  */
 
 import { useState, useEffect, useRef, useCallback } from 'react';
@@ -14,10 +14,9 @@ import {
   createSpeechRecognition,
   stopSpeaking,
   isSpeechRecognitionSupported,
-  enableEchoCancellation,
-  disableEchoCancellation,
 } from './speechService';
 import { StreamingSpeechQueue } from './streamingQueue';
+import { isLikelyEcho, countWords } from './echoFilter';
 
 interface UseVoiceModeProps {
   isActive: boolean;
@@ -25,221 +24,335 @@ interface UseVoiceModeProps {
   isStreaming?: boolean;
 }
 
+const INTERRUPT_KEYWORDS = new Set([
+  'stop',
+  'wait',
+  'pause',
+  'cancel',
+  'enough',
+  'hold',
+  'quiet',
+  'okay',
+  'ok',
+]);
+
 export function useVoiceMode({
   isActive,
   onSendMessage,
-  isStreaming: _isStreaming,
+  isStreaming = false,
 }: UseVoiceModeProps) {
   const [voiceState, setVoiceState] = useState<VoiceModeState>('listening');
   const [voiceTranscript, setVoiceTranscript] = useState<string>('');
   const [isMuted, setIsMuted] = useState<boolean>(false);
 
-  const recognitionRef = useRef<ReturnType<typeof createSpeechRecognition> | null>(null);
-  const silenceTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const restartTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const isComponentMounted = useRef<boolean>(true);
+  // Refs prevent re-render teardowns of the active SpeechRecognition session
+  const onSendMessageRef = useRef(onSendMessage);
+  onSendMessageRef.current = onSendMessage;
 
-  // Streaming speech playback queue
-  const queueRef = useRef<StreamingSpeechQueue>(
-    new StreamingSpeechQueue({
-      onStartSpeaking: () => {
-        if (isComponentMounted.current) setVoiceState('speaking');
+  const isActiveRef = useRef(isActive);
+  isActiveRef.current = isActive;
+
+  const isMutedRef = useRef(isMuted);
+  isMutedRef.current = isMuted;
+
+  const isStreamingRef = useRef(isStreaming);
+  isStreamingRef.current = isStreaming;
+
+  const recognitionRef = useRef<ReturnType<typeof createSpeechRecognition> | null>(null);
+  const silenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const restartTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isMountedRef = useRef<boolean>(true);
+
+  // Tracks where the current uncommitted user turn starts inside event.results
+  const turnStartIndexRef = useRef<number>(0);
+  const lastResultsLenRef = useRef<number>(0);
+  const carryOverTextRef = useRef<string>('');
+  const latestTranscriptRef = useRef<string>('');
+
+  const queueRef = useRef<StreamingSpeechQueue | null>(null);
+  if (!queueRef.current) {
+    queueRef.current = new StreamingSpeechQueue({
+      onSentenceStart: () => {
+        if (isMountedRef.current && isActiveRef.current) {
+          setVoiceState('speaking');
+        }
       },
-      onFinishedAll: () => {
-        if (isComponentMounted.current && !isMuted) {
+      onDrained: () => {
+        if (isMountedRef.current && isActiveRef.current && !isMutedRef.current) {
           setVoiceState('listening');
         }
       },
-      onInterrupted: () => {
-        if (isComponentMounted.current) setVoiceState('listening');
-      },
-    })
-  );
+    });
+  }
 
-  // Feeds token chunks directly from SSE into the speech queue
+  const clearTimers = useCallback(() => {
+    if (silenceTimerRef.current) {
+      clearTimeout(silenceTimerRef.current);
+      silenceTimerRef.current = null;
+    }
+    if (restartTimerRef.current) {
+      clearTimeout(restartTimerRef.current);
+      restartTimerRef.current = null;
+    }
+  }, []);
+
+  const resetTurnBuffer = useCallback(() => {
+    turnStartIndexRef.current = lastResultsLenRef.current;
+    carryOverTextRef.current = '';
+    latestTranscriptRef.current = '';
+    setVoiceTranscript('');
+  }, []);
+
+  const commitTurnNow = useCallback(() => {
+    if (silenceTimerRef.current) {
+      clearTimeout(silenceTimerRef.current);
+      silenceTimerRef.current = null;
+    }
+    const textToSend = latestTranscriptRef.current.trim();
+    resetTurnBuffer();
+    if (textToSend.length > 0 && !isStreamingRef.current) {
+      queueRef.current?.startResponse();
+      setVoiceState('thinking');
+      onSendMessageRef.current(textToSend);
+    }
+  }, [resetTurnBuffer]);
+
+  const startVoiceResponse = useCallback(() => {
+    if (!isActiveRef.current || isMutedRef.current) return;
+    queueRef.current?.startResponse();
+    setVoiceState('thinking');
+  }, []);
+
   const feedStreamingChunk = useCallback((chunk: string) => {
-    if (!isActive || isMuted) return;
-    queueRef.current.push(chunk);
-  }, [isActive, isMuted]);
+    if (!isActiveRef.current || isMutedRef.current) return;
+    queueRef.current?.push(chunk);
+  }, []);
 
-  // Signals that LLM stream completed
   const finishStreaming = useCallback(() => {
-    if (!isActive || isMuted) return;
-    queueRef.current.flush();
-  }, [isActive, isMuted]);
+    if (!isActiveRef.current || isMutedRef.current) return;
+    queueRef.current?.flush();
+  }, []);
 
-  // Interrupt / stop speech
   const interrupt = useCallback(() => {
-    queueRef.current.cancel();
+    queueRef.current?.cancel();
     stopSpeaking();
-    if (voiceState === 'speaking') {
+    if (latestTranscriptRef.current.trim().length > 1 && !isStreamingRef.current) {
+      commitTurnNow();
+      return;
+    }
+    if (!isMutedRef.current) {
       setVoiceState('listening');
     }
-  }, [voiceState]);
+  }, [commitTurnNow]);
 
-  // Toggle Mute
   const toggleMute = useCallback(() => {
     setIsMuted((prev) => {
       const next = !prev;
+      isMutedRef.current = next;
       if (next) {
-        queueRef.current.cancel();
+        if (silenceTimerRef.current) {
+          clearTimeout(silenceTimerRef.current);
+          silenceTimerRef.current = null;
+        }
+        queueRef.current?.cancel();
         stopSpeaking();
-        if (recognitionRef.current) {
-          try {
-            recognitionRef.current.stop();
-          } catch {
-            // pass
-          }
+        resetTurnBuffer();
+        try {
+          recognitionRef.current?.stop();
+        } catch {
+          // ignore
         }
         setVoiceState('muted');
       } else {
         setVoiceState('listening');
-        if (recognitionRef.current) {
-          try {
-            recognitionRef.current.start();
-          } catch {
-            // pass
-          }
+        try {
+          recognitionRef.current?.start();
+        } catch {
+          // ignore if already running
         }
       }
       return next;
     });
-  }, []);
+  }, [resetTurnBuffer]);
 
-  // WebRTC Hardware Acoustic Echo Cancellation (AEC) Lifecycle
+  // Reflect streaming state onto orb when waiting for first sentence
   useEffect(() => {
-    if (isActive) {
-      enableEchoCancellation();
-    } else {
-      disableEchoCancellation();
+    if (!isActive) return;
+    if (isStreaming && !queueRef.current?.isSpeaking()) {
+      setVoiceState('thinking');
+    } else if (!isStreaming && !queueRef.current?.isSpeaking() && !isMuted) {
+      setVoiceState('listening');
     }
-    return () => {
-      disableEchoCancellation();
-    };
-  }, [isActive]);
+  }, [isActive, isStreaming, isMuted]);
 
-  // Setup Continuous Speech Recognition & Hands-Free Barge-In
+  // Main SpeechRecognition lifecycle — ONLY depends on [isActive]
   useEffect(() => {
-    isComponentMounted.current = true;
+    isMountedRef.current = true;
 
     if (!isActive) {
-      queueRef.current.cancel();
+      clearTimers();
+      queueRef.current?.cancel();
       stopSpeaking();
-      if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
-      if (restartTimerRef.current) clearTimeout(restartTimerRef.current);
+      resetTurnBuffer();
       if (recognitionRef.current) {
         try {
+          recognitionRef.current.onend = null;
+          recognitionRef.current.onresult = null;
+          recognitionRef.current.onerror = null;
           recognitionRef.current.abort();
         } catch {
-          // pass
+          // ignore
         }
+        recognitionRef.current = null;
       }
       return;
     }
 
     if (!isSpeechRecognitionSupported()) {
-      console.warn('Speech recognition not supported in this browser.');
+      console.warn('[VoiceMode] Web Speech API is not supported in this browser.');
       return;
     }
 
     const rec = createSpeechRecognition();
     if (!rec) return;
 
+    turnStartIndexRef.current = 0;
+    lastResultsLenRef.current = 0;
+    carryOverTextRef.current = '';
+    latestTranscriptRef.current = '';
+    setIsMuted(false);
+    isMutedRef.current = false;
+    setVoiceState('listening');
+
     rec.onstart = () => {
-      if (!isMuted && !queueRef.current.getIsPlaying()) {
+      turnStartIndexRef.current = 0;
+      lastResultsLenRef.current = 0;
+      if (!isMutedRef.current && !queueRef.current?.isSpeaking() && !isStreamingRef.current) {
         setVoiceState('listening');
       }
     };
 
     rec.onresult = (event) => {
-      let interim = '';
-      for (let i = event.resultIndex; i < event.results.length; ++i) {
-        interim += event.results[i][0].transcript;
+      if (!isActiveRef.current || isMutedRef.current) return;
+
+      lastResultsLenRef.current = event.results.length;
+
+      let sessionText = '';
+      let hasInterim = false;
+      for (let i = turnStartIndexRef.current; i < event.results.length; i++) {
+        const res = event.results[i];
+        const piece = res[0]?.transcript || '';
+        if (res.isFinal) {
+          sessionText += `${piece} `;
+        } else {
+          sessionText += piece;
+          hasInterim = true;
+        }
       }
-      const spoken = interim.trim();
-      if (spoken.length === 0) return;
 
-      // ⚡ SMART BARGE-IN INTERRUPTION:
-      // If Tenali is currently speaking and user speaks, test for real speech vs echo
-      const isCurrentlySpeaking =
-        queueRef.current.getIsPlaying() ||
-        (typeof window !== 'undefined' && Boolean(window.speechSynthesis?.speaking));
+      const fullSpoken = [carryOverTextRef.current, sessionText.trim()]
+        .filter(Boolean)
+        .join(' ')
+        .replace(/\s+/g, ' ')
+        .trim();
 
-      if (isCurrentlySpeaking) {
-        const curSentence = queueRef.current.getCurrentSentence().toLowerCase();
-        const spokenLower = spoken.toLowerCase();
+      if (!fullSpoken) return;
 
-        // Echo filter: Check if mic captured Tenali's own words from speaker
-        const isEcho =
-          curSentence.length > 0 &&
-          (curSentence.includes(spokenLower) ||
-            spokenLower.split(/\s+/).every((w) => w.length > 2 && curSentence.includes(w)));
+      // Check if assistant is currently speaking (barge-in vs speaker echo)
+      if (queueRef.current?.isSpeaking()) {
+        const spokenSoFar = queueRef.current.getSpokenText();
+        if (isLikelyEcho(fullSpoken, spokenSoFar)) {
+          // Discard speaker echo so AI never interrupts itself
+          turnStartIndexRef.current = event.results.length;
+          carryOverTextRef.current = '';
+          latestTranscriptRef.current = '';
+          return;
+        }
 
-        if (!isEcho && spoken.length >= 2) {
-          // Real user vocal interruption! Immediately silence AI mid-sentence.
+        const words = fullSpoken.toLowerCase().replace(/[^a-z\s]/g, '').split(/\s+/).filter(Boolean);
+        const hasKeyword = words.some((w) => INTERRUPT_KEYWORDS.has(w));
+        if (countWords(fullSpoken) >= 2 || hasKeyword) {
+          // Real user barge-in: silence assistant immediately
           queueRef.current.cancel();
           stopSpeaking();
           setVoiceState('listening');
         } else {
-          // Ignore echo loopback
           return;
         }
       }
 
-      setVoiceTranscript(spoken);
+      // Do not accumulate new user turns while waiting for LLM unless barging in
+      if (isStreamingRef.current && !queueRef.current?.isSpeaking()) {
+        return;
+      }
 
-      // Auto-commit on silence (1.0s pause)
-      if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
+      latestTranscriptRef.current = fullSpoken;
+      setVoiceTranscript(fullSpoken);
+
+      // Schedule auto-send after natural silence pause
+      if (silenceTimerRef.current) {
+        clearTimeout(silenceTimerRef.current);
+      }
+
+      const wordsCount = countWords(fullSpoken);
+      const delayMs = wordsCount <= 1 ? 2200 : hasInterim ? 1750 : 1350;
+
       silenceTimerRef.current = setTimeout(() => {
-        if (spoken.length > 1) {
-          queueRef.current.reset();
-          onSendMessage(spoken);
-          setVoiceTranscript('');
-          setVoiceState('thinking');
-        }
-      }, 1000);
+        commitTurnNow();
+      }, delayMs);
     };
 
     rec.onerror = (e) => {
-      if (e.error !== 'no-speech') {
-        console.warn('[VoiceMode] Speech recognition notice:', e.error);
+      if (e.error !== 'no-speech' && e.error !== 'aborted') {
+        console.warn('[VoiceMode] SpeechRecognition notice:', e.error);
       }
     };
 
     rec.onend = () => {
-      // Auto-restart continuous listening safely
-      if (isActive && !isMuted && isComponentMounted.current) {
-        if (restartTimerRef.current) clearTimeout(restartTimerRef.current);
-        restartTimerRef.current = setTimeout(() => {
-          try {
-            rec.start();
-          } catch {
-            // Already active or transitioning
-          }
-        }, 120);
+      if (!isActiveRef.current || isMutedRef.current || !isMountedRef.current) {
+        return;
       }
+      // Preserve any uncommitted speech across browser session auto-restarts
+      if (latestTranscriptRef.current.trim().length > 0) {
+        carryOverTextRef.current = latestTranscriptRef.current.trim();
+      }
+      turnStartIndexRef.current = 0;
+      lastResultsLenRef.current = 0;
+
+      if (restartTimerRef.current) clearTimeout(restartTimerRef.current);
+      restartTimerRef.current = setTimeout(() => {
+        if (!isActiveRef.current || isMutedRef.current || !isMountedRef.current) return;
+        try {
+          rec.start();
+        } catch {
+          // already started
+        }
+      }, 100);
     };
 
     recognitionRef.current = rec;
     try {
       rec.start();
     } catch {
-      // pass
+      // ignore
     }
 
     return () => {
-      isComponentMounted.current = false;
-      queueRef.current.cancel();
+      isMountedRef.current = false;
+      clearTimers();
+      queueRef.current?.cancel();
       stopSpeaking();
-      if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
-      if (restartTimerRef.current) clearTimeout(restartTimerRef.current);
       try {
+        rec.onend = null;
+        rec.onresult = null;
+        rec.onerror = null;
         rec.abort();
       } catch {
-        // pass
+        // ignore
       }
+      recognitionRef.current = null;
     };
-  }, [isActive, isMuted, onSendMessage]);
+  }, [isActive, clearTimers, resetTurnBuffer, commitTurnNow]);
 
   return {
     voiceState,
@@ -247,6 +360,7 @@ export function useVoiceMode({
     isMuted,
     toggleMute,
     interrupt,
+    startVoiceResponse,
     feedStreamingChunk,
     finishStreaming,
   };
