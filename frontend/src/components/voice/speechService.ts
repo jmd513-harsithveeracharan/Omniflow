@@ -157,7 +157,7 @@ export const speakSentence = (text: string, onDone: () => void): SpeechSynthesis
     utter.voice = voice;
     utter.lang = voice.lang;
   }
-  utter.rate = 1.05;
+  utter.rate = 1.07;
   utter.pitch = 1.0;
 
   let finished = false;

@@ -19,7 +19,7 @@ export interface SpeechQueueEvents {
 }
 
 const SENTENCE_BOUNDARY = /[.!?]+\s+|\n+/g;
-const MERGE_UNDER_CHARS = 160;
+const MERGE_UNDER_CHARS = 110;
 const CODE_PLACEHOLDER = '\nThe code is shown in the chat.\n';
 
 export class StreamingSpeechQueue {
@@ -113,9 +113,9 @@ export class StreamingSpeechQueue {
   private enqueue(raw: string): void {
     const text = cleanTextForSpeech(raw);
     if (text.length < 2 || !/[a-z0-9]/i.test(text)) return;
-    // Merge short fragments so the voice doesn't stop and restart every few words.
+    // Merge short fragments after the first sentence so the first sentence starts speaking immediately
     const lastIdx = this.pending.length - 1;
-    if (lastIdx >= 0 && this.pending[lastIdx].length < MERGE_UNDER_CHARS) {
+    if (lastIdx >= 1 && this.pending[lastIdx].length < MERGE_UNDER_CHARS) {
       this.pending[lastIdx] = `${this.pending[lastIdx]} ${text}`;
     } else {
       this.pending.push(text);

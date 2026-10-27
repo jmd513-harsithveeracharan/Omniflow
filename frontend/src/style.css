@@ -13023,14 +13023,11 @@ pre[class*="language-"] {
    ============================================================================== */
 
 .bolt-chat-pane.in-chat .chat-dock-container.voice-mode-active {
-    background: linear-gradient(
-        to top,
-        var(--bg-base) 0%,
-        var(--bg-base) 64px,
-        rgba(19, 19, 20, 0.65) 120px,
-        transparent 100%
-    );
-    padding: 16px 20px 18px 20px;
+    background: transparent !important;
+    backdrop-filter: none !important;
+    box-shadow: none !important;
+    border: none !important;
+    padding: 8px 20px 18px 20px;
     pointer-events: none;
 }
 
@@ -13040,199 +13037,128 @@ pre[class*="language-"] {
 
 .chatgpt-floating-orb-wrapper {
     position: relative;
-    margin-bottom: 18px;
+    margin-bottom: 14px;
     z-index: 60;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    animation: floatingOrbEnter 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+    animation: floatingOrbEnter 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 @keyframes floatingOrbEnter {
-    from { opacity: 0; transform: translateY(14px) scale(0.9); }
+    from { opacity: 0; transform: translateY(10px) scale(0.94); }
     to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
-.floating-orb-transcript-pill {
-    margin-bottom: 14px;
-    padding: 6px 16px;
-    border-radius: 999px;
-    background: rgba(18, 20, 26, 0.92);
-    border: 1px solid rgba(255, 255, 255, 0.14);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.45);
-    font-size: 13px;
-    color: #f4f4f5;
-    max-width: 480px;
-    text-align: center;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    animation: pillFadeIn 0.2s ease;
-}
-
-@keyframes pillFadeIn {
-    from { opacity: 0; transform: translateY(4px); }
-    to { opacity: 1; transform: translateY(0); }
-}
-
-/* Ambient Glow behind the sphere */
-.floating-orb-glow {
-    position: absolute;
-    bottom: -4px;
-    width: 96px;
-    height: 96px;
-    border-radius: 50%;
-    filter: blur(26px);
-    opacity: 0.55;
-    pointer-events: none;
-    transition: all 0.4s ease;
-}
-
-.floating-orb-glow.state-listening {
-    background: radial-gradient(circle, rgba(59, 130, 246, 0.75) 0%, rgba(147, 197, 253, 0.35) 60%, transparent 100%);
-    animation: orbGlowBreathe 2.4s infinite ease-in-out;
-}
-
-.floating-orb-glow.state-speaking {
-    background: radial-gradient(circle, rgba(96, 165, 250, 0.95) 0%, rgba(59, 130, 246, 0.55) 60%, transparent 100%);
-    animation: orbGlowPulseSpeaking 1.3s infinite ease-in-out;
-}
-
-.floating-orb-glow.state-thinking {
-    background: radial-gradient(circle, rgba(96, 165, 250, 0.85) 0%, rgba(37, 99, 235, 0.45) 60%, transparent 100%);
-    animation: orbGlowBreathe 1.6s infinite ease-in-out;
-}
-
-.floating-orb-glow.state-muted {
-    background: radial-gradient(circle, rgba(148, 163, 184, 0.3) 0%, transparent 70%);
-}
-
-/* The Exact 3D Sky-Blue & White Cloud Sphere from ChatGPT */
+/* The Exact 3D Sky-Blue & White Cloud Sphere from ChatGPT (Compact 72px, Level-2 Subtle Motion) */
 .floating-orb-sphere {
     position: relative;
-    width: 88px;
-    height: 88px;
+    width: 72px;
+    height: 72px;
     border-radius: 50%;
     overflow: hidden;
-    background: linear-gradient(165deg, #1d4ed8 0%, #2563eb 35%, #60a5fa 65%, #dbeafe 100%);
-    box-shadow:
-        0 10px 30px rgba(0, 0, 0, 0.55),
-        0 0 28px rgba(59, 130, 246, 0.35),
-        inset 0 2px 6px rgba(255, 255, 255, 0.45),
-        inset 0 -4px 10px rgba(30, 64, 175, 0.4);
+    background: linear-gradient(170deg, #1d4ed8 0%, #2563eb 32%, #60a5fa 62%, #eff6ff 100%);
+    box-shadow: 0 4px 18px rgba(0, 0, 0, 0.28);
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.3s ease, filter 0.3s ease;
+    transition: transform 0.3s ease, filter 0.3s ease;
     user-select: none;
 }
 
 .floating-orb-sphere:hover {
-    transform: scale(1.05);
+    transform: scale(1.02);
 }
 
 .orb-cloud-base {
     position: absolute;
     inset: 0;
-    background: radial-gradient(circle at 50% 18%, #1e40af 0%, #2563eb 42%, #93c5fd 78%, #eff6ff 100%);
+    background: radial-gradient(circle at 48% 16%, #1d4ed8 0%, #2563eb 38%, #60a5fa 68%, #dbeafe 92%, #ffffff 100%);
 }
 
 .orb-cloud-wisp {
     position: absolute;
     border-radius: 50%;
     pointer-events: none;
-    filter: blur(7px);
+    filter: blur(6px);
 }
 
 .orb-cloud-1 {
-    width: 115%;
-    height: 75%;
-    bottom: -18%;
+    width: 120%;
+    height: 76%;
+    bottom: -16%;
     left: -10%;
-    background: radial-gradient(ellipse at 50% 45%, #ffffff 0%, #eff6ff 55%, rgba(191, 219, 254, 0) 100%);
+    background: radial-gradient(ellipse at 50% 45%, #ffffff 0%, #f0f9ff 58%, rgba(219, 234, 254, 0) 100%);
     opacity: 0.96;
-    animation: cloudDrift1 5.5s infinite ease-in-out alternate;
+    animation: cloudDrift1 6s infinite ease-in-out alternate;
 }
 
 .orb-cloud-2 {
-    width: 95%;
-    height: 65%;
-    top: 28%;
-    right: -18%;
-    background: radial-gradient(ellipse at 50% 50%, #ffffff 0%, #dbeafe 60%, rgba(147, 197, 253, 0) 100%);
-    opacity: 0.88;
-    animation: cloudDrift2 4.2s infinite ease-in-out alternate;
+    width: 96%;
+    height: 64%;
+    top: 26%;
+    right: -16%;
+    background: radial-gradient(ellipse at 50% 50%, #ffffff 0%, #dbeafe 62%, rgba(147, 197, 253, 0) 100%);
+    opacity: 0.9;
+    animation: cloudDrift2 4.8s infinite ease-in-out alternate;
 }
 
 .orb-cloud-3 {
-    width: 85%;
-    height: 55%;
-    bottom: 8%;
-    left: -15%;
-    background: radial-gradient(ellipse at 50% 50%, #dbeafe 0%, #93c5fd 55%, rgba(59, 130, 246, 0) 100%);
-    opacity: 0.78;
-    animation: cloudDrift3 6.2s infinite ease-in-out alternate;
+    width: 88%;
+    height: 54%;
+    bottom: 10%;
+    left: -14%;
+    background: radial-gradient(ellipse at 50% 50%, #eff6ff 0%, #93c5fd 58%, rgba(59, 130, 246, 0) 100%);
+    opacity: 0.82;
+    animation: cloudDrift3 6.5s infinite ease-in-out alternate;
 }
 
 @keyframes cloudDrift1 {
-    0% { transform: translate(-4%, 2%) scale(1); }
-    100% { transform: translate(6%, -5%) scale(1.08); }
+    0% { transform: translate(-3%, 1%) scale(1); }
+    100% { transform: translate(4%, -3%) scale(1.04); }
 }
 
 @keyframes cloudDrift2 {
-    0% { transform: translate(5%, -3%) scale(1.04); }
-    100% { transform: translate(-7%, 4%) scale(0.96); }
+    0% { transform: translate(4%, -2%) scale(1.02); }
+    100% { transform: translate(-5%, 3%) scale(0.98); }
 }
 
 @keyframes cloudDrift3 {
-    0% { transform: translate(-3%, -2%) rotate(-4deg); }
-    100% { transform: translate(5%, 3%) rotate(6deg); }
+    0% { transform: translate(-2%, -1%) rotate(-3deg); }
+    100% { transform: translate(4%, 2%) rotate(4deg); }
 }
 
 .floating-orb-sphere.state-listening {
-    animation: orbListeningPulse 2.8s infinite ease-in-out;
+    animation: orbListeningPulse 3.2s infinite ease-in-out;
 }
 
 .floating-orb-sphere.state-speaking {
-    animation: orbSpeakingBounce 1.15s infinite ease-in-out;
-    box-shadow:
-        0 12px 34px rgba(0, 0, 0, 0.6),
-        0 0 42px rgba(96, 165, 250, 0.65),
-        inset 0 2px 8px rgba(255, 255, 255, 0.7);
+    animation: orbSpeakingBounce 1.4s infinite ease-in-out;
+    box-shadow: 0 6px 22px rgba(59, 130, 246, 0.32);
 }
 
 .floating-orb-sphere.state-speaking .orb-cloud-1 {
-    animation-duration: 1.8s;
+    animation-duration: 2.4s;
 }
 
 .floating-orb-sphere.state-speaking .orb-cloud-2 {
-    animation-duration: 1.5s;
+    animation-duration: 2.0s;
 }
 
 .floating-orb-sphere.state-thinking {
-    animation: orbListeningPulse 1.5s infinite ease-in-out;
+    animation: orbListeningPulse 2.0s infinite ease-in-out;
 }
 
 .floating-orb-sphere.state-thinking .orb-cloud-1,
 .floating-orb-sphere.state-thinking .orb-cloud-2 {
-    animation-duration: 2.2s;
+    animation-duration: 2.8s;
 }
 
 .floating-orb-sphere.state-muted {
     filter: saturate(0.25) brightness(0.75);
     opacity: 0.8;
-}
-
-.floating-orb-highlight {
-    position: absolute;
-    inset: 0;
-    border-radius: 50%;
-    box-shadow: inset 0 2px 5px rgba(255, 255, 255, 0.45), inset 0 -3px 8px rgba(15, 23, 42, 0.25);
-    pointer-events: none;
 }
 
 /* ==============================================================================
@@ -13354,12 +13280,12 @@ pre[class*="language-"] {
 
 @keyframes orbListeningPulse {
     0%, 100% { transform: scale(1); }
-    50% { transform: scale(1.05); }
+    50% { transform: scale(1.015); }
 }
 
 @keyframes orbSpeakingBounce {
-    0%, 100% { transform: scale(1.01); }
-    50% { transform: scale(1.1); }
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.03); }
 }
 
 @keyframes orbGlowBreathe {

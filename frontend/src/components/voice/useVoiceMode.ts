@@ -236,6 +236,21 @@ export function useVoiceMode({
       if (!isActiveRef.current || isMutedRef.current) return;
 
       lastResultsLenRef.current = event.results.length;
+      const isAssistantSpeaking = Boolean(queueRef.current?.isSpeaking());
+      const spokenSoFar = isAssistantSpeaking ? (queueRef.current?.getSpokenText() || '') : '';
+
+      // If assistant is speaking, skip any finalized segments that are confirmed speaker echo
+      if (isAssistantSpeaking && spokenSoFar) {
+        while (turnStartIndexRef.current < event.results.length) {
+          const seg = event.results[turnStartIndexRef.current];
+          const segText = seg?.[0]?.transcript || '';
+          if (seg?.isFinal && isLikelyEcho(segText, spokenSoFar)) {
+            turnStartIndexRef.current += 1;
+          } else {
+            break;
+          }
+        }
+      }
 
       let sessionText = '';
       let hasInterim = false;
@@ -259,24 +274,28 @@ export function useVoiceMode({
       if (!fullSpoken) return;
 
       // Check if assistant is currently speaking (barge-in vs speaker echo)
-      if (queueRef.current?.isSpeaking()) {
-        const spokenSoFar = queueRef.current.getSpokenText();
+      if (isAssistantSpeaking) {
         if (isLikelyEcho(fullSpoken, spokenSoFar)) {
-          // Discard speaker echo so AI never interrupts itself
-          turnStartIndexRef.current = event.results.length;
-          carryOverTextRef.current = '';
-          latestTranscriptRef.current = '';
+          // Only advance turnStartIndex if all segments are finalized echo;
+          // never skip an in-progress interim segment!
+          if (!hasInterim) {
+            turnStartIndexRef.current = event.results.length;
+            carryOverTextRef.current = '';
+            latestTranscriptRef.current = '';
+          }
           return;
         }
 
         const words = fullSpoken.toLowerCase().replace(/[^a-z\s]/g, '').split(/\s+/).filter(Boolean);
         const hasKeyword = words.some((w) => INTERRUPT_KEYWORDS.has(w));
         if (countWords(fullSpoken) >= 2 || hasKeyword) {
-          // Real user barge-in: silence assistant immediately
-          queueRef.current.cancel();
+          // Real user barge-in: silence assistant immediately while keeping word 1..N intact!
+          queueRef.current?.cancel();
           stopSpeaking();
           setVoiceState('listening');
         } else {
+          // Hold word 1 in place without advancing turnStartIndex so word 1 is preserved when word 2 arrives
+          latestTranscriptRef.current = fullSpoken;
           return;
         }
       }
@@ -289,13 +308,13 @@ export function useVoiceMode({
       latestTranscriptRef.current = fullSpoken;
       setVoiceTranscript(fullSpoken);
 
-      // Schedule auto-send after natural silence pause
+      // Schedule auto-send after natural silence pause (snappy 900ms once segment finalized)
       if (silenceTimerRef.current) {
         clearTimeout(silenceTimerRef.current);
       }
 
       const wordsCount = countWords(fullSpoken);
-      const delayMs = wordsCount <= 1 ? 2200 : hasInterim ? 1750 : 1350;
+      const delayMs = wordsCount <= 1 ? 1800 : hasInterim ? 1350 : 900;
 
       silenceTimerRef.current = setTimeout(() => {
         commitTurnNow();

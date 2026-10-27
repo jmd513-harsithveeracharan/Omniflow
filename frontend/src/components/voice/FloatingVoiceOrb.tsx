@@ -35,12 +35,6 @@ export const FloatingVoiceOrb: React.FC<FloatingVoiceOrbProps> = ({
 
   return (
     <div className="chatgpt-floating-orb-wrapper" onClick={handleClick}>
-      {transcript && transcript.trim().length > 0 && (
-        <div className="floating-orb-transcript-pill">
-          <span>{transcript}</span>
-        </div>
-      )}
-
       <div
         className={`floating-orb-sphere state-${state}`}
         title={

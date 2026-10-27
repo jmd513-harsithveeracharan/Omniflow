@@ -12,7 +12,7 @@
  * than plain word overlap.
  */
 
-const MAX_REFERENCE_WORDS = 400;
+const MAX_REFERENCE_WORDS = 80;
 
 const toWords = (text: string): string[] =>
   text
@@ -39,14 +39,18 @@ const longestCommonRun = (heard: string[], reference: string[]): number => {
 
 export const countWords = (text: string): number => toWords(text).length;
 
-/** True when `heard` is most likely the assistant's speech leaking into the mic. */
+/**
+ * True when `heard` is most likely the assistant's speech leaking into the mic.
+ * Requires at least a 3-word contiguous match against the assistant's recent
+ * speech so the first 1-2 words of a user barge-in ("What is...", "I want...")
+ * are never mistaken for echo and discarded.
+ */
 export const isLikelyEcho = (heard: string, assistantSpeech: string): boolean => {
   const heardWords = toWords(heard);
   const refWords = toWords(assistantSpeech).slice(-MAX_REFERENCE_WORDS);
-  if (heardWords.length === 0 || refWords.length === 0) return false;
+  if (heardWords.length < 3 || refWords.length === 0) return false;
 
   const run = longestCommonRun(heardWords, refWords);
-  if (heardWords.length <= 2) return run === heardWords.length;
-  return run >= Math.max(2, Math.ceil(heardWords.length * 0.6));
+  return run >= Math.max(3, Math.ceil(heardWords.length * 0.65));
 };
 
