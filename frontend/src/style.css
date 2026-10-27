@@ -13288,14 +13288,19 @@ pre[class*="language-"] {
     transform: scale(1.05);
 }
 
+.floating-orb-sphere.is-reverbing {
+    transition: transform 0.08s ease-out, box-shadow 0.1s ease-out !important;
+}
+
 @keyframes orbListeningPulse {
     0%, 100% { transform: scale(1); }
-    50% { transform: scale(1.015); }
+    50% { transform: scale(1.065); }
 }
 
 @keyframes orbSpeakingBounce {
     0%, 100% { transform: scale(1); }
-    50% { transform: scale(1.03); }
+    35% { transform: scale(1.10); }
+    70% { transform: scale(1.04); }
 }
 
 @keyframes orbGlowBreathe {

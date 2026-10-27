@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Loader2, Globe, Layers, Paperclip, X, Plus, Mic, MicOff } from 'lucide-react';
+import { Loader2, Globe, Layers, Paperclip, X, Mic, MicOff } from 'lucide-react';
 import { IntakeSpecModal } from './modals/IntakeSpecModal';
 import { FloatingVoiceOrb, VoiceModeState } from './voice/FloatingVoiceOrb';
 import { unlockSpeechEngine, isSpeechRecognitionSupported } from './voice/speechService';
@@ -73,13 +73,15 @@ export const PromptDock: React.FC<PromptDockProps> = ({
   const leftControlsRef = useRef<HTMLDivElement>(null);
   const modelPillWrapperRef = useRef<HTMLDivElement>(null);
 
+  const displayValue = input || (isVoiceModeActive ? voiceTranscript : '');
+
   useEffect(() => {
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
       const newHeight = Math.min(textareaRef.current.scrollHeight, 180);
       textareaRef.current.style.height = `${newHeight}px`;
     }
-  }, [input]);
+  }, [input, voiceTranscript, isVoiceModeActive]);
 
   useEffect(() => {
     const handleOutsideClick = (e: MouseEvent) => {
@@ -107,10 +109,10 @@ export const PromptDock: React.FC<PromptDockProps> = ({
     };
   }, []);
 
-  const handleSubmit = (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    if (!input.trim() || isStreaming) return;
-    onSendMessage(input.trim(), selectedModel, selectedEffort.toLowerCase(), chatMode);
+  const handleSubmit = (textOverride?: string) => {
+    const val = (typeof textOverride === 'string' ? textOverride : '') || input || (isVoiceModeActive ? voiceTranscript : '');
+    if (!val.trim() || isStreaming) return;
+    onSendMessage(val.trim(), selectedModel, selectedEffort.toLowerCase(), chatMode);
     setInput('');
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
@@ -120,7 +122,7 @@ export const PromptDock: React.FC<PromptDockProps> = ({
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      handleSubmit();
+      handleSubmit(displayValue);
     }
   };
 
@@ -141,79 +143,38 @@ export const PromptDock: React.FC<PromptDockProps> = ({
 
   return (
     <div className={`chat-dock-container ${isVoiceModeActive ? 'voice-mode-active' : ''}`} id="chatDockContainer">
-      {isVoiceModeActive ? (
-        <>
-          <FloatingVoiceOrb
-            state={voiceState}
-            transcript={voiceTranscript}
-            onClick={onToggleVoiceMute}
-            onInterrupt={onInterruptVoice}
-          />
-          <div className="voice-mode-pill-dock">
-            <button
-              type="button"
-              className="voice-dock-plus-btn"
-              onClick={() => setIsIntakeModalOpen(true)}
-              title="Attach Project Intake Spec"
-            >
-              <Plus width={18} height={18} />
-            </button>
-            <input
-              type="text"
-              className="voice-dock-input"
-              id="voiceChatInput"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault();
-                  handleSubmit();
-                }
-              }}
-              placeholder={voiceTranscript ? voiceTranscript : 'Type'}
-              disabled={isStreaming}
-            />
-            <div className="voice-dock-actions">
-              <button
-                type="button"
-                className={`voice-dock-mic-btn ${isVoiceMuted ? 'is-muted' : 'is-listening'}`}
-                id="btnVoiceMuteToggle"
-                title={isVoiceMuted ? 'Unmute Microphone' : 'Mute Microphone'}
-                onClick={onToggleVoiceMute}
-              >
-                {isVoiceMuted ? <MicOff width={16} height={16} /> : <Mic width={16} height={16} />}
-              </button>
-              <button
-                type="button"
-                className="btn-voice-exit"
-                id="btnExitVoiceMode"
-                title="End Voice Mode"
-                onClick={onToggleVoiceMode}
-              >
-                <X width={16} height={16} />
-              </button>
-            </div>
-          </div>
-        </>
-      ) : (
-        <>
-          <div className="google-prompt-dock">
-            {/* Text Input Wrapper */}
-            <div className="dock-textarea-wrapper">
-              <textarea
-                ref={textareaRef}
-                id="chatInput"
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder="Start typing a prompt to see what our models can do..."
-                rows={1}
-                disabled={isStreaming}
-              />
-            </div>
+      {isVoiceModeActive && (
+        <FloatingVoiceOrb
+          state={voiceState}
+          transcript={voiceTranscript}
+          onClick={onToggleVoiceMute}
+          onInterrupt={onInterruptVoice}
+        />
+      )}
 
-            {/* Dock Controls Row */}
-            <div className="dock-controls-row">
+      <div className="google-prompt-dock">
+        {/* Text Input Wrapper */}
+        <div className="dock-textarea-wrapper">
+          <textarea
+            ref={textareaRef}
+            id="chatInput"
+            value={displayValue}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder={
+              isVoiceModeActive
+                ? isVoiceMuted
+                  ? 'Microphone muted. Tap unmute or start typing...'
+                  : 'Speak in plain English (or type here)...'
+                : 'Start typing a prompt to see what our models can do...'
+            }
+            rows={1}
+            disabled={isStreaming}
+          />
+        </div>
+
+        {/* Dock Controls Row */}
+        <div className="dock-controls-row">
               <div className="dock-left-controls" ref={leftControlsRef} style={{ position: 'relative' }}>
                 {/* Model Tuning Button */}
                 <button
@@ -453,73 +414,129 @@ export const PromptDock: React.FC<PromptDockProps> = ({
                   )}
                 </div>
 
-                {/* Voice Input Mic */}
-                <button
-                  type="button"
-                  className="dock-icon-btn"
-                  id="btnVoiceInput"
-                  title="Start Voice Mode (Hands-Free)"
-                  onClick={handleLaunchVoiceMode}
-                >
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
-                    <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-                    <line x1="12" y1="19" x2="12" y2="23" />
-                    <line x1="8" y1="23" x2="16" y2="23" />
-                  </svg>
-                </button>
+                {isVoiceModeActive ? (
+                  <>
+                    {/* Live Voice Microphone Mute Toggle */}
+                    <button
+                      type="button"
+                      className={`voice-dock-mic-btn ${isVoiceMuted ? 'is-muted' : 'is-listening'}`}
+                      id="btnVoiceMuteToggle"
+                      title={isVoiceMuted ? 'Unmute Microphone' : 'Mute Microphone'}
+                      onClick={onToggleVoiceMute}
+                    >
+                      {isVoiceMuted ? <MicOff width={15} height={15} /> : <Mic width={15} height={15} />}
+                    </button>
 
-                {/* Send Button or Live Audio Waveform */}
-                {input.trim().length > 0 || isStreaming ? (
-                  <button
-                    type="button"
-                    onClick={() => handleSubmit()}
-                    disabled={!input.trim() || isStreaming}
-                    className="dock-icon-btn btn-chat-send"
-                    id="btnChatSend"
-                    title="Send Prompt (Enter)"
-                    style={{
-                      background: '#ffffff',
-                      color: '#09090b',
-                      borderRadius: '50%',
-                      width: '32px',
-                      height: '32px',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    }}
-                  >
-                    {isStreaming ? (
-                      <Loader2 width={14} height={14} className="animate-spin" />
-                    ) : (
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                        <polyline points="18 15 12 9 6 15" />
-                      </svg>
+                    {/* Send Button if text was spoken or typed */}
+                    {displayValue.trim().length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => handleSubmit(displayValue)}
+                        disabled={isStreaming}
+                        className="dock-icon-btn btn-chat-send"
+                        id="btnChatSend"
+                        title="Send Spoken Prompt (Enter)"
+                        style={{
+                          background: '#ffffff',
+                          color: '#09090b',
+                          borderRadius: '50%',
+                          width: '32px',
+                          height: '32px',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}
+                      >
+                        {isStreaming ? (
+                          <Loader2 width={14} height={14} className="animate-spin" />
+                        ) : (
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                            <polyline points="18 15 12 9 6 15" />
+                          </svg>
+                        )}
+                      </button>
                     )}
-                  </button>
+
+                    {/* Round Blue Exit Button */}
+                    <button
+                      type="button"
+                      className="btn-voice-exit"
+                      id="btnExitVoiceMode"
+                      title="End Voice Mode"
+                      onClick={onToggleVoiceMode}
+                    >
+                      <X width={16} height={16} />
+                    </button>
+                  </>
                 ) : (
-                  <button
-                    type="button"
-                    className="dock-icon-btn"
-                    id="btnAudioWave"
-                    title="Start ChatGPT Voice Mode (Hands-Free)"
-                    onClick={handleLaunchVoiceMode}
-                  >
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <line x1="4" y1="9" x2="4" y2="15" />
-                      <line x1="8" y1="5" x2="8" y2="19" />
-                      <line x1="12" y1="2" x2="12" y2="22" />
-                      <line x1="16" y1="5" x2="16" y2="19" />
-                      <line x1="20" y1="9" x2="20" y2="15" />
-                    </svg>
-                  </button>
+                  <>
+                    {/* Voice Input Mic */}
+                    <button
+                      type="button"
+                      className="dock-icon-btn"
+                      id="btnVoiceInput"
+                      title="Start Voice Mode (Hands-Free)"
+                      onClick={handleLaunchVoiceMode}
+                    >
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
+                        <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                        <line x1="12" y1="19" x2="12" y2="23" />
+                        <line x1="8" y1="23" x2="16" y2="23" />
+                      </svg>
+                    </button>
+
+                    {/* Send Button or Live Audio Waveform */}
+                    {input.trim().length > 0 || isStreaming ? (
+                      <button
+                        type="button"
+                        onClick={() => handleSubmit()}
+                        disabled={!input.trim() || isStreaming}
+                        className="dock-icon-btn btn-chat-send"
+                        id="btnChatSend"
+                        title="Send Prompt (Enter)"
+                        style={{
+                          background: '#ffffff',
+                          color: '#09090b',
+                          borderRadius: '50%',
+                          width: '32px',
+                          height: '32px',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}
+                      >
+                        {isStreaming ? (
+                          <Loader2 width={14} height={14} className="animate-spin" />
+                        ) : (
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                            <polyline points="18 15 12 9 6 15" />
+                          </svg>
+                        )}
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        className="dock-icon-btn"
+                        id="btnAudioWave"
+                        title="Start ChatGPT Voice Mode (Hands-Free)"
+                        onClick={handleLaunchVoiceMode}
+                      >
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <line x1="4" y1="9" x2="4" y2="15" />
+                          <line x1="8" y1="5" x2="8" y2="19" />
+                          <line x1="12" y1="2" x2="12" y2="22" />
+                          <line x1="16" y1="5" x2="16" y2="19" />
+                          <line x1="20" y1="9" x2="20" y2="15" />
+                        </svg>
+                      </button>
+                    )}
+                  </>
                 )}
               </div>
             </div>
           </div>
           <div className="dock-disclaimer">Omniflow can make mistakes. Please double-check responses.</div>
-        </>
-      )}
 
       {/* Project Intake Specification Modal */}
       <IntakeSpecModal
