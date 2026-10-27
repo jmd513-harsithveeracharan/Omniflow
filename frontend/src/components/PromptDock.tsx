@@ -2,7 +2,12 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Loader2, Globe, Layers, Paperclip, X, Mic, MicOff } from 'lucide-react';
 import { IntakeSpecModal } from './modals/IntakeSpecModal';
 import { FloatingVoiceOrb, VoiceModeState } from './voice/FloatingVoiceOrb';
-import { unlockSpeechEngine, isSpeechRecognitionSupported } from './voice/speechService';
+import {
+  unlockSpeechEngine,
+  isSpeechRecognitionSupported,
+  createSpeechRecognition,
+  IBrowserSpeechRecognition,
+} from './voice/speechService';
 
 interface PromptDockProps {
   onSendMessage: (text: string, model?: string, effort?: string, mode?: 'auto' | 'general' | 'project') => void;
@@ -38,7 +43,108 @@ export const PromptDock: React.FC<PromptDockProps> = ({
   const [isIntakeModalOpen, setIsIntakeModalOpen] = useState(false);
   const [temperature, setTemperature] = useState(0.2);
 
+  // Dedicated speech-to-text dictation state (Microphone only)
+  const [isDictating, setIsDictating] = useState<boolean>(false);
+  const dictationRecRef = useRef<IBrowserSpeechRecognition | null>(null);
+  const baseInputRef = useRef<string>('');
+
+  useEffect(() => {
+    return () => {
+      if (dictationRecRef.current) {
+        try {
+          dictationRecRef.current.abort();
+        } catch {
+          // ignore
+        }
+        dictationRecRef.current = null;
+      }
+    };
+  }, []);
+
+  const handleToggleDictation = () => {
+    if (!isSpeechRecognitionSupported()) {
+      alert(
+        'Zen Browser and Firefox (Gecko engine) do not support the Web Speech Recognition API.\n\nPlease open OmniFlow in Google Chrome or Microsoft Edge to use microphone speech-to-text dictation.'
+      );
+      return;
+    }
+
+    if (isDictating) {
+      if (dictationRecRef.current) {
+        try {
+          dictationRecRef.current.stop();
+        } catch {
+          // ignore
+        }
+        dictationRecRef.current = null;
+      }
+      setIsDictating(false);
+      return;
+    }
+
+    // If interactive voice mode was active, exit it
+    if (isVoiceModeActive && onToggleVoiceMode) {
+      onToggleVoiceMode();
+    }
+
+    const rec = createSpeechRecognition();
+    if (!rec) return;
+
+    baseInputRef.current = input.trim().length > 0 ? `${input.trim()} ` : '';
+    let sessionTranscript = '';
+
+    rec.onstart = () => {
+      setIsDictating(true);
+    };
+
+    rec.onresult = (event) => {
+      let interim = '';
+      let finalized = '';
+      for (let i = 0; i < event.results.length; i++) {
+        const res = event.results[i];
+        const piece = res[0]?.transcript || '';
+        if (res.isFinal) {
+          finalized += `${piece} `;
+        } else {
+          interim += piece;
+        }
+      }
+      sessionTranscript = `${finalized}${interim}`.trim();
+      setInput(`${baseInputRef.current}${sessionTranscript}`);
+    };
+
+    rec.onerror = (e) => {
+      if (e.error !== 'no-speech' && e.error !== 'aborted') {
+        console.warn('[Dictation] Speech recognition notice:', e.error);
+      }
+      setIsDictating(false);
+    };
+
+    rec.onend = () => {
+      setIsDictating(false);
+      dictationRecRef.current = null;
+    };
+
+    dictationRecRef.current = rec;
+    try {
+      rec.start();
+    } catch (err) {
+      console.error('Failed to start dictation:', err);
+      setIsDictating(false);
+    }
+  };
+
   const handleLaunchVoiceMode = () => {
+    if (dictationRecRef.current) {
+      try {
+        dictationRecRef.current.stop();
+      } catch {
+        // ignore
+      }
+      dictationRecRef.current = null;
+      setIsDictating(false);
+    }
+
     if (!isSpeechRecognitionSupported()) {
       alert(
         'Zen Browser and Firefox (Gecko engine) do not support the Web Speech Recognition API.\n\nPlease open OmniFlow in Google Chrome or Microsoft Edge to use Hands-Free Voice Mode.'
@@ -110,6 +216,15 @@ export const PromptDock: React.FC<PromptDockProps> = ({
   }, []);
 
   const handleSubmit = (textOverride?: string) => {
+    if (dictationRecRef.current) {
+      try {
+        dictationRecRef.current.stop();
+      } catch {
+        // ignore
+      }
+      dictationRecRef.current = null;
+      setIsDictating(false);
+    }
     const val = (typeof textOverride === 'string' ? textOverride : '') || input || (isVoiceModeActive ? voiceTranscript : '');
     if (!val.trim() || isStreaming) return;
     onSendMessage(val.trim(), selectedModel, selectedEffort.toLowerCase(), chatMode);
@@ -470,13 +585,13 @@ export const PromptDock: React.FC<PromptDockProps> = ({
                   </>
                 ) : (
                   <>
-                    {/* Voice Input Mic */}
+                    {/* Microphone Dictation (Audio to Text Only) */}
                     <button
                       type="button"
-                      className="dock-icon-btn"
+                      className={`dock-icon-btn ${isDictating ? 'recording' : ''}`}
                       id="btnVoiceInput"
-                      title="Start Voice Mode (Hands-Free)"
-                      onClick={handleLaunchVoiceMode}
+                      title={isDictating ? 'Stop microphone dictation' : 'Dictate with microphone (Audio to text)'}
+                      onClick={handleToggleDictation}
                     >
                       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                         <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
@@ -486,7 +601,7 @@ export const PromptDock: React.FC<PromptDockProps> = ({
                       </svg>
                     </button>
 
-                    {/* Send Button or Live Audio Waveform */}
+                    {/* Send Button or Live Audio Waveform (Interactive Voice Mode) */}
                     {input.trim().length > 0 || isStreaming ? (
                       <button
                         type="button"
@@ -519,7 +634,7 @@ export const PromptDock: React.FC<PromptDockProps> = ({
                         type="button"
                         className="dock-icon-btn"
                         id="btnAudioWave"
-                        title="Start ChatGPT Voice Mode (Hands-Free)"
+                        title="Start Voice Mode (Hands-Free Conversation)"
                         onClick={handleLaunchVoiceMode}
                       >
                         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
