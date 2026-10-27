@@ -4,6 +4,7 @@ import {
   PanelLeftOpen,
   Workflow,
   RefreshCw,
+  Mic,
 } from 'lucide-react';
 import { FabricStatus } from '../types';
 
@@ -17,6 +18,7 @@ interface TopBarProps {
   onRefreshWorkspace: () => void;
   status?: FabricStatus | null;
   onOpenFabricConnection?: () => void;
+  onOpenVoiceMode?: () => void;
 }
 
 export const TopBar: React.FC<TopBarProps> = ({
@@ -28,6 +30,7 @@ export const TopBar: React.FC<TopBarProps> = ({
   onRefreshWorkspace,
   status,
   onOpenFabricConnection,
+  onOpenVoiceMode,
 }) => {
   const wsDisplayName =
     status?.workspaceName ||
@@ -80,6 +83,19 @@ export const TopBar: React.FC<TopBarProps> = ({
         >
           <Workflow width={16} height={16} />
         </button>
+
+        {/* Live ChatGPT Voice Mode */}
+        {onOpenVoiceMode && (
+          <button
+            type="button"
+            className="topbar-tool-icon"
+            onClick={onOpenVoiceMode}
+            title="Start ChatGPT Voice Mode (Hands-Free)"
+            style={{ color: '#10b981' }}
+          >
+            <Mic width={16} height={16} />
+          </button>
+        )}
 
         {/* Sync Workspace Items */}
         <button

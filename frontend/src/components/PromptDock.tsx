@@ -5,11 +5,13 @@ import { IntakeSpecModal } from './modals/IntakeSpecModal';
 interface PromptDockProps {
   onSendMessage: (text: string, model?: string, effort?: string, mode?: 'auto' | 'general' | 'project') => void;
   isStreaming: boolean;
+  onOpenVoiceMode?: () => void;
 }
 
 export const PromptDock: React.FC<PromptDockProps> = ({
   onSendMessage,
   isStreaming,
+  onOpenVoiceMode,
 }) => {
   const [input, setInput] = useState('');
   const [chatMode, setChatMode] = useState<'general' | 'project'>('project');
@@ -476,7 +478,8 @@ export const PromptDock: React.FC<PromptDockProps> = ({
                 type="button"
                 className="dock-icon-btn"
                 id="btnAudioWave"
-                title="Live Audio Mode"
+                title="Start ChatGPT Voice Mode (Hands-Free)"
+                onClick={onOpenVoiceMode}
               >
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <line x1="4" y1="9" x2="4" y2="15" />

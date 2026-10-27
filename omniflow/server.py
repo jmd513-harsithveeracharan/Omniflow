@@ -714,11 +714,11 @@ async def handle_chat_stream(req: ChatRequest) -> StreamingResponse:
         # MODE 1: General Conversational & Technical Q&A (Instant, 0 Thought Steps)
         # ==============================================================================
         if intent == "GENERAL_CHAT":
-            sys_prompt = build_general_chat_prompt()
-            reply = chat([
-                {"role": "system", "content": sys_prompt},
-                {"role": "user", "content": req.message},
-            ])
+            sys_prompt = build_general_chat_prompt(effort=req.effort)
+            reply = chat(
+                [{"role": "system", "content": sys_prompt}, {"role": "user", "content": req.message}],
+                effort=req.effort,
+            )
             for chunk in reply.split(" "):
                 yield f"data: {json.dumps({'type': 'chunk', 'text': chunk + ' '})}\n\n"
                 await asyncio.sleep(0.012)
@@ -775,11 +775,11 @@ async def handle_chat_stream(req: ChatRequest) -> StreamingResponse:
                 team_members=members,
             )
 
-            sys_prompt = build_project_qa_prompt(proj_ctx)
-            reply = chat([
-                {"role": "system", "content": sys_prompt},
-                {"role": "user", "content": req.message},
-            ])
+            sys_prompt = build_project_qa_prompt(proj_ctx, effort=req.effort)
+            reply = chat(
+                [{"role": "system", "content": sys_prompt}, {"role": "user", "content": req.message}],
+                effort=req.effort,
+            )
             for chunk in reply.split(" "):
                 yield f"data: {json.dumps({'type': 'chunk', 'text': chunk + ' '})}\n\n"
                 await asyncio.sleep(0.012)
@@ -1101,7 +1101,10 @@ async def handle_chat_stream(req: ChatRequest) -> StreamingResponse:
                 f"- If asked for a pipeline, define the dynamic activity JSON with clear dependency wiring.\n"
                 f"- Include a concise summary and next execution steps."
             )
-            reply = chat([{"role": "system", "content": sys_prompt}, {"role": "user", "content": req.message}])
+            reply = chat(
+                [{"role": "system", "content": sys_prompt}, {"role": "user", "content": req.message}],
+                effort=req.effort,
+            )
 
             for chunk in reply.split(" "):
                 yield f"data: {json.dumps({'type': 'chunk', 'text': chunk + ' '})}\n\n"

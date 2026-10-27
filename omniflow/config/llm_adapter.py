@@ -45,6 +45,7 @@ def chat(
     target_model: str | None = None,
     complexity: str = "standard",
     session_id: str | None = None,
+    effort: str | None = None,
     **kwargs: Any,
 ) -> str:
     """Invokes chat completions via Azure OpenAI or OpenAI."""
@@ -59,6 +60,12 @@ def chat(
         "model": model,
         "messages": messages,  # type: ignore
     }
+
+    # Dynamically inject Azure OpenAI reasoning_effort (low / medium / high)
+    eff = (effort or kwargs.get("reasoning_effort") or "").lower()
+    if eff in ["low", "medium", "high"]:
+        call_kwargs["reasoning_effort"] = eff
+
     if "luna" not in model.lower() and "o1" not in model.lower() and "o3" not in model.lower():
         if "temperature" in kwargs:
             call_kwargs["temperature"] = kwargs["temperature"]
@@ -66,8 +73,15 @@ def chat(
     try:
         resp = client.chat.completions.create(**call_kwargs)
     except Exception as e:
-        if "temperature" in str(e).lower() and "temperature" in call_kwargs:
+        err_msg = str(e).lower()
+        retry = False
+        if "reasoning_effort" in err_msg and "reasoning_effort" in call_kwargs:
+            del call_kwargs["reasoning_effort"]
+            retry = True
+        if "temperature" in err_msg and "temperature" in call_kwargs:
             del call_kwargs["temperature"]
+            retry = True
+        if retry:
             resp = client.chat.completions.create(**call_kwargs)
         else:
             raise

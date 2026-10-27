@@ -141,11 +141,19 @@ def classify_prompt_intent(
     return "COMPONENT_SYNTHESIS"
 
 
-def build_general_chat_prompt() -> str:
+def build_general_chat_prompt(effort: str | None = "medium") -> str:
     """System prompt for Mode 1: Fast direct conversational Q&A without thought steps."""
+    eff = (effort or "medium").lower()
+    effort_clause = (
+        "Reasoning depth: Maximum thoroughness and analytical precision."
+        if eff == "high"
+        else "Reasoning depth: Ultra-fast and concise."
+        if eff == "low"
+        else "Reasoning depth: Balanced and practical."
+    )
     return (
         "You are Tenali AI (OmniFlow), an intelligent, friendly AI assistant specializing in "
-        "Microsoft Fabric, PySpark, Delta Lake, SQL, and modern cloud data architectures.\n"
+        f"Microsoft Fabric, PySpark, Delta Lake, SQL, and modern cloud data architectures. {effort_clause}\n"
         "Guidelines:\n"
         "- Answer greetings, conceptual questions, definitions, and discussions directly, concisely, and warmly.\n"
         "- Do NOT show intermediate engineering steps, agent-contact logs, or unnecessary technical boilerplate.\n"
@@ -153,11 +161,19 @@ def build_general_chat_prompt() -> str:
     )
 
 
-def build_project_qa_prompt(ctx: ProjectContext) -> str:
+def build_project_qa_prompt(ctx: ProjectContext, effort: str | None = "medium") -> str:
     """System prompt for Mode 2: Direct JIT project-aware Q&A without thought steps."""
     members_str = ", ".join(ctx.team_members) if ctx.team_members else "Sarah (Contributor), Harsith (Owner)"
     tables_str = ", ".join([t.get("name", "") for t in ctx.tables]) if ctx.tables else "Operational entities"
     artifacts_str = f"Artifacts folder: `{ctx.local_path}`" if ctx.local_path else "Standard Medallion artifacts"
+    eff = (effort or "medium").lower()
+    effort_clause = (
+        "Reasoning effort: HIGH (Deep Exhaustive Analysis). Verify edge cases, schema constraints, and SLA boundaries thoroughly."
+        if eff == "high"
+        else "Reasoning effort: LOW (Fast). Deliver crisp, immediate answers with minimal verbosity."
+        if eff == "low"
+        else "Reasoning effort: MEDIUM (Balanced). Provide standard comprehensive reasoning."
+    )
 
     return (
         f"You are Tenali AI, the dedicated project assistant for:\n"
@@ -167,7 +183,8 @@ def build_project_qa_prompt(ctx: ProjectContext) -> str:
         f"- Folder Boundary: {ctx.root_folder}\n"
         f"- Active Entities & Tables: {tables_str}\n"
         f"- Project Team Members: {members_str}\n"
-        f"- Storage / Artifacts: {artifacts_str}\n\n"
+        f"- Storage / Artifacts: {artifacts_str}\n"
+        f"- {effort_clause}\n\n"
         f"Instructions:\n"
         f"- The user is asking an informational question about THIS project.\n"
         f"- Answer directly, informatively, and accurately using the project context above.\n"
