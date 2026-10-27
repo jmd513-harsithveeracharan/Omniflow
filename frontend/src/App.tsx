@@ -335,7 +335,7 @@ export const App: React.FC = () => {
         });
         if (plan) {
           setCurrentPlan(plan as unknown as IngestionPlan);
-          setIsWorkbenchOpen(true);
+          // Visual canvas is decoupled; only opens when user explicitly clicks the canvas button
         }
         loadSessions();
       },
@@ -400,7 +400,6 @@ export const App: React.FC = () => {
   const handlePlanGenerated = (plan: IngestionPlan) => {
     setCurrentPlan(plan);
     setActiveView('chat');
-    setIsWorkbenchOpen(true);
     const msg = `Generated Medallion Ingestion Plan for source: **${plan.sourceName}** (${plan.schedule}). Target Lakehouses: \`lh_enterprise_bronze\`, \`lh_enterprise_silver\`, \`lh_enterprise_gold\`.`;
     setMessages((prev) => [...prev, { role: 'assistant', content: msg }]);
   };
@@ -412,7 +411,6 @@ export const App: React.FC = () => {
 
   const handleInspectWorkspaceItem = (_item: WorkspaceItem) => {
     setActiveView('chat');
-    setIsWorkbenchOpen(true);
   };
 
   const handleDeleteWorkspaceItem = (_item: WorkspaceItem) => {
@@ -481,8 +479,7 @@ export const App: React.FC = () => {
         {activeView === 'projects' && (
           <ProjectsView
             onOpenProject={(id) => {
-              setActiveView('chat');
-              handleSendMessage(`Load and focus on project context: ${id}`);
+              handleSelectProject(id);
             }}
             onNewChatWithContext={(_name) => {
               setActiveView('chat');

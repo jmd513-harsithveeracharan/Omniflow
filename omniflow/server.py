@@ -30,6 +30,12 @@ from omniflow.tools.fabric_deployer import (
     verify_fabric_workspace_connection,
 )
 from omniflow.auth import auth_router, init_auth_db
+from omniflow.intent_router import (
+    classify_prompt_intent,
+    build_general_chat_prompt,
+    build_project_qa_prompt,
+    ProjectContext,
+)
 
 app = FastAPI(
     title="Fabric Studio — OmniFlow Autonomous Engine",
@@ -79,49 +85,49 @@ class ProjectRequest(BaseModel):
 # High-performance In-Memory Caches for Sub-Millisecond Page Loads
 PROJECTS_CACHE: list[dict[str, Any]] = [
     {
-        "id": "PRJ-GLOBAL-DELIVERY",
-        "name": "Global Express Delivery & Courier Logistics Platform",
-        "description": "Courier Logistics, Fleet Telemetry & Order Fulfillment",
+        "id": "PRJ-FINTECH-PAYMENTS",
+        "name": "Global Cross-Border Payments & Fraud Intelligence Platform",
+        "description": "Real-time AML, Sanctions Screening, ISO 20022 Wire Settlements & Fraud Intelligence in Microsoft Fabric.",
         "status": "active",
         "is_pinned": 1,
+        "is_archived": 0,
+        "local_path": os.path.join(os.getcwd(), "omniflow", "generated_artifacts", "PRJ-FINTECH-PAYMENTS"),
+    },
+    {
+        "id": "PRJ-GLOBAL-DELIVERY",
+        "name": "Global Express Delivery & Courier Logistics Platform",
+        "description": "Courier Logistics, Fleet Telemetry & Order Fulfillment with Medallion Lakehouses and ADF batch ingestion.",
+        "status": "active",
+        "is_pinned": 0,
         "is_archived": 0,
         "local_path": os.path.join(os.getcwd(), "omniflow", "generated_artifacts", "PRJ-GLOBAL-DELIVERY"),
     },
     {
         "id": "PRJ-HEALTHCARE-CLAIMS",
         "name": "Healthcare Clinical & Claims Intelligence Platform",
-        "description": "Healthcare Operations & Claims Analytics",
+        "description": "Healthcare Operations & Claims Analytics with HIPAA SHA-256 PII Masking and Direct Lake reporting.",
         "status": "active",
         "is_pinned": 0,
         "is_archived": 0,
-        "local_path": "",
+        "local_path": os.path.join(os.getcwd(), "omniflow", "generated_artifacts", "PRJ-HEALTHCARE-CLAIMS"),
+    },
+    {
+        "id": "PRJ-SUPPLYCHAIN-OPS",
+        "name": "Global Supply Chain & Inventory Fulfillment Platform",
+        "description": "Logistics, Procurement & Inventory Operations with Delta MERGE upserts and Gold Kimball Warehouse.",
+        "status": "active",
+        "is_pinned": 0,
+        "is_archived": 0,
+        "local_path": os.path.join(os.getcwd(), "omniflow", "generated_artifacts", "PRJ-SUPPLYCHAIN-OPS"),
     },
     {
         "id": "PRJ-COMMERCIAL-REV",
         "name": "Order-to-Cash Commercial Revenue Platform",
-        "description": "Commercial Revenue & Order Operations",
+        "description": "Commercial Revenue & Order Operations with Delta Lake deduplication and Power BI Direct Lake semantic model.",
         "status": "active",
         "is_pinned": 0,
         "is_archived": 0,
-        "local_path": "",
-    },
-    {
-        "id": "PRJ-SUPPLYCHAIN-OPS",
-        "name": "Global Supply Chain & Inventory Fulfillment",
-        "description": "Logistics, Procurement & Inventory Operations",
-        "status": "active",
-        "is_pinned": 0,
-        "is_archived": 0,
-        "local_path": "",
-    },
-    {
-        "id": "PRJ-FINTECH-PAYMENTS",
-        "name": "Global Cross-Border Payments & Fraud Intelligence",
-        "description": "Real-time AML, Sanctions Screening & Settlement Batches",
-        "status": "active",
-        "is_pinned": 0,
-        "is_archived": 0,
-        "local_path": "",
+        "local_path": os.path.join(os.getcwd(), "omniflow", "generated_artifacts", "PRJ-COMMERCIAL-REV"),
     },
 ]
 PROJECTS_CACHE_TIME: float = time.time()
@@ -157,7 +163,7 @@ def fetch_projects_cached(force_refresh: bool = False) -> list[dict[str, Any]]:
         repo = PostgresRepository()
         with repo._connect() as conn:
             with conn.cursor() as cur:
-                cur.execute("SELECT project_id, project_name, description, status, created_at FROM projects ORDER BY created_at DESC LIMIT 50;")
+                cur.execute("SELECT COALESCE(project_code, project_id::text) as pid, project_name, description, status, created_at FROM projects ORDER BY created_at DESC LIMIT 50;")
                 for r in cur.fetchall():
                     pid = str(r[0])
                     def_folder = os.path.join(os.getcwd(), "omniflow", "generated_artifacts", pid)
@@ -167,7 +173,7 @@ def fetch_projects_cached(force_refresh: bool = False) -> list[dict[str, Any]]:
                         "name": r[1],
                         "description": r[2] or "",
                         "status": r[3],
-                        "is_pinned": 0,
+                        "is_pinned": 1 if pid == "PRJ-FINTECH-PAYMENTS" else 0,
                         "is_archived": 0,
                         "local_path": def_folder if has_folder else "",
                         "created_at": str(r[4]) if r[4] else "",
@@ -408,17 +414,60 @@ async def get_project_detail(project_id: str) -> dict[str, Any]:
             project_data["local_path"] = ""
 
     clean_dom = re.sub(r"[^a-zA-Z0-9_]", "_", pname.lower()).strip("_")[:16]
-    if "delivery" in pcode.lower() or "delivery" in pname.lower():
+    if "fintech" in pcode.lower() or "payment" in pname.lower():
+        clean_dom = "fintech"
+        root_f = "Fintech_Payments_Platform"
+        sub_f = {"raw": "01 Raw Ingestion", "stage": "02 Stage & Curation", "silver": "03 Silver Harmonized", "gold": "04 Gold Star Schema"}
+        tables = [
+            {"name": "swift_mt103_wires", "target": f"{sub_f['raw']} / lh_fintech_raw_bronze"},
+            {"name": "sanctioned_entities", "target": f"{sub_f['stage']} / nb_fintech_aml_screening"},
+            {"name": "cleared_settlements", "target": f"{sub_f['silver']} / lh_fintech_curated_silver"},
+            {"name": "fact_wire_settlement", "target": f"{sub_f['gold']} / wh_fintech_analytics_gold"},
+        ]
+    elif "delivery" in pcode.lower() or "delivery" in pname.lower():
         clean_dom = "delivery"
+        root_f = "Delivery_Logistics_Platform"
+        sub_f = {"raw": "01 Raw", "stage": "02 Stage", "silver": "03 Silver", "gold": "04 Gold"}
+        tables = [
+            {"name": "shipments", "target": f"{sub_f['raw']} / lh_{clean_dom}_bronze"},
+            {"name": "couriers", "target": f"{sub_f['stage']} / nb_{clean_dom}_curate"},
+            {"name": "telemetry_pings", "target": f"{sub_f['silver']} / lh_{clean_dom}_silver"},
+        ]
     elif "health" in pcode.lower() or "health" in pname.lower():
         clean_dom = "healthcare"
+        root_f = "Healthcare_Platform"
+        sub_f = {"raw": "01 Raw", "stage": "02 Stage", "silver": "03 Silver", "gold": "04 Gold"}
+        tables = [
+            {"name": "patients_encounters", "target": f"{sub_f['raw']} / lh_healthcare_bronze"},
+            {"name": "claims_pii_masked", "target": f"{sub_f['stage']} / nb_healthcare_curate"},
+            {"name": "clinical_harmonized", "target": f"{sub_f['silver']} / lh_healthcare_silver"},
+        ]
     elif "comm" in pcode.lower() or "rev" in pcode.lower():
         clean_dom = "commercial_rev"
+        root_f = "Commercial_Rev_Platform"
+        sub_f = {"raw": "01 Raw", "stage": "02 Stage", "silver": "03 Silver", "gold": "04 Gold"}
+        tables = [
+            {"name": "orders_invoices", "target": f"{sub_f['raw']} / lh_commercial_rev_bronze"},
+            {"name": "customers_deduped", "target": f"{sub_f['stage']} / nb_commercial_rev_curate"},
+            {"name": "revenue_harmonized", "target": f"{sub_f['silver']} / lh_commercial_rev_silver"},
+        ]
     elif "supply" in pcode.lower() or "ops" in pcode.lower():
         clean_dom = "supplychain"
-
-    root_f = f"{clean_dom.capitalize()}_Platform" if clean_dom != "delivery" else "Delivery_Logistics_Platform"
-    sub_f = {"raw": "01 Raw", "stage": "02 Stage", "silver": "03 Silver", "gold": "04 Gold"}
+        root_f = "Supplychain_Platform"
+        sub_f = {"raw": "01 Raw", "stage": "02 Stage", "silver": "03 Silver", "gold": "04 Gold"}
+        tables = [
+            {"name": "inventory_warehouses", "target": f"{sub_f['raw']} / lh_supplychain_bronze"},
+            {"name": "purchase_orders_scd2", "target": f"{sub_f['stage']} / nb_supplychain_curate"},
+            {"name": "fulfillment_silver", "target": f"{sub_f['silver']} / lh_supplychain_silver"},
+        ]
+    else:
+        root_f = f"{clean_dom.capitalize()}_Platform"
+        sub_f = {"raw": "01 Raw", "stage": "02 Stage", "silver": "03 Silver", "gold": "04 Gold"}
+        tables = [
+            {"name": f"{clean_dom}_entity_1", "target": f"{sub_f['raw']} / lh_{clean_dom}_bronze"},
+            {"name": f"{clean_dom}_entity_2", "target": f"{sub_f['stage']} / nb_{clean_dom}_curate"},
+            {"name": f"{clean_dom}_entity_3", "target": f"{sub_f['silver']} / lh_{clean_dom}_silver"},
+        ]
 
     plan = {
         "sourceName": pname,
@@ -427,15 +476,7 @@ async def get_project_detail(project_id: str) -> dict[str, Any]:
         "schedule": "Hourly Micro-Batch",
         "root_folder": root_f,
         "folders": sub_f,
-        "tables": [
-            {"name": "shipments", "target": f"{sub_f['raw']} / lh_{clean_dom}_bronze"},
-            {"name": "couriers", "target": f"{sub_f['stage']} / nb_{clean_dom}_curate"},
-            {"name": "telemetry_pings", "target": f"{sub_f['silver']} / lh_{clean_dom}_silver"},
-        ] if clean_dom == "delivery" else [
-            {"name": f"{clean_dom}_entity_1", "target": f"{sub_f['raw']} / lh_{clean_dom}_bronze"},
-            {"name": f"{clean_dom}_entity_2", "target": f"{sub_f['stage']} / nb_{clean_dom}_curate"},
-            {"name": f"{clean_dom}_entity_3", "target": f"{sub_f['silver']} / lh_{clean_dom}_silver"},
-        ],
+        "tables": tables,
     }
 
     deployed_items = [
@@ -661,6 +702,91 @@ async def handle_chat_stream(req: ChatRequest) -> StreamingResponse:
 
     async def event_generator():
         yield f"data: {json.dumps({'type': 'init', 'session_id': sid, 'resuming': is_resume})}\n\n"
+
+        # Multi-Mode Intent Classification
+        intent = classify_prompt_intent(
+            message=req.message,
+            mode=req.mode,
+            has_intake=(intake_override is not None),
+        )
+
+        # ==============================================================================
+        # MODE 1: General Conversational & Technical Q&A (Instant, 0 Thought Steps)
+        # ==============================================================================
+        if intent == "GENERAL_CHAT":
+            sys_prompt = build_general_chat_prompt()
+            reply = chat([
+                {"role": "system", "content": sys_prompt},
+                {"role": "user", "content": req.message},
+            ])
+            for chunk in reply.split(" "):
+                yield f"data: {json.dumps({'type': 'chunk', 'text': chunk + ' '})}\n\n"
+                await asyncio.sleep(0.012)
+
+            SESSIONS[sid]["messages"].append({"role": "assistant", "content": reply})
+            yield f"data: {json.dumps({'type': 'done', 'session_id': sid, 'plan': None})}\n\n"
+            return
+
+        # ==============================================================================
+        # MODE 2: Project Context Q&A (Direct Contextual Reply, 0 Thought Steps)
+        # ==============================================================================
+        if intent == "PROJECT_QA":
+            active_plan = SESSIONS[sid].get("active_plan") or {}
+            p_code = active_plan.get("project_code")
+            if not p_code and sid.startswith("proj_"):
+                p_code = sid[5:]
+            if not p_code:
+                p_code = PROJECTS_CACHE[0]["id"] if PROJECTS_CACHE else "PRJ-FINTECH-PAYMENTS"
+
+            p_rec = next((p for p in PROJECTS_CACHE if p["id"] == p_code), None)
+            p_name = p_rec["name"] if p_rec else active_plan.get("sourceName", p_code)
+            p_desc = p_rec["description"] if p_rec else ""
+            p_lpath = p_rec.get("local_path", "") if p_rec else ""
+
+            # Discover local artifacts if present
+            artifacts_list = []
+            if p_lpath and os.path.exists(p_lpath):
+                try:
+                    artifacts_list = os.listdir(p_lpath)
+                except Exception:
+                    pass
+
+            # Fetch team members from DB
+            members = []
+            try:
+                repo = PostgresRepository()
+                with repo._connect() as conn:
+                    with conn.cursor() as cur:
+                        cur.execute("SELECT u.full_name, pm.role FROM project_members pm JOIN users u ON pm.user_id = u.id WHERE pm.project_id = %s;", (p_code,))
+                        for row in cur.fetchall():
+                            members.append(f"{row[0]} ({row[1].capitalize()})")
+            except Exception:
+                pass
+
+            proj_ctx = ProjectContext(
+                project_id=p_code,
+                project_name=p_name,
+                description=p_desc,
+                domain=active_plan.get("domain", "enterprise"),
+                root_folder=active_plan.get("root_folder", f"{p_code}_Platform"),
+                folders=active_plan.get("folders", {}),
+                tables=active_plan.get("tables", []),
+                local_path=p_lpath,
+                team_members=members,
+            )
+
+            sys_prompt = build_project_qa_prompt(proj_ctx)
+            reply = chat([
+                {"role": "system", "content": sys_prompt},
+                {"role": "user", "content": req.message},
+            ])
+            for chunk in reply.split(" "):
+                yield f"data: {json.dumps({'type': 'chunk', 'text': chunk + ' '})}\n\n"
+                await asyncio.sleep(0.012)
+
+            SESSIONS[sid]["messages"].append({"role": "assistant", "content": reply})
+            yield f"data: {json.dumps({'type': 'done', 'session_id': sid, 'plan': active_plan if active_plan else None})}\n\n"
+            return
 
         # ==============================================================================
         # COGNITIVE HARNESS TIER 1: Atomic Item Fast-Path (< 2s Direct Provisioning)
