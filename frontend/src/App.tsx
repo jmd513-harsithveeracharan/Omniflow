@@ -208,7 +208,14 @@ export const App: React.FC = () => {
           setCurrentPlan(detail.plan);
         }
         if (detail.messages && detail.messages.length > 0) {
-          setMessages(detail.messages.map((m) => ({ role: m.role, content: m.content })));
+          setMessages(
+            detail.messages.map((m) => ({
+              role: m.role,
+              content: m.content,
+              thoughtSteps: m.thoughtSteps,
+              thoughtElapsed: m.thoughtElapsed,
+            }))
+          );
         } else {
           setMessages([]);
         }

@@ -383,7 +383,7 @@ export async function fetchProjectDetail(id: string): Promise<{
   project: import('../types').ProjectRecord;
   plan: import('../types').IngestionPlan | null;
   deployed_items: Array<{ item_type: string; display_name: string; folder: string; item_id: string }>;
-  messages: Array<{ role: 'user' | 'assistant'; content: string }>;
+  messages: import('../types').ChatMessage[];
 }> {
   const res = await fetch(`${API_BASE}/projects/${id}/detail`);
   if (!res.ok) throw new Error(`Failed to fetch project detail: ${res.statusText}`);
