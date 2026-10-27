@@ -99,14 +99,16 @@ export const App: React.FC = () => {
     }
   };
 
-  const loadProjectsList = async () => {
+  const loadProjectsList = async (shouldAutoSelect: boolean = false) => {
     try {
       setIsLoadingProjects(true);
       const projs = await fetchProjects();
       if (projs && projs.length > 0) {
         setProjects(projs);
-        const defaultProj = projs.find((p) => p.name.toLowerCase().includes('delivery')) || projs[0];
-        handleSelectProject(defaultProj.id);
+        if (shouldAutoSelect && !activeProjectId) {
+          const defaultProj = projs.find((p) => p.name.toLowerCase().includes('delivery')) || projs[0];
+          handleSelectProject(defaultProj.id, false);
+        }
       }
     } catch (e) {
       console.error('Failed to load projects', e);
@@ -121,7 +123,7 @@ export const App: React.FC = () => {
       .catch(() => setStatus(null));
 
     loadSessions();
-    loadProjectsList();
+    loadProjectsList(true);
 
     const initialSid = generateNewSessionId();
     setSessionId(initialSid);
@@ -183,11 +185,11 @@ export const App: React.FC = () => {
   };
 
   // Projects Handlers
-  const handleSelectProject = async (projectId: string) => {
+  const handleSelectProject = async (projectId: string, shouldSwitchToChat: boolean = true) => {
     setActiveProjectId(projectId);
     if (projectId === 'playground') {
       setCurrentPlan(null);
-      setActiveView('chat');
+      if (shouldSwitchToChat) setActiveView('chat');
       setSessionId('sess_playground');
       setMessages([
         {
@@ -200,7 +202,7 @@ export const App: React.FC = () => {
 
     try {
       setIsLoadingSession(true);
-      setActiveView('chat');
+      if (shouldSwitchToChat) setActiveView('chat');
       const detail = await fetchProjectDetail(projectId);
       if (detail) {
         if (detail.plan) {
@@ -215,7 +217,7 @@ export const App: React.FC = () => {
       }
     } catch (e) {
       console.error('Failed to load project detail', e);
-      setActiveView('chat');
+      if (shouldSwitchToChat) setActiveView('chat');
     } finally {
       setIsLoadingSession(false);
     }
@@ -518,7 +520,7 @@ export const App: React.FC = () => {
               setActiveView('chat');
               handleNewSession();
             }}
-            onProjectsChanged={loadProjectsList}
+            onProjectsChanged={() => loadProjectsList(false)}
           />
         )}
 

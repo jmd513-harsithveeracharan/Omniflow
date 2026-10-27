@@ -82,6 +82,26 @@ class ProjectRequest(BaseModel):
     metadata: dict[str, Any] | None = None
 
 
+class MemberAddRequest(BaseModel):
+    user_id: str
+    role: str = "contributor"
+
+
+class MemberRemoveRequest(BaseModel):
+    user_id: str
+
+
+DIRECTORY_USERS: list[dict[str, Any]] = [
+    {"id": "usr_harsith", "name": "Bheesetti Harsith (You)", "email": "bheesetti.harsith@fabric.ai", "avatar_color": "#10b981", "role": "lead"},
+    {"id": "usr_alex", "name": "Alex Chen", "email": "alex.chen@fabric.internal", "avatar_color": "#6366f1", "role": "engineer"},
+    {"id": "usr_sarah", "name": "Sarah Jenkins", "email": "sarah.j@fabric.internal", "avatar_color": "#ec4899", "role": "architect"},
+    {"id": "usr_david", "name": "David Kumar", "email": "david.kumar@fabric.internal", "avatar_color": "#3b82f6", "role": "contributor"},
+    {"id": "usr_priya", "name": "Priya Sharma", "email": "priya.s@fabric.internal", "avatar_color": "#14b8a6", "role": "viewer"},
+    {"id": "usr_marcus", "name": "Marcus Vance", "email": "marcus.v@fabric.internal", "avatar_color": "#8b5cf6", "role": "engineer"},
+    {"id": "usr_elena", "name": "Elena Rostova", "email": "elena.r@fabric.internal", "avatar_color": "#f59e0b", "role": "contributor"},
+]
+
+
 # High-performance In-Memory Caches for Sub-Millisecond Page Loads
 PROJECTS_CACHE: list[dict[str, Any]] = [
     {
@@ -324,6 +344,8 @@ async def update_project_endpoint(req: ProjectRequest) -> dict[str, Any]:
                     p["is_pinned"] = req.is_pinned
                 if req.is_archived is not None:
                     p["is_archived"] = req.is_archived
+                if req.metadata is not None:
+                    p["metadata"] = req.metadata
                 break
 
     # Persist updates to Postgres in background
@@ -355,6 +377,93 @@ async def delete_project_endpoint(project_id: str) -> dict[str, Any]:
                 conn.commit()
     except Exception:
         pass
+    return {"success": True}
+
+
+@app.get("/api/users/search")
+async def search_users(q: str = "") -> dict[str, Any]:
+    query = q.lower().strip()
+    if not query:
+        return {"users": DIRECTORY_USERS}
+    matched = [
+        u for u in DIRECTORY_USERS
+        if query in u["name"].lower() or query in u["email"].lower()
+    ]
+    return {"users": matched}
+
+
+@app.get("/api/projects/{project_id}/members")
+async def get_project_members(project_id: str) -> dict[str, Any]:
+    global PROJECTS_CACHE
+    target = next((p for p in PROJECTS_CACHE if p["id"] == project_id), None)
+    if not target:
+        return {"members": []}
+    meta = target.get("metadata") or {}
+    members = meta.get("members", [])
+    if not members:
+        members = [
+            {
+                "id": "mem_default",
+                "user_id": "usr_harsith",
+                "name": "Bheesetti Harsith (You)",
+                "email": "bheesetti.harsith@fabric.ai",
+                "role": "owner",
+                "avatarBg": "#10b981",
+            }
+        ]
+        meta["members"] = members
+        target["metadata"] = meta
+    return {"members": members}
+
+
+@app.post("/api/projects/{project_id}/members/add")
+async def add_project_member_endpoint(project_id: str, req: MemberAddRequest) -> dict[str, Any]:
+    global PROJECTS_CACHE
+    target = next((p for p in PROJECTS_CACHE if p["id"] == project_id), None)
+    if not target:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    meta = target.get("metadata") or {}
+    members = list(meta.get("members", []))
+
+    user = next((u for u in DIRECTORY_USERS if u["id"] == req.user_id), None)
+    user_name = user["name"] if user else req.user_id
+    user_email = user["email"] if user else f"{req.user_id}@fabric.internal"
+    user_avatar = user.get("avatar_color", "#3b82f6") if user else "#3b82f6"
+
+    new_member = {
+        "id": f"mem_{uuid.uuid4().hex[:8]}",
+        "user_id": req.user_id,
+        "name": user_name,
+        "email": user_email,
+        "role": req.role,
+        "avatarBg": user_avatar,
+    }
+
+    # Deduplicate by user_id or email
+    members = [m for m in members if m.get("user_id") != req.user_id and m.get("email") != user_email]
+    members.append(new_member)
+    meta["members"] = members
+    target["metadata"] = meta
+
+    return {"member": new_member, "success": True}
+
+
+@app.post("/api/projects/{project_id}/members/remove")
+async def remove_project_member_endpoint(project_id: str, req: MemberRemoveRequest) -> dict[str, Any]:
+    global PROJECTS_CACHE
+    target = next((p for p in PROJECTS_CACHE if p["id"] == project_id), None)
+    if not target:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    meta = target.get("metadata") or {}
+    members = meta.get("members", [])
+    meta["members"] = [
+        m for m in members
+        if m.get("user_id") != req.user_id and m.get("id") != req.user_id
+    ]
+    target["metadata"] = meta
+
     return {"success": True}
 
 @app.get("/api/projects/{project_id}/detail")
