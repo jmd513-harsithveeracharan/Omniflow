@@ -1,17 +1,25 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Loader2, Globe, Layers, Paperclip } from 'lucide-react';
+import { Loader2, Globe, Layers, Paperclip, X } from 'lucide-react';
 import { IntakeSpecModal } from './modals/IntakeSpecModal';
 
 interface PromptDockProps {
   onSendMessage: (text: string, model?: string, effort?: string, mode?: 'auto' | 'general' | 'project') => void;
   isStreaming: boolean;
-  onOpenVoiceMode?: () => void;
+  isVoiceModeActive?: boolean;
+  onToggleVoiceMode?: () => void;
+  isVoiceListening?: boolean;
+  onToggleVoiceMute?: () => void;
+  voiceTranscript?: string;
 }
 
 export const PromptDock: React.FC<PromptDockProps> = ({
   onSendMessage,
   isStreaming,
-  onOpenVoiceMode,
+  isVoiceModeActive = false,
+  onToggleVoiceMode,
+  isVoiceListening = false,
+  onToggleVoiceMute,
+  voiceTranscript = '',
 }) => {
   const [input, setInput] = useState('');
   const [chatMode, setChatMode] = useState<'general' | 'project'>('project');
@@ -182,7 +190,11 @@ export const PromptDock: React.FC<PromptDockProps> = ({
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Start typing a prompt to see what our models can do..."
+            placeholder={
+              isVoiceModeActive
+                ? (voiceTranscript ? `"${voiceTranscript}"` : "Listening... (Speak anytime, or type below)")
+                : "Start typing a prompt to see what our models can do..."
+            }
             rows={1}
             disabled={isStreaming}
           />
@@ -446,7 +458,33 @@ export const PromptDock: React.FC<PromptDockProps> = ({
             </button>
 
             {/* Send Button or Live Audio Waveform */}
-            {input.trim().length > 0 || isStreaming ? (
+            {isVoiceModeActive ? (
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                <button
+                  type="button"
+                  className={`dock-icon-btn ${isVoiceListening ? 'recording' : ''}`}
+                  id="btnVoiceMuteToggle"
+                  title={isVoiceListening ? "Mute Microphone" : "Unmute Microphone"}
+                  onClick={onToggleVoiceMute}
+                >
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
+                    <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                    <line x1="12" y1="19" x2="12" y2="23" />
+                    <line x1="8" y1="23" x2="16" y2="23" />
+                  </svg>
+                </button>
+                <button
+                  type="button"
+                  className="btn-voice-exit"
+                  id="btnExitVoiceMode"
+                  title="Close Voice Mode"
+                  onClick={onToggleVoiceMode}
+                >
+                  <X width={15} height={15} />
+                </button>
+              </div>
+            ) : input.trim().length > 0 || isStreaming ? (
               <button
                 type="button"
                 onClick={() => handleSubmit()}
@@ -479,7 +517,7 @@ export const PromptDock: React.FC<PromptDockProps> = ({
                 className="dock-icon-btn"
                 id="btnAudioWave"
                 title="Start ChatGPT Voice Mode (Hands-Free)"
-                onClick={onOpenVoiceMode}
+                onClick={onToggleVoiceMode}
               >
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <line x1="4" y1="9" x2="4" y2="15" />

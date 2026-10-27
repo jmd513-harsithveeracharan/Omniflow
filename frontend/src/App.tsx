@@ -12,7 +12,8 @@ import { SettingsModal } from './components/SettingsModal';
 import { FabricConnectionModal } from './components/modals/FabricConnectionModal';
 import { ProjectEditModal } from './components/ProjectEditModal';
 import { AuthModal } from './components/auth/AuthModal';
-import { VoiceModeModal } from './components/voice/VoiceModeModal';
+import { FloatingVoiceOrb } from './components/voice/FloatingVoiceOrb';
+import { useVoiceMode } from './components/voice/useVoiceMode';
 import { SkillsView } from './components/SkillsView';
 import { ProjectsView } from './components/ProjectsView';
 import { WorkspaceExplorerView } from './components/WorkspaceExplorerView';
@@ -81,7 +82,7 @@ export const App: React.FC = () => {
   const [isGovernanceModalOpen, setIsGovernanceModalOpen] = useState<boolean>(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState<boolean>(false);
   const [isFabricConnectionModalOpen, setIsFabricConnectionModalOpen] = useState<boolean>(false);
-  const [isVoiceModeOpen, setIsVoiceModeOpen] = useState<boolean>(false);
+  const [isVoiceModeActive, setIsVoiceModeActive] = useState<boolean>(false);
   const [currentPlan, setCurrentPlan] = useState<IngestionPlan | null>(null);
 
   const generateNewSessionId = () => 'sess_' + Math.random().toString(36).substring(2, 11);
@@ -391,6 +392,20 @@ export const App: React.FC = () => {
     );
   };
 
+  // ChatGPT-Style Hands-Free Voice Mode Hook
+  const lastAssistantMessage = messages.filter((m) => m.role === 'assistant').slice(-1)[0]?.content;
+  const {
+    voiceState,
+    voiceTranscript,
+    toggleMute: toggleVoiceMute,
+    interrupt: interruptVoice,
+  } = useVoiceMode({
+    isActive: isVoiceModeActive,
+    onSendMessage: handleSendMessage,
+    lastAssistantMessage,
+    isStreaming,
+  });
+
   const handleSelectView = (view: string) => {
     if (view === 'settings') {
       setIsSettingsModalOpen(true);
@@ -475,7 +490,7 @@ export const App: React.FC = () => {
           onRefreshWorkspace={() => fetchFabricStatus().then(setStatus)}
           status={status}
           onOpenFabricConnection={() => setIsFabricConnectionModalOpen(true)}
-          onOpenVoiceMode={() => setIsVoiceModeOpen(true)}
+          onOpenVoiceMode={() => setIsVoiceModeActive((prev) => !prev)}
         />
 
         {/* View Routing */}
@@ -542,10 +557,23 @@ export const App: React.FC = () => {
                 />
               )}
 
+              {/* ChatGPT Floating Voice Orb (Inline Over Chat Timeline) */}
+              {isVoiceModeActive && (
+                <FloatingVoiceOrb
+                  state={voiceState}
+                  transcript={voiceTranscript}
+                  onInterrupt={interruptVoice}
+                />
+              )}
+
               <PromptDock
                 onSendMessage={handleSendMessage}
                 isStreaming={isStreaming}
-                onOpenVoiceMode={() => setIsVoiceModeOpen(true)}
+                isVoiceModeActive={isVoiceModeActive}
+                onToggleVoiceMode={() => setIsVoiceModeActive((prev) => !prev)}
+                isVoiceListening={voiceState === 'listening'}
+                onToggleVoiceMute={toggleVoiceMute}
+                voiceTranscript={voiceTranscript}
               />
             </div>
 
@@ -609,17 +637,6 @@ export const App: React.FC = () => {
         onClose={() => setIsAuthModalOpen(false)}
         currentUser={currentUser}
         onUserChanged={handleUserChanged}
-      />
-
-      <VoiceModeModal
-        isOpen={isVoiceModeOpen}
-        onClose={() => setIsVoiceModeOpen(false)}
-        activeProjectId={activeProjectId}
-        projectName={projects.find((p) => p.id === activeProjectId)?.name || 'Fintech Platform'}
-        sessionId={sessionId}
-        onAddMessageToTimeline={(role, content) => {
-          setMessages((prev) => [...prev, { role, content }]);
-        }}
       />
     </div>
   );

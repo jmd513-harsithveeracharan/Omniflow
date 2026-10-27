@@ -6,7 +6,7 @@
  */
 
 // Window speech recognition typings
-interface SpeechRecognitionEvent {
+export interface SpeechRecognitionEvent {
   resultIndex: number;
   results: {
     length: number;
@@ -19,7 +19,7 @@ interface SpeechRecognitionEvent {
   };
 }
 
-interface IBrowserSpeechRecognition {
+export interface IBrowserSpeechRecognition {
   continuous: boolean;
   interimResults: boolean;
   lang: string;
@@ -58,10 +58,12 @@ export const createSpeechRecognition = (): IBrowserSpeechRecognition | null => {
 
 /**
  * Strips markdown code blocks, backticks, asterisks, URLs, and table artifacts
- * so that spoken text sounds conversational and natural.
+ * so that spoken text sounds conversational, crisp, and natural.
  */
 export const cleanTextForSpeech = (rawText: string): string => {
   return rawText
+    // Remove multi-agent tags and headers
+    .replace(/###\s*[^\n]+/g, '')
     // Remove code blocks
     .replace(/```[\s\S]*?```/g, ' Code snippet omitted. ')
     // Remove inline code
@@ -76,39 +78,109 @@ export const cleanTextForSpeech = (rawText: string): string => {
     .replace(/<[^>]*>/g, '')
     // Remove bullet dashes / numbers
     .replace(/^[\s*-]+(?=[a-zA-Z])/gm, '')
-    // Collapse excess spaces
+    // Remove markdown tables
+    .replace(/\|[^\n]+\|/g, '')
+    // Collapse excess spaces & newlines
     .replace(/\s+/g, ' ')
     .trim();
 };
 
+let cachedVoices: SpeechSynthesisVoice[] = [];
+
+if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+  cachedVoices = window.speechSynthesis.getVoices();
+  window.speechSynthesis.onvoiceschanged = () => {
+    cachedVoices = window.speechSynthesis.getVoices();
+  };
+}
+
 /**
  * Picks the highest-fidelity natural neural voice available on the device.
+ * Prioritizes Microsoft Natural / Azure Neural voices (Windows/Edge) & Google US English (Chrome).
  */
 export const getBestSpeechVoice = (): SpeechSynthesisVoice | null => {
   if (typeof window === 'undefined' || !('speechSynthesis' in window)) return null;
-  const voices = window.speechSynthesis.getVoices();
+  const voices = cachedVoices.length > 0 ? cachedVoices : window.speechSynthesis.getVoices();
   if (voices.length === 0) return null;
 
-  // 1. Natural / Online high quality English voices (Edge / Windows 11 / Chrome)
-  const naturalVoice = voices.find(
+  // 1. Microsoft Online / Natural neural voices (Jenny, Aria, Guy) - sounds human
+  const msNatural = voices.find(
     (v) =>
       v.lang.startsWith('en') &&
-      (v.name.includes('Natural') || v.name.includes('Online') || v.name.includes('Neural'))
+      (v.name.includes('Natural') || v.name.includes('Online')) &&
+      (v.name.includes('Jenny') || v.name.includes('Aria') || v.name.includes('Guy'))
   );
-  if (naturalVoice) return naturalVoice;
+  if (msNatural) return msNatural;
 
-  // 2. Google US English
-  const googleVoice = voices.find((v) => v.name.includes('Google US English') || v.name.includes('Google UK'));
+  // 2. Any Natural / Neural voice
+  const anyNatural = voices.find(
+    (v) =>
+      v.lang.startsWith('en') &&
+      (v.name.includes('Natural') || v.name.includes('Neural') || v.name.includes('Online'))
+  );
+  if (anyNatural) return anyNatural;
+
+  // 3. Google US English (Chrome)
+  const googleVoice = voices.find((v) => v.name.includes('Google US English') || v.name.includes('Google UK English Female'));
   if (googleVoice) return googleVoice;
 
-  // 3. Samantha (macOS / iOS)
-  const samantha = voices.find((v) => v.name.includes('Samantha'));
+  // 4. Apple Samantha / Siri
+  const samantha = voices.find((v) => v.name.includes('Samantha') || v.name.includes('Ava'));
   if (samantha) return samantha;
 
-  // 4. Any English voice
-  const anyEnglish = voices.find((v) => v.lang.startsWith('en'));
+  // 5. Any English voice
+  const anyEnglish = voices.find((v) => v.lang === 'en-US' || v.lang.startsWith('en'));
   if (anyEnglish) return anyEnglish;
 
   return voices[0] || null;
 };
 
+/**
+ * Speaks text using the best natural browser voice.
+ */
+export const speakNaturalVoice = (
+  text: string,
+  onStart?: () => void,
+  onEnd?: () => void,
+  onError?: () => void
+): SpeechSynthesisUtterance | null => {
+  if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
+    onEnd?.();
+    return null;
+  }
+
+  stopSpeaking();
+  const clean = cleanTextForSpeech(text);
+  if (!clean) {
+    onEnd?.();
+    return null;
+  }
+
+  const utter = new SpeechSynthesisUtterance(clean);
+  const voice = getBestSpeechVoice();
+  if (voice) utter.voice = voice;
+  utter.rate = 1.04; // Natural human cadence
+  utter.pitch = 1.0;
+
+  utter.onstart = () => {
+    onStart?.();
+  };
+  utter.onend = () => {
+    onEnd?.();
+  };
+  utter.onerror = () => {
+    onError?.();
+  };
+
+  window.speechSynthesis.speak(utter);
+  return utter;
+};
+
+/**
+ * Instantly silences any ongoing speech synthesis.
+ */
+export const stopSpeaking = (): void => {
+  if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+    window.speechSynthesis.cancel();
+  }
+};
