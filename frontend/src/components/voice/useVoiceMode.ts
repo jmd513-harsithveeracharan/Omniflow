@@ -26,6 +26,7 @@ export type VoiceAudioMode = 'speaker' | 'headphone';
 interface UseVoiceModeProps {
   isActive: boolean;
   onSendMessage: (text: string) => void;
+  onInterruptStreaming?: () => void;
   isStreaming?: boolean;
 }
 
@@ -44,6 +45,7 @@ const INTERRUPT_KEYWORDS = new Set([
 export function useVoiceMode({
   isActive,
   onSendMessage,
+  onInterruptStreaming,
   isStreaming = false,
 }: UseVoiceModeProps) {
   const [voiceState, setVoiceState] = useState<VoiceModeState>('listening');
@@ -53,6 +55,9 @@ export function useVoiceMode({
 
   const onSendMessageRef = useRef(onSendMessage);
   onSendMessageRef.current = onSendMessage;
+
+  const onInterruptStreamingRef = useRef(onInterruptStreaming);
+  onInterruptStreamingRef.current = onInterruptStreaming;
 
   const isActiveRef = useRef(isActive);
   isActiveRef.current = isActive;
@@ -118,7 +123,7 @@ export function useVoiceMode({
     const raw = latestTranscriptRef.current.trim();
     const textToSend = normalizeDataEngineeringTerms(raw);
     resetTurnBuffer();
-    if (textToSend.length > 0 && !isStreamingRef.current) {
+    if (textToSend.length > 0) {
       queueRef.current?.startResponse();
       setVoiceState('thinking');
       onSendMessageRef.current(textToSend);
@@ -144,7 +149,10 @@ export function useVoiceMode({
   const interrupt = useCallback(() => {
     queueRef.current?.cancel();
     stopSpeaking();
-    if (latestTranscriptRef.current.trim().length > 1 && !isStreamingRef.current) {
+    if (onInterruptStreamingRef.current) {
+      onInterruptStreamingRef.current();
+    }
+    if (latestTranscriptRef.current.trim().length > 1) {
       commitTurnNow();
       return;
     }
@@ -283,7 +291,7 @@ export function useVoiceMode({
 
       if (!fullSpoken) return;
 
-      // Handle acoustic leakage while assistant is speaking
+      // 1. Handle acoustic leakage and user interruption while assistant is speaking
       if (isAssistantSpeaking) {
         if (isLikelyEcho(fullSpoken, spokenSoFar)) {
           if (!hasInterim) {
@@ -294,28 +302,36 @@ export function useVoiceMode({
           return;
         }
 
+        // Heard speech is NOT speaker echo -> user is actively interrupting the assistant!
         const words = fullSpoken.toLowerCase().replace(/[^a-z\s]/g, '').split(/\s+/).filter(Boolean);
         const hasKeyword = words.some((w) => INTERRUPT_KEYWORDS.has(w));
+        const wordsCount = words.length;
 
-        // In Speaker Mode: ignore speaker acoustic bleed unless an explicit keyword is spoken
-        // In Headphone Mode: countWords >= 2 or explicit keyword triggers barge-in
-        const shouldBargeIn = audioModeRef.current === 'headphone'
-          ? (countWords(fullSpoken) >= 2 || hasKeyword)
-          : hasKeyword;
-
-        if (shouldBargeIn) {
+        // Barge-in: user spoke an interrupt keyword, 2+ words, or finalized speech
+        if (hasKeyword || wordsCount >= 2 || !hasInterim) {
           queueRef.current?.cancel();
           stopSpeaking();
+          if (onInterruptStreamingRef.current) {
+            onInterruptStreamingRef.current();
+          }
           setVoiceState('listening');
         } else {
-          // Acoustic bleed in speaker mode: suppress without interrupting
+          // Isolated background noise: suppress
           return;
         }
       }
 
-      // Do not accumulate user turns during backend synthesis unless user barged in
-      if (isStreamingRef.current && !queueRef.current?.isSpeaking()) {
-        return;
+      // 2. Handle interruption while assistant is thinking (thinking dots displayed)
+      if (isStreamingRef.current && !isAssistantSpeaking) {
+        const wordsCount = countWords(fullSpoken);
+        if (wordsCount >= 1) {
+          queueRef.current?.cancel();
+          stopSpeaking();
+          if (onInterruptStreamingRef.current) {
+            onInterruptStreamingRef.current();
+          }
+          setVoiceState('listening');
+        }
       }
 
       const normalized = normalizeDataEngineeringTerms(fullSpoken);

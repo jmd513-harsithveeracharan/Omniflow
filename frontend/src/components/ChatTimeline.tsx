@@ -431,28 +431,17 @@ export const ChatTimeline: React.FC<ChatTimelineProps> = ({
           );
         })}
 
-        {/* ChatGPT-Style Live Growing User Bubble during Voice Mode */}
-        {isVoiceModeActive && liveVoiceTranscript && liveVoiceTranscript.trim().length > 0 && !isStreaming && (
+        {/* Live User Bubble during Voice Mode (Clean matching standard grey bubble) */}
+        {isVoiceModeActive && liveVoiceTranscript && liveVoiceTranscript.trim().length > 0 && (
           <div
             ref={liveVoiceBubbleRef}
-            className="chat-bubble user live-voice-bubble"
+            className="chat-bubble user"
             data-raw-content={liveVoiceTranscript}
             onClick={onCommitLiveVoice}
             title="Click to send immediately"
           >
-            <div className="chat-content-card live-speech-card">
-              <div className="chat-card-text">
-                {liveVoiceTranscript}
-                <span className="live-speech-pulse-dot" title="Listening to speech..." />
-              </div>
-            </div>
-            <div className="live-voice-status-hint">
-              <span className="live-voice-wave-bars">
-                <span className="v-bar v1" />
-                <span className="v-bar v2" />
-                <span className="v-bar v3" />
-              </span>
-              <span>Listening... Pause or tap orb to send</span>
+            <div className="chat-content-card">
+              <div className="chat-card-text">{liveVoiceTranscript}</div>
             </div>
           </div>
         )}

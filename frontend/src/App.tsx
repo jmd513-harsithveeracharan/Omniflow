@@ -326,6 +326,26 @@ export const App: React.FC = () => {
   const startVoiceResponseRef = React.useRef<(() => void) | null>(null);
   const feedStreamingChunkRef = React.useRef<((chunk: string) => void) | null>(null);
   const finishStreamingRef = React.useRef<(() => void) | null>(null);
+  const abortControllerRef = React.useRef<AbortController | null>(null);
+
+  const handleInterruptStreaming = React.useCallback(() => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    setIsStreaming(false);
+    setMessages((prev) => {
+      const last = prev[prev.length - 1];
+      if (last && last.role === 'assistant') {
+        if (!last.content.trim()) {
+          return prev.slice(0, -1);
+        } else {
+          return [...prev.slice(0, -1), { ...last, isStreaming: false }];
+        }
+      }
+      return prev;
+    });
+  }, []);
 
   const handleSendMessage = async (
     text: string,
@@ -333,7 +353,12 @@ export const App: React.FC = () => {
     effort?: string,
     mode?: 'auto' | 'general' | 'project'
   ) => {
-    if (!text.trim() || isStreaming) return;
+    if (!text.trim()) return;
+
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
 
     if (activeView !== 'chat') {
       setActiveView('chat');
@@ -342,6 +367,9 @@ export const App: React.FC = () => {
     if (isVoiceModeActive && startVoiceResponseRef.current) {
       startVoiceResponseRef.current();
     }
+
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
 
     const startTime = Date.now();
     const userMsg: ChatMessage = { role: 'user', content: text };
@@ -352,7 +380,12 @@ export const App: React.FC = () => {
       thoughtSteps: [],
       thoughtElapsed: '0.0',
     };
-    setMessages((prev) => [...prev, userMsg, placeholderAssistantMsg]);
+    setMessages((prev) => {
+      const filtered = prev.filter(
+        (m, i) => !(m.role === 'assistant' && !m.content.trim() && i === prev.length - 1)
+      );
+      return [...filtered, userMsg, placeholderAssistantMsg];
+    });
     setIsStreaming(true);
 
     let assistantContent = '';
@@ -361,6 +394,7 @@ export const App: React.FC = () => {
       text,
       sessionId,
       (chunk) => {
+        if (controller.signal.aborted) return;
         assistantContent += chunk;
         if (isVoiceModeActive && feedStreamingChunkRef.current) {
           feedStreamingChunkRef.current(chunk);
@@ -374,6 +408,7 @@ export const App: React.FC = () => {
         });
       },
       (plan) => {
+        if (controller.signal.aborted) return;
         setIsStreaming(false);
         if (isVoiceModeActive && finishStreamingRef.current) {
           finishStreamingRef.current();
@@ -391,11 +426,14 @@ export const App: React.FC = () => {
         });
         if (plan) {
           setCurrentPlan(plan as unknown as IngestionPlan);
-          // Visual canvas is decoupled; only opens when user explicitly clicks the canvas button
         }
         loadSessions();
       },
       (err) => {
+        if (controller.signal.aborted || err.includes('aborted') || err.includes('AbortError')) {
+          setIsStreaming(false);
+          return;
+        }
         console.error('Stream error:', err);
         if (isVoiceModeActive && finishStreamingRef.current) {
           finishStreamingRef.current();
@@ -417,9 +455,11 @@ export const App: React.FC = () => {
       model,
       effort,
       (stage) => {
+        if (controller.signal.aborted) return;
         console.log('[STAGE]', stage);
       },
       (thoughtStep) => {
+        if (controller.signal.aborted) return;
         setMessages((prev) => {
           const last = prev[prev.length - 1];
           if (last && last.role === 'assistant') {
@@ -445,7 +485,8 @@ export const App: React.FC = () => {
         });
       },
       mode,
-      isVoiceModeActive
+      isVoiceModeActive,
+      controller.signal
     );
   };
 
@@ -465,6 +506,7 @@ export const App: React.FC = () => {
   } = useVoiceMode({
     isActive: isVoiceModeActive,
     onSendMessage: (txt) => handleSendMessage(txt, undefined, 'low', 'general'),
+    onInterruptStreaming: handleInterruptStreaming,
     isStreaming,
   });
 
