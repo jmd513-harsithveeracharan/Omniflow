@@ -342,10 +342,8 @@ export function useVoiceMode({
         clearTimeout(silenceTimerRef.current);
       }
 
-      // Natural conversational pause buffer: 1.8s once finalized, 2.1s for interim, 2.4s for 1-2 words.
-      // Gives comfortable time to pause and inhale while feeling snappy and prompt when done.
-      const wordsCount = countWords(fullSpoken);
-      const delayMs = wordsCount <= 2 ? 2400 : hasInterim ? 2100 : 1800;
+      // User-requested snappy pause buffer: 1.3s once speech pauses (1.5s during mid-stream interim)
+      const delayMs = hasInterim ? 1500 : 1300;
 
       silenceTimerRef.current = setTimeout(() => {
         commitTurnNow();

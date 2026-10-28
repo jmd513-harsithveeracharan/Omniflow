@@ -18,7 +18,8 @@ export interface SpeechQueueEvents {
   onDrained?: () => void;
 }
 
-const SENTENCE_BOUNDARY = /[.!?]+\s+|\n+/g;
+const SENTENCE_BOUNDARY = /[.!?]+(?:\s+|$)|(?:\n+)/g;
+const INITIAL_CLAUSE_BOUNDARY = /[,;:\u2014]\s+/g;
 const MERGE_UNDER_CHARS = 110;
 const CODE_PLACEHOLDER = '\nThe code is shown in the chat.\n';
 
@@ -100,7 +101,19 @@ export class StreamingSpeechQueue {
     workable = workable.replace(/```[\s\S]*?```/g, CODE_PLACEHOLDER);
 
     let last = 0;
-    SENTENCE_BOUNDARY.lastIndex = 0;
+
+    // Fast-path time-to-first-voice: If nothing has spoken yet, split on initial clause (comma/colon/dash) after 30+ chars
+    if (this.spokenHistory.length === 0 && this.pending.length === 0 && workable.length >= 35) {
+      INITIAL_CLAUSE_BOUNDARY.lastIndex = 0;
+      const clauseMatch = INITIAL_CLAUSE_BOUNDARY.exec(workable);
+      if (clauseMatch && clauseMatch.index >= 20) {
+        const end = clauseMatch.index + clauseMatch[0].length;
+        this.enqueue(workable.slice(0, end));
+        last = end;
+      }
+    }
+
+    SENTENCE_BOUNDARY.lastIndex = last;
     let match: RegExpExecArray | null;
     while ((match = SENTENCE_BOUNDARY.exec(workable)) !== null) {
       const end = match.index + match[0].length;

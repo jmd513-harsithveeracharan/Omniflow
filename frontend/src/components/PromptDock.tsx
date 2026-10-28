@@ -605,19 +605,11 @@ export const PromptDock: React.FC<PromptDockProps> = ({
                       {isVoiceMuted ? <MicOff width={15} height={15} /> : <Mic width={15} height={15} />}
                     </button>
 
-                    {/* Send Button if text was spoken or typed */}
-                    {(input.trim().length > 0 || (isVoiceModeActive && voiceTranscript.trim().length > 0)) && (
+                    {/* Send Button only if text was manually typed */}
+                    {input.trim().length > 0 && (
                       <button
                         type="button"
-                        onClick={() => {
-                          if (input.trim()) {
-                            handleSubmit(input);
-                          } else if (onCommitVoice) {
-                            onCommitVoice();
-                          } else {
-                            handleSubmit(voiceTranscript);
-                          }
-                        }}
+                        onClick={() => handleSubmit(input)}
                         disabled={isStreaming}
                         className="dock-icon-btn btn-chat-send"
                         id="btnChatSend"

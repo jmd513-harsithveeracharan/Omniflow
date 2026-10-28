@@ -1010,10 +1010,22 @@ async def handle_chat_stream(req: ChatRequest) -> StreamingResponse:
         if intent == "GENERAL_CHAT":
             effective_effort = "low" if req.is_voice or not req.effort or req.effort.lower() in ["medium", "auto"] else req.effort
             sys_prompt = build_general_chat_prompt(effort=effective_effort, is_voice=req.is_voice)
+            
+            # Multi-turn conversational history hydration
+            raw_history = SESSIONS[sid].get("messages", [])
+            recent_history = [
+                {"role": m["role"], "content": m["content"]}
+                for m in raw_history[-10:]
+                if m.get("content") and m.get("role") in ["user", "assistant"]
+            ]
+            if not recent_history or recent_history[-1]["content"] != req.message:
+                recent_history.append({"role": "user", "content": req.message})
+            llm_payload = [{"role": "system", "content": sys_prompt}] + recent_history
+
             reply_chunks: list[str] = []
             try:
                 async for chunk in chat_stream_async(
-                    [{"role": "system", "content": sys_prompt}, {"role": "user", "content": req.message}],
+                    llm_payload,
                     effort=effective_effort,
                 ):
                     reply_chunks.append(chunk)
@@ -1022,7 +1034,7 @@ async def handle_chat_stream(req: ChatRequest) -> StreamingResponse:
             except Exception as stream_err:
                 print(f"[OmniFlow Mode1 Notice] Stream fallback: {stream_err}")
                 fallback_reply = chat(
-                    [{"role": "system", "content": sys_prompt}, {"role": "user", "content": req.message}],
+                    llm_payload,
                     effort=effective_effort,
                 )
                 reply_chunks = [fallback_reply]
@@ -1085,10 +1097,22 @@ async def handle_chat_stream(req: ChatRequest) -> StreamingResponse:
 
             effective_effort = "low" if req.is_voice or not req.effort or req.effort.lower() in ["medium", "auto"] else req.effort
             sys_prompt = build_project_qa_prompt(proj_ctx, effort=effective_effort, is_voice=req.is_voice)
+            
+            # Multi-turn conversational history hydration
+            raw_history = SESSIONS[sid].get("messages", [])
+            recent_history = [
+                {"role": m["role"], "content": m["content"]}
+                for m in raw_history[-10:]
+                if m.get("content") and m.get("role") in ["user", "assistant"]
+            ]
+            if not recent_history or recent_history[-1]["content"] != req.message:
+                recent_history.append({"role": "user", "content": req.message})
+            llm_payload = [{"role": "system", "content": sys_prompt}] + recent_history
+
             reply_chunks: list[str] = []
             try:
                 async for chunk in chat_stream_async(
-                    [{"role": "system", "content": sys_prompt}, {"role": "user", "content": req.message}],
+                    llm_payload,
                     effort=effective_effort,
                 ):
                     reply_chunks.append(chunk)
@@ -1097,7 +1121,7 @@ async def handle_chat_stream(req: ChatRequest) -> StreamingResponse:
             except Exception as stream_err:
                 print(f"[OmniFlow Mode2 Notice] Stream fallback: {stream_err}")
                 fallback_reply = chat(
-                    [{"role": "system", "content": sys_prompt}, {"role": "user", "content": req.message}],
+                    llm_payload,
                     effort=effective_effort,
                 )
                 reply_chunks = [fallback_reply]
