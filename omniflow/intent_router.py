@@ -125,23 +125,38 @@ def classify_prompt_intent(
     if any(re.search(pat, msg_lower) for pat in GREETING_PATTERNS) and len(msg.split()) <= 10:
         return "GENERAL_CHAT"
 
-    # 7. Project Context Q&A (Informational inquiry about current project)
-    is_proj_qa = any(re.search(pat, msg_lower) for pat in PROJECT_QA_PATTERNS)
-    is_question = msg.endswith("?") or any(
-        msg_lower.startswith(w) for w in [
-            "what", "how", "who", "where", "why", "can you explain", "tell me", "describe", "show"
-        ]
+    # 7. Informational Inquiry & Conceptual Q&A Detection
+    inquiry_indicators = [
+        "what", "how", "who", "where", "why", "when", "can you", "could you",
+        "tell me", "describe", "explain", "understand", "difference between",
+        "is it", "is there", "versus", " vs ", "superior", "meaning", "definition",
+        "guide", "overview", "hear me", "do you know"
+    ]
+    is_inquiry = (
+        msg.endswith("?")
+        or any(w in msg_lower for w in inquiry_indicators)
+        or any(re.search(pat, msg_lower) for pat in GREETING_PATTERNS)
     )
     has_action = any(k in msg_lower for k in ACTION_KEYWORDS)
+    is_proj_qa = any(re.search(pat, msg_lower) for pat in PROJECT_QA_PATTERNS)
 
-    if (is_proj_qa or (is_question and not has_action)):
+    if not has_action and is_inquiry:
+        is_specifically_proj = is_proj_qa or any(
+            w in msg_lower
+            for w in ["this project", "our tables", "our pipeline", "current plan", "team member", "active plan", "this folder"]
+        )
+        if is_specifically_proj:
+            return "PROJECT_QA"
+        return "GENERAL_CHAT"
+
+    if is_proj_qa and not has_action:
         return "PROJECT_QA"
 
     # 8. Component Code Synthesis (Tier 2 PySpark / SQL / Pipeline generation)
     return "COMPONENT_SYNTHESIS"
 
 
-def build_general_chat_prompt(effort: str | None = "medium") -> str:
+def build_general_chat_prompt(effort: str | None = "medium", is_voice: bool = False) -> str:
     """System prompt for Mode 1: Fast direct conversational Q&A without thought steps."""
     eff = (effort or "medium").lower()
     effort_clause = (
@@ -151,17 +166,28 @@ def build_general_chat_prompt(effort: str | None = "medium") -> str:
         if eff == "low"
         else "Reasoning depth: Balanced and practical."
     )
+    voice_clause = (
+        "- Voice Conversation Mode Active: The user is speaking hands-free and listening aloud. "
+        "Keep answers conversational, natural to listen to, and concise (typically 2-4 sentences or key highlights). "
+        "Do NOT output large code blocks or dense ASCII tables unless explicitly asked.\n"
+        "- Acoustic Phonetic Tolerance: The user may be speaking through a laptop mic where technical terms "
+        "are transcribed phonetically (e.g. 'she Ali' or 'eul uli' for 'CLI', 'restopia' for 'REST API', 'won lake' for 'OneLake', 'pie spark' for 'PySpark'). "
+        "Interpret these in context automatically without asking for clarification.\n"
+        if is_voice
+        else ""
+    )
     return (
         "You are Tenali AI (OmniFlow), an intelligent, friendly AI assistant specializing in "
         f"Microsoft Fabric, PySpark, Delta Lake, SQL, and modern cloud data architectures. {effort_clause}\n"
         "Guidelines:\n"
         "- Answer greetings, conceptual questions, definitions, and discussions directly, concisely, and warmly.\n"
+        f"{voice_clause}"
         "- Do NOT show intermediate engineering steps, agent-contact logs, or unnecessary technical boilerplate.\n"
         "- Use clean GitHub markdown formatting with bullet points and code blocks where helpful."
     )
 
 
-def build_project_qa_prompt(ctx: ProjectContext, effort: str | None = "medium") -> str:
+def build_project_qa_prompt(ctx: ProjectContext, effort: str | None = "medium", is_voice: bool = False) -> str:
     """System prompt for Mode 2: Direct JIT project-aware Q&A without thought steps."""
     members_str = ", ".join(ctx.team_members) if ctx.team_members else "Sarah (Contributor), Harsith (Owner)"
     tables_str = ", ".join([t.get("name", "") for t in ctx.tables]) if ctx.tables else "Operational entities"
@@ -173,6 +199,13 @@ def build_project_qa_prompt(ctx: ProjectContext, effort: str | None = "medium") 
         else "Reasoning effort: LOW (Fast). Deliver crisp, immediate answers with minimal verbosity."
         if eff == "low"
         else "Reasoning effort: MEDIUM (Balanced). Provide standard comprehensive reasoning."
+    )
+    voice_clause = (
+        "- Voice Conversation Mode Active: The user is listening aloud. Deliver direct, spoken-friendly responses "
+        "in 2-4 clear sentences without large code blocks or verbose preambles.\n"
+        "- Acoustic Phonetic Tolerance: Automatically map spoken phonetic transcriptions (e.g. 'she Ali' -> CLI, 'restopia' -> REST API) to domain concepts.\n"
+        if is_voice
+        else ""
     )
 
     return (
@@ -187,6 +220,7 @@ def build_project_qa_prompt(ctx: ProjectContext, effort: str | None = "medium") 
         f"- {effort_clause}\n\n"
         f"Instructions:\n"
         f"- The user is asking an informational question about THIS project.\n"
+        f"{voice_clause}"
         f"- Answer directly, informatively, and accurately using the project context above.\n"
         f"- Do NOT trigger multi-agent pipeline steps, agent contact thoughts, or unrequested file creation.\n"
         f"- Provide a clear, crisp, helpful breakdown addressing the user's specific inquiry."

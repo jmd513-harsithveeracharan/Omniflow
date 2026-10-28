@@ -117,10 +117,10 @@ export const FloatingVoiceOrb: React.FC<FloatingVoiceOrbProps> = ({
   const audioEnergy = useLiveAudioEnergy(state !== 'muted', isListening);
 
   // Dynamic voice modulation scaling:
-  // Base scale is enhanced, and live speech volume swells the sphere up to 1.22
-  const dynamicScale = audioEnergy > 0.03 ? 1.0 + audioEnergy * 0.22 : undefined;
-  const dynamicGlow = audioEnergy > 0.03
-    ? `0 0 ${Math.round(18 + audioEnergy * 32)}px rgba(59, 130, 246, ${Math.min(0.85, 0.35 + audioEnergy * 0.5)})`
+  // Base scale is enhanced, and live speech volume swells the sphere up to 1.35
+  const dynamicScale = audioEnergy > 0.02 ? 1.0 + audioEnergy * 0.35 : undefined;
+  const dynamicGlow = audioEnergy > 0.02
+    ? `0 0 ${Math.round(20 + audioEnergy * 42)}px rgba(59, 130, 246, ${Math.min(0.95, 0.4 + audioEnergy * 0.6)})`
     : undefined;
 
   const handleClick = (e: React.MouseEvent) => {

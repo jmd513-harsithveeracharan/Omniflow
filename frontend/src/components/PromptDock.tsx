@@ -13,6 +13,7 @@ import { normalizeDataEngineeringTerms } from './voice/termNormalizer';
 interface PromptDockProps {
   onSendMessage: (text: string, model?: string, effort?: string, mode?: 'auto' | 'general' | 'project') => void;
   isStreaming: boolean;
+  activeProjectId?: string | null;
   isVoiceModeActive?: boolean;
   onToggleVoiceMode?: () => void;
   voiceState?: VoiceModeState;
@@ -27,6 +28,7 @@ interface PromptDockProps {
 export const PromptDock: React.FC<PromptDockProps> = ({
   onSendMessage,
   isStreaming,
+  activeProjectId,
   isVoiceModeActive = false,
   onToggleVoiceMode,
   voiceState = 'listening',
@@ -38,8 +40,16 @@ export const PromptDock: React.FC<PromptDockProps> = ({
   onToggleVoiceAudioMode,
 }) => {
   const [input, setInput] = useState('');
-  const [chatMode, setChatMode] = useState<'general' | 'project'>('project');
+  const [chatMode, setChatMode] = useState<'general' | 'project'>(activeProjectId ? 'project' : 'general');
   const [isFlipping, setIsFlipping] = useState(false);
+
+  useEffect(() => {
+    if (activeProjectId) {
+      setChatMode('project');
+    } else {
+      setChatMode('general');
+    }
+  }, [activeProjectId]);
   const [selectedModel, setSelectedModel] = useState('Tenali AI');
   const [selectedEffort, setSelectedEffort] = useState('Medium');
   const [isModelDropdownOpen, setIsModelDropdownOpen] = useState(false);

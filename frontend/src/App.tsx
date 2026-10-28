@@ -122,19 +122,37 @@ export const App: React.FC = () => {
       .catch(() => setStatus(null));
 
     loadSessions();
-    loadProjectsList(true);
 
-    const initialSid = generateNewSessionId();
-    setSessionId(initialSid);
-    setMessages([]);
+    const savedProjId = localStorage.getItem('omniflow_active_project_id');
+    const savedSid = localStorage.getItem('omniflow_active_session_id');
+
+    if (savedProjId) {
+      loadProjectsList(false).then(() => {
+        handleSelectProject(savedProjId, false);
+      });
+    } else if (savedSid && !savedSid.startsWith('proj_')) {
+      loadProjectsList(false);
+      handleSelectSession(savedSid);
+    } else {
+      loadProjectsList(true);
+      const initialSid = generateNewSessionId();
+      setSessionId(initialSid);
+      setMessages([]);
+    }
   }, []);
 
   const handleNewSession = () => {
     if (isStreaming) return;
+    setActiveProjectId(null);
+    setCurrentPlan(null);
     const newSid = generateNewSessionId();
     setSessionId(newSid);
     setMessages([]);
     setActiveView('chat');
+    try {
+      localStorage.removeItem('omniflow_active_project_id');
+      localStorage.setItem('omniflow_active_session_id', newSid);
+    } catch {}
   };
 
   const handleSelectSession = async (sid: string) => {
@@ -142,14 +160,22 @@ export const App: React.FC = () => {
     if (sid === sessionId && messages.length > 0) return;
     try {
       setIsLoadingSession(true);
+      setActiveProjectId(null);
+      setCurrentPlan(null);
       setActiveView('chat');
       setSessionId(sid);
+      try {
+        localStorage.removeItem('omniflow_active_project_id');
+        localStorage.setItem('omniflow_active_session_id', sid);
+      } catch {}
       const detail = await fetchSessionDetail(sid);
       if (detail && Array.isArray(detail.messages)) {
         setMessages(
           detail.messages.map((m) => ({
             role: m.role,
             content: m.content,
+            thoughtSteps: m.thoughtSteps,
+            thoughtElapsed: m.thoughtElapsed,
           }))
         );
       }
@@ -186,6 +212,11 @@ export const App: React.FC = () => {
   // Projects Handlers
   const handleSelectProject = async (projectId: string, shouldSwitchToChat: boolean = true) => {
     setActiveProjectId(projectId);
+    try {
+      localStorage.setItem('omniflow_active_project_id', projectId);
+      localStorage.setItem('omniflow_active_session_id', `proj_${projectId}`);
+    } catch {}
+
     if (projectId === 'playground') {
       setCurrentPlan(null);
       if (shouldSwitchToChat) setActiveView('chat');
@@ -581,6 +612,7 @@ export const App: React.FC = () => {
                   messages={messages}
                   isStreaming={isStreaming}
                   sessionId={sessionId}
+                  isVoiceModeActive={isVoiceModeActive}
                   onDeployPlan={() => {
                     setIsWorkbenchOpen(true);
                     handleSendMessage('deploy active plan');
@@ -594,6 +626,7 @@ export const App: React.FC = () => {
               <PromptDock
                 onSendMessage={handleSendMessage}
                 isStreaming={isStreaming}
+                activeProjectId={activeProjectId}
                 isVoiceModeActive={isVoiceModeActive}
                 onToggleVoiceMode={() => setIsVoiceModeActive((prev) => !prev)}
                 voiceState={voiceState}

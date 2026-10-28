@@ -51,7 +51,16 @@ export async function fetchSessions(): Promise<ChatSession[]> {
 
 export async function fetchSessionDetail(
   sessionId: string
-): Promise<{ sessionId: string; title: string; messages: { role: 'user' | 'assistant' | 'system'; content: string }[] }> {
+): Promise<{
+  sessionId: string;
+  title: string;
+  messages: {
+    role: 'user' | 'assistant' | 'system';
+    content: string;
+    thoughtSteps?: import('../types').ThoughtStep[];
+    thoughtElapsed?: string;
+  }[];
+}> {
   const res = await fetch(`${API_BASE}/sessions/${sessionId}`);
   if (!res.ok) throw new Error(`Failed to fetch session detail: ${res.statusText}`);
   const data = await res.json();
@@ -61,6 +70,8 @@ export async function fetchSessionDetail(
     messages: (data.messages || []).map((m: Record<string, unknown>) => ({
       role: (m.role as 'user' | 'assistant' | 'system') || 'user',
       content: String(m.content || ''),
+      thoughtSteps: m.thoughtSteps as import('../types').ThoughtStep[] | undefined,
+      thoughtElapsed: typeof m.thoughtElapsed === 'string' ? m.thoughtElapsed : undefined,
     })),
   };
 }

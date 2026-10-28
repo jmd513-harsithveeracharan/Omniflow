@@ -9,6 +9,7 @@ interface ChatTimelineProps {
   messages: ChatMessage[];
   isStreaming: boolean;
   sessionId?: string;
+  isVoiceModeActive?: boolean;
   onDeployPlan?: () => void;
   onOpenCanvas?: () => void;
   onOpenWorkspace?: () => void;
@@ -19,6 +20,7 @@ export const ChatTimeline: React.FC<ChatTimelineProps> = ({
   messages,
   isStreaming,
   sessionId,
+  isVoiceModeActive = false,
   onDeployPlan,
   onOpenCanvas,
   onOpenWorkspace,
@@ -109,8 +111,8 @@ export const ChatTimeline: React.FC<ChatTimelineProps> = ({
 
         const threadRect = currentThread.getBoundingClientRect();
         const targetRect = targetEl.getBoundingClientRect();
-        // Floating prompt dock height reserved at the bottom (~160px)
-        const dockReserved = 160;
+        // Floating prompt dock height reserved at the bottom (~160px normal, ~290px when voice mode orb is active)
+        const dockReserved = isVoiceModeActive ? 290 : 160;
         const visibleBottom = threadRect.bottom - dockReserved;
 
         if (targetRect.bottom > visibleBottom) {

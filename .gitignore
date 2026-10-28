@@ -67,3 +67,5 @@ database_design/
 database_migrations/
 fabric_workspace/
 research_fabric_ai/
+omniflow/sessions_store.json
+omniflow/*.tmp

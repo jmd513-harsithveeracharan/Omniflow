@@ -61,8 +61,33 @@ if not os.path.exists(DIST_DIR):
     DIST_DIR = os.path.join(os.path.dirname(BASE_DIR), "frontend", "dist")
 INTAKE_DIR = os.path.join(BASE_DIR, "intake")
 
-# In-memory session store (paired with persistent DB runs)
-SESSIONS: dict[str, dict[str, Any]] = {}
+# Durable JSON session store surviving reloads and restarts
+SESSION_STORE_PATH = os.path.join(BASE_DIR, "sessions_store.json")
+
+
+def load_sessions_from_disk() -> dict[str, dict[str, Any]]:
+    if os.path.exists(SESSION_STORE_PATH):
+        try:
+            with open(SESSION_STORE_PATH, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                if isinstance(data, dict):
+                    return data
+        except Exception as e:
+            print(f"[SessionsStore] Read error: {e}")
+    return {}
+
+
+def save_sessions_to_disk() -> None:
+    try:
+        tmp_path = f"{SESSION_STORE_PATH}.tmp"
+        with open(tmp_path, "w", encoding="utf-8") as f:
+            json.dump(SESSIONS, f, indent=2, ensure_ascii=False)
+        os.replace(tmp_path, SESSION_STORE_PATH)
+    except Exception as e:
+        print(f"[SessionsStore] Write error: {e}")
+
+
+SESSIONS: dict[str, dict[str, Any]] = load_sessions_from_disk()
 
 
 class ChatRequest(BaseModel):
@@ -255,6 +280,7 @@ async def list_sessions() -> dict[str, Any]:
 async def create_new_session(payload: dict[str, Any] | None = None) -> dict[str, Any]:
     sid = f"sess_{uuid.uuid4().hex[:9]}"
     SESSIONS[sid] = {"session_id": sid, "title": "New Conversation", "messages": [], "updated_at": ""}
+    save_sessions_to_disk()
     return {"session_id": sid}
 
 
@@ -269,6 +295,7 @@ async def get_session_detail(session_id: str) -> dict[str, Any]:
 @app.delete("/api/sessions/{session_id}")
 async def delete_session(session_id: str) -> dict[str, Any]:
     SESSIONS.pop(session_id, None)
+    save_sessions_to_disk()
     return {"deleted": True}
 
 
@@ -276,6 +303,7 @@ async def delete_session(session_id: str) -> dict[str, Any]:
 async def rename_session(session_id: str, payload: dict[str, Any]) -> dict[str, Any]:
     if session_id in SESSIONS:
         SESSIONS[session_id]["title"] = payload.get("title", "Conversation")
+        save_sessions_to_disk()
     return {"success": True}
 
 
@@ -713,6 +741,7 @@ async def get_project_detail(project_id: str) -> dict[str, Any]:
             "active_plan": plan,
             "updated_at": "",
         }
+        save_sessions_to_disk()
 
     return {
         "project": project_data,
@@ -953,6 +982,7 @@ async def handle_chat_stream(req: ChatRequest) -> StreamingResponse:
         SESSIONS[sid] = {"session_id": sid, "title": "Medallion Architecture Session", "messages": [], "updated_at": ""}
     
     SESSIONS[sid]["messages"].append({"role": "user", "content": req.message})
+    save_sessions_to_disk()
 
     # Detect if message contains intake JSON or architectural instructions
     intake_override = None
@@ -975,19 +1005,33 @@ async def handle_chat_stream(req: ChatRequest) -> StreamingResponse:
         )
 
         # ==============================================================================
-        # MODE 1: General Conversational & Technical Q&A (Instant, 0 Thought Steps)
+        # MODE 1: General Conversational & Technical Q&A (Instant Real-Time Stream, 0 Thought Steps)
         # ==============================================================================
         if intent == "GENERAL_CHAT":
-            sys_prompt = build_general_chat_prompt(effort=req.effort)
-            reply = chat(
-                [{"role": "system", "content": sys_prompt}, {"role": "user", "content": req.message}],
-                effort=req.effort,
-            )
-            for chunk in reply.split(" "):
-                yield f"data: {json.dumps({'type': 'chunk', 'text': chunk + ' '})}\n\n"
-                await asyncio.sleep(0.012)
+            effective_effort = "low" if req.is_voice or not req.effort or req.effort.lower() in ["medium", "auto"] else req.effort
+            sys_prompt = build_general_chat_prompt(effort=effective_effort, is_voice=req.is_voice)
+            reply_chunks: list[str] = []
+            try:
+                async for chunk in chat_stream_async(
+                    [{"role": "system", "content": sys_prompt}, {"role": "user", "content": req.message}],
+                    effort=effective_effort,
+                ):
+                    reply_chunks.append(chunk)
+                    yield f"data: {json.dumps({'type': 'chunk', 'text': chunk})}\n\n"
+                    await asyncio.sleep(0)  # Flushes token over TCP immediately
+            except Exception as stream_err:
+                print(f"[OmniFlow Mode1 Notice] Stream fallback: {stream_err}")
+                fallback_reply = chat(
+                    [{"role": "system", "content": sys_prompt}, {"role": "user", "content": req.message}],
+                    effort=effective_effort,
+                )
+                reply_chunks = [fallback_reply]
+                yield f"data: {json.dumps({'type': 'chunk', 'text': fallback_reply})}\n\n"
 
+            reply = "".join(reply_chunks)
             SESSIONS[sid]["messages"].append({"role": "assistant", "content": reply})
+            save_sessions_to_disk()
+            save_sessions_to_disk()
             yield f"data: {json.dumps({'type': 'done', 'session_id': sid, 'plan': None})}\n\n"
             return
 
@@ -1039,16 +1083,30 @@ async def handle_chat_stream(req: ChatRequest) -> StreamingResponse:
                 team_members=members,
             )
 
-            sys_prompt = build_project_qa_prompt(proj_ctx, effort=req.effort)
-            reply = chat(
-                [{"role": "system", "content": sys_prompt}, {"role": "user", "content": req.message}],
-                effort=req.effort,
-            )
-            for chunk in reply.split(" "):
-                yield f"data: {json.dumps({'type': 'chunk', 'text': chunk + ' '})}\n\n"
-                await asyncio.sleep(0.012)
+            effective_effort = "low" if req.is_voice or not req.effort or req.effort.lower() in ["medium", "auto"] else req.effort
+            sys_prompt = build_project_qa_prompt(proj_ctx, effort=effective_effort, is_voice=req.is_voice)
+            reply_chunks: list[str] = []
+            try:
+                async for chunk in chat_stream_async(
+                    [{"role": "system", "content": sys_prompt}, {"role": "user", "content": req.message}],
+                    effort=effective_effort,
+                ):
+                    reply_chunks.append(chunk)
+                    yield f"data: {json.dumps({'type': 'chunk', 'text': chunk})}\n\n"
+                    await asyncio.sleep(0)  # Flushes token over TCP immediately
+            except Exception as stream_err:
+                print(f"[OmniFlow Mode2 Notice] Stream fallback: {stream_err}")
+                fallback_reply = chat(
+                    [{"role": "system", "content": sys_prompt}, {"role": "user", "content": req.message}],
+                    effort=effective_effort,
+                )
+                reply_chunks = [fallback_reply]
+                yield f"data: {json.dumps({'type': 'chunk', 'text': fallback_reply})}\n\n"
 
+            reply = "".join(reply_chunks)
             SESSIONS[sid]["messages"].append({"role": "assistant", "content": reply})
+            save_sessions_to_disk()
+            save_sessions_to_disk()
             yield f"data: {json.dumps({'type': 'done', 'session_id': sid, 'plan': active_plan if active_plan else None})}\n\n"
             return
 
@@ -1118,6 +1176,7 @@ async def handle_chat_stream(req: ChatRequest) -> StreamingResponse:
                 await asyncio.sleep(0.015)
 
             SESSIONS[sid]["messages"].append({"role": "assistant", "content": summary})
+            save_sessions_to_disk()
             yield f"data: {json.dumps({'type': 'done', 'session_id': sid, 'plan': None})}\n\n"
             return
 
@@ -1187,6 +1246,7 @@ async def handle_chat_stream(req: ChatRequest) -> StreamingResponse:
                 await asyncio.sleep(0.015)
 
             SESSIONS[sid]["messages"].append({"role": "assistant", "content": deploy_summary})
+            save_sessions_to_disk()
             yield f"data: {json.dumps({'type': 'done', 'session_id': sid, 'plan': active_plan})}\n\n"
 
         # ==============================================================================
@@ -1275,6 +1335,7 @@ async def handle_chat_stream(req: ChatRequest) -> StreamingResponse:
             }
             SESSIONS[sid]["active_plan"] = plan_obj
             SESSIONS[sid]["messages"].append({"role": "assistant", "content": summary_text})
+            save_sessions_to_disk()
             yield f"data: {json.dumps({'type': 'done', 'session_id': sid, 'plan': plan_obj})}\n\n"
 
         else:
@@ -1416,6 +1477,7 @@ async def handle_chat_stream(req: ChatRequest) -> StreamingResponse:
 
             reply = "".join(reply_chunks)
             SESSIONS[sid]["messages"].append({"role": "assistant", "content": reply})
+            save_sessions_to_disk()
             yield f"data: {json.dumps({'type': 'done', 'session_id': sid, 'plan': active_plan})}\n\n"
 
     return StreamingResponse(

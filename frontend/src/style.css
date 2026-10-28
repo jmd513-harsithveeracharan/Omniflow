@@ -1800,6 +1800,7 @@ nav.sidebar-nav {
     display: flex;
     flex-direction: column;
     align-items: center;
+    z-index: 50;
 }
 
 .bolt-chat-pane.in-chat .google-prompt-dock,
@@ -13051,7 +13052,7 @@ pre[class*="language-"] {
 }
 
 .bolt-chat-pane.voice-active .chat-thread-scroll {
-    padding-bottom: 250px !important;
+    padding-bottom: 290px !important;
 }
 
 .chatgpt-floating-orb-wrapper {
