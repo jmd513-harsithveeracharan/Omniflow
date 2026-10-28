@@ -413,7 +413,8 @@ export const App: React.FC = () => {
           return prev;
         });
       },
-      mode
+      mode,
+      isVoiceModeActive
     );
   };
 
@@ -422,14 +423,16 @@ export const App: React.FC = () => {
     voiceState,
     voiceTranscript,
     isMuted: isVoiceMuted,
+    audioMode: voiceAudioMode,
     toggleMute: toggleVoiceMute,
+    toggleAudioMode: toggleVoiceAudioMode,
     interrupt: interruptVoice,
     startVoiceResponse,
     feedStreamingChunk,
     finishStreaming,
   } = useVoiceMode({
     isActive: isVoiceModeActive,
-    onSendMessage: handleSendMessage,
+    onSendMessage: (txt) => handleSendMessage(txt, undefined, 'low', 'general'),
     isStreaming,
   });
 
@@ -598,6 +601,8 @@ export const App: React.FC = () => {
                 onToggleVoiceMute={toggleVoiceMute}
                 onInterruptVoice={interruptVoice}
                 voiceTranscript={voiceTranscript}
+                voiceAudioMode={voiceAudioMode}
+                onToggleVoiceAudioMode={toggleVoiceAudioMode}
               />
             </div>
 

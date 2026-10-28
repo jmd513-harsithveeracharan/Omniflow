@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Loader2, Globe, Layers, Paperclip, X, Mic, MicOff } from 'lucide-react';
+import { Loader2, Globe, Layers, Paperclip, X, Mic, MicOff, Volume2, Headphones } from 'lucide-react';
 import { IntakeSpecModal } from './modals/IntakeSpecModal';
 import { FloatingVoiceOrb, VoiceModeState } from './voice/FloatingVoiceOrb';
 import {
@@ -8,6 +8,7 @@ import {
   createSpeechRecognition,
   IBrowserSpeechRecognition,
 } from './voice/speechService';
+import { normalizeDataEngineeringTerms } from './voice/termNormalizer';
 
 interface PromptDockProps {
   onSendMessage: (text: string, model?: string, effort?: string, mode?: 'auto' | 'general' | 'project') => void;
@@ -19,6 +20,8 @@ interface PromptDockProps {
   onToggleVoiceMute?: () => void;
   onInterruptVoice?: () => void;
   voiceTranscript?: string;
+  voiceAudioMode?: 'speaker' | 'headphone';
+  onToggleVoiceAudioMode?: () => void;
 }
 
 export const PromptDock: React.FC<PromptDockProps> = ({
@@ -31,6 +34,8 @@ export const PromptDock: React.FC<PromptDockProps> = ({
   onToggleVoiceMute,
   onInterruptVoice,
   voiceTranscript = '',
+  voiceAudioMode = 'speaker',
+  onToggleVoiceAudioMode,
 }) => {
   const [input, setInput] = useState('');
   const [chatMode, setChatMode] = useState<'general' | 'project'>('project');
@@ -109,7 +114,7 @@ export const PromptDock: React.FC<PromptDockProps> = ({
           interim += piece;
         }
       }
-      sessionTranscript = `${finalized}${interim}`.trim();
+      sessionTranscript = normalizeDataEngineeringTerms(`${finalized}${interim}`.trim());
       setInput(`${baseInputRef.current}${sessionTranscript}`);
     };
 
@@ -531,6 +536,51 @@ export const PromptDock: React.FC<PromptDockProps> = ({
 
                 {isVoiceModeActive ? (
                   <>
+                    {/* Audio Output Mode Toggle (Speaker vs Headphone) */}
+                    {onToggleVoiceAudioMode && (
+                      <button
+                        type="button"
+                        className={`voice-dock-mode-pill ${voiceAudioMode === 'headphone' ? 'is-headphone' : 'is-speaker'}`}
+                        id="btnVoiceAudioModeToggle"
+                        title={
+                          voiceAudioMode === 'headphone'
+                            ? 'Headphones Active: Full duplex hands-free barge-in enabled. (Click to switch to Speakers)'
+                            : 'Laptop Speakers Active: Echo Guard prevents self-interruption. (Click if using Headphones)'
+                        }
+                        onClick={onToggleVoiceAudioMode}
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '5px',
+                          padding: '4px 10px',
+                          borderRadius: '16px',
+                          fontSize: '11.5px',
+                          fontWeight: 500,
+                          border: voiceAudioMode === 'headphone'
+                            ? '1px solid rgba(59, 130, 246, 0.4)'
+                            : '1px solid rgba(255, 255, 255, 0.12)',
+                          background: voiceAudioMode === 'headphone'
+                            ? 'rgba(59, 130, 246, 0.15)'
+                            : 'rgba(255, 255, 255, 0.05)',
+                          color: voiceAudioMode === 'headphone' ? '#60a5fa' : '#a1a1aa',
+                          cursor: 'pointer',
+                          transition: 'all 0.15s ease',
+                        }}
+                      >
+                        {voiceAudioMode === 'headphone' ? (
+                          <>
+                            <Headphones width={13} height={13} />
+                            <span>Headphones</span>
+                          </>
+                        ) : (
+                          <>
+                            <Volume2 width={13} height={13} />
+                            <span>Speakers</span>
+                          </>
+                        )}
+                      </button>
+                    )}
+
                     {/* Live Voice Microphone Mute Toggle */}
                     <button
                       type="button"

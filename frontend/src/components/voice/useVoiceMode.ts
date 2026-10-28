@@ -4,8 +4,9 @@
  * Hands-free conversational voice mode hook:
  * - Stable SpeechRecognition lifecycle (never tears down on transcript re-renders)
  * - Full-utterance transcript accumulation across interim + final segments
+ * - Technical domain term phonetic normalizer (CLI, REST API, PySpark, OneLake)
  * - Sentence-by-sentence streaming TTS playback via StreamingSpeechQueue
- * - Hands-free vocal barge-in with longest-common-run echo filtering
+ * - Speaker Mode (acoustic feedback safe) vs Headphone Mode (full duplex)
  */
 
 import { useState, useEffect, useRef, useCallback } from 'react';
@@ -18,6 +19,9 @@ import {
 } from './speechService';
 import { StreamingSpeechQueue } from './streamingQueue';
 import { isLikelyEcho, countWords } from './echoFilter';
+import { normalizeDataEngineeringTerms } from './termNormalizer';
+
+export type VoiceAudioMode = 'speaker' | 'headphone';
 
 interface UseVoiceModeProps {
   isActive: boolean;
@@ -33,8 +37,8 @@ const INTERRUPT_KEYWORDS = new Set([
   'enough',
   'hold',
   'quiet',
-  'okay',
-  'ok',
+  'shut',
+  'hush',
 ]);
 
 export function useVoiceMode({
@@ -45,8 +49,8 @@ export function useVoiceMode({
   const [voiceState, setVoiceState] = useState<VoiceModeState>('listening');
   const [voiceTranscript, setVoiceTranscript] = useState<string>('');
   const [isMuted, setIsMuted] = useState<boolean>(false);
+  const [audioMode, setAudioMode] = useState<VoiceAudioMode>('speaker');
 
-  // Refs prevent re-render teardowns of the active SpeechRecognition session
   const onSendMessageRef = useRef(onSendMessage);
   onSendMessageRef.current = onSendMessage;
 
@@ -59,12 +63,14 @@ export function useVoiceMode({
   const isStreamingRef = useRef(isStreaming);
   isStreamingRef.current = isStreaming;
 
+  const audioModeRef = useRef<VoiceAudioMode>(audioMode);
+  audioModeRef.current = audioMode;
+
   const recognitionRef = useRef<ReturnType<typeof createSpeechRecognition> | null>(null);
   const silenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const restartTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isMountedRef = useRef<boolean>(true);
 
-  // Tracks where the current uncommitted user turn starts inside event.results
   const turnStartIndexRef = useRef<number>(0);
   const lastResultsLenRef = useRef<number>(0);
   const carryOverTextRef = useRef<string>('');
@@ -109,7 +115,8 @@ export function useVoiceMode({
       clearTimeout(silenceTimerRef.current);
       silenceTimerRef.current = null;
     }
-    const textToSend = latestTranscriptRef.current.trim();
+    const raw = latestTranscriptRef.current.trim();
+    const textToSend = normalizeDataEngineeringTerms(raw);
     resetTurnBuffer();
     if (textToSend.length > 0 && !isStreamingRef.current) {
       queueRef.current?.startResponse();
@@ -176,6 +183,10 @@ export function useVoiceMode({
     });
   }, [resetTurnBuffer]);
 
+  const toggleAudioMode = useCallback(() => {
+    setAudioMode((prev) => (prev === 'speaker' ? 'headphone' : 'speaker'));
+  }, []);
+
   // Reflect streaming state onto orb when waiting for first sentence
   useEffect(() => {
     if (!isActive) return;
@@ -186,7 +197,7 @@ export function useVoiceMode({
     }
   }, [isActive, isStreaming, isMuted]);
 
-  // Main SpeechRecognition lifecycle — ONLY depends on [isActive]
+  // Main SpeechRecognition lifecycle
   useEffect(() => {
     isMountedRef.current = true;
 
@@ -209,10 +220,7 @@ export function useVoiceMode({
       return;
     }
 
-    if (!isSpeechRecognitionSupported()) {
-      console.warn('[VoiceMode] Web Speech API is not supported in this browser.');
-      return;
-    }
+    if (!isSpeechRecognitionSupported()) return;
 
     const rec = createSpeechRecognition();
     if (!rec) return;
@@ -241,7 +249,7 @@ export function useVoiceMode({
       const isAssistantSpeaking = Boolean(queueRef.current?.isSpeaking());
       const spokenSoFar = isAssistantSpeaking ? (queueRef.current?.getSpokenText() || '') : '';
 
-      // If assistant is speaking, skip any finalized segments that are confirmed speaker echo
+      // Skip finalized segments that are confirmed speaker echo
       if (isAssistantSpeaking && spokenSoFar) {
         while (turnStartIndexRef.current < event.results.length) {
           const seg = event.results[turnStartIndexRef.current];
@@ -275,11 +283,9 @@ export function useVoiceMode({
 
       if (!fullSpoken) return;
 
-      // Check if assistant is currently speaking (barge-in vs speaker echo)
+      // Handle acoustic leakage while assistant is speaking
       if (isAssistantSpeaking) {
         if (isLikelyEcho(fullSpoken, spokenSoFar)) {
-          // Only advance turnStartIndex if all segments are finalized echo;
-          // never skip an in-progress interim segment!
           if (!hasInterim) {
             turnStartIndexRef.current = event.results.length;
             carryOverTextRef.current = '';
@@ -290,27 +296,32 @@ export function useVoiceMode({
 
         const words = fullSpoken.toLowerCase().replace(/[^a-z\s]/g, '').split(/\s+/).filter(Boolean);
         const hasKeyword = words.some((w) => INTERRUPT_KEYWORDS.has(w));
-        if (countWords(fullSpoken) >= 2 || hasKeyword) {
-          // Real user barge-in: silence assistant immediately while keeping word 1..N intact!
+
+        // In Speaker Mode: ignore speaker acoustic bleed unless an explicit keyword is spoken
+        // In Headphone Mode: countWords >= 2 or explicit keyword triggers barge-in
+        const shouldBargeIn = audioModeRef.current === 'headphone'
+          ? (countWords(fullSpoken) >= 2 || hasKeyword)
+          : hasKeyword;
+
+        if (shouldBargeIn) {
           queueRef.current?.cancel();
           stopSpeaking();
           setVoiceState('listening');
         } else {
-          // Hold word 1 in place without advancing turnStartIndex so word 1 is preserved when word 2 arrives
-          latestTranscriptRef.current = fullSpoken;
+          // Acoustic bleed in speaker mode: suppress without interrupting
           return;
         }
       }
 
-      // Do not accumulate new user turns while waiting for LLM unless barging in
+      // Do not accumulate user turns during backend synthesis unless user barged in
       if (isStreamingRef.current && !queueRef.current?.isSpeaking()) {
         return;
       }
 
-      latestTranscriptRef.current = fullSpoken;
-      setVoiceTranscript(fullSpoken);
+      const normalized = normalizeDataEngineeringTerms(fullSpoken);
+      latestTranscriptRef.current = normalized;
+      setVoiceTranscript(normalized);
 
-      // Schedule auto-send after natural silence pause (snappy 900ms once segment finalized)
       if (silenceTimerRef.current) {
         clearTimeout(silenceTimerRef.current);
       }
@@ -324,18 +335,13 @@ export function useVoiceMode({
     };
 
     rec.onerror = (e) => {
-      if (e.error === 'not-allowed') {
-        console.error('[VoiceMode] Microphone access is blocked. Allow microphone permission in browser settings.');
-      } else if (e.error !== 'no-speech' && e.error !== 'aborted') {
+      if (e.error !== 'no-speech' && e.error !== 'aborted') {
         console.warn('[VoiceMode] SpeechRecognition notice:', e.error);
       }
     };
 
     rec.onend = () => {
-      if (!isActiveRef.current || isMutedRef.current || !isMountedRef.current) {
-        return;
-      }
-      // Preserve any uncommitted speech across browser session auto-restarts
+      if (!isActiveRef.current || isMutedRef.current || !isMountedRef.current) return;
       if (latestTranscriptRef.current.trim().length > 0) {
         carryOverTextRef.current = latestTranscriptRef.current.trim();
       }
@@ -348,7 +354,7 @@ export function useVoiceMode({
         try {
           rec.start();
         } catch {
-          // already started
+          // already running
         }
       }, 100);
     };
@@ -381,7 +387,9 @@ export function useVoiceMode({
     voiceState,
     voiceTranscript,
     isMuted,
+    audioMode,
     toggleMute,
+    toggleAudioMode,
     interrupt,
     startVoiceResponse,
     feedStreamingChunk,

@@ -23,7 +23,7 @@ from pydantic import BaseModel, Field
 
 from omniflow.agents.orchestrator import MultiAgentOrchestrator
 from omniflow.agents.schemas import NaturalLanguagePlanRequest
-from omniflow.config.llm_adapter import chat
+from omniflow.config.llm_adapter import chat, chat_stream
 from omniflow.db.postgres_repo import PostgresRepository
 from omniflow.tools.fabric_deployer import (
     deploy_medallion_architecture_to_fabric,
@@ -72,6 +72,7 @@ class ChatRequest(BaseModel):
     effort: str | None = Field(default="medium")
     mode: str | None = Field(default="project")
     stream: bool = Field(default=True)
+    is_voice: bool = Field(default=False)
 
 
 class ProjectRequest(BaseModel):
@@ -1353,6 +1354,7 @@ async def handle_chat_stream(req: ChatRequest) -> StreamingResponse:
                 f"Recent Fabric Items: {', '.join(db_ctx)}\n\n"
                 f"Instructions:\n"
                 f"- Answer concisely and directly with exact, production-grade code.\n"
+                f"- Acoustic Phonetic Tolerance: The user may be speaking through a laptop microphone where browser speech recognition transcribes technical terms phonetically (e.g. 'she Ali' or 'eul uli' for 'CLI', 'restopia' for 'REST API', 'won lake' for 'OneLake', 'pie spark' for 'PySpark', 'tea sequel' for 'T-SQL'). Automatically and seamlessly interpret these terms in context without asking for clarification or correcting them unless requested.\n"
                 f"- Do NOT assume or force multi-tier Medallion folder hierarchies unless the user's project explicitly defines or asks for them.\n"
                 f"- For ad-hoc or granular tasks (folders, notebooks, stored procedures, single tables), execute ONLY what was requested without hallucinating extra layers.\n"
                 f"- If asked for T-SQL, write clean CREATE OR ALTER statements with proper TRY...CATCH error handling and transaction safety.\n"
@@ -1360,15 +1362,33 @@ async def handle_chat_stream(req: ChatRequest) -> StreamingResponse:
                 f"- If asked for a pipeline, define the dynamic activity JSON with clear dependency wiring.\n"
                 f"- Include a concise summary and next execution steps."
             )
-            reply = chat(
-                [{"role": "system", "content": sys_prompt}, {"role": "user", "content": req.message}],
-                effort=req.effort,
-            )
 
-            for chunk in reply.split(" "):
-                yield f"data: {json.dumps({'type': 'chunk', 'text': chunk + ' '})}\n\n"
-                await asyncio.sleep(0.015)
+            # Fast conversational routing:
+            # In voice mode or general queries, use effort='low' so tokens arrive in seconds
+            # instead of blocking for 40s on deep hidden chain-of-thought reasoning!
+            effective_effort = req.effort
+            if req.is_voice or req.mode == "general":
+                if not effective_effort or effective_effort.lower() in ["medium", "auto"]:
+                    effective_effort = "low"
 
+            reply_chunks: list[str] = []
+            try:
+                for chunk in chat_stream(
+                    [{"role": "system", "content": sys_prompt}, {"role": "user", "content": req.message}],
+                    effort=effective_effort,
+                ):
+                    reply_chunks.append(chunk)
+                    yield f"data: {json.dumps({'type': 'chunk', 'text': chunk})}\n\n"
+            except Exception:
+                # Fallback to standard chat if streaming is interrupted
+                fallback_reply = chat(
+                    [{"role": "system", "content": sys_prompt}, {"role": "user", "content": req.message}],
+                    effort=effective_effort,
+                )
+                reply_chunks = [fallback_reply]
+                yield f"data: {json.dumps({'type': 'chunk', 'text': fallback_reply})}\n\n"
+
+            reply = "".join(reply_chunks)
             SESSIONS[sid]["messages"].append({"role": "assistant", "content": reply})
             yield f"data: {json.dumps({'type': 'done', 'session_id': sid, 'plan': active_plan})}\n\n"
 

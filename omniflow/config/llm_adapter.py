@@ -3,6 +3,7 @@ omniflow/config/llm_adapter.py
 ------------------------------
 Lightweight standalone LLM adapter for OmniFlow when executing outside Fabric_AI.
 Uses standard Azure OpenAI or OpenAI client configured via environment variables.
+Supports both synchronous completion and real-time token streaming.
 """
 
 from __future__ import annotations
@@ -10,7 +11,7 @@ from __future__ import annotations
 import json
 import os
 import re
-from typing import Any
+from typing import Any, Generator
 
 
 def _get_client():
@@ -89,6 +90,53 @@ def chat(
     return resp.choices[0].message.content or ""
 
 
+def chat_stream(
+    messages: list[dict[str, str]],
+    target_model: str | None = None,
+    complexity: str = "standard",
+    session_id: str | None = None,
+    effort: str | None = None,
+    **kwargs: Any,
+) -> Generator[str, None, None]:
+    """Streams real-time text token chunks via Azure OpenAI or OpenAI."""
+    client = _get_client()
+    model = (
+        target_model
+        or os.getenv("AZURE_OPENAI_DEPLOYMENT")
+        or os.getenv("AZURE_OPENAI_CHAT_DEPLOYMENT_NAME")
+        or "omni-flow-gpt-6-luna"
+    )
+    call_kwargs: dict[str, Any] = {
+        "model": model,
+        "messages": messages,  # type: ignore
+        "stream": True,
+    }
+
+    eff = (effort or kwargs.get("reasoning_effort") or "").lower()
+    if eff in ["low", "medium", "high"]:
+        call_kwargs["reasoning_effort"] = eff
+
+    if "luna" not in model.lower() and "o1" not in model.lower() and "o3" not in model.lower():
+        if "temperature" in kwargs:
+            call_kwargs["temperature"] = kwargs["temperature"]
+
+    try:
+        response = client.chat.completions.create(**call_kwargs)
+        for chunk in response:
+            if chunk.choices and chunk.choices[0].delta and chunk.choices[0].delta.content:
+                yield chunk.choices[0].delta.content
+    except Exception as e:
+        err_msg = str(e).lower()
+        if "reasoning_effort" in err_msg and "reasoning_effort" in call_kwargs:
+            del call_kwargs["reasoning_effort"]
+            response = client.chat.completions.create(**call_kwargs)
+            for chunk in response:
+                if chunk.choices and chunk.choices[0].delta and chunk.choices[0].delta.content:
+                    yield chunk.choices[0].delta.content
+        else:
+            raise
+
+
 def chat_json(
     messages: list[dict[str, str]],
     target_model: str | None = None,
@@ -108,4 +156,3 @@ def chat_json(
         if s != -1 and e != -1 and e > s:
             return json.loads(clean[s : e + 1])
         raise
-

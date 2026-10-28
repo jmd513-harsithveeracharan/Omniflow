@@ -256,7 +256,8 @@ export async function streamChatTurn(
   effort?: string,
   onStage?: (stage: string) => void,
   onThoughtStep?: (step: import('../types').ThoughtStep) => void,
-  mode?: 'auto' | 'general' | 'project'
+  mode?: 'auto' | 'general' | 'project',
+  isVoice?: boolean
 ): Promise<void> {
   try {
     const res = await fetch(`${API_BASE}/chat/stream`, {
@@ -269,6 +270,7 @@ export async function streamChatTurn(
         model: model || undefined,
         effort: effort || undefined,
         mode: mode || 'auto',
+        is_voice: Boolean(isVoice),
       }),
     });
     if (!res.ok || !res.body) throw new Error(`Stream connection failed: ${res.statusText}`);
