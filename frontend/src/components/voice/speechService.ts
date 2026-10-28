@@ -62,17 +62,15 @@ export const createSpeechRecognition = (): IBrowserSpeechRecognition | null => {
  */
 export const cleanTextForSpeech = (rawText: string): string => {
   return rawText
-    // Remove multi-agent tags and headers
-    .replace(/###\s*[^\n]+/g, '')
     // Remove code blocks
     .replace(/```[\s\S]*?```/g, ' Code snippet omitted. ')
     // Remove inline code
     .replace(/`([^`]+)`/g, '$1')
-    // Remove markdown headers
+    // Remove markdown header hashtags (preserving the header text itself)
     .replace(/^#{1,6}\s+/gm, '')
     // Remove bold/italics
     .replace(/(\*\*|\*|__|_)(.*?)\1/g, '$2')
-    // Remove markdown links
+    // Remove markdown links (keep text)
     .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
     // Remove HTML tags
     .replace(/<[^>]*>/g, '')
@@ -114,10 +112,9 @@ export const unlockSpeechEngine = (): void => {
 };
 
 /**
- * Picks the highest-fidelity natural voice supported by the current browser.
- * Edge: uses Microsoft Online Natural neural voices (Jenny, Aria, Guy).
- * Chrome: filters out Edge Online voices (which throw 'not-allowed' in Chrome)
- * and uses Google US/UK English or local Windows/Mac desktop neural voices.
+ * Picks the highest-fidelity natural MALE voice supported by the current browser.
+ * Edge: uses Microsoft Online Natural neural male voices (Guy, Christopher, Eric, Ryan, Brian).
+ * Chrome: uses Google UK English Male or local desktop male voices (David, Mark, George, Daniel).
  */
 export const getBestSpeechVoice = (): SpeechSynthesisVoice | null => {
   if (typeof window === 'undefined' || !('speechSynthesis' in window)) return null;
@@ -132,55 +129,68 @@ export const getBestSpeechVoice = (): SpeechSynthesisVoice | null => {
     ? rawVoices
     : rawVoices.filter((v) => !v.name.includes('Online'));
 
+  // 1. Edge Online Natural Male voices (Guy, Christopher, Eric, Ryan, Brian, Steffan)
   if (isEdge) {
-    // 1. Edge Online Natural neural voices (Jenny, Aria, Guy)
-    const edgeNatural = voices.find(
+    const edgeNaturalMale = voices.find(
       (v) =>
         v.lang.startsWith('en') &&
         (v.name.includes('Natural') || v.name.includes('Online')) &&
-        (v.name.includes('Jenny') || v.name.includes('Aria') || v.name.includes('Guy'))
+        (v.name.includes('Guy') ||
+          v.name.includes('Christopher') ||
+          v.name.includes('Eric') ||
+          v.name.includes('Ryan') ||
+          v.name.includes('Brian') ||
+          v.name.includes('Steffan'))
     );
-    if (edgeNatural) return edgeNatural;
+    if (edgeNaturalMale) return edgeNaturalMale;
   }
 
-  // 2. Google High-Quality English voices (Chrome)
-  const googleVoice = voices.find(
-    (v) =>
-      v.name.includes('Google US English') ||
-      v.name.includes('Google UK English Female') ||
-      v.name.includes('Google UK English Male')
-  );
-  if (googleVoice) return googleVoice;
-
-  // 3. Local Natural / Neural voices
-  const localNatural = voices.find(
+  // 2. Google High-Quality Male English Voice (Chrome)
+  const googleMale = voices.find(
     (v) =>
       v.lang.startsWith('en') &&
-      (v.name.includes('Natural') || v.name.includes('Neural'))
+      (v.name.includes('Google UK English Male') ||
+        (v.name.toLowerCase().includes('male') && !v.name.toLowerCase().includes('female')))
   );
-  if (localNatural) return localNatural;
+  if (googleMale) return googleMale;
 
-  // 4. Windows Local Desktop Voices (Zira / David / Mark)
-  const winDesktop = voices.find(
+  // 3. Windows & Mac High-Quality Desktop Male Voices (David, Mark, George, Daniel, Alex, Oliver)
+  const desktopMale = voices.find(
     (v) =>
       v.lang.startsWith('en') &&
-      (v.name.includes('Zira') || v.name.includes('David') || v.name.includes('Mark'))
+      (v.name.includes('David') ||
+        v.name.includes('Mark') ||
+        v.name.includes('George') ||
+        v.name.includes('Daniel') ||
+        v.name.includes('Alex') ||
+        v.name.includes('Oliver') ||
+        v.name.toLowerCase().includes('male'))
   );
-  if (winDesktop) return winDesktop;
+  if (desktopMale) return desktopMale;
 
-  // 5. Apple Samantha / Ava / Daniel
-  const appleVoice = voices.find((v) => v.name.includes('Samantha') || v.name.includes('Ava'));
-  if (appleVoice) return appleVoice;
+  // 4. Any English Voice that avoids known female identifiers
+  const fallbackMale = voices.find(
+    (v) =>
+      v.lang.startsWith('en') &&
+      !v.name.includes('Jenny') &&
+      !v.name.includes('Aria') &&
+      !v.name.includes('Zira') &&
+      !v.name.includes('Samantha') &&
+      !v.name.includes('Ava') &&
+      !v.name.includes('Susan') &&
+      !v.name.toLowerCase().includes('female')
+  );
+  if (fallbackMale) return fallbackMale;
 
-  // 6. Any English voice that is safe
-  const anyEnglish = voices.find((v) => v.lang === 'en-US' || v.lang.startsWith('en'));
+  // 5. General English fallback
+  const anyEnglish = voices.find((v) => v.lang.startsWith('en'));
   if (anyEnglish) return anyEnglish;
 
   return voices[0] || null;
 };
 
 /**
- * Speaks one sentence with the best natural voice and calls onDone exactly once
+ * Speaks one sentence with the best natural male voice and calls onDone exactly once
  * when it finishes, errors, or is cancelled. Includes automatic retry with default voice
  * and a 15-second keepalive to prevent Chrome's background freeze bug.
  */
@@ -203,8 +213,9 @@ export const speakSentence = (text: string, onDone: () => void): SpeechSynthesis
     utter.voice = voice;
     utter.lang = voice.lang;
   }
-  utter.rate = 1.05;
-  utter.pitch = 1.0;
+  // Snappy, authoritative natural male tone
+  utter.rate = 1.02;
+  utter.pitch = 0.95;
 
   let startedAt = 0;
   const queuedAt = Date.now();

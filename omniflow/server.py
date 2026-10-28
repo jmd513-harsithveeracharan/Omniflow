@@ -56,9 +56,9 @@ app.include_router(auth_router)
 app.include_router(git_router)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DIST_DIR = os.path.join(BASE_DIR, "dist")
+DIST_DIR = os.path.join(os.path.dirname(BASE_DIR), "frontend", "dist")
 if not os.path.exists(DIST_DIR):
-    DIST_DIR = os.path.join(os.path.dirname(BASE_DIR), "frontend", "dist")
+    DIST_DIR = os.path.join(BASE_DIR, "dist")
 INTAKE_DIR = os.path.join(BASE_DIR, "intake")
 
 # Durable JSON session store surviving reloads and restarts

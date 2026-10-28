@@ -196,15 +196,13 @@ export const PromptDock: React.FC<PromptDockProps> = ({
   const leftControlsRef = useRef<HTMLDivElement>(null);
   const modelPillWrapperRef = useRef<HTMLDivElement>(null);
 
-  const displayValue = input || (isVoiceModeActive ? voiceTranscript : '');
-
   useEffect(() => {
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
       const newHeight = Math.min(textareaRef.current.scrollHeight, 180);
       textareaRef.current.style.height = `${newHeight}px`;
     }
-  }, [input, voiceTranscript, isVoiceModeActive]);
+  }, [input]);
 
   useEffect(() => {
     const handleOutsideClick = (e: MouseEvent) => {
@@ -242,7 +240,7 @@ export const PromptDock: React.FC<PromptDockProps> = ({
       dictationRecRef.current = null;
       setIsDictating(false);
     }
-    const val = (typeof textOverride === 'string' ? textOverride : '') || input || (isVoiceModeActive ? voiceTranscript : '');
+    const val = (typeof textOverride === 'string' ? textOverride : '') || input;
     if (!val.trim() || isStreaming) return;
     onSendMessage(val.trim(), selectedModel, selectedEffort.toLowerCase(), chatMode);
     setInput('');
@@ -254,7 +252,7 @@ export const PromptDock: React.FC<PromptDockProps> = ({
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      handleSubmit(displayValue);
+      handleSubmit(input);
     }
   };
 
@@ -291,7 +289,7 @@ export const PromptDock: React.FC<PromptDockProps> = ({
           <textarea
             ref={textareaRef}
             id="chatInput"
-            value={isVoiceModeActive ? input : displayValue}
+            value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder={
