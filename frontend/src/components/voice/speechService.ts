@@ -108,10 +108,6 @@ export const unlockSpeechEngine = (): void => {
   try {
     const synth = window.speechSynthesis;
     if (synth.paused) synth.resume();
-    // Warm up the engine with a silent 0-volume empty utterance
-    const primer = new SpeechSynthesisUtterance('');
-    primer.volume = 0;
-    synth.speak(primer);
   } catch {
     // ignore
   }
@@ -194,6 +190,10 @@ export const speakSentence = (text: string, onDone: () => void): SpeechSynthesis
     return null;
   }
   const synth = window.speechSynthesis;
+  // If Chrome has any stale or hung utterances in queue, cancel them so speech starts immediately
+  if (synth.pending) {
+    synth.cancel();
+  }
   let finished = false;
   let retried = false;
 

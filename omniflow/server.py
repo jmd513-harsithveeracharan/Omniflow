@@ -233,6 +233,10 @@ async def get_fabric_status() -> dict[str, Any]:
     return FABRIC_STATUS_CACHE
 
 
+FABRIC_ITEMS_CACHE: list[str] = []
+FABRIC_ITEMS_CACHE_TIME: float = 0.0
+
+
 @app.get("/api/sessions")
 async def list_sessions() -> dict[str, Any]:
     sess_list = []
@@ -1331,20 +1335,27 @@ async def handle_chat_stream(req: ChatRequest) -> StreamingResponse:
                 },
             ]
             for st in tier2_steps:
-                await asyncio.sleep(0.18)
                 yield f"data: {json.dumps({'type': 'thought_step', 'step': st})}\n\n"
+            await asyncio.sleep(0)
 
-            # Query Postgres repository for recent items JIT context
-            repo = PostgresRepository()
-            db_ctx = []
-            try:
-                with repo._connect() as conn:
-                    with conn.cursor() as cur:
-                        cur.execute("SELECT item_name, item_type, status FROM fabric_items ORDER BY created_at DESC LIMIT 10;")
-                        for itm in cur.fetchall():
-                            db_ctx.append(f"- {itm[0]} ({itm[1]}): {itm[2]}")
-            except Exception:
-                pass
+            # Query Postgres repository with in-memory caching to eliminate 2.2s connection stall
+            global FABRIC_ITEMS_CACHE, FABRIC_ITEMS_CACHE_TIME
+            now = time.time()
+            if not FABRIC_ITEMS_CACHE or (now - FABRIC_ITEMS_CACHE_TIME > 60.0):
+                db_ctx = []
+                try:
+                    repo = PostgresRepository()
+                    with repo._connect() as conn:
+                        with conn.cursor() as cur:
+                            cur.execute("SELECT item_name, item_type, status FROM fabric_items ORDER BY created_at DESC LIMIT 10;")
+                            for itm in cur.fetchall():
+                                db_ctx.append(f"- {itm[0]} ({itm[1]}): {itm[2]}")
+                    FABRIC_ITEMS_CACHE = db_ctx
+                    FABRIC_ITEMS_CACHE_TIME = now
+                except Exception:
+                    db_ctx = FABRIC_ITEMS_CACHE
+            else:
+                db_ctx = FABRIC_ITEMS_CACHE
 
             sys_prompt = (
                 f"You are Tenali AI (OmniFlow GPT-6 Luna), the autonomous enterprise Microsoft Fabric data engineering agent.\n"
@@ -1375,12 +1386,22 @@ async def handle_chat_stream(req: ChatRequest) -> StreamingResponse:
                 if not effective_effort or effective_effort.lower() in ["medium", "auto"]:
                     effective_effort = "low"
 
+            # Emit active progress step before LLM stream starts
+            yield f"data: {json.dumps({'type': 'thought_step', 'step': {'id': 't2_stream', 'title': 'Tenali AI: Generating stream response...', 'status': 'in_progress', 'target': 'Tenali AI'}})}\n\n"
+            await asyncio.sleep(0)
+
             reply_chunks: list[str] = []
+            first_chunk_emitted = False
+            t_llm_start = time.time()
             try:
                 async for chunk in chat_stream_async(
                     [{"role": "system", "content": sys_prompt}, {"role": "user", "content": req.message}],
                     effort=effective_effort,
                 ):
+                    if not first_chunk_emitted:
+                        first_chunk_emitted = True
+                        dur_str = f"{time.time() - t_llm_start:.1f}s"
+                        yield f"data: {json.dumps({'type': 'thought_step', 'step': {'id': 't2_stream', 'title': f'Tenali AI: Response streaming active ({dur_str})', 'status': 'completed', 'duration': dur_str, 'target': 'Tenali AI'}})}\n\n"
                     reply_chunks.append(chunk)
                     yield f"data: {json.dumps({'type': 'chunk', 'text': chunk})}\n\n"
                     await asyncio.sleep(0)  # Immediately flushes chunk over TCP socket
