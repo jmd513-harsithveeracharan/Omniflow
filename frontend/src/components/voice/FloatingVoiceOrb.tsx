@@ -14,6 +14,7 @@ interface FloatingVoiceOrbProps {
   transcript?: string;
   onClick?: () => void;
   onInterrupt?: () => void;
+  onCommit?: () => void;
 }
 
 /**
@@ -112,6 +113,7 @@ export const FloatingVoiceOrb: React.FC<FloatingVoiceOrbProps> = ({
   transcript,
   onClick,
   onInterrupt,
+  onCommit,
 }) => {
   const isListening = state === 'listening';
   const audioEnergy = useLiveAudioEnergy(state !== 'muted', isListening);
@@ -127,6 +129,8 @@ export const FloatingVoiceOrb: React.FC<FloatingVoiceOrbProps> = ({
     e.stopPropagation();
     if (state === 'muted' && onClick) {
       onClick();
+    } else if (transcript && transcript.trim().length > 0 && onCommit) {
+      onCommit();
     } else if (onInterrupt) {
       onInterrupt();
     } else if (onClick) {

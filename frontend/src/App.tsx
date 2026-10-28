@@ -458,6 +458,7 @@ export const App: React.FC = () => {
     toggleMute: toggleVoiceMute,
     toggleAudioMode: toggleVoiceAudioMode,
     interrupt: interruptVoice,
+    commitTurn,
     startVoiceResponse,
     feedStreamingChunk,
     finishStreaming,
@@ -613,6 +614,8 @@ export const App: React.FC = () => {
                   isStreaming={isStreaming}
                   sessionId={sessionId}
                   isVoiceModeActive={isVoiceModeActive}
+                  liveVoiceTranscript={voiceTranscript}
+                  onCommitLiveVoice={commitTurn}
                   onDeployPlan={() => {
                     setIsWorkbenchOpen(true);
                     handleSendMessage('deploy active plan');
@@ -633,6 +636,7 @@ export const App: React.FC = () => {
                 isVoiceMuted={isVoiceMuted}
                 onToggleVoiceMute={toggleVoiceMute}
                 onInterruptVoice={interruptVoice}
+                onCommitVoice={commitTurn}
                 voiceTranscript={voiceTranscript}
                 voiceAudioMode={voiceAudioMode}
                 onToggleVoiceAudioMode={toggleVoiceAudioMode}

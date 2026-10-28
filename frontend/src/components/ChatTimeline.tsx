@@ -10,6 +10,8 @@ interface ChatTimelineProps {
   isStreaming: boolean;
   sessionId?: string;
   isVoiceModeActive?: boolean;
+  liveVoiceTranscript?: string;
+  onCommitLiveVoice?: () => void;
   onDeployPlan?: () => void;
   onOpenCanvas?: () => void;
   onOpenWorkspace?: () => void;
@@ -21,6 +23,8 @@ export const ChatTimeline: React.FC<ChatTimelineProps> = ({
   isStreaming,
   sessionId,
   isVoiceModeActive = false,
+  liveVoiceTranscript = '',
+  onCommitLiveVoice,
   onDeployPlan,
   onOpenCanvas,
   onOpenWorkspace,
@@ -37,6 +41,7 @@ export const ChatTimeline: React.FC<ChatTimelineProps> = ({
 
   const lastUserRef = useRef<HTMLDivElement | null>(null);
   const activeAssistantRef = useRef<HTMLDivElement | null>(null);
+  const liveVoiceBubbleRef = useRef<HTMLDivElement | null>(null);
 
   // User manual scroll detection
   const handleScroll = () => {
@@ -124,6 +129,26 @@ export const ChatTimeline: React.FC<ChatTimelineProps> = ({
 
     prevCountRef.current = messages.length;
   }, [messages, isStreaming]);
+
+  // Live Growing User Bubble Autoscroll during Voice Speech
+  useEffect(() => {
+    if (isVoiceModeActive && liveVoiceTranscript && !isUserScrolledUpRef.current && threadRef.current) {
+      requestAnimationFrame(() => {
+        if (!threadRef.current) return;
+        const currentThread = threadRef.current;
+        const targetEl = liveVoiceBubbleRef.current;
+        if (!targetEl) return;
+        const threadRect = currentThread.getBoundingClientRect();
+        const targetRect = targetEl.getBoundingClientRect();
+        const dockReserved = 290;
+        const visibleBottom = threadRect.bottom - dockReserved;
+        if (targetRect.bottom > visibleBottom) {
+          const overflow = targetRect.bottom - visibleBottom;
+          currentThread.scrollTop += overflow;
+        }
+      });
+    }
+  }, [liveVoiceTranscript, isVoiceModeActive]);
 
   const handleCopy = (text: string, idx: number) => {
     navigator.clipboard.writeText(text);
@@ -405,6 +430,32 @@ export const ChatTimeline: React.FC<ChatTimelineProps> = ({
             </div>
           );
         })}
+
+        {/* ChatGPT-Style Live Growing User Bubble during Voice Mode */}
+        {isVoiceModeActive && liveVoiceTranscript && liveVoiceTranscript.trim().length > 0 && !isStreaming && (
+          <div
+            ref={liveVoiceBubbleRef}
+            className="chat-bubble user live-voice-bubble"
+            data-raw-content={liveVoiceTranscript}
+            onClick={onCommitLiveVoice}
+            title="Click to send immediately"
+          >
+            <div className="chat-content-card live-speech-card">
+              <div className="chat-card-text">
+                {liveVoiceTranscript}
+                <span className="live-speech-pulse-dot" title="Listening to speech..." />
+              </div>
+            </div>
+            <div className="live-voice-status-hint">
+              <span className="live-voice-wave-bars">
+                <span className="v-bar v1" />
+                <span className="v-bar v2" />
+                <span className="v-bar v3" />
+              </span>
+              <span>Listening... Pause or tap orb to send</span>
+            </div>
+          </div>
+        )}
 
         <div id="chatBottomSpacer" className="chat-thread-bottom-spacer" style={{ height: '16px', flexShrink: 0 }} />
       </div>

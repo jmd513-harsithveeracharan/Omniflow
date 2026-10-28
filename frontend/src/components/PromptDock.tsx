@@ -20,6 +20,7 @@ interface PromptDockProps {
   isVoiceMuted?: boolean;
   onToggleVoiceMute?: () => void;
   onInterruptVoice?: () => void;
+  onCommitVoice?: () => void;
   voiceTranscript?: string;
   voiceAudioMode?: 'speaker' | 'headphone';
   onToggleVoiceAudioMode?: () => void;
@@ -35,6 +36,7 @@ export const PromptDock: React.FC<PromptDockProps> = ({
   isVoiceMuted = false,
   onToggleVoiceMute,
   onInterruptVoice,
+  onCommitVoice,
   voiceTranscript = '',
   voiceAudioMode = 'speaker',
   onToggleVoiceAudioMode,
@@ -279,6 +281,7 @@ export const PromptDock: React.FC<PromptDockProps> = ({
           transcript={voiceTranscript}
           onClick={onToggleVoiceMute}
           onInterrupt={onInterruptVoice}
+          onCommit={onCommitVoice}
         />
       )}
 
@@ -288,14 +291,16 @@ export const PromptDock: React.FC<PromptDockProps> = ({
           <textarea
             ref={textareaRef}
             id="chatInput"
-            value={displayValue}
+            value={isVoiceModeActive ? input : displayValue}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder={
               isVoiceModeActive
                 ? isVoiceMuted
                   ? 'Microphone muted. Tap unmute or start typing...'
-                  : 'Speak in plain English (or type here)...'
+                  : voiceTranscript
+                  ? 'Speaking live into conversation above... (or type here)'
+                  : 'Voice mode active — speak freely (words grow in chat above)...'
                 : 'Start typing a prompt to see what our models can do...'
             }
             rows={1}
@@ -603,14 +608,22 @@ export const PromptDock: React.FC<PromptDockProps> = ({
                     </button>
 
                     {/* Send Button if text was spoken or typed */}
-                    {displayValue.trim().length > 0 && (
+                    {(input.trim().length > 0 || (isVoiceModeActive && voiceTranscript.trim().length > 0)) && (
                       <button
                         type="button"
-                        onClick={() => handleSubmit(displayValue)}
+                        onClick={() => {
+                          if (input.trim()) {
+                            handleSubmit(input);
+                          } else if (onCommitVoice) {
+                            onCommitVoice();
+                          } else {
+                            handleSubmit(voiceTranscript);
+                          }
+                        }}
                         disabled={isStreaming}
                         className="dock-icon-btn btn-chat-send"
                         id="btnChatSend"
-                        title="Send Spoken Prompt (Enter)"
+                        title="Send Prompt (Enter)"
                         style={{
                           background: '#ffffff',
                           color: '#09090b',

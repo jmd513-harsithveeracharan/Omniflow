@@ -326,10 +326,10 @@ export function useVoiceMode({
         clearTimeout(silenceTimerRef.current);
       }
 
-      // Natural human conversational breathing buffer: 2.2s once finalized, 2.5s for interim, 2.8s for 1-2 words.
-      // Gives comfortable time to pause and inhale without prematurely sending.
+      // Natural conversational pause buffer: 1.8s once finalized, 2.1s for interim, 2.4s for 1-2 words.
+      // Gives comfortable time to pause and inhale while feeling snappy and prompt when done.
       const wordsCount = countWords(fullSpoken);
-      const delayMs = wordsCount <= 2 ? 2800 : hasInterim ? 2500 : 2200;
+      const delayMs = wordsCount <= 2 ? 2400 : hasInterim ? 2100 : 1800;
 
       silenceTimerRef.current = setTimeout(() => {
         commitTurnNow();
@@ -393,6 +393,7 @@ export function useVoiceMode({
     toggleMute,
     toggleAudioMode,
     interrupt,
+    commitTurn: commitTurnNow,
     startVoiceResponse,
     feedStreamingChunk,
     finishStreaming,
