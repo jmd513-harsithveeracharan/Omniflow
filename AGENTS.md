@@ -60,11 +60,13 @@ This document defines the non-negotiable architectural standards, code quality r
 - `dev`: Active integration and feature development branch.
 - `feat/<name>`: Dedicated feature branches for major milestones.
 
-### B. Natural, Human-Written Commit Messages
+### B. Natural, Human-Written Commit Messages & Mandatory Visibility
 - Follow conventional commit prefixes: `feat:`, `fix:`, `refactor:`, `test:`, `docs:`, `chore:`.
 - Keep messages simple, natural, and human-written (avoid stiff AI punctuation and over-complicated wording).
   - *Good*: `feat: add claude cli session resume and fastapi server`
   - *Good*: `fix: handle missing db session in chat router`
   - *Good*: `refactor: extract sql transpiler to domain model`
-- Commit atomically after every verified milestone or feature completion.
+- **Mandatory Atomic Commit**: Commit atomically after *every single* verified milestone, bug fix, or feature step.
+- **Mandatory Response Commit Proof**: In every response that modifies files, you MUST state the exact Git commit SHA and commit message at the end so the user always sees the version trail.
+- **Remote Sync Awareness**: Always clarify to the user whether commits are on a local feature branch (e.g., `feat/ui-integration`) or pushed to GitHub (`origin`), offering to push or merge when milestones complete.
 - Never commit `.env`, local `.db` files, credentials, or Obsidian notes (`.gitignore` enforced).
