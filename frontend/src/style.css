@@ -1843,6 +1843,7 @@ nav.sidebar-nav {
     border: none;
     outline: none;
     resize: none;
+    overflow-y: auto;
     color: var(--text-primary);
     font-family: var(--font-sans);
     font-size: 15px;
@@ -1850,6 +1851,17 @@ nav.sidebar-nav {
     min-height: 48px;
     max-height: 180px;
     padding: 2px 2px;
+    word-break: break-word;
+    white-space: pre-wrap;
+}
+
+.dock-textarea-wrapper textarea::-webkit-scrollbar {
+    width: 5px;
+}
+
+.dock-textarea-wrapper textarea::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 4px;
 }
 
 .dock-textarea-wrapper textarea::placeholder {

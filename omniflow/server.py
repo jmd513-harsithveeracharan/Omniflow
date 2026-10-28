@@ -23,7 +23,7 @@ from pydantic import BaseModel, Field
 
 from omniflow.agents.orchestrator import MultiAgentOrchestrator
 from omniflow.agents.schemas import NaturalLanguagePlanRequest
-from omniflow.config.llm_adapter import chat, chat_stream
+from omniflow.config.llm_adapter import chat, chat_stream, chat_stream_async
 from omniflow.db.postgres_repo import PostgresRepository
 from omniflow.tools.fabric_deployer import (
     deploy_medallion_architecture_to_fabric,
@@ -1360,27 +1360,32 @@ async def handle_chat_stream(req: ChatRequest) -> StreamingResponse:
                 f"- If asked for T-SQL, write clean CREATE OR ALTER statements with proper TRY...CATCH error handling and transaction safety.\n"
                 f"- If asked for PySpark, provide idempotent Delta Lake code with Delta MERGE on primary keys.\n"
                 f"- If asked for a pipeline, define the dynamic activity JSON with clear dependency wiring.\n"
+                f"- For conceptual or conversational explanations (e.g. 'what is data engineering'), provide crisp, engaging, structured answers (2-3 concise paragraphs or key highlights). Do NOT output unprompted 2,000-word walls of text.\n"
                 f"- Include a concise summary and next execution steps."
             )
 
-            # Fast conversational routing:
-            # In voice mode or general queries, use effort='low' so tokens arrive in seconds
-            # instead of blocking for 40s on deep hidden chain-of-thought reasoning!
+            # Ultra-low latency conversational routing:
+            # Check if this is a deep architecture task or conceptual / voice conversation
+            is_heavy_task = any(
+                w in req.message.lower()
+                for w in ["blueprint", "synthesize", "star schema", "scd2", "deploy active plan", "end-to-end platform", "pipeline activity"]
+            )
             effective_effort = req.effort
-            if req.is_voice or req.mode == "general":
+            if req.is_voice or not is_heavy_task or req.mode == "general":
                 if not effective_effort or effective_effort.lower() in ["medium", "auto"]:
                     effective_effort = "low"
 
             reply_chunks: list[str] = []
             try:
-                for chunk in chat_stream(
+                async for chunk in chat_stream_async(
                     [{"role": "system", "content": sys_prompt}, {"role": "user", "content": req.message}],
                     effort=effective_effort,
                 ):
                     reply_chunks.append(chunk)
                     yield f"data: {json.dumps({'type': 'chunk', 'text': chunk})}\n\n"
-            except Exception:
-                # Fallback to standard chat if streaming is interrupted
+                    await asyncio.sleep(0)  # Immediately flushes chunk over TCP socket
+            except Exception as stream_err:
+                print(f"[OmniFlow Stream Notice] Streaming fallback triggered: {stream_err}")
                 fallback_reply = chat(
                     [{"role": "system", "content": sys_prompt}, {"role": "user", "content": req.message}],
                     effort=effective_effort,
@@ -1392,7 +1397,15 @@ async def handle_chat_stream(req: ChatRequest) -> StreamingResponse:
             SESSIONS[sid]["messages"].append({"role": "assistant", "content": reply})
             yield f"data: {json.dumps({'type': 'done', 'session_id': sid, 'plan': active_plan})}\n\n"
 
-    return StreamingResponse(event_generator(), media_type="text/event-stream")
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 
 @app.get("/")
