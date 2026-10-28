@@ -215,8 +215,8 @@ export const speakSentence = (text: string, onDone: () => void): SpeechSynthesis
     utter.voice = voice;
     utter.lang = voice.lang;
   }
-  // Snappy, authoritative natural male tone at conversational brisk pace
-  utter.rate = 1.16;
+  // Snappy, authoritative natural male tone at brisk conversational pace
+  utter.rate = 1.22;
   utter.pitch = 0.96;
 
   let startedAt = 0;
