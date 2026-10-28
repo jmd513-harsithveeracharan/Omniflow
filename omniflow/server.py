@@ -14,7 +14,15 @@ import os
 import re
 import time
 import uuid
+import sys
 from typing import Any
+
+# Ensure both omniflow folder and parent folder are on sys.path for standalone or monorepo execution
+_current_dir = os.path.dirname(os.path.abspath(__file__))
+_parent_dir = os.path.dirname(_current_dir)
+for _p in [_parent_dir, _current_dir]:
+    if _p not in sys.path:
+        sys.path.insert(0, _p)
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -56,9 +64,11 @@ app.include_router(auth_router)
 app.include_router(git_router)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DIST_DIR = os.path.join(os.path.dirname(BASE_DIR), "frontend", "dist")
+DIST_DIR = os.path.join(BASE_DIR, "frontend", "dist")
 if not os.path.exists(DIST_DIR):
     DIST_DIR = os.path.join(BASE_DIR, "dist")
+if not os.path.exists(DIST_DIR):
+    DIST_DIR = os.path.join(os.path.dirname(BASE_DIR), "frontend", "dist")
 INTAKE_DIR = os.path.join(BASE_DIR, "intake")
 
 # Durable JSON session store surviving reloads and restarts
@@ -853,7 +863,10 @@ async def get_workspace_tree() -> dict[str, Any]:
 @app.get("/api/skills")
 async def get_skills_list() -> list[dict[str, Any]]:
     try:
-        from app.skill_loader import get_skill_index
+        try:
+            from omniflow.tools.skill_loader import get_skill_index
+        except ImportError:
+            from app.skill_loader import get_skill_index
         index = get_skill_index()
         if index:
             return [

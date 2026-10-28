@@ -9,9 +9,9 @@ import networkx as nx
 import psycopg2
 
 try:
-    from app.llm_router import chat
-except ImportError:
     from omniflow.config.llm_adapter import chat
+except ImportError:
+    from app.llm_router import chat
 
 from omniflow.db.catalog_seeder import get_table_schema_context_from_db
 from omniflow.db.postgres_repo import NEON_URI

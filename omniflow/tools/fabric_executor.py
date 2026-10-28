@@ -20,6 +20,18 @@ if _root not in sys.path:
     sys.path.insert(0, _root)
 
 try:
+    from omniflow.config.env_loader import get_workspace_id
+    from omniflow.config.llm_adapter import chat_json
+    from omniflow.tools.fabric_adapter import (
+        get_job_status,
+        refresh_semantic_model,
+        run_notebook,
+        trigger_pipeline_run,
+        update_definition,
+        compile_notebook_update,
+    )
+    ALLOWED_WORKSPACE_ID = get_workspace_id()
+except ImportError:
     from app.config import ALLOWED_WORKSPACE_ID
     from app.fabric_client import (
         get_job_status,
@@ -30,19 +42,6 @@ try:
     )
     from app.fabric_compiler import compile_notebook_update
     from app.llm_router import chat_json
-except ImportError:
-    from omniflow.config.env_loader import get_workspace_id
-    from omniflow.config.llm_adapter import chat_json
-    from omniflow.tools.fabric_adapter import (
-        get_job_status,
-        run_notebook,
-        compile_notebook_update,
-    )
-
-    ALLOWED_WORKSPACE_ID = get_workspace_id()
-
-    def refresh_semantic_model(workspace_id: str, dataset_id: str) -> dict[str, Any]:
-        return {"status": "SUCCESS", "message": "Direct Lake model refreshed."}
 
     def trigger_pipeline_run(workspace_id: str, pipeline_id: str) -> dict[str, Any]:
         return {"status": "SUCCESS", "pipeline_id": pipeline_id}

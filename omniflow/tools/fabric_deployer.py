@@ -20,6 +20,18 @@ if _root not in sys.path:
     sys.path.insert(0, _root)
 
 try:
+    from omniflow.config.env_loader import get_workspace_id, get_workspace_name
+    from omniflow.tools.fabric_adapter import (
+        create_item,
+        get_or_create_folder,
+        list_folders,
+        list_workspace_items,
+        provision_item_with_definition,
+        compile_notebook_update,
+    )
+    ALLOWED_WORKSPACE_ID = get_workspace_id()
+    ALLOWED_WORKSPACE_NAME = get_workspace_name()
+except ImportError:
     from app.config import ALLOWED_WORKSPACE_ID, ALLOWED_WORKSPACE_NAME
     from app.fabric_client import (
         create_item,
@@ -29,19 +41,6 @@ try:
         provision_item_with_definition,
     )
     from app.fabric_compiler import compile_notebook_update
-except ImportError:
-    from omniflow.config.env_loader import get_workspace_id, get_workspace_name
-    from omniflow.tools.fabric_adapter import (
-        create_item,
-        get_or_create_folder,
-        compile_notebook_update,
-    )
-
-    ALLOWED_WORKSPACE_ID = get_workspace_id()
-    ALLOWED_WORKSPACE_NAME = get_workspace_name()
-
-    def list_folders(workspace_id: str) -> list[dict[str, Any]]:
-        return []
 
     def list_workspace_items(workspace_id: str) -> list[dict[str, Any]]:
         return []

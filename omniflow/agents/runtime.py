@@ -73,9 +73,9 @@ from omniflow.agents.schemas import (
     ToolCheckItem,
 )
 try:
-    from app.llm_router import chat, chat_json
-except ImportError:
     from omniflow.config.llm_adapter import chat, chat_json
+except ImportError:
+    from app.llm_router import chat, chat_json
 from omniflow.agents.tool_synthesizer import synthesize_and_register_tool
 from omniflow.db.execution_logger import ExecutionDatabaseLogger
 from omniflow.db.postgres_repo import NEON_URI, PostgresRepository
