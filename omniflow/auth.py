@@ -284,9 +284,19 @@ def get_project_members(project_id: str) -> dict[str, Any]:
 @auth_router.post("/projects/{project_id}/members/add")
 def add_project_member(project_id: str, req: ProjectMemberAddRequest) -> dict[str, Any]:
     global _MEMBERS_CACHE, _USERS_CACHE
-    user = next((u for u in _USERS_CACHE if u["id"] == req.user_id), None)
+    user = next((u for u in _USERS_CACHE if u["id"] == req.user_id or u["email"].lower() == req.user_id.lower()), None)
     if not user:
-        raise HTTPException(status_code=404, detail="User not found.")
+        if "@" in req.user_id:
+            user = {
+                "id": f"usr_{uuid.uuid4().hex[:8]}",
+                "name": req.user_id.split("@")[0].replace(".", " ").title(),
+                "email": req.user_id.strip(),
+                "avatar_color": "#3b82f6",
+                "created_at": time.strftime("%Y-%m-%dT%H:%M:%SZ"),
+            }
+            _USERS_CACHE.append(user)
+        else:
+            raise HTTPException(status_code=404, detail="User not found.")
 
     member_id = f"mem_{uuid.uuid4().hex[:8]}"
     new_member = {
@@ -304,10 +314,31 @@ def add_project_member(project_id: str, req: ProjectMemberAddRequest) -> dict[st
         _MEMBERS_CACHE[project_id] = []
     
     # Check if already added
-    if any(m["user_id"] == req.user_id for m in _MEMBERS_CACHE[project_id]):
+    if any(m["user_id"] == user["id"] or m["email"].lower() == user["email"].lower() for m in _MEMBERS_CACHE[project_id]):
         raise HTTPException(status_code=400, detail="User is already a member of this project.")
 
     _MEMBERS_CACHE[project_id].append(new_member)
+
+    # Also synchronize with server.PROJECTS_CACHE so scoping picks it up immediately
+    try:
+        from server import PROJECTS_CACHE
+        target_p = next((p for p in PROJECTS_CACHE if p["id"] == project_id), None)
+        if target_p:
+            meta = target_p.get("metadata") or {}
+            m_list = list(meta.get("members", []))
+            m_list = [m for m in m_list if m.get("email", "").lower() != user["email"].lower()]
+            m_list.append({
+                "id": member_id,
+                "user_id": user["id"],
+                "name": user["name"],
+                "email": user["email"],
+                "role": req.role,
+                "avatarBg": user["avatar_color"],
+            })
+            meta["members"] = m_list
+            target_p["metadata"] = meta
+    except Exception:
+        pass
 
     if NEON_URI:
         try:

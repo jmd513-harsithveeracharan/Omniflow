@@ -73,8 +73,17 @@ export const App: React.FC = () => {
     setIsAuthModalOpen(false);
     if (user) {
       localStorage.setItem('omniflow_active_user', JSON.stringify(user));
+      loadProjectsList(true, user.email);
+      loadSessions(user.email);
+      const newSid = generateNewSessionId();
+      setSessionId(newSid);
+      setMessages([]);
     } else {
       localStorage.setItem('omniflow_active_user', 'signed_out');
+      setProjects([]);
+      setSessions([]);
+      setMessages([]);
+      setActiveProjectId(null);
     }
   };
 
@@ -101,10 +110,11 @@ export const App: React.FC = () => {
 
   const generateNewSessionId = () => 'sess_' + Math.random().toString(36).substring(2, 11);
 
-  const loadSessions = async () => {
+  const loadSessions = async (emailOverride?: string) => {
     try {
       setIsLoadingSessions(true);
-      const sessList = await fetchSessions();
+      const email = emailOverride !== undefined ? emailOverride : currentUser?.email;
+      const sessList = await fetchSessions(email);
       setSessions(sessList);
     } catch (e) {
       console.error('Failed to load sessions', e);
@@ -113,16 +123,19 @@ export const App: React.FC = () => {
     }
   };
 
-  const loadProjectsList = async (shouldAutoSelect: boolean = false) => {
+  const loadProjectsList = async (shouldAutoSelect: boolean = false, emailOverride?: string) => {
     try {
       setIsLoadingProjects(true);
-      const projs = await fetchProjects();
+      const email = emailOverride !== undefined ? emailOverride : currentUser?.email;
+      const projs = await fetchProjects(email);
+      setProjects(projs || []);
       if (projs && projs.length > 0) {
-        setProjects(projs);
         if (shouldAutoSelect && !activeProjectId) {
           const defaultProj = projs.find((p) => p.name.toLowerCase().includes('delivery')) || projs[0];
           handleSelectProject(defaultProj.id, false);
         }
+      } else {
+        setActiveProjectId(null);
       }
     } catch (e) {
       console.error('Failed to load projects', e);
@@ -136,25 +149,26 @@ export const App: React.FC = () => {
       .then(setStatus)
       .catch(() => setStatus(null));
 
-    loadSessions();
+    const activeEmail = currentUser?.email;
+    loadSessions(activeEmail);
 
     const savedProjId = localStorage.getItem('omniflow_active_project_id');
     const savedSid = localStorage.getItem('omniflow_active_session_id');
 
     if (savedProjId) {
-      loadProjectsList(false).then(() => {
+      loadProjectsList(false, activeEmail).then(() => {
         handleSelectProject(savedProjId, false);
       });
     } else if (savedSid && !savedSid.startsWith('proj_')) {
-      loadProjectsList(false);
+      loadProjectsList(false, activeEmail);
       handleSelectSession(savedSid);
     } else {
-      loadProjectsList(true);
+      loadProjectsList(true, activeEmail);
       const initialSid = generateNewSessionId();
       setSessionId(initialSid);
       setMessages([]);
     }
-  }, []);
+  }, [currentUser?.email]);
 
   const handleNewSession = () => {
     if (isStreaming) return;
@@ -501,7 +515,8 @@ export const App: React.FC = () => {
       },
       mode,
       isVoiceModeActive,
-      controller.signal
+      controller.signal,
+      currentUser?.email
     );
   };
 
@@ -631,6 +646,7 @@ export const App: React.FC = () => {
               handleNewSession();
             }}
             onProjectsChanged={() => loadProjectsList(false)}
+            currentUser={currentUser}
           />
         )}
 

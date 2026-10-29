@@ -108,6 +108,7 @@ class ChatRequest(BaseModel):
     mode: str | None = Field(default="project")
     stream: bool = Field(default=True)
     is_voice: bool = Field(default=False)
+    user_email: str | None = Field(default=None, description="User email for session scoping")
 
 
 class ProjectRequest(BaseModel):
@@ -117,6 +118,7 @@ class ProjectRequest(BaseModel):
     is_pinned: int | None = 0
     is_archived: int | None = 0
     local_path: str | None = None
+    created_by: str | None = None
     metadata: dict[str, Any] | None = None
 
 
@@ -131,6 +133,7 @@ class MemberRemoveRequest(BaseModel):
 
 DIRECTORY_USERS: list[dict[str, Any]] = [
     {"id": "usr_harsith", "name": "Bheesetti Harsith (You)", "email": "bheesetti.harsith@fabric.ai", "avatar_color": "#10b981", "role": "lead"},
+    {"id": "usr_veeracharan", "name": "Harsith", "email": "veeracharan99@gmail.com", "avatar_color": "#343438", "role": "lead"},
     {"id": "usr_alex", "name": "Alex Chen", "email": "alex.chen@fabric.internal", "avatar_color": "#6366f1", "role": "engineer"},
     {"id": "usr_sarah", "name": "Sarah Jenkins", "email": "sarah.j@fabric.internal", "avatar_color": "#ec4899", "role": "architect"},
     {"id": "usr_david", "name": "David Kumar", "email": "david.kumar@fabric.internal", "avatar_color": "#3b82f6", "role": "contributor"},
@@ -217,6 +220,7 @@ def fetch_projects_cached(force_refresh: bool = False) -> list[dict[str, Any]]:
         return PROJECTS_CACHE
 
     projects = []
+    existing_map = {p["id"]: p for p in PROJECTS_CACHE}
     try:
         repo = PostgresRepository()
         with repo._connect() as conn:
@@ -226,6 +230,20 @@ def fetch_projects_cached(force_refresh: bool = False) -> list[dict[str, Any]]:
                     pid = str(r[0])
                     def_folder = os.path.join(os.getcwd(), "omniflow", "generated_artifacts", pid)
                     has_folder = os.path.isdir(def_folder)
+                    old_p = existing_map.get(pid, {})
+                    creator = old_p.get("created_by") or "bheesetti.harsith@fabric.ai"
+                    meta = old_p.get("metadata") or {
+                        "members": [
+                            {
+                                "id": f"mem_{pid}",
+                                "user_id": "usr_harsith",
+                                "name": "Bheesetti Harsith (You)",
+                                "email": "bheesetti.harsith@fabric.ai",
+                                "role": "owner",
+                                "avatarBg": "#10b981",
+                            }
+                        ]
+                    }
                     projects.append({
                         "id": pid,
                         "name": r[1],
@@ -235,6 +253,8 @@ def fetch_projects_cached(force_refresh: bool = False) -> list[dict[str, Any]]:
                         "is_archived": 0,
                         "local_path": def_folder if has_folder else "",
                         "created_at": str(r[4]) if r[4] else "",
+                        "created_by": creator,
+                        "metadata": meta,
                     })
     except Exception:
         pass
@@ -273,14 +293,25 @@ FABRIC_ITEMS_CACHE_TIME: float = 0.0
 
 
 @app.get("/api/sessions")
-async def list_sessions() -> dict[str, Any]:
+async def list_sessions(user_email: str | None = None) -> dict[str, Any]:
     sess_list = []
+    u = user_email.strip().lower() if user_email else None
     for sid, sdata in SESSIONS.items():
+        s_user = (sdata.get("user_email") or "").strip().lower()
+        if u:
+            if s_user:
+                if s_user != u:
+                    continue
+            else:
+                # Unscoped legacy sessions belong to the admin/lead accounts
+                if u not in ["bheesetti.harsith@fabric.ai", "veeracharan99@gmail.com"]:
+                    continue
         sess_list.append({
             "session_id": sid,
             "title": sdata.get("title", "New Conversation"),
             "message_count": len(sdata.get("messages", [])),
             "run_count": 1,
+            "user_email": s_user,
             "last_active": sdata.get("updated_at", ""),
         })
     return {"sessions": sess_list}
@@ -289,7 +320,14 @@ async def list_sessions() -> dict[str, Any]:
 @app.post("/api/sessions/new")
 async def create_new_session(payload: dict[str, Any] | None = None) -> dict[str, Any]:
     sid = f"sess_{uuid.uuid4().hex[:9]}"
-    SESSIONS[sid] = {"session_id": sid, "title": "New Conversation", "messages": [], "updated_at": ""}
+    user_email = (payload or {}).get("user_email", "").strip()
+    SESSIONS[sid] = {
+        "session_id": sid,
+        "title": "New Conversation",
+        "messages": [],
+        "user_email": user_email,
+        "updated_at": "",
+    }
     save_sessions_to_disk()
     return {"session_id": sid}
 
@@ -318,10 +356,28 @@ async def rename_session(session_id: str, payload: dict[str, Any]) -> dict[str, 
 
 
 @app.get("/api/projects")
-async def list_projects() -> dict[str, Any]:
+async def list_projects(user_email: str | None = None) -> dict[str, Any]:
     # Returns in < 1ms from in-memory cache with background refresh
     projects = fetch_projects_cached()
-    return {"projects": projects}
+    if not user_email or not user_email.strip():
+        return {"projects": projects}
+
+    u = user_email.strip().lower()
+    # Workspace Lead Admin has workspace-wide view
+    is_admin = u in ["bheesetti.harsith@fabric.ai", "veeracharan99@gmail.com"]
+    if is_admin:
+        return {"projects": projects}
+
+    scoped = []
+    for p in projects:
+        p_creator = (p.get("created_by") or "").strip().lower()
+        if p_creator and p_creator == u:
+            scoped.append(p)
+            continue
+        members = (p.get("metadata") or {}).get("members", [])
+        if any(m.get("email", "").strip().lower() == u for m in members):
+            scoped.append(p)
+    return {"projects": scoped}
 
 
 @app.post("/api/projects/new")
@@ -331,6 +387,7 @@ async def create_project_endpoint(req: ProjectRequest) -> dict[str, Any]:
     pname = req.name or "New Project"
     desc = req.description or ""
     lpath = req.local_path or os.path.join(os.getcwd(), "omniflow", "generated_artifacts", pid)
+    created_by = (req.created_by or "bheesetti.harsith@fabric.ai").strip()
 
     # Ensure local directory exists if specified
     if lpath:
@@ -338,6 +395,19 @@ async def create_project_endpoint(req: ProjectRequest) -> dict[str, Any]:
             os.makedirs(lpath, exist_ok=True)
         except Exception:
             pass
+
+    meta = req.metadata or {}
+    if "members" not in meta:
+        meta["members"] = [
+            {
+                "id": f"mem_{uuid.uuid4().hex[:8]}",
+                "user_id": f"usr_{uuid.uuid4().hex[:6]}",
+                "name": created_by.split("@")[0].replace(".", " ").title(),
+                "email": created_by,
+                "role": "owner",
+                "avatarBg": "#10b981",
+            }
+        ]
 
     new_project = {
         "id": pid,
@@ -347,6 +417,8 @@ async def create_project_endpoint(req: ProjectRequest) -> dict[str, Any]:
         "is_pinned": 0,
         "is_archived": 0,
         "local_path": lpath,
+        "created_by": created_by,
+        "metadata": meta,
         "created_at": time.strftime("%Y-%m-%dT%H:%M:%SZ"),
     }
     # Update cache immediately
@@ -992,7 +1064,15 @@ async def handle_pipeline_deploy(req: DeployPlanRequest) -> dict[str, Any]:
 async def handle_chat_stream(req: ChatRequest) -> StreamingResponse:
     sid = req.session_id or f"sess_{uuid.uuid4().hex[:9]}"
     if sid not in SESSIONS:
-        SESSIONS[sid] = {"session_id": sid, "title": "Medallion Architecture Session", "messages": [], "updated_at": ""}
+        SESSIONS[sid] = {
+            "session_id": sid,
+            "title": "Medallion Architecture Session",
+            "messages": [],
+            "user_email": (req.user_email or "").strip(),
+            "updated_at": "",
+        }
+    elif req.user_email and not SESSIONS[sid].get("user_email"):
+        SESSIONS[sid]["user_email"] = req.user_email.strip()
     
     SESSIONS[sid]["messages"].append({"role": "user", "content": req.message})
     save_sessions_to_disk()

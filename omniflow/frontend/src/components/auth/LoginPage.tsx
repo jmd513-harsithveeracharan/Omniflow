@@ -94,7 +94,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
             fontWeight: 400,
             fontFamily: "'Inter', sans-serif",
           }}>
-            Autonomous Medallion pipelines & dynamic data engineering for Microsoft Fabric
+            Your data engineering for Microsoft Fabric
           </p>
 
           {/* Form Card */}

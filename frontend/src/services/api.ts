@@ -35,8 +35,9 @@ export async function fetchFabricStatus(): Promise<FabricStatus> {
   };
 }
 
-export async function fetchSessions(): Promise<ChatSession[]> {
-  const res = await fetch(`${API_BASE}/sessions`);
+export async function fetchSessions(userEmail?: string): Promise<ChatSession[]> {
+  const url = userEmail ? `${API_BASE}/sessions?user_email=${encodeURIComponent(userEmail)}` : `${API_BASE}/sessions`;
+  const res = await fetch(url);
   if (!res.ok) throw new Error(`Failed to fetch sessions: ${res.statusText}`);
   const data = await res.json();
   return (data.sessions || []).map((s: Record<string, unknown>) => ({
@@ -76,11 +77,11 @@ export async function fetchSessionDetail(
   };
 }
 
-export async function createNewSession(workspaceId?: string): Promise<string> {
+export async function createNewSession(workspaceId?: string, userEmail?: string): Promise<string> {
   const res = await fetch(`${API_BASE}/sessions/new`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ workspace_id: workspaceId }),
+    body: JSON.stringify({ workspace_id: workspaceId, user_email: userEmail }),
   });
   if (!res.ok) throw new Error(`Failed to create session: ${res.statusText}`);
   const data = await res.json();
@@ -269,7 +270,8 @@ export async function streamChatTurn(
   onThoughtStep?: (step: import('../types').ThoughtStep) => void,
   mode?: 'auto' | 'general' | 'project',
   isVoice?: boolean,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  userEmail?: string
 ): Promise<void> {
   try {
     const res = await fetch(`${API_BASE}/chat/stream`, {
@@ -283,6 +285,7 @@ export async function streamChatTurn(
         effort: effort || undefined,
         mode: mode || 'auto',
         is_voice: Boolean(isVoice),
+        user_email: userEmail || undefined,
       }),
       signal,
     });
@@ -332,8 +335,9 @@ export async function streamChatTurn(
   }
 }
 
-export async function fetchProjects(): Promise<import('../types').ProjectRecord[]> {
-  const res = await fetch(`${API_BASE}/projects`);
+export async function fetchProjects(userEmail?: string): Promise<import('../types').ProjectRecord[]> {
+  const url = userEmail ? `${API_BASE}/projects?user_email=${encodeURIComponent(userEmail)}` : `${API_BASE}/projects`;
+  const res = await fetch(url);
   if (!res.ok) throw new Error(`Failed to fetch projects: ${res.statusText}`);
   const data = await res.json();
   return (data.projects || []).map((p: Record<string, unknown>) => ({
@@ -345,6 +349,7 @@ export async function fetchProjects(): Promise<import('../types').ProjectRecord[
     is_archived: Number(p.is_archived || 0),
     created_at: String(p.created_at || ''),
     updated_at: String(p.updated_at || p.created_at || ''),
+    created_by: String(p.created_by || ''),
     metadata: (p.metadata as Record<string, unknown>) || {},
   }));
 }
@@ -353,12 +358,13 @@ export async function createProject(
   name: string,
   description = '',
   metadata?: import('../types').ProjectMetadata,
-  local_path = ''
+  local_path = '',
+  created_by?: string
 ): Promise<import('../types').ProjectRecord> {
   const res = await fetch(`${API_BASE}/projects/new`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name, description, local_path, metadata: metadata || {} }),
+    body: JSON.stringify({ name, description, local_path, created_by, metadata: metadata || {} }),
   });
   if (!res.ok) throw new Error(`Failed to create project: ${res.statusText}`);
   const data = await res.json();

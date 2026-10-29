@@ -258,6 +258,7 @@ export interface ProjectRecord {
   is_archived?: number;
   created_at?: string;
   updated_at?: string;
+  created_by?: string;
   metadata?: ProjectMetadata;
   itemsCount?: number;
   badge?: string;

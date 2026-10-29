@@ -14,11 +14,13 @@ interface ProjectsViewProps {
   onOpenProject: (projectId: string) => void;
   onNewChatWithContext?: (projectName: string) => void;
   onProjectsChanged?: () => void;
+  currentUser?: import('../types').UserProfile | null;
 }
 
 export const ProjectsView: React.FC<ProjectsViewProps> = ({
   onOpenProject,
   onProjectsChanged,
+  currentUser,
 }) => {
   const [projects, setProjects] = useState<ProjectRecord[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -42,7 +44,7 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({
   const loadAllProjects = async () => {
     try {
       setIsLoading(true);
-      const data = await fetchProjects();
+      const data = await fetchProjects(currentUser?.email);
       setProjects(data || []);
     } catch (e) {
       console.error('Failed to load projects from DB', e);
@@ -53,7 +55,7 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({
 
   useEffect(() => {
     loadAllProjects();
-  }, []);
+  }, [currentUser?.email]);
 
   useEffect(() => {
     const handleOutsideClick = (e: MouseEvent) => {
@@ -117,7 +119,7 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({
         )
       );
     } else {
-      const created = await createProject(data.name, data.description, data.metadata);
+      const created = await createProject(data.name, data.description, data.metadata, '', currentUser?.email);
       if (created) {
         setProjects((prev) => [created, ...prev]);
         const enriched: ProjectRecord = {
