@@ -305,7 +305,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               className="sidebar-section-action-btn"
               onClick={() => onSelectView('projects')}
               title="New project / Manage projects"
-              style={{ background: 'transparent', border: 'none', color: '#71717a', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '2px 4px', borderRadius: '4px' }}
+              style={{ background: 'transparent', border: 'none', color: '#d1d5db', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '2px 4px', borderRadius: '4px' }}
             >
               <Plus width={13} height={13} />
             </button>
@@ -348,7 +348,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   <div className="skeleton-line" style={{ height: '28px', borderRadius: '6px' }} />
                 </div>
               ) : sortedProjects.length === 0 ? (
-                <div style={{ padding: '6px 8px', fontSize: '12px', color: '#71717a' }}>
+                <div style={{ padding: '6px 8px', fontSize: '12px', color: '#94a3b8' }}>
                   No projects yet
                 </div>
               ) : (
