@@ -10,19 +10,16 @@ import {
   ChevronDown,
   Search,
   PanelLeftClose,
-  LogOut,
   Sliders,
   MoreVertical,
   Edit3,
   Trash2,
   Pin,
   Archive,
-  Users,
-  Shield,
-  User,
 } from 'lucide-react';
 import { ChatSession, ProjectRecord, UserProfile } from '../types';
 import { AccountSwitcherModal } from './auth/AccountSwitcherModal';
+import { UserProfileMenu } from './UserProfileMenu';
 
 interface SidebarProps {
   activeView: string;
@@ -85,7 +82,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
 }) => {
   const [selectedPlatform, setSelectedPlatform] = useState('fabric');
   const [isPlatformMenuOpen, setIsPlatformMenuOpen] = useState(false);
-  const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
   const [isProjectsOpen, setIsProjectsOpen] = useState(true);
   const [isProjectsExpanded, setIsProjectsExpanded] = useState(false);
@@ -98,7 +94,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   // Menus Refs
   const platformMenuRef = useRef<HTMLDivElement>(null);
-  const profileMenuRef = useRef<HTMLDivElement>(null);
 
   // Close menus on outside click or Escape
   useEffect(() => {
@@ -112,9 +107,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
       if (platformMenuRef.current && !platformMenuRef.current.contains(target)) {
         setIsPlatformMenuOpen(false);
       }
-      if (profileMenuRef.current && !profileMenuRef.current.contains(target)) {
-        setIsProfileMenuOpen(false);
-      }
     };
 
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -122,7 +114,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
         setProjectMenuId(null);
         setProjectMenuPos(null);
         setIsPlatformMenuOpen(false);
-        setIsProfileMenuOpen(false);
       }
     };
 
@@ -493,111 +484,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
       </nav>
 
-      {/* Footer User Profile Pill */}
+      {/* Footer User Profile Pill & Claude Menu */}
       <div className="sidebar-footer">
-        <div className="auth-card-wrapper" ref={profileMenuRef} style={{ position: 'relative', width: '100%' }}>
-          <div
-            className="auth-card"
-            onClick={() => {
-              if (!currentUser) {
-                onOpenAuthModal?.();
-              } else {
-                setIsProfileMenuOpen(!isProfileMenuOpen);
-              }
-            }}
-            title={currentUser ? `Signed in as ${currentUser.name}` : 'Click to sign in'}
-          >
-            <div className="auth-user-row">
-              <div
-                className="auth-avatar-ring"
-                style={!currentUser ? { background: '#3f3f46', padding: '1px' } : undefined}
-              >
-                <div
-                  className="auth-avatar-inner"
-                  style={!currentUser ? { background: '#27272a', color: '#a1a1aa' } : { background: currentUser.avatar_color || '#10b981' }}
-                >
-                  {currentUser ? (currentUser.name ? currentUser.name[0].toUpperCase() : 'U') : <User width={13} height={13} />}
-                </div>
-              </div>
-              <div className="auth-info">
-                <span className="auth-username" style={!currentUser ? { color: '#a1a1aa' } : undefined}>
-                  {currentUser ? currentUser.name : 'Guest (Sign In)'}
-                </span>
-              </div>
-              {currentUser ? (
-                <span className="auth-pro-badge">PRO</span>
-              ) : (
-                <span
-                  className="auth-pro-badge"
-                  style={{
-                    background: 'rgba(59, 130, 246, 0.15)',
-                    color: '#60a5fa',
-                    border: '1px solid rgba(59, 130, 246, 0.35)',
-                    fontSize: '10px',
-                    padding: '1px 5px',
-                  }}
-                >
-                  SIGN IN
-                </span>
-              )}
-            </div>
-          </div>
-
-          {/* Profile Dropdown Popup (When signed in) */}
-          {isProfileMenuOpen && currentUser && (
-            <div className="user-profile-menu">
-              <div className="profile-menu-header">
-                <div
-                  className="profile-menu-avatar"
-                  style={{ background: currentUser.avatar_color || '#10b981' }}
-                >
-                  {currentUser.name ? currentUser.name[0].toUpperCase() : 'U'}
-                </div>
-                <div className="profile-menu-info">
-                  <span className="profile-menu-name">{currentUser.name}</span>
-                  <span className="profile-menu-email">{currentUser.email}</span>
-                </div>
-              </div>
-              <div className="dock-model-divider" />
-              <button
-                className="profile-menu-item"
-                onClick={() => {
-                  setIsProfileMenuOpen(false);
-                  onOpenAuthModal?.();
-                }}
-              >
-                <Shield width={14} height={14} />
-                <span>OmniFlow Account & RBAC</span>
-              </button>
-              <button
-                className="profile-menu-item"
-                onClick={() => {
-                  setIsProfileMenuOpen(false);
-                  setIsAccountModalOpen(true);
-                }}
-              >
-                <Users width={14} height={14} />
-                <span>Switch Fabric Account</span>
-              </button>
-              <button className="profile-menu-item" onClick={() => onSelectView('settings')}>
-                <Settings2 width={14} height={14} />
-                <span>Settings & Customize</span>
-              </button>
-              <button
-                className="profile-menu-item logout-item"
-                onClick={async () => {
-                  setIsProfileMenuOpen(false);
-                  if (onSignOut) {
-                    onSignOut();
-                  }
-                }}
-              >
-                <LogOut width={14} height={14} />
-                <span>Sign out</span>
-              </button>
-            </div>
-          )}
-        </div>
+        <UserProfileMenu
+          currentUser={currentUser}
+          isCollapsed={isCollapsed}
+          onSignOut={onSignOut}
+          onSelectView={onSelectView}
+          onOpenAuthModal={onOpenAuthModal}
+        />
       </div>
 
       <AccountSwitcherModal

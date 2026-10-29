@@ -987,8 +987,8 @@ nav.sidebar-nav {
     width: 26px;
     height: 26px;
     border-radius: 50%;
-    padding: 1.5px;
-    background: conic-gradient(from 45deg, #ea4335, #4285f4, #34a853, #fbbc05, #ea4335);
+    padding: 0;
+    background: #343438;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -999,12 +999,12 @@ nav.sidebar-nav {
     width: 100%;
     height: 100%;
     border-radius: 50%;
-    background: #131314;
+    background: transparent;
     display: flex;
     align-items: center;
     justify-content: center;
-    color: #e3e3e3;
-    font-size: 11px;
+    color: #ffffff;
+    font-size: 13px;
     font-weight: 600;
 }
 
@@ -7098,6 +7098,180 @@ ul.chat-md-list {
 
 .auth-submit-btn:active {
     transform: scale(0.985);
+}
+
+/* ═══════════════ CLAUDE-STYLE USER PROFILE BAR & POPOVER ═══════════════ */
+.claude-profile-footer-container {
+    position: relative;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.claude-profile-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    gap: 6px;
+}
+
+.claude-profile-pill {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex: 1;
+    min-width: 0;
+    padding: 6px 8px;
+    border-radius: 8px;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    text-align: left;
+    transition: background 0.15s ease;
+}
+
+.claude-profile-pill:hover,
+.claude-profile-pill.active {
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.claude-avatar-circle {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: #343438;
+    color: #ffffff;
+    font-size: 13px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    user-select: none;
+}
+
+.claude-profile-name-group {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    min-width: 0;
+    overflow: hidden;
+}
+
+.claude-profile-name {
+    font-size: 13.5px;
+    font-weight: 500;
+    color: #f3f3f3;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.claude-profile-tier {
+    font-size: 13.5px;
+    color: #9ca3af;
+    white-space: nowrap;
+}
+
+.claude-profile-chevron {
+    color: #9ca3af;
+    flex-shrink: 0;
+    margin-left: 2px;
+    transition: transform 0.15s ease;
+}
+
+.claude-devices-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    background: transparent;
+    border: none;
+    color: #9ca3af;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: background 0.15s ease, color 0.15s ease;
+}
+
+.claude-devices-btn:hover {
+    background: rgba(255, 255, 255, 0.08);
+    color: #ffffff;
+}
+
+/* Claude Popover Menu */
+.claude-popover-menu {
+    position: absolute;
+    bottom: calc(100% + 8px);
+    left: 0;
+    width: 100%;
+    min-width: 260px;
+    background: #212124;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 14px;
+    box-shadow: 0 16px 36px rgba(0, 0, 0, 0.7);
+    padding: 6px;
+    z-index: 1000;
+    box-sizing: border-box;
+    animation: fadeInMsg 0.12s ease forwards;
+}
+
+.claude-popover-email-header {
+    padding: 10px 12px 6px 12px;
+    font-size: 13px;
+    color: #9ca3af;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    user-select: text;
+}
+
+.claude-popover-divider {
+    height: 1px;
+    background: rgba(255, 255, 255, 0.08);
+    margin: 5px 4px;
+}
+
+.claude-popover-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 8px 10px;
+    border-radius: 8px;
+    border: none;
+    background: transparent;
+    color: #f3f3f3;
+    font-size: 13.5px;
+    font-weight: 450;
+    cursor: pointer;
+    text-align: left;
+    transition: background 0.12s ease, color 0.12s ease;
+    box-sizing: border-box;
+}
+
+.claude-popover-item:hover {
+    background: rgba(255, 255, 255, 0.08);
+    color: #ffffff;
+}
+
+.claude-popover-item svg {
+    color: #e4e4e7;
+    flex-shrink: 0;
+}
+
+.claude-popover-shortcut {
+    margin-left: auto;
+    font-size: 11.5px;
+    color: #71717a;
+    font-weight: 500;
+}
+
+.claude-popover-arrow {
+    margin-left: auto;
+    color: #71717a;
+    flex-shrink: 0;
 }
 
 /* ═══════════════ USER PROFILE MENU IN SIDEBAR ═══════════════ */

@@ -13,9 +13,9 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
     setIsLoading(true);
     const msUser: UserProfile = {
       id: 'usr_lead',
-      name: 'Bheesetti Harsith',
-      email: 'bheesetti.harsith@fabric.ai',
-      avatar_color: '#10b981',
+      name: 'Harsith',
+      email: 'veeracharan99@gmail.com',
+      avatar_color: '#343438',
     };
     setTimeout(() => {
       onLoginSuccess(msUser);
@@ -26,16 +26,16 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
     e.preventDefault();
     setIsLoading(true);
     const trimmed = email.trim();
-    const finalEmail = trimmed || 'bheesetti.harsith@fabric.ai';
+    const finalEmail = trimmed || 'veeracharan99@gmail.com';
     const computedName = trimmed
       ? trimmed.split('@')[0].replace(/[._-]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
-      : 'Bheesetti Harsith';
+      : 'Harsith';
 
     const emailUser: UserProfile = {
       id: `usr_${Math.random().toString(36).substring(2, 9)}`,
       name: computedName,
       email: finalEmail,
-      avatar_color: '#10b981',
+      avatar_color: '#343438',
     };
     setTimeout(() => {
       onLoginSuccess(emailUser);
@@ -246,7 +246,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
         }}>
           <img
             src="/assets/auth-hero.jpg"
-            alt="OmniFlow Workspace"
+            alt="OmniFlow Wallpaper"
             style={{
               width: '100%',
               height: '100%',
@@ -254,6 +254,38 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
               display: 'block',
             }}
           />
+          {/* Elegant Minimalist Quote Overlay */}
+          <div style={{
+            position: 'absolute',
+            bottom: 0,
+            left: 0,
+            right: 0,
+            padding: '40px 36px',
+            background: 'linear-gradient(to top, rgba(14,14,14,0.88) 0%, rgba(14,14,14,0.45) 60%, transparent 100%)',
+            color: '#f5f3ec',
+            boxSizing: 'border-box',
+          }}>
+            <p style={{
+              fontFamily: "'Newsreader', 'Playfair Display', Georgia, serif",
+              fontStyle: 'italic',
+              fontSize: '21px',
+              lineHeight: 1.45,
+              margin: '0 0 8px 0',
+              color: 'rgba(255, 255, 255, 0.95)',
+              letterSpacing: '-0.01em',
+            }}>
+              “Simplicity is prerequisite for reliability.”
+            </p>
+            <span style={{
+              fontSize: '12.5px',
+              fontWeight: 500,
+              color: 'rgba(255, 255, 255, 0.65)',
+              letterSpacing: '0.04em',
+              textTransform: 'uppercase',
+            }}>
+              Edsger W. Dijkstra
+            </span>
+          </div>
         </div>
       </div>
     </div>
