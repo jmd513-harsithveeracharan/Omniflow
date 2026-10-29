@@ -7259,6 +7259,23 @@ ul.chat-md-list {
     flex-shrink: 0;
 }
 
+.claude-popover-item.logout-item {
+    color: #f87171 !important;
+}
+
+.claude-popover-item.logout-item svg {
+    color: #f87171 !important;
+}
+
+.claude-popover-item.logout-item:hover {
+    background: rgba(239, 68, 68, 0.12) !important;
+    color: #ef4444 !important;
+}
+
+.claude-popover-item.logout-item:hover svg {
+    color: #ef4444 !important;
+}
+
 /* ═══════════════ USER PROFILE MENU IN SIDEBAR ═══════════════ */
 .user-profile-menu {
     position: absolute;

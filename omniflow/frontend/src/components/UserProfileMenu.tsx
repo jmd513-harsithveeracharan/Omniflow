@@ -129,7 +129,7 @@ export const UserProfileMenu: React.FC<UserProfileMenuProps> = ({
 
           <button
             type="button"
-            className="claude-popover-item"
+            className="claude-popover-item logout-item"
             onClick={() => {
               setIsOpen(false);
               onSignOut?.();
@@ -162,7 +162,6 @@ export const UserProfileMenu: React.FC<UserProfileMenuProps> = ({
             <>
               <div className="claude-profile-name-group">
                 <span className="claude-profile-name">{displayName}</span>
-                <span className="claude-profile-tier">· Free</span>
               </div>
               <ChevronDown
                 size={14}
