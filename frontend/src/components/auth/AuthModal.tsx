@@ -80,7 +80,14 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
   const handleSignOut = () => {
     onUserChanged(null);
+    setEmail('');
+    setPassword('');
+    setName('');
+    setActiveTab('signin');
     setSuccessMsg('Signed out successfully');
+    setTimeout(() => {
+      setSuccessMsg(null);
+    }, 2000);
   };
 
   return (

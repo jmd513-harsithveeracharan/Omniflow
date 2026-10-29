@@ -7193,6 +7193,23 @@ ul.chat-md-list {
     color: #ffffff;
 }
 
+.profile-menu-item.logout-item {
+    color: #ef4444 !important;
+}
+
+.profile-menu-item.logout-item svg {
+    color: #ef4444 !important;
+}
+
+.profile-menu-item.logout-item:hover {
+    background: rgba(239, 68, 68, 0.12) !important;
+    color: #f87171 !important;
+}
+
+.profile-menu-item.logout-item:hover svg {
+    color: #f87171 !important;
+}
+
 /* ═══════════════ SSO ACCOUNT PICKER MODALS ═══════════════ */
 .sso-modal-backdrop {
     position: fixed;

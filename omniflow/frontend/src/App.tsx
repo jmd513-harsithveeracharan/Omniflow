@@ -28,6 +28,7 @@ import {
   fetchProjectDetail,
   updateProject,
   deleteProject,
+  logoutFabric,
 } from './services/api';
 import { FabricStatus, ChatMessage, IngestionPlan, WorkspaceItem, ChatSession, ProjectRecord, UserProfile } from './types';
 
@@ -53,6 +54,7 @@ export const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(() => {
     try {
       const saved = localStorage.getItem('omniflow_active_user');
+      if (saved === 'signed_out') return null;
       return saved ? JSON.parse(saved) : {
         id: 'usr_lead',
         name: 'Bheesetti Harsith',
@@ -70,7 +72,17 @@ export const App: React.FC = () => {
     if (user) {
       localStorage.setItem('omniflow_active_user', JSON.stringify(user));
     } else {
-      localStorage.removeItem('omniflow_active_user');
+      localStorage.setItem('omniflow_active_user', 'signed_out');
+    }
+  };
+
+  const handleSignOut = async () => {
+    handleUserChanged(null);
+    try {
+      await logoutFabric();
+      fetchFabricStatus().then(setStatus).catch(() => {});
+    } catch (e) {
+      console.error('Sign out error:', e);
     }
   };
 
@@ -572,8 +584,8 @@ export const App: React.FC = () => {
         onSelectSession={handleSelectSession}
         onDeleteSession={handleDeleteSession}
         onRenameSession={handleRenameSession}
-        userName={currentUser ? currentUser.name : (status?.userIdentity ? status.userIdentity.split('@')[0].replace('.', ' ') : 'Harsith Veer')}
-        userEmail={currentUser ? currentUser.email : (status?.userIdentity || 'bheesetti.harsith@fabric.ai')}
+        currentUser={currentUser}
+        onSignOut={handleSignOut}
         projects={projects}
         isLoadingProjects={isLoadingProjects}
         activeProjectId={activeProjectId}

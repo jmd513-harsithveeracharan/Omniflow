@@ -19,9 +19,9 @@ import {
   Archive,
   Users,
   Shield,
+  User,
 } from 'lucide-react';
-import { ChatSession, ProjectRecord } from '../types';
-import { logoutFabric } from '../services/api';
+import { ChatSession, ProjectRecord, UserProfile } from '../types';
 import { AccountSwitcherModal } from './auth/AccountSwitcherModal';
 
 interface SidebarProps {
@@ -30,8 +30,8 @@ interface SidebarProps {
   onNewChat: () => void;
   isCollapsed: boolean;
   onToggleCollapse: () => void;
-  userName?: string;
-  userEmail?: string;
+  currentUser?: UserProfile | null;
+  onSignOut?: () => void;
   sessions?: ChatSession[];
   activeSessionId?: string;
   isLoadingSessions?: boolean;
@@ -70,8 +70,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onNewChat,
   isCollapsed,
   onToggleCollapse,
-  userName = 'Bheesetti Harsith',
-  userEmail = 'bheesetti.harsith@fabric.ai',
+  currentUser,
+  onSignOut,
   projects = [],
   isLoadingProjects = false,
   activeProjectId = null,
@@ -498,27 +498,64 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <div className="auth-card-wrapper" ref={profileMenuRef} style={{ position: 'relative', width: '100%' }}>
           <div
             className="auth-card"
-            onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)}
+            onClick={() => {
+              if (!currentUser) {
+                onOpenAuthModal?.();
+              } else {
+                setIsProfileMenuOpen(!isProfileMenuOpen);
+              }
+            }}
+            title={currentUser ? `Signed in as ${currentUser.name}` : 'Click to sign in'}
           >
             <div className="auth-user-row">
-              <div className="auth-avatar-ring">
-                <div className="auth-avatar-inner">{userName[0]}</div>
+              <div
+                className="auth-avatar-ring"
+                style={!currentUser ? { background: '#3f3f46', padding: '1px' } : undefined}
+              >
+                <div
+                  className="auth-avatar-inner"
+                  style={!currentUser ? { background: '#27272a', color: '#a1a1aa' } : { background: currentUser.avatar_color || '#10b981' }}
+                >
+                  {currentUser ? (currentUser.name ? currentUser.name[0].toUpperCase() : 'U') : <User width={13} height={13} />}
+                </div>
               </div>
               <div className="auth-info">
-                <span className="auth-username">{userName}</span>
+                <span className="auth-username" style={!currentUser ? { color: '#a1a1aa' } : undefined}>
+                  {currentUser ? currentUser.name : 'Guest (Sign In)'}
+                </span>
               </div>
-              <span className="auth-pro-badge">PRO</span>
+              {currentUser ? (
+                <span className="auth-pro-badge">PRO</span>
+              ) : (
+                <span
+                  className="auth-pro-badge"
+                  style={{
+                    background: 'rgba(59, 130, 246, 0.15)',
+                    color: '#60a5fa',
+                    border: '1px solid rgba(59, 130, 246, 0.35)',
+                    fontSize: '10px',
+                    padding: '1px 5px',
+                  }}
+                >
+                  SIGN IN
+                </span>
+              )}
             </div>
           </div>
 
-          {/* Profile Dropdown Popup */}
-          {isProfileMenuOpen && (
+          {/* Profile Dropdown Popup (When signed in) */}
+          {isProfileMenuOpen && currentUser && (
             <div className="user-profile-menu">
               <div className="profile-menu-header">
-                <div className="profile-menu-avatar">{userName[0]}</div>
+                <div
+                  className="profile-menu-avatar"
+                  style={{ background: currentUser.avatar_color || '#10b981' }}
+                >
+                  {currentUser.name ? currentUser.name[0].toUpperCase() : 'U'}
+                </div>
                 <div className="profile-menu-info">
-                  <span className="profile-menu-name">{userName}</span>
-                  <span className="profile-menu-email">{userEmail}</span>
+                  <span className="profile-menu-name">{currentUser.name}</span>
+                  <span className="profile-menu-email">{currentUser.email}</span>
                 </div>
               </div>
               <div className="dock-model-divider" />
@@ -547,14 +584,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 <span>Settings & Customize</span>
               </button>
               <button
-                className="profile-menu-item"
+                className="profile-menu-item logout-item"
                 onClick={async () => {
                   setIsProfileMenuOpen(false);
-                  try {
-                    await logoutFabric();
-                    if (onRefreshStatus) onRefreshStatus();
-                  } catch (e) {
-                    console.error(e);
+                  if (onSignOut) {
+                    onSignOut();
                   }
                 }}
               >
