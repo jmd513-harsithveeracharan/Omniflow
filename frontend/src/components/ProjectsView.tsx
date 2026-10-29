@@ -121,7 +121,6 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({
     } else {
       const created = await createProject(data.name, data.description, data.metadata, '', currentUser?.email);
       if (created) {
-        setProjects((prev) => [created, ...prev]);
         const enriched: ProjectRecord = {
           ...created,
           badge: data.badge,

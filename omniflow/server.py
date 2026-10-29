@@ -624,210 +624,21 @@ async def get_project_detail(project_id: str) -> dict[str, Any]:
     if not project_data:
         project_data = {
             "id": project_id,
-            "code": "PRJ-GLOBAL-DELIVERY",
-            "name": "Global Express Delivery & Courier Logistics Platform",
-            "description": "Courier Logistics, Fleet Telemetry & Order Fulfillment",
+            "code": project_id,
+            "name": pname or project_id,
+            "description": "",
             "status": "active",
         }
-        pcode = "PRJ-GLOBAL-DELIVERY"
-        pname = "Global Express Delivery & Courier Logistics Platform"
-
-    def_folder = os.path.join(os.getcwd(), "omniflow", "generated_artifacts", pcode)
-    if "local_path" not in project_data or not project_data["local_path"]:
-        if os.path.isdir(def_folder):
-            project_data["local_path"] = def_folder
-        else:
-            project_data["local_path"] = ""
-
-    clean_dom = re.sub(r"[^a-zA-Z0-9_]", "_", pname.lower()).strip("_")[:16]
-    if "fintech" in pcode.lower() or "payment" in pname.lower():
-        clean_dom = "fintech"
-        root_f = "Fintech_Payments_Platform"
-        sub_f = {"raw": "01 Raw Ingestion", "stage": "02 Stage & Curation", "silver": "03 Silver Harmonized", "gold": "04 Gold Star Schema"}
-        tables = [
-            {"name": "swift_mt103_wires", "target": f"{sub_f['raw']} / lh_fintech_raw_bronze"},
-            {"name": "sanctioned_entities", "target": f"{sub_f['stage']} / nb_fintech_aml_screening"},
-            {"name": "cleared_settlements", "target": f"{sub_f['silver']} / lh_fintech_curated_silver"},
-            {"name": "fact_wire_settlement", "target": f"{sub_f['gold']} / wh_fintech_analytics_gold"},
-        ]
-    elif "delivery" in pcode.lower() or "delivery" in pname.lower():
-        clean_dom = "delivery"
-        root_f = "Delivery_Logistics_Platform"
-        sub_f = {"raw": "01 Raw", "stage": "02 Stage", "silver": "03 Silver", "gold": "04 Gold"}
-        tables = [
-            {"name": "shipments", "target": f"{sub_f['raw']} / lh_{clean_dom}_bronze"},
-            {"name": "couriers", "target": f"{sub_f['stage']} / nb_{clean_dom}_curate"},
-            {"name": "telemetry_pings", "target": f"{sub_f['silver']} / lh_{clean_dom}_silver"},
-        ]
-    elif "health" in pcode.lower() or "health" in pname.lower():
-        clean_dom = "healthcare"
-        root_f = "Healthcare_Platform"
-        sub_f = {"raw": "01 Raw", "stage": "02 Stage", "silver": "03 Silver", "gold": "04 Gold"}
-        tables = [
-            {"name": "patients_encounters", "target": f"{sub_f['raw']} / lh_healthcare_bronze"},
-            {"name": "claims_pii_masked", "target": f"{sub_f['stage']} / nb_healthcare_curate"},
-            {"name": "clinical_harmonized", "target": f"{sub_f['silver']} / lh_healthcare_silver"},
-        ]
-    elif "comm" in pcode.lower() or "rev" in pcode.lower():
-        clean_dom = "commercial_rev"
-        root_f = "Commercial_Rev_Platform"
-        sub_f = {"raw": "01 Raw", "stage": "02 Stage", "silver": "03 Silver", "gold": "04 Gold"}
-        tables = [
-            {"name": "orders_invoices", "target": f"{sub_f['raw']} / lh_commercial_rev_bronze"},
-            {"name": "customers_deduped", "target": f"{sub_f['stage']} / nb_commercial_rev_curate"},
-            {"name": "revenue_harmonized", "target": f"{sub_f['silver']} / lh_commercial_rev_silver"},
-        ]
-    elif "supply" in pcode.lower() or "ops" in pcode.lower():
-        clean_dom = "supplychain"
-        root_f = "Supplychain_Platform"
-        sub_f = {"raw": "01 Raw", "stage": "02 Stage", "silver": "03 Silver", "gold": "04 Gold"}
-        tables = [
-            {"name": "inventory_warehouses", "target": f"{sub_f['raw']} / lh_supplychain_bronze"},
-            {"name": "purchase_orders_scd2", "target": f"{sub_f['stage']} / nb_supplychain_curate"},
-            {"name": "fulfillment_silver", "target": f"{sub_f['silver']} / lh_supplychain_silver"},
-        ]
-    else:
-        root_f = f"{clean_dom.capitalize()}_Platform"
-        sub_f = {"raw": "01 Raw", "stage": "02 Stage", "silver": "03 Silver", "gold": "04 Gold"}
-        tables = [
-            {"name": f"{clean_dom}_entity_1", "target": f"{sub_f['raw']} / lh_{clean_dom}_bronze"},
-            {"name": f"{clean_dom}_entity_2", "target": f"{sub_f['stage']} / nb_{clean_dom}_curate"},
-            {"name": f"{clean_dom}_entity_3", "target": f"{sub_f['silver']} / lh_{clean_dom}_silver"},
-        ]
-
-    plan = {
-        "sourceName": pname,
-        "project_code": pcode,
-        "domain": clean_dom,
-        "schedule": "Hourly Micro-Batch",
-        "root_folder": root_f,
-        "folders": sub_f,
-        "tables": tables,
-    }
-
-    deployed_items = [
-        {"item_type": "Lakehouse", "display_name": f"lh_{clean_dom}_bronze", "folder": f"{root_f}/{sub_f['raw']}", "item_id": "active"},
-        {"item_type": "DataPipeline", "display_name": f"pl_{clean_dom}_bronze_ingest", "folder": f"{root_f}/{sub_f['raw']}", "item_id": "active"},
-        {"item_type": "Notebook", "display_name": f"nb_{clean_dom}_curate", "folder": f"{root_f}/{sub_f['stage']}", "item_id": "active"},
-        {"item_type": "Lakehouse", "display_name": f"lh_{clean_dom}_silver", "folder": f"{root_f}/{sub_f['silver']}", "item_id": "active"},
-        {"item_type": "Warehouse", "display_name": f"wh_{clean_dom}_gold", "folder": f"{root_f}/{sub_f['gold']}", "item_id": "active"},
-    ]
 
     proj_session_id = f"proj_{project_id}"
-    existing_messages = SESSIONS.get(proj_session_id, {}).get("messages", [])
-    if not existing_messages:
-        # Turn 1: User Medallion Deployment Prompt
-        user_prompt = (
-            f"Deploy Microsoft Fabric Medallion Architecture for **{pname}** (`{pcode}`) "
-            f"based on enterprise intake specification. "
-            f"Configure isolated subfolder containment in `{root_f}`, Delta Lake bronze ingestion, "
-            f"silver PySpark MERGE with SCD Type-2 tracking, and a gold Kimball star-schema warehouse for Power BI Direct Lake."
-        )
-
-        thought_steps = [
-            {
-                "title": "Ingestion Strategy & Domain Analysis",
-                "status": "completed",
-                "details": f"Analyzed intake spec for {pname}. Derived entity primary keys, temporal partitioning, and watermark strategies.",
-                "target": "analysis",
-            },
-            {
-                "title": "Fabric Workspace Hierarchy & Folder Partitioning",
-                "status": "completed",
-                "details": f"Created root folder '{root_f}' with isolated Medallion subdirectories: {sub_f['raw']}, {sub_f['stage']}, {sub_f['silver']}, {sub_f['gold']}.",
-                "target": "folders",
-            },
-            {
-                "title": "Synthesizing Delta Lake & PySpark Transformations",
-                "status": "completed",
-                "details": f"Generated idempotent PySpark Delta MERGE SCD-2 deduplication and SHA-256 PII masking routines in `nb_{clean_dom}_curate`.",
-                "target": "pyspark",
-            },
-            {
-                "title": "SQL AST Transpilation to ANSI Spark SQL",
-                "status": "completed",
-                "details": "Transpiled source DDL queries via SQLGlot AST engine to enforce Delta schema constraints.",
-                "target": "transpiler",
-            },
-            {
-                "title": "Microsoft Fabric REST API Deployment Verification",
-                "status": "completed",
-                "details": f"Verified live Lakehouses (lh_{clean_dom}_bronze, lh_{clean_dom}_silver), Warehouse (wh_{clean_dom}_gold), and Data Pipelines.",
-                "target": "deployer",
-            },
-        ]
-
-        assistant_content = (
-            f"### 🚀 Microsoft Fabric Medallion Platform Deployed: `{pname}`\n\n"
-            f"The end-to-end Medallion data engineering architecture for **{pname}** (`{pcode}`) has been provisioned and configured in your Microsoft Fabric workspace.\n\n"
-            f"#### 📁 Workspace Folder Hierarchy & Deployed Assets\n"
-            f"- 📁 **`{root_f}/{sub_f['raw']}`**\n"
-            f"  - `Lakehouse`: `lh_{clean_dom}_bronze` (Raw immutable Delta Lake ingestion layer)\n"
-            f"  - `DataPipeline`: `pl_{clean_dom}_bronze_ingest` (Fabric Data Factory pipeline scheduled hourly)\n"
-            f"- 📁 **`{root_f}/{sub_f['stage']}`**\n"
-            f"  - `Notebook`: `nb_{clean_dom}_curate` (PySpark Delta MERGE, SCD Type-2 tracking, SHA-256 PII hashing)\n"
-            f"- 📁 **`{root_f}/{sub_f['silver']}`**\n"
-            f"  - `Lakehouse`: `lh_{clean_dom}_silver` (Curated, deduplicated, conformant Delta Lake tables)\n"
-            f"- 📁 **`{root_f}/{sub_f['gold']}`**\n"
-            f"  - `Warehouse`: `wh_{clean_dom}_gold` (Kimball dimensional star schema for Power BI Direct Lake)\n\n"
-            f"#### ⚡ PySpark Silver Curation Routine (`nb_{clean_dom}_curate`)\n"
-            f"```python\n"
-            f"# PySpark Delta MERGE with SCD-1 / SCD-2 Upsert & SHA-256 Masking\n"
-            f"from delta.tables import DeltaTable\n"
-            f"from pyspark.sql import functions as F\n\n"
-            f"# 1. Read Bronze Delta Table\n"
-            f"bronze_df = spark.read.table(\"lh_{clean_dom}_bronze.{clean_dom}_entity_1\")\n\n"
-            f"# 2. Apply SHA-256 Masking on Sensitive Attributes & Add Ingestion Timestamps\n"
-            f"curated_df = (bronze_df\n"
-            f"    .withColumn(\"ingestion_timestamp\", F.current_timestamp())\n"
-            f"    .withColumn(\"watermark_hash\", F.sha2(F.col(\"id\").cast(\"string\"), 256))\n"
-            f"    .dropDuplicates([\"id\"]))\n\n"
-            f"# 3. Atomic Delta Lake Upsert via MERGE\n"
-            f"silver_table = DeltaTable.forName(spark, \"lh_{clean_dom}_silver.{clean_dom}_entity_1\")\n"
-            f"silver_table.alias(\"target\").merge(\n"
-            f"    curated_df.alias(\"source\"),\n"
-            f"    \"target.id = source.id\"\n"
-            f").whenMatchedUpdateAll() \\\n"
-            f" .whenNotMatchedInsertAll() \\\n"
-            f" .execute()\n"
-            f"```\n\n"
-            f"#### 🏛️ Gold Kimball Analytical Warehouse DDL (`wh_{clean_dom}_gold`)\n"
-            f"```sql\n"
-            f"-- Star Schema Dimensional Fact Table for Power BI Direct Lake\n"
-            f"CREATE TABLE IF NOT EXISTS wh_{clean_dom}_gold.fact_{clean_dom}_daily_metrics (\n"
-            f"    metric_key BIGINT NOT NULL,\n"
-            f"    date_id INT NOT NULL,\n"
-            f"    entity_id VARCHAR(64) NOT NULL,\n"
-            f"    total_volume DECIMAL(18, 4),\n"
-            f"    processed_count INT,\n"
-            f"    status_flag VARCHAR(16),\n"
-            f"    dw_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n"
-            f");\n"
-            f"```\n\n"
-            f"✨ **Project context is active.** You can now ask any question in natural language (or via voice mode), request schema alterations, generate stored procedures, or inspect the interactive flow."
-        )
-
-        existing_messages = [
-            {"role": "user", "content": user_prompt},
-            {
-                "role": "assistant",
-                "content": assistant_content,
-                "thoughtSteps": thought_steps,
-                "thoughtElapsed": "7.2",
-            },
-        ]
-        SESSIONS[proj_session_id] = {
-            "session_id": proj_session_id,
-            "title": pname,
-            "messages": existing_messages,
-            "active_plan": plan,
-            "updated_at": "",
-        }
-        save_sessions_to_disk()
+    session_data = SESSIONS.get(proj_session_id) or {}
+    existing_messages = session_data.get("messages", [])
+    active_plan = session_data.get("active_plan", None)
+    deployed_items = session_data.get("deployed_items", [])
 
     return {
         "project": project_data,
-        "plan": plan,
+        "plan": active_plan,
         "deployed_items": deployed_items,
         "messages": existing_messages,
     }

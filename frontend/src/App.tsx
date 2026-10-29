@@ -250,12 +250,7 @@ export const App: React.FC = () => {
       setCurrentPlan(null);
       if (shouldSwitchToChat) setActiveView('chat');
       setSessionId('sess_playground');
-      setMessages([
-        {
-          role: 'assistant',
-          content: '### 🚀 OmniFlow Playground Active\n\nThis is your scratchpad for rapid experimentation. You can attach an intake spec using the **Intake Spec** button or type any natural language data engineering prompt below.',
-        },
-      ]);
+      setMessages([]);
       return;
     }
 
@@ -264,9 +259,7 @@ export const App: React.FC = () => {
       if (shouldSwitchToChat) setActiveView('chat');
       const detail = await fetchProjectDetail(projectId);
       if (detail) {
-        if (detail.plan) {
-          setCurrentPlan(detail.plan);
-        }
+        setCurrentPlan(detail.plan || null);
         if (detail.messages && detail.messages.length > 0) {
           setMessages(
             detail.messages.map((m) => ({
@@ -582,8 +575,23 @@ export const App: React.FC = () => {
         return 'Workspace Explorer';
       case 'apps':
         return 'Apps & Ingestion Studio';
-      default:
-        return messages.length === 0 ? 'Playground' : 'Architect Orders Medallion Flow';
+      default: {
+        if (activeProjectId && activeProjectId !== 'playground') {
+          const currentProj = projects.find((p) => p.id === activeProjectId);
+          return currentProj ? currentProj.name : 'Project';
+        }
+        if (sessionId && sessionId !== 'sess_playground') {
+          const currentSess = sessions.find((s) => s.sessionId === sessionId);
+          if (
+            currentSess?.title &&
+            currentSess.title !== 'Medallion Architecture Session' &&
+            currentSess.title !== 'Architect Orders Medallion Flow'
+          ) {
+            return currentSess.title;
+          }
+        }
+        return 'Playground';
+      }
     }
   };
 
