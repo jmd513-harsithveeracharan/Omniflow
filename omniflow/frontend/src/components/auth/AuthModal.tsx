@@ -18,13 +18,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   if (!isOpen) return null;
 
   const handleLogin = () => {
-    const defaultUser: UserProfile = {
-      id: 'usr_lead',
-      name: 'Bheesetti Harsith',
-      email: 'bheesetti.harsith@fabric.ai',
-      avatar_color: '#10b981',
-    };
-    onUserChanged(defaultUser);
+    onUserChanged(null);
     onClose();
   };
 

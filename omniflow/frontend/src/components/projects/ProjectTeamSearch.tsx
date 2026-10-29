@@ -9,7 +9,7 @@ interface ProjectTeamSearchProps {
 }
 
 const DIRECTORY_ACCOUNTS: Array<{ name: string; email: string; avatarBg: string }> = [
-  { name: 'Harsith Veer Bheesetti (You)', email: 'harsith@fabric.internal', avatarBg: '#10b981' },
+  { name: 'Harsith Veer Bheesetti', email: 'harsith@fabric.internal', avatarBg: '#10b981' },
   { name: 'Alex Chen', email: 'alex.chen@fabric.internal', avatarBg: '#6366f1' },
   { name: 'Sarah Jenkins', email: 'sarah.j@fabric.internal', avatarBg: '#ec4899' },
   { name: 'David Kumar', email: 'david.kumar@fabric.internal', avatarBg: '#3b82f6' },

@@ -132,8 +132,6 @@ class MemberRemoveRequest(BaseModel):
 
 
 DIRECTORY_USERS: list[dict[str, Any]] = [
-    {"id": "usr_harsith", "name": "Bheesetti Harsith (You)", "email": "bheesetti.harsith@fabric.ai", "avatar_color": "#10b981", "role": "lead"},
-    {"id": "usr_veeracharan", "name": "Harsith", "email": "veeracharan99@gmail.com", "avatar_color": "#343438", "role": "lead"},
     {"id": "usr_alex", "name": "Alex Chen", "email": "alex.chen@fabric.internal", "avatar_color": "#6366f1", "role": "engineer"},
     {"id": "usr_sarah", "name": "Sarah Jenkins", "email": "sarah.j@fabric.internal", "avatar_color": "#ec4899", "role": "architect"},
     {"id": "usr_david", "name": "David Kumar", "email": "david.kumar@fabric.internal", "avatar_color": "#3b82f6", "role": "contributor"},
@@ -152,7 +150,7 @@ FABRIC_STATUS_CACHE: dict[str, Any] | None = {
     "workspace_name": os.getenv("ALLOWED_WORKSPACE_NAME", "PBT_DATA_AGENT"),
     "target_folder": "Workspace Root (Zero Container)",
     "workspaces_count": 1,
-    "user_identity": "Bheesetti.Harsith@Pelibiothermal.com",
+    "user_identity": os.getenv("FABRIC_USER_IDENTITY", "Fabric Workspace Identity"),
     "auth_method": "Azure CLI",
     "tenant_id": os.getenv("AZURE_TENANT_ID", "94b62ba4-8d71-4507-9dc9-9734a149f836"),
     "expires_in_minutes": 60,
@@ -233,7 +231,7 @@ async def get_fabric_status() -> dict[str, Any]:
         "workspace_name": os.getenv("ALLOWED_WORKSPACE_NAME", "PBT_DATA_AGENT"),
         "target_folder": "Workspace Root (Zero Container)",
         "workspaces_count": 1,
-        "user_identity": "Bheesetti.Harsith@Pelibiothermal.com",
+        "user_identity": os.getenv("FABRIC_USER_IDENTITY", "Fabric Workspace Identity"),
         "auth_method": "Azure CLI",
         "tenant_id": os.getenv("AZURE_TENANT_ID", "94b62ba4-8d71-4507-9dc9-9734a149f836"),
         "expires_in_minutes": 60,
@@ -258,9 +256,7 @@ async def list_sessions(user_email: str | None = None) -> dict[str, Any]:
                 if s_user != u:
                     continue
             else:
-                # Unscoped legacy sessions belong to the admin/lead accounts
-                if u not in ["bheesetti.harsith@fabric.ai", "veeracharan99@gmail.com"]:
-                    continue
+                continue
         sess_list.append({
             "session_id": sid,
             "title": sdata.get("title", "New Conversation"),
@@ -318,11 +314,6 @@ async def list_projects(user_email: str | None = None) -> dict[str, Any]:
         return {"projects": projects}
 
     u = user_email.strip().lower()
-    # Workspace Lead Admin has workspace-wide view
-    is_admin = u in ["bheesetti.harsith@fabric.ai", "veeracharan99@gmail.com"]
-    if is_admin:
-        return {"projects": projects}
-
     scoped = []
     for p in projects:
         p_creator = (p.get("created_by") or "").strip().lower()
@@ -342,7 +333,7 @@ async def create_project_endpoint(req: ProjectRequest) -> dict[str, Any]:
     pname = req.name or "New Project"
     desc = req.description or ""
     lpath = req.local_path or os.path.join(os.getcwd(), "omniflow", "generated_artifacts", pid)
-    created_by = (req.created_by or "bheesetti.harsith@fabric.ai").strip()
+    created_by = (req.created_by or "user@fabric.ai").strip()
 
     # Ensure local directory exists if specified
     if lpath:
@@ -473,12 +464,14 @@ async def get_project_members(project_id: str) -> dict[str, Any]:
     meta = target.get("metadata") or {}
     members = meta.get("members", [])
     if not members:
+        creator = target.get("created_by") or "owner@fabric.ai"
+        c_name = creator.split("@")[0].replace(".", " ").title() if "@" in creator else creator
         members = [
             {
-                "id": "mem_default",
-                "user_id": "usr_harsith",
-                "name": "Bheesetti Harsith (You)",
-                "email": "bheesetti.harsith@fabric.ai",
+                "id": f"mem_{target['id']}",
+                "user_id": f"usr_{target['id'][:8]}",
+                "name": f"{c_name} (Owner)",
+                "email": creator,
                 "role": "owner",
                 "avatarBg": "#10b981",
             }
