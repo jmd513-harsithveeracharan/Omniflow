@@ -37,7 +37,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
       width: '100vw',
       background: '#141413',
       color: '#f5f3ec',
-      fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
+      fontFamily: "'Anthropic Sans', 'anthropic-sans', var(--font-sans)",
       overflow: 'hidden',
     }}>
       {/* Left Column: Brand & Form */}
@@ -56,7 +56,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <PlatformCube platformId="fabric" size={24} />
           <span style={{
-            fontFamily: "'Google Sans', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
+            fontFamily: "'Anthropic Sans', 'anthropic-sans', var(--font-heading)",
             fontSize: '20px',
             fontWeight: 700,
             color: '#f8fafc',
@@ -77,7 +77,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
         }}>
           {/* Modern Sans Headline */}
           <h1 style={{
-            fontFamily: "'Google Sans', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
+            fontFamily: "'Anthropic Sans', 'anthropic-sans', var(--font-heading)",
             fontSize: '38px',
             fontWeight: 700,
             color: '#f8fafc',
@@ -92,7 +92,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
             color: '#94a3b8',
             margin: '0 0 32px 0',
             fontWeight: 400,
-            fontFamily: "'Inter', sans-serif",
+            fontFamily: "'Anthropic Sans', 'anthropic-sans', var(--font-sans)",
           }}>
             Your data engineering for Microsoft Fabric
           </p>

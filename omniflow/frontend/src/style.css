@@ -1,4 +1,105 @@
 /* =============================================================================
+   Anthropic Typeface Family (@font-face declarations)
+   ============================================================================= */
+@font-face {
+  font-family: 'Anthropic Sans';
+  src: url('/fonts/AnthropicSans@400.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Anthropic Sans';
+  src: url('/fonts/AnthropicSans@500.woff2') format('woff2');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Anthropic Sans';
+  src: url('/fonts/AnthropicSans@600.woff2') format('woff2');
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Anthropic Sans';
+  src: url('/fonts/AnthropicSans@700.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Lowercase kebab-case alias 'anthropic-sans' */
+@font-face {
+  font-family: 'anthropic-sans';
+  src: url('/fonts/AnthropicSans@400.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'anthropic-sans';
+  src: url('/fonts/AnthropicSans@500.woff2') format('woff2');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'anthropic-sans';
+  src: url('/fonts/AnthropicSans@600.woff2') format('woff2');
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'anthropic-sans';
+  src: url('/fonts/AnthropicSans@700.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Anthropic Serif */
+@font-face {
+  font-family: 'Anthropic Serif';
+  src: url('/fonts/AnthropicSerif@400.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Anthropic Serif';
+  src: url('/fonts/AnthropicSerif@700.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'anthropic-serif';
+  src: url('/fonts/AnthropicSerif@400.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'anthropic-serif';
+  src: url('/fonts/AnthropicSerif@700.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* =============================================================================
    Fabric AI Studio — Google AI Studio Dark Theme Design System
    ============================================================================= */
 
@@ -47,9 +148,9 @@
     --purple: #c58af9;
 
     /* Typography */
-    --font-sans: 'anthropic-sans', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-    --font-heading: 'anthropic-sans', var(--font-sans);
-    --font-serif: 'Newsreader', Georgia, Cambria, 'Times New Roman', serif;
+    --font-sans: 'Anthropic Sans', 'anthropic-sans', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    --font-heading: 'Anthropic Sans', 'anthropic-sans', var(--font-sans);
+    --font-serif: 'Anthropic Serif', 'anthropic-serif', 'Newsreader', Georgia, Cambria, 'Times New Roman', serif;
     --font-mono: 'JetBrains Mono', 'Roboto Mono', 'Courier New', monospace;
 
     /* Dimensions */

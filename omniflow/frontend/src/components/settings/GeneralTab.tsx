@@ -156,8 +156,8 @@ export const GeneralTab: React.FC<GeneralTabProps> = ({ onClose }) => {
           value={font}
           onChange={(e) => setFont(e.target.value)}
         >
+          <option>Anthropic Sans</option>
           <option>Anthropic Serif (Newsreader)</option>
-          <option>Google Sans Text</option>
           <option>Inter (Modern Sans)</option>
         </select>
       </div>

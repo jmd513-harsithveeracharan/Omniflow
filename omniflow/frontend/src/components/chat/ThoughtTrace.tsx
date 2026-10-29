@@ -145,7 +145,7 @@ export const ThoughtTrace: React.FC<ThoughtTraceProps> = ({ meta, isStreaming = 
       style={{
         width: '100%',
         marginBottom: '10px',
-        fontFamily: 'var(--font-sans, "Google Sans Text", system-ui, sans-serif)',
+        fontFamily: 'var(--font-sans)',
       }}
     >
       {/* 1. Sleek Antigravity Header Toggle */}
