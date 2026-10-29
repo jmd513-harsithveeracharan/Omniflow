@@ -152,7 +152,7 @@ button, input, select, textarea, optgroup, option {
     display: flex;
     flex-direction: column;
     flex-shrink: 0;
-    z-index: 30;
+    z-index: 100;
     position: relative;
     transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease;
 }
@@ -929,6 +929,9 @@ nav.sidebar-nav {
     border-top: 1px solid rgba(255, 255, 255, 0.05);
     background: transparent;
     flex-shrink: 0;
+    position: relative;
+    z-index: 100;
+    overflow: visible;
 }
 
 .sidebar-footer-icons {
@@ -7105,23 +7108,23 @@ ul.chat-md-list {
     position: relative;
     width: 100%;
     box-sizing: border-box;
+    z-index: 100;
+    overflow: visible;
 }
 
 .claude-profile-row {
     display: flex;
     align-items: center;
-    justify-content: space-between;
     width: 100%;
-    gap: 6px;
 }
 
 .claude-profile-pill {
     display: flex;
     align-items: center;
     gap: 10px;
-    flex: 1;
+    width: 100%;
     min-width: 0;
-    padding: 6px 8px;
+    padding: 6px 10px;
     border-radius: 8px;
     background: transparent;
     border: none;
@@ -7176,37 +7179,19 @@ ul.chat-md-list {
 .claude-profile-chevron {
     color: #9ca3af;
     flex-shrink: 0;
-    margin-left: 2px;
+    margin-left: auto;
     transition: transform 0.15s ease;
 }
 
-.claude-devices-btn {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 32px;
-    height: 32px;
-    border-radius: 8px;
-    background: transparent;
-    border: none;
-    color: #9ca3af;
-    cursor: pointer;
-    flex-shrink: 0;
-    transition: background 0.15s ease, color 0.15s ease;
-}
-
-.claude-devices-btn:hover {
-    background: rgba(255, 255, 255, 0.08);
-    color: #ffffff;
-}
-
-/* Claude Popover Menu */
+/* Claude Popover Menu - Contained precisely within sidebar bounds */
 .claude-popover-menu {
     position: absolute;
     bottom: calc(100% + 8px);
     left: 0;
+    right: 0;
     width: 100%;
-    min-width: 260px;
+    min-width: 0;
+    max-width: 100%;
     background: #212124;
     border: 1px solid rgba(255, 255, 255, 0.12);
     border-radius: 14px;

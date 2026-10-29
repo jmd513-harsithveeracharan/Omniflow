@@ -4,7 +4,6 @@ import {
   Globe,
   HelpCircle,
   ArrowUpCircle,
-  MonitorSmartphone,
   Info,
   ChevronRight,
   ChevronDown,
@@ -61,7 +60,7 @@ export const UserProfileMenu: React.FC<UserProfileMenuProps> = ({
 
   return (
     <div className="claude-profile-footer-container" ref={containerRef}>
-      {/* Popover Menu matching Claude.ai pixel-for-pixel */}
+      {/* Popover Menu matching Claude.ai */}
       {isOpen && (
         <div className="claude-popover-menu">
           <div className="claude-popover-email-header" title={displayEmail}>
@@ -116,15 +115,6 @@ export const UserProfileMenu: React.FC<UserProfileMenuProps> = ({
           <button
             type="button"
             className="claude-popover-item"
-            onClick={() => setIsOpen(false)}
-          >
-            <MonitorSmartphone size={15} strokeWidth={1.75} />
-            <span>Get apps and extensions</span>
-          </button>
-
-          <button
-            type="button"
-            className="claude-popover-item"
             onClick={() => {
               setIsOpen(false);
               window.open('https://fabric.microsoft.com', '_blank');
@@ -151,7 +141,7 @@ export const UserProfileMenu: React.FC<UserProfileMenuProps> = ({
         </div>
       )}
 
-      {/* Bottom Bar: Profile Pill + App Devices Icon */}
+      {/* Bottom Bar: Full-Width Profile Pill */}
       <div className="claude-profile-row">
         <button
           type="button"
@@ -184,19 +174,7 @@ export const UserProfileMenu: React.FC<UserProfileMenuProps> = ({
             </>
           )}
         </button>
-
-        {!isCollapsed && (
-          <button
-            type="button"
-            className="claude-devices-btn"
-            title="Get apps and extensions"
-            onClick={() => setIsOpen(!isOpen)}
-          >
-            <MonitorSmartphone size={16} />
-          </button>
-        )}
       </div>
     </div>
   );
 };
-

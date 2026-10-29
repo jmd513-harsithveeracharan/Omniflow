@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { UserProfile } from '../../types';
+import { PlatformCube } from '../PlatformCube';
 
 interface LoginPageProps {
   onLoginSuccess: (user: UserProfile) => void;
@@ -8,19 +9,6 @@ interface LoginPageProps {
 export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
   const [email, setEmail] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-
-  const handleMicrosoftLogin = () => {
-    setIsLoading(true);
-    const msUser: UserProfile = {
-      id: 'usr_lead',
-      name: 'Harsith',
-      email: 'veeracharan99@gmail.com',
-      avatar_color: '#343438',
-    };
-    setTimeout(() => {
-      onLoginSuccess(msUser);
-    }, 200);
-  };
 
   const handleEmailLogin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -64,25 +52,17 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
         boxSizing: 'border-box',
         zIndex: 2,
       }}>
-        {/* Top-Left Logo */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          {/* Claude-style Terracotta Starburst */}
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0 }}>
-            <path
-              d="M12 2v20M2 12h20M4.93 4.93l14.14 14.14M4.93 19.07l14.14-14.14"
-              stroke="#d97757"
-              strokeWidth="2.75"
-              strokeLinecap="round"
-            />
-          </svg>
+        {/* Top-Left OmniFlow Logo */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <PlatformCube platformId="fabric" size={24} />
           <span style={{
-            fontFamily: "'Newsreader', 'Playfair Display', Georgia, serif",
+            fontFamily: "'Google Sans', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
             fontSize: '20px',
-            fontWeight: 500,
-            color: '#f5f3ec',
-            letterSpacing: '-0.01em',
+            fontWeight: 700,
+            color: '#f8fafc',
+            letterSpacing: '-0.02em',
           }}>
-            OmniFlow
+            Omni<span style={{ color: '#10b981' }}>flow</span>
           </span>
         </div>
 
@@ -95,25 +75,26 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
           margin: 'auto 0',
           width: '100%',
         }}>
-          {/* Headline */}
+          {/* Modern Sans Headline */}
           <h1 style={{
-            fontFamily: "'Newsreader', 'Playfair Display', Georgia, serif",
-            fontSize: '44px',
-            fontWeight: 400,
-            color: '#f5f3ec',
-            letterSpacing: '-0.025em',
+            fontFamily: "'Google Sans', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
+            fontSize: '38px',
+            fontWeight: 700,
+            color: '#f8fafc',
+            letterSpacing: '-0.03em',
             margin: '0 0 10px 0',
-            lineHeight: 1.15,
+            lineHeight: 1.2,
           }}>
-            Question what’s next
+            Orchestrate your intelligence
           </h1>
           <p style={{
             fontSize: '14.5px',
-            color: '#9e9c94',
+            color: '#94a3b8',
             margin: '0 0 32px 0',
             fontWeight: 400,
+            fontFamily: "'Inter', sans-serif",
           }}>
-            Your thinking partner for Microsoft Fabric
+            Autonomous Medallion pipelines & dynamic data engineering for Microsoft Fabric
           </p>
 
           {/* Form Card */}
@@ -126,38 +107,48 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
             padding: '24px',
             boxSizing: 'border-box',
           }}>
-            {/* Continue with Microsoft Button */}
+            {/* Disabled / Non-clickable Microsoft SSO Button */}
             <button
               type="button"
-              onClick={handleMicrosoftLogin}
-              disabled={isLoading}
+              disabled={true}
+              title="Microsoft Entra SSO is configured by your Fabric Tenant Administrator"
               style={{
                 width: '100%',
                 height: '42px',
-                background: '#2b2a27',
-                border: '1px solid rgba(255, 255, 255, 0.09)',
+                background: '#22211f',
+                border: '1px solid rgba(255, 255, 255, 0.06)',
                 borderRadius: '8px',
-                color: '#f5f3ec',
-                fontSize: '13.5px',
+                color: '#8c8a82',
+                fontSize: '13px',
                 fontWeight: 500,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 gap: '10px',
-                cursor: isLoading ? 'not-allowed' : 'pointer',
-                transition: 'background 0.15s ease, border-color 0.15s ease',
+                cursor: 'not-allowed',
+                opacity: 0.65,
+                userSelect: 'none',
               }}
-              onMouseEnter={(e) => { e.currentTarget.style.background = '#363531'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = '#2b2a27'; }}
             >
               {/* Microsoft 4-square logo */}
-              <svg width="18" height="18" viewBox="0 0 21 21">
+              <svg width="17" height="17" viewBox="0 0 21 21" style={{ opacity: 0.7 }}>
                 <rect x="1" y="1" width="9" height="9" fill="#f25022" />
                 <rect x="11" y="1" width="9" height="9" fill="#7fba00" />
                 <rect x="1" y="12" width="9" height="9" fill="#00a4ef" />
                 <rect x="11" y="12" width="9" height="9" fill="#ffb900" />
               </svg>
               <span>Continue with Microsoft</span>
+              <span style={{
+                fontSize: '10px',
+                background: 'rgba(255, 255, 255, 0.08)',
+                color: '#a1a1aa',
+                padding: '2px 6px',
+                borderRadius: '4px',
+                marginLeft: '4px',
+                fontWeight: 600,
+              }}>
+                SSO
+              </span>
             </button>
 
             {/* OR Divider */}
@@ -192,10 +183,16 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
                   padding: '0 14px',
                   outline: 'none',
                   boxSizing: 'border-box',
-                  transition: 'border-color 0.15s ease',
+                  transition: 'border-color 0.15s ease, box-shadow 0.15s ease',
                 }}
-                onFocus={(e) => { e.currentTarget.style.borderColor = '#d97757'; }}
-                onBlur={(e) => { e.currentTarget.style.borderColor = '#33312c'; }}
+                onFocus={(e) => {
+                  e.currentTarget.style.borderColor = '#10b981';
+                  e.currentTarget.style.boxShadow = '0 0 0 2px rgba(16, 185, 129, 0.18)';
+                }}
+                onBlur={(e) => {
+                  e.currentTarget.style.borderColor = '#33312c';
+                  e.currentTarget.style.boxShadow = 'none';
+                }}
               />
 
               <button
@@ -222,7 +219,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
           </div>
         </div>
 
-        {/* Clean Empty Footer (Desktop app button intentionally removed) */}
+        {/* Clean Empty Footer */}
         <div style={{ height: '24px' }} />
       </div>
 

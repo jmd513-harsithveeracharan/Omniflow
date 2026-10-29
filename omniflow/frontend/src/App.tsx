@@ -70,6 +70,7 @@ export const App: React.FC = () => {
 
   const handleUserChanged = (user: UserProfile | null) => {
     setCurrentUser(user);
+    setIsAuthModalOpen(false);
     if (user) {
       localStorage.setItem('omniflow_active_user', JSON.stringify(user));
     } else {
@@ -79,7 +80,7 @@ export const App: React.FC = () => {
 
   const handleSignOut = async () => {
     handleUserChanged(null);
-    setIsAuthModalOpen(true);
+    setIsAuthModalOpen(false);
     try {
       await logoutFabric();
       fetchFabricStatus().then(setStatus).catch(() => {});
