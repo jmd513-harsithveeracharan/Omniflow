@@ -182,9 +182,9 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content }) =
             const str = typeof children === 'string' ? children : (Array.isArray(children) && typeof children[0] === 'string' ? children[0] : '');
             if (str) {
               const fb = renderFabricItemBadge(str);
-              if (fb) return <li>{fb}</li>;
+              if (fb) return <li className="chat-md-list-item badge-item">{fb}</li>;
             }
-            return <li {...props}>{renderWithLineBreaks(children)}</li>;
+            return <li className="chat-md-list-item" {...props}>{renderWithLineBreaks(children)}</li>;
           },
           p({ children, ...props }: any) {
             if (typeof children === 'string') {

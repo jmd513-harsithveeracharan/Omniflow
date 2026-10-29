@@ -47,9 +47,10 @@
     --purple: #c58af9;
 
     /* Typography */
-    --font-sans: 'Google Sans', 'Google Sans Text', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    --font-heading: 'Google Sans', var(--font-sans);
-    --font-mono: 'Roboto Mono', 'JetBrains Mono', 'Courier New', monospace;
+    --font-sans: 'anthropic-sans', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    --font-heading: 'anthropic-sans', var(--font-sans);
+    --font-serif: 'Newsreader', Georgia, Cambria, 'Times New Roman', serif;
+    --font-mono: 'JetBrains Mono', 'Roboto Mono', 'Courier New', monospace;
 
     /* Dimensions */
     --sidebar-w: 260px;
@@ -80,6 +81,8 @@ html, body {
     line-height: 1.5;
     overflow-x: hidden;
     -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
 }
 
 button, input, select, textarea, optgroup, option {
@@ -1471,9 +1474,10 @@ nav.sidebar-nav {
     box-shadow: none !important;
     backdrop-filter: none !important;
     padding: 0 !important;
-    color: #e3e3e3;
+    color: #dcdfe4;
     font-size: 15px;
-    line-height: 1.65;
+    line-height: 1.7;
+    letter-spacing: -0.01em;
     width: 100%;
 }
 
@@ -11310,121 +11314,182 @@ pre[class*="language-"] {
 
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   CHAT MARKDOWN ENHANCEMENTS & FABRIC ASSET CARDS
+   CHAT MARKDOWN ENHANCEMENTS & EDITORIAL TYPOGRAPHY
    ═══════════════════════════════════════════════════════════════════════════ */
 .chat-markdown-renderer {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
+    display: block;
     width: 100%;
+    color: #dcdfe4;
+    font-size: 15px;
+    line-height: 1.7;
+    letter-spacing: -0.01em;
+    word-break: break-word;
 }
 
-.chat-md-paragraph {
-    margin: 3px 0;
-    line-height: 1.65;
-    color: #e4e4e7;
+.chat-md-paragraph,
+.chat-markdown-renderer p {
+    margin: 0 0 14px 0;
+    line-height: 1.7;
+    color: #dcdfe4;
+    font-size: 15px;
+    letter-spacing: -0.01em;
+}
+
+.chat-md-paragraph:last-child,
+.chat-markdown-renderer p:last-child {
+    margin-bottom: 0;
+}
+
+/* Headings with clear typographic hierarchy */
+.chat-md-h1,
+.chat-markdown-renderer h1 {
+    font-size: 20px;
+    font-weight: 600;
+    color: #f9fafb;
+    margin: 22px 0 12px 0;
+    letter-spacing: -0.02em;
+    line-height: 1.35;
+}
+
+.chat-md-h2,
+.chat-markdown-renderer h2 {
+    font-size: 17.5px;
+    font-weight: 600;
+    color: #f9fafb;
+    margin: 20px 0 10px 0;
+    letter-spacing: -0.015em;
+    line-height: 1.4;
+}
+
+.chat-md-h3,
+.chat-markdown-renderer h3 {
+    font-size: 15.5px;
+    font-weight: 600;
+    color: #f3f4f6;
+    margin: 16px 0 8px 0;
+    letter-spacing: -0.01em;
+    line-height: 1.45;
+}
+
+.chat-md-h4,
+.chat-markdown-renderer h4 {
     font-size: 14.5px;
+    font-weight: 600;
+    color: #e5e7eb;
+    margin: 14px 0 6px 0;
+    line-height: 1.5;
 }
 
-.chat-md-bold {
+.chat-markdown-renderer h1:first-child,
+.chat-markdown-renderer h2:first-child,
+.chat-markdown-renderer h3:first-child,
+.chat-markdown-renderer h4:first-child {
+    margin-top: 0;
+}
+
+.chat-md-bold,
+.chat-markdown-renderer strong,
+.chat-markdown-renderer b {
     font-weight: 600;
     color: #ffffff;
 }
 
-.chat-md-inline-code {
-    background: rgba(255, 255, 255, 0.08);
-    padding: 2px 7px;
-    border-radius: 4px;
-    font-size: 13px;
-    font-family: var(--font-mono, 'JetBrains Mono', 'Roboto Mono', monospace);
-    color: #f4f4f5 !important;
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    font-weight: 500;
-}
-
-.chat-md-italic {
-    color: #a1a1aa;
+.chat-md-italic,
+.chat-markdown-renderer em,
+.chat-markdown-renderer i {
+    color: #cbd5e1;
     font-style: italic;
 }
 
-.chat-md-link {
-    color: #38bdf8;
-    text-decoration: underline;
-    text-underline-offset: 2px;
-    transition: color 0.15s;
+.chat-md-inline-code,
+.chat-markdown-renderer code:not(pre code) {
+    background: rgba(255, 255, 255, 0.08);
+    padding: 2px 6px;
+    border-radius: 5px;
+    font-size: 13.5px;
+    font-family: var(--font-mono, 'JetBrains Mono', 'Roboto Mono', monospace);
+    color: #f1f5f9 !important;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    font-weight: 500;
+    white-space: break-spaces;
 }
 
-.chat-md-link:hover {
+.chat-md-link,
+.chat-markdown-renderer a {
+    color: #38bdf8;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    transition: color 0.15s ease;
+}
+
+.chat-md-link:hover,
+.chat-markdown-renderer a:hover {
     color: #7dd3fc;
 }
 
-/* Ordered List (1. 2. 3.) */
-.chat-md-ordered-list {
-    list-style: none;
-    padding: 0;
-    margin: 8px 0;
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-}
-
-.chat-md-ordered-item {
-    display: flex;
-    align-items: flex-start;
-    gap: 10px;
-    line-height: 1.65;
-    font-size: 14.5px;
-    color: #e4e4e7;
-}
-
-.chat-md-ordered-item .order-counter {
-    width: 20px;
-    height: 20px;
-    border-radius: 50%;
-    background: rgba(16, 185, 129, 0.15);
-    color: #10b981;
-    border: 1px solid rgba(16, 185, 129, 0.3);
-    font-size: 11px;
-    font-weight: 700;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-    margin-top: 2px;
-}
-
-.chat-md-ordered-item .order-content {
-    flex: 1;
-}
-
-/* Bullet List */
-.chat-md-bullet-list {
-    list-style: none;
-    padding: 0;
-    margin: 6px 0;
+/* Bullet Lists with proper markers and breathing room */
+.chat-md-bullet-list,
+.chat-markdown-renderer ul {
+    list-style: disc;
+    padding-left: 22px;
+    margin: 8px 0 14px 0;
     display: flex;
     flex-direction: column;
     gap: 5px;
 }
 
-.chat-md-bullet-item {
+/* Ordered Lists with proper decimal numbers */
+.chat-md-ordered-list,
+.chat-markdown-renderer ol {
+    list-style: decimal;
+    padding-left: 22px;
+    margin: 8px 0 14px 0;
     display: flex;
-    align-items: flex-start;
-    gap: 8px;
-    line-height: 1.65;
-    font-size: 14.5px;
-    color: #e4e4e7;
+    flex-direction: column;
+    gap: 5px;
 }
 
-.chat-md-bullet-item .bullet-disc {
-    color: #10b981;
+.chat-md-bullet-list li,
+.chat-md-ordered-list li,
+.chat-markdown-renderer li {
+    line-height: 1.68;
+    color: #dcdfe4;
     font-size: 15px;
-    line-height: 1.4;
-    flex-shrink: 0;
+    padding-left: 3px;
+    margin-bottom: 2px;
 }
 
-.chat-md-bullet-item .bullet-content {
-    flex: 1;
+.chat-md-bullet-list li:last-child,
+.chat-md-ordered-list li:last-child,
+.chat-markdown-renderer li:last-child {
+    margin-bottom: 0;
+}
+
+.chat-md-bullet-list li::marker,
+.chat-markdown-renderer ul li::marker {
+    color: #9ca3af;
+}
+
+.chat-md-ordered-list li::marker,
+.chat-markdown-renderer ol li::marker {
+    color: #9ca3af;
+    font-weight: 500;
+}
+
+.chat-markdown-renderer ul ul,
+.chat-markdown-renderer ol ol,
+.chat-markdown-renderer ul ol,
+.chat-markdown-renderer ol ul {
+    margin: 4px 0;
+    padding-left: 18px;
+}
+
+/* Badge list items override */
+.chat-markdown-renderer li.badge-item,
+.chat-markdown-renderer li:has(.chat-fabric-item-card) {
+    list-style: none !important;
+    margin-left: -18px;
+    padding-left: 0;
 }
 
 /* Fabric Item Badges / Cards (Lakehouse, Notebook, Pipeline) */
