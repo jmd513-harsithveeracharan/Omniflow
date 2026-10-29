@@ -12,7 +12,6 @@ import { SettingsModal } from './components/SettingsModal';
 import { FabricConnectionModal } from './components/modals/FabricConnectionModal';
 import { ProjectEditModal } from './components/ProjectEditModal';
 import { AuthModal } from './components/auth/AuthModal';
-import { AuthScreen } from './components/auth/AuthScreen';
 import { useVoiceMode } from './components/voice/useVoiceMode';
 import { SkillsView } from './components/SkillsView';
 import { ProjectsView } from './components/ProjectsView';
@@ -79,6 +78,7 @@ export const App: React.FC = () => {
 
   const handleSignOut = async () => {
     handleUserChanged(null);
+    setIsAuthModalOpen(true);
     try {
       await logoutFabric();
       fetchFabricStatus().then(setStatus).catch(() => {});
@@ -569,10 +569,6 @@ export const App: React.FC = () => {
         return messages.length === 0 ? 'Playground' : 'Architect Orders Medallion Flow';
     }
   };
-
-  if (!currentUser) {
-    return <AuthScreen onLoginSuccess={handleUserChanged} />;
-  }
 
   return (
     <div className="studio-app-container">
