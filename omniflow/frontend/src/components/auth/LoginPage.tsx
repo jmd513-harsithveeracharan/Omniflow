@@ -12,12 +12,11 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
 
   const handleEmailLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
     const trimmed = email.trim();
-    const finalEmail = trimmed || 'veeracharan99@gmail.com';
-    const computedName = trimmed
-      ? trimmed.split('@')[0].replace(/[._-]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
-      : 'Harsith';
+    if (!trimmed) return;
+    setIsLoading(true);
+    const finalEmail = trimmed;
+    const computedName = trimmed.split('@')[0].replace(/[._-]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 
     const emailUser: UserProfile = {
       id: `usr_${Math.random().toString(36).substring(2, 9)}`,
@@ -169,6 +168,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
             <form onSubmit={handleEmailLogin} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <input
                 type="email"
+                required
                 placeholder="Enter your email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}

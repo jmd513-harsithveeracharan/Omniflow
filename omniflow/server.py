@@ -144,54 +144,8 @@ DIRECTORY_USERS: list[dict[str, Any]] = [
 
 
 # High-performance In-Memory Caches for Sub-Millisecond Page Loads
-PROJECTS_CACHE: list[dict[str, Any]] = [
-    {
-        "id": "PRJ-FINTECH-PAYMENTS",
-        "name": "Global Cross-Border Payments & Fraud Intelligence Platform",
-        "description": "Real-time AML, Sanctions Screening, ISO 20022 Wire Settlements & Fraud Intelligence in Microsoft Fabric.",
-        "status": "active",
-        "is_pinned": 1,
-        "is_archived": 0,
-        "local_path": os.path.join(os.getcwd(), "omniflow", "generated_artifacts", "PRJ-FINTECH-PAYMENTS"),
-    },
-    {
-        "id": "PRJ-GLOBAL-DELIVERY",
-        "name": "Global Express Delivery & Courier Logistics Platform",
-        "description": "Courier Logistics, Fleet Telemetry & Order Fulfillment with Medallion Lakehouses and ADF batch ingestion.",
-        "status": "active",
-        "is_pinned": 0,
-        "is_archived": 0,
-        "local_path": os.path.join(os.getcwd(), "omniflow", "generated_artifacts", "PRJ-GLOBAL-DELIVERY"),
-    },
-    {
-        "id": "PRJ-HEALTHCARE-CLAIMS",
-        "name": "Healthcare Clinical & Claims Intelligence Platform",
-        "description": "Healthcare Operations & Claims Analytics with HIPAA SHA-256 PII Masking and Direct Lake reporting.",
-        "status": "active",
-        "is_pinned": 0,
-        "is_archived": 0,
-        "local_path": os.path.join(os.getcwd(), "omniflow", "generated_artifacts", "PRJ-HEALTHCARE-CLAIMS"),
-    },
-    {
-        "id": "PRJ-SUPPLYCHAIN-OPS",
-        "name": "Global Supply Chain & Inventory Fulfillment Platform",
-        "description": "Logistics, Procurement & Inventory Operations with Delta MERGE upserts and Gold Kimball Warehouse.",
-        "status": "active",
-        "is_pinned": 0,
-        "is_archived": 0,
-        "local_path": os.path.join(os.getcwd(), "omniflow", "generated_artifacts", "PRJ-SUPPLYCHAIN-OPS"),
-    },
-    {
-        "id": "PRJ-COMMERCIAL-REV",
-        "name": "Order-to-Cash Commercial Revenue Platform",
-        "description": "Commercial Revenue & Order Operations with Delta Lake deduplication and Power BI Direct Lake semantic model.",
-        "status": "active",
-        "is_pinned": 0,
-        "is_archived": 0,
-        "local_path": os.path.join(os.getcwd(), "omniflow", "generated_artifacts", "PRJ-COMMERCIAL-REV"),
-    },
-]
-PROJECTS_CACHE_TIME: float = time.time()
+PROJECTS_CACHE: list[dict[str, Any]] = []
+PROJECTS_CACHE_TIME: float = 0.0
 FABRIC_STATUS_CACHE: dict[str, Any] | None = {
     "authenticated": True,
     "workspace_id": os.getenv("ALLOWED_WORKSPACE_ID", "db7344c1-ecd9-44d6-849f-f2de49484f9f"),
@@ -216,7 +170,7 @@ async def on_startup():
 def fetch_projects_cached(force_refresh: bool = False) -> list[dict[str, Any]]:
     global PROJECTS_CACHE, PROJECTS_CACHE_TIME
     now = time.time()
-    if not force_refresh and PROJECTS_CACHE:
+    if not force_refresh and PROJECTS_CACHE and (now - PROJECTS_CACHE_TIME < 30.0):
         return PROJECTS_CACHE
 
     projects = []
@@ -225,20 +179,21 @@ def fetch_projects_cached(force_refresh: bool = False) -> list[dict[str, Any]]:
         repo = PostgresRepository()
         with repo._connect() as conn:
             with conn.cursor() as cur:
-                cur.execute("SELECT COALESCE(project_code, project_id::text) as pid, project_name, description, status, created_at FROM projects ORDER BY created_at DESC LIMIT 50;")
+                cur.execute("SELECT COALESCE(project_code, project_id::text) as pid, project_name, description, status, created_at, created_by FROM projects ORDER BY created_at DESC LIMIT 50;")
                 for r in cur.fetchall():
                     pid = str(r[0])
                     def_folder = os.path.join(os.getcwd(), "omniflow", "generated_artifacts", pid)
                     has_folder = os.path.isdir(def_folder)
                     old_p = existing_map.get(pid, {})
-                    creator = old_p.get("created_by") or "bheesetti.harsith@fabric.ai"
+                    creator = r[5] or old_p.get("created_by") or "bheesetti.harsith@fabric.ai"
+                    owner_name = creator.split("@")[0].replace(".", " ").title() if "@" in creator else creator
                     meta = old_p.get("metadata") or {
                         "members": [
                             {
                                 "id": f"mem_{pid}",
-                                "user_id": "usr_harsith",
-                                "name": "Bheesetti Harsith (You)",
-                                "email": "bheesetti.harsith@fabric.ai",
+                                "user_id": f"usr_{pid[:8]}",
+                                "name": f"{owner_name} (Owner)",
+                                "email": creator,
                                 "role": "owner",
                                 "avatarBg": "#10b981",
                             }
@@ -249,8 +204,8 @@ def fetch_projects_cached(force_refresh: bool = False) -> list[dict[str, Any]]:
                         "name": r[1],
                         "description": r[2] or "",
                         "status": r[3],
-                        "is_pinned": 1 if pid == "PRJ-FINTECH-PAYMENTS" else 0,
-                        "is_archived": 0,
+                        "is_pinned": old_p.get("is_pinned", 0),
+                        "is_archived": old_p.get("is_archived", 0),
                         "local_path": def_folder if has_folder else "",
                         "created_at": str(r[4]) if r[4] else "",
                         "created_by": creator,
@@ -430,8 +385,8 @@ async def create_project_endpoint(req: ProjectRequest) -> dict[str, Any]:
         with repo._connect() as conn:
             with conn.cursor() as cur:
                 cur.execute(
-                    "INSERT INTO projects (project_id, project_code, project_name, description, primary_language, target_platform, status) VALUES (%s, %s, %s, %s, 'PySpark / T-SQL', 'Microsoft Fabric', 'active');",
-                    (pid, pid, pname, desc),
+                    "INSERT INTO projects (project_id, project_code, project_name, description, primary_language, target_platform, status, created_by) VALUES (%s, %s, %s, %s, 'PySpark / T-SQL', 'Microsoft Fabric', 'active', %s);",
+                    (pid, pid, pname, desc, created_by),
                 )
                 conn.commit()
     except Exception:
@@ -714,17 +669,6 @@ async def get_workspace_items() -> dict[str, Any]:
     except Exception:
         pass
 
-    if not items_out:
-        # Dynamic items matching the active enterprise logistics project
-        items_out = [
-            {"id": "lh_delivery_bronze", "displayName": "lh_delivery_bronze", "type": "Lakehouse", "description": "Raw immutable logistics event feed", "folderId": "Delivery_Logistics_Platform/01 Raw"},
-            {"id": "pl_delivery_bronze_ingest", "displayName": "pl_delivery_bronze_ingest", "type": "DataPipeline", "description": "Fabric Data Factory bronze pipeline", "folderId": "Delivery_Logistics_Platform/01 Raw"},
-            {"id": "nb_delivery_curate", "displayName": "nb_delivery_curate", "type": "Notebook", "description": "PySpark Delta MERGE & PII hashing", "folderId": "Delivery_Logistics_Platform/02 Stage"},
-            {"id": "lh_delivery_silver", "displayName": "lh_delivery_silver", "type": "Lakehouse", "description": "Curated clean logistics delta lakehouse", "folderId": "Delivery_Logistics_Platform/03 Silver"},
-            {"id": "wh_delivery_gold", "displayName": "wh_delivery_gold", "type": "Warehouse", "description": "Kimball star schema delivery warehouse", "folderId": "Delivery_Logistics_Platform/04 Gold"},
-            {"id": "agent_delivery_mesh", "displayName": "Delivery_Data_Agent", "type": "DataAgent", "description": "Autonomous Lakehouse orchestrator", "folderId": "Workspace Root"},
-        ]
-
     return {"items": items_out, "folders": folders_out, "workspace_id": ws_id}
 
 
@@ -846,9 +790,10 @@ class DeployPlanRequest(BaseModel):
 @app.post("/api/pipeline/deploy")
 async def handle_pipeline_deploy(req: DeployPlanRequest) -> dict[str, Any]:
     plan_data = req.plan or {}
-    domain = plan_data.get("domain", "delivery")
-    pcode = plan_data.get("project_code", "PRJ-GLOBAL-DELIVERY")
-    root_folder = plan_data.get("root_folder") or "Delivery_Logistics_Platform"
+    domain = plan_data.get("domain", "fabric")
+    pcode = plan_data.get("project_code") or f"PRJ-{uuid.uuid4().hex[:6].upper()}"
+    clean_d = re.sub(r"[^a-zA-Z0-9_]", "_", domain).strip("_") or "fabric"
+    root_folder = plan_data.get("root_folder") or f"{clean_d.capitalize()}_Platform"
     subfolders = plan_data.get("folders") or {"raw": "01 Raw", "stage": "02 Stage", "silver": "03 Silver", "gold": "04 Gold"}
     target_folders = {
         "root": root_folder,
@@ -877,7 +822,7 @@ async def handle_chat_stream(req: ChatRequest) -> StreamingResponse:
     if sid not in SESSIONS:
         SESSIONS[sid] = {
             "session_id": sid,
-            "title": "Medallion Architecture Session",
+            "title": "New Conversation",
             "messages": [],
             "user_email": (req.user_email or "").strip(),
             "updated_at": "",
@@ -960,10 +905,10 @@ async def handle_chat_stream(req: ChatRequest) -> StreamingResponse:
             if not p_code and sid.startswith("proj_"):
                 p_code = sid[5:]
             if not p_code:
-                p_code = PROJECTS_CACHE[0]["id"] if PROJECTS_CACHE else "PRJ-FINTECH-PAYMENTS"
+                p_code = PROJECTS_CACHE[0]["id"] if PROJECTS_CACHE else ""
 
-            p_rec = next((p for p in PROJECTS_CACHE if p["id"] == p_code), None)
-            p_name = p_rec["name"] if p_rec else active_plan.get("sourceName", p_code)
+            p_rec = next((p for p in PROJECTS_CACHE if p["id"] == p_code), None) if p_code else None
+            p_name = p_rec["name"] if p_rec else active_plan.get("sourceName", p_code or "Active Project")
             p_desc = p_rec["description"] if p_rec else ""
             p_lpath = p_rec.get("local_path", "") if p_rec else ""
 
@@ -1115,16 +1060,23 @@ async def handle_chat_stream(req: ChatRequest) -> StreamingResponse:
         )
 
         if is_deploy_trigger:
-            active_plan = SESSIONS[sid].get("active_plan") or {
-                "sourceName": "Global Express Delivery & Courier Logistics Platform",
-                "project_code": "PRJ-GLOBAL-DELIVERY",
-                "domain": "delivery",
-                "root_folder": "Delivery_Logistics_Platform",
-                "folders": {"raw": "01 Raw", "stage": "02 Stage", "silver": "03 Silver", "gold": "04 Gold"},
-            }
-            clean_dom = active_plan.get("domain", "delivery")
-            proj_code = active_plan.get("project_code", "PRJ-GLOBAL-DELIVERY")
-            root_f = active_plan.get("root_folder", "Delivery_Logistics_Platform")
+            active_plan = SESSIONS[sid].get("active_plan")
+            if not active_plan:
+                no_plan_msg = (
+                    "No active architecture plan was found to deploy. "
+                    "Please describe your data pipeline or ingestion requirements first so I can synthesize the architecture before deploying to Microsoft Fabric."
+                )
+                for chunk in no_plan_msg.split(" "):
+                    yield f"data: {json.dumps({'type': 'chunk', 'text': chunk + ' '})}\n\n"
+                    await asyncio.sleep(0.015)
+                SESSIONS[sid]["messages"].append({"role": "assistant", "content": no_plan_msg})
+                save_sessions_to_disk()
+                yield f"data: {json.dumps({'type': 'done', 'session_id': sid, 'plan': None})}\n\n"
+                return
+
+            clean_dom = active_plan.get("domain") or "fabric"
+            proj_code = active_plan.get("project_code") or f"PRJ-{uuid.uuid4().hex[:6].upper()}"
+            root_f = active_plan.get("root_folder") or f"{proj_code}_Platform"
             sub_f = active_plan.get("folders", {"raw": "01 Raw", "stage": "02 Stage", "silver": "03 Silver", "gold": "04 Gold"})
 
             deploy_steps = [
@@ -1211,13 +1163,26 @@ async def handle_chat_stream(req: ChatRequest) -> StreamingResponse:
 
             # Execute real pipeline in background worker (dry-run synthesis without immediate deployment)
             orch = MultiAgentOrchestrator()
+            # Dynamic resolution of project identity
+            proj_name = ""
+            proj_code = ""
+            if sid.startswith("proj_"):
+                active_pid = sid[5:]
+                p_rec = next((p for p in fetch_projects_cached() if p["id"] == active_pid), None)
+                if p_rec:
+                    proj_name = p_rec["name"]
+                    proj_code = p_rec["id"]
+
             p_summary = (intake_override or {}).get("project_context", {}).get("project_summary", {})
             sol_summary = (intake_override or {}).get("project_context", {}).get("solution_summary", {})
-            proj_name = p_summary.get("project_name", "Global Express Delivery Platform")
-            proj_code = p_summary.get("project_code", "PRJ-GLOBAL-DELIVERY")
-            clean_dom = re.sub(r"[^a-zA-Z0-9_]", "_", p_summary.get("business_domain", "delivery").lower()).strip("_")[:16] or "delivery"
+            if not proj_name:
+                proj_name = p_summary.get("project_name") or "Fabric Engineering Platform"
+            if not proj_code:
+                proj_code = p_summary.get("project_code") or f"PRJ-{uuid.uuid4().hex[:6].upper()}"
+
+            clean_dom = re.sub(r"[^a-zA-Z0-9_]", "_", (p_summary.get("business_domain") or proj_name).lower()).strip("_")[:16] or "fabric"
             folder_struct = sol_summary.get("target_folder_structure", {})
-            root_f = folder_struct.get("root_folder", f"{clean_dom.capitalize()}_Platform")
+            root_f = folder_struct.get("root_folder") or f"{clean_dom.capitalize()}_Platform"
             sub_f = folder_struct.get("subfolders", {"raw": "01 Raw", "stage": "02 Stage", "silver": "03 Silver", "gold": "04 Gold"})
 
             plan_req = NaturalLanguagePlanRequest(
@@ -1256,9 +1221,9 @@ async def handle_chat_stream(req: ChatRequest) -> StreamingResponse:
                 "root_folder": root_f,
                 "folders": sub_f,
                 "tables": [
-                    {"name": "shipments", "target": f"{sub_f.get('raw', '01 Raw')} / lh_{clean_dom}_bronze"},
-                    {"name": "couriers", "target": f"{sub_f.get('stage', '02 Stage')} / nb_{clean_dom}_curate"},
-                    {"name": "telemetry_pings", "target": f"{sub_f.get('silver', '03 Silver')} / lh_{clean_dom}_silver"},
+                    {"name": f"{clean_dom}_raw_stream", "target": f"{sub_f.get('raw', '01 Raw')} / lh_{clean_dom}_bronze"},
+                    {"name": f"{clean_dom}_curated", "target": f"{sub_f.get('stage', '02 Stage')} / nb_{clean_dom}_curate"},
+                    {"name": f"{clean_dom}_harmonized", "target": f"{sub_f.get('silver', '03 Silver')} / lh_{clean_dom}_silver"},
                 ],
             }
             SESSIONS[sid]["active_plan"] = plan_obj
@@ -1273,9 +1238,17 @@ async def handle_chat_stream(req: ChatRequest) -> StreamingResponse:
             # Resolves operational components: Stored Procedures, PySpark Delta notebooks,
             # connected pipelines, DDL, and queries in 2-4 seconds without 7-stage overhead.
             active_plan = SESSIONS[sid].get("active_plan") or {}
-            p_name = active_plan.get("sourceName") or "Global Express Delivery & Courier Logistics Platform"
-            p_code = active_plan.get("project_code") or "PRJ-GLOBAL-DELIVERY"
-            p_root = active_plan.get("root_folder") or "Delivery_Logistics_Platform"
+            p_name = active_plan.get("sourceName")
+            p_code = active_plan.get("project_code")
+            if not p_name and sid.startswith("proj_"):
+                active_pid = sid[5:]
+                p_rec = next((p for p in fetch_projects_cached() if p["id"] == active_pid), None)
+                if p_rec:
+                    p_name = p_rec["name"]
+                    p_code = p_rec["id"]
+            p_name = p_name or "Fabric Data Engineering"
+            p_code = p_code or "FABRIC-STUDIO"
+            p_root = active_plan.get("root_folder") or f"{p_code}_Platform"
 
             # 1. Classify component type and target engine
             is_sql = any(w in req.message.lower() for w in ["procedure", "stored proc", "sp_", "sql", "ddl", "query", "view", "warehouse"])

@@ -98,7 +98,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               width: '38px',
               height: '38px',
               borderRadius: '50%',
-              background: '#10b981',
+              background: currentUser?.avatar_color || '#10b981',
               color: '#ffffff',
               display: 'flex',
               alignItems: 'center',
@@ -106,12 +106,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               fontWeight: 700,
               fontSize: '15px',
             }}>
-              B
+              {(currentUser?.name || currentUser?.email || 'U')[0].toUpperCase()}
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <span style={{ fontSize: '13.5px', fontWeight: 600, color: '#ffffff' }}>
-                  Bheesetti Harsith
+                  {currentUser?.name || 'Workspace Identity'}
                 </span>
                 {currentUser && (
                   <span style={{
@@ -128,7 +128,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 )}
               </div>
               <div style={{ fontSize: '11.5px', color: '#94a3b8', textOverflow: 'ellipsis', overflow: 'hidden' }}>
-                bheesetti.harsith@fabric.ai
+                {currentUser?.email || 'identity@fabric.ai'}
               </div>
             </div>
           </div>

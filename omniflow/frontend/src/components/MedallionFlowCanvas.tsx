@@ -140,55 +140,14 @@ export const MedallionFlowCanvas: React.FC<MedallionFlowCanvasProps> = ({
   const { dagNodes, dagEdges, treeItems, pysparkCode, jsonSpec } = React.useMemo(() => {
     if (!plan || typeof plan !== 'object') {
       return {
-        dagNodes: DEFAULT_NODES,
-        dagEdges: DEFAULT_EDGES,
-        treeItems: [
-          '📁 AI_Test_Folder/',
-          '└── 📁 SalesPipeline/',
-          '    ├── 🏢 lh_bronze (Delta Lakehouse)',
-          '    ├── 🏢 lh_silver (Delta Lakehouse)',
-          '    ├── 🏢 lh_gold (Star Schema Lakehouse)',
-          '    ├── 🏬 wh_sales_analytics (Synapse Warehouse)',
-          '    ├── 📜 nb_bronze_ingest (PySpark Ingest)',
-          '    ├── 📜 nb_silver_merge (PySpark MERGE)',
-          '    ├── 📜 nb_gold_star (PySpark Star Schema)',
-          '    └── ⚡ pl_daily_sales (Data Factory Pipeline)',
-        ],
-        pysparkCode: `# Fabric AI Studio — Production Medallion MERGE Upsert
-from delta.tables import DeltaTable
-from pyspark.sql.functions import col, current_timestamp, sha2
-
-# 1. Load Raw Bronze Delta Lake
-df_bronze = spark.read.format("delta").table("lh_bronze.raw_sales")
-
-# 2. Cleanse and Add Audit Metadata
-df_silver = df_bronze \\
-    .filter(col("TransactionID").isNotNull()) \\
-    .withColumn("_ingested_at", current_timestamp())
-
-# 3. Target Silver Delta MERGE Upsert
-target_table = DeltaTable.forName(spark, "lh_silver.cleansed_sales")
-
-target_table.alias("tgt").merge(
-    df_silver.alias("src"),
-    "tgt.TransactionID = src.TransactionID"
-).whenMatchedUpdateAll() \\
- .whenNotMatchedInsertAll() \\
- .execute()
-
-print("✅ Delta MERGE completed successfully into lh_silver.")
-`,
+        dagNodes: [],
+        dagEdges: [],
+        treeItems: [],
+        pysparkCode: '# No pipeline code generated yet.\n# Run an architecture prompt or attach an intake spec to synthesize PySpark Delta logic.',
         jsonSpec: JSON.stringify(
           {
-            name: 'pl_daily_sales',
-            properties: {
-              activities: [
-                { name: 'nb_bronze_ingest', type: 'FabricNotebook' },
-                { name: 'nb_silver_merge', type: 'FabricNotebook', dependsOn: [{ activity: 'nb_bronze_ingest' }] },
-                { name: 'nb_gold_star', type: 'FabricNotebook', dependsOn: [{ activity: 'nb_silver_merge' }] },
-              ],
-              triggers: [{ recurrence: { frequency: 'Day', schedule: { hours: [2], minutes: [0] } } }],
-            },
+            status: 'idle',
+            message: 'No active plan generated yet.',
           },
           null,
           2
@@ -464,6 +423,15 @@ print("✅ Delta MERGE completed successfully into lh_silver.")
         {/* 1. Pipeline Flow SVG Canvas */}
         {activeTab === 'wbDAG' && (
           <div className="wb-view-pane active">
+            {dagNodes.length === 0 ? (
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', minHeight: '340px', color: '#94a3b8', textAlign: 'center', padding: '32px' }}>
+                <Layers width={36} height={36} style={{ opacity: 0.35, marginBottom: '12px' }} />
+                <h4 style={{ color: '#e2e8f0', margin: '0 0 6px 0', fontSize: '15px' }}>No Active Architecture Flow</h4>
+                <p style={{ maxWidth: '380px', margin: 0, fontSize: '13px', lineHeight: 1.5 }}>
+                  Prompt the agent or create a project to generate a dynamic Medallion DAG, PySpark curation scripts, and Fabric items.
+                </p>
+              </div>
+            ) : (
             <div className="dag-canvas-viewport">
               <svg
                 viewBox="0 0 1180 320"
@@ -588,6 +556,7 @@ print("✅ Delta MERGE completed successfully into lh_silver.")
                 })}
               </svg>
             </div>
+            )}
           </div>
         )}
 
@@ -601,6 +570,12 @@ print("✅ Delta MERGE completed successfully into lh_silver.")
                 <span>Sync Items</span>
               </button>
             </div>
+            {treeItems.length === 0 ? (
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', minHeight: '260px', color: '#94a3b8', textAlign: 'center', padding: '32px' }}>
+                <FolderTree width={32} height={32} style={{ opacity: 0.35, marginBottom: '10px' }} />
+                <p style={{ margin: 0, fontSize: '13px' }}>No OneLake workspace folder hierarchy generated yet.</p>
+              </div>
+            ) : (
             <div className="tree-container">
               {treeItems.map((item, idx) => {
                 const isNested = item.startsWith('    ');
@@ -617,6 +592,7 @@ print("✅ Delta MERGE completed successfully into lh_silver.")
                 );
               })}
             </div>
+            )}
           </div>
         )}
 

@@ -20,11 +20,14 @@ export const ProjectMembersModal: React.FC<ProjectMembersModalProps> = ({
 
   if (!isOpen || !project) return null;
 
+  const ownerName = project.created_by
+    ? project.created_by.split('@')[0].replace(/[._-]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
+    : 'Project Owner';
   const currentMembers: ProjectMember[] = project.metadata?.members || [
     {
-      id: 'usr_harsith',
-      name: 'Harsith Veer Bheesetti (You)',
-      email: 'harsith@fabric.internal',
+      id: `usr_${project.id}`,
+      name: `${ownerName} (Owner)`,
+      email: project.created_by || 'owner@fabric.ai',
       avatarBg: '#10b981',
     },
   ];

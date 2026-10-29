@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, FolderPlus, FolderGit2 } from 'lucide-react';
-import { ProjectRecord, ProjectMetadata, ProjectMember } from '../../types';
+import { ProjectRecord, ProjectMetadata, ProjectMember, UserProfile } from '../../types';
 import { ProjectTeamSearch } from './ProjectTeamSearch';
 import { ProjectWorkspacesPicker } from './ProjectWorkspacesPicker';
 
@@ -15,6 +15,7 @@ interface ProjectModalProps {
     badge: string;
     metadata: ProjectMetadata;
   }) => Promise<void>;
+  currentUser?: UserProfile | null;
 }
 
 export const ProjectModal: React.FC<ProjectModalProps> = ({
@@ -22,6 +23,7 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
   onClose,
   project,
   onSave,
+  currentUser,
 }) => {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -32,28 +34,38 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    const ownerMember: ProjectMember = currentUser
+      ? {
+          id: currentUser.id || 'usr_owner',
+          name: `${currentUser.name} (You)`,
+          email: currentUser.email,
+          role: 'owner',
+          avatarBg: currentUser.avatar_color || '#10b981',
+        }
+      : {
+          id: 'usr_me',
+          name: 'Project Owner (You)',
+          email: 'owner@fabric.ai',
+          role: 'owner',
+          avatarBg: '#10b981',
+        };
+
     if (project) {
       setName(project.name);
       setDescription(project.description || '');
       const meta = project.metadata || {};
       setSelectedWorkspaces(meta.workspaces || ['PBT_DATA_AGENT']);
       setSharedContext(meta.sharedContext !== false);
-      setMembers(
-        meta.members || [
-          { id: 'usr_harsith', name: 'Harsith Veer Bheesetti (You)', email: 'harsith@fabric.internal', avatarBg: '#10b981' },
-        ]
-      );
+      setMembers(meta.members && meta.members.length > 0 ? meta.members : [ownerMember]);
     } else {
       setName('');
       setDescription('');
       setSelectedWorkspaces(['PBT_DATA_AGENT']);
       setSharedContext(true);
-      setMembers([
-        { id: 'usr_harsith', name: 'Harsith Veer Bheesetti (You)', email: 'harsith@fabric.internal', avatarBg: '#10b981' },
-      ]);
+      setMembers([ownerMember]);
     }
     setError(null);
-  }, [project, isOpen]);
+  }, [project, isOpen, currentUser]);
 
   if (!isOpen) return null;
 

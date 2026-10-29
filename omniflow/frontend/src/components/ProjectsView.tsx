@@ -294,6 +294,7 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({
           onClose={() => setIsProjectModalOpen(false)}
           project={selectedProjectForEdit}
           onSave={handleSaveProject}
+          currentUser={currentUser}
         />
 
         <ProjectMembersModal

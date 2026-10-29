@@ -56,12 +56,7 @@ export const App: React.FC = () => {
     try {
       const saved = localStorage.getItem('omniflow_active_user');
       if (saved === 'signed_out') return null;
-      return saved ? JSON.parse(saved) : {
-        id: 'usr_lead',
-        name: 'Bheesetti Harsith',
-        email: 'bheesetti.harsith@fabric.ai',
-        avatar_color: '#10b981',
-      };
+      return saved ? JSON.parse(saved) : null;
     } catch {
       return null;
     }

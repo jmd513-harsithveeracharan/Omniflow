@@ -52,11 +52,11 @@ export const UserProfileMenu: React.FC<UserProfileMenuProps> = ({
 
   const displayName = currentUser?.name
     ? (currentUser.name.includes(' ') ? currentUser.name.split(' ')[0] : currentUser.name)
-    : 'Harsith';
+    : (currentUser?.email ? currentUser.email.split('@')[0] : 'User');
   const initial = currentUser?.name
     ? currentUser.name[0].toUpperCase()
-    : 'H';
-  const displayEmail = currentUser?.email || 'veeracharan99@gmail.com';
+    : (currentUser?.email ? currentUser.email[0].toUpperCase() : 'U');
+  const displayEmail = currentUser?.email || '';
 
   return (
     <div className="claude-profile-footer-container" ref={containerRef}>
