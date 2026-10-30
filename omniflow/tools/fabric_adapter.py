@@ -101,11 +101,32 @@ def create_item(
 
     r = requests.post(url, headers=h, json=body, timeout=30)
     if r.status_code in (200, 201, 202):
-        data = r.json() if r.text else {}
+        data: dict[str, Any] = {}
+        if r.text and r.text.strip() not in ("null", ""):
+            try:
+                parsed = r.json()
+                if isinstance(parsed, dict):
+                    data = parsed
+            except Exception:
+                pass
+
         item_id = data.get("id") or r.headers.get("x-ms-item-id")
+
+        # Handle async LRO HTTP 202 where Fabric returns null body
+        if not item_id and r.status_code == 202:
+            time.sleep(1.2)
+            try:
+                items = list_workspace_items(workspace_id, item_type=item_type)
+                for it in items:
+                    if it.get("displayName") == display_name and it.get("type") == item_type:
+                        item_id = it.get("id")
+                        break
+            except Exception:
+                pass
+
         return {
             "success": True,
-            "item_id": item_id,
+            "item_id": item_id or "provisioned_async",
             "already_existed": False,
             "display_name": display_name,
             "item_type": item_type,

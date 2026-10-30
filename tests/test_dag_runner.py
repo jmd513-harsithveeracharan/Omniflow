@@ -74,18 +74,16 @@ def test_interpolate_placeholders():
 
 
 def test_build_minimal_shell_payload():
-    """Verifies minimal shells have valid base64 structures."""
+    """Verifies shells return None for instant serverless Fabric creation and compile_definition_payload works."""
     pl_shell = _build_minimal_shell_payload("DataPipeline", "pl_test")
-    assert pl_shell is not None
-    assert "parts" in pl_shell
-    assert pl_shell["parts"][0]["path"] == "pipeline-content.json"
+    assert pl_shell is None
 
-    nb_shell = _build_minimal_shell_payload("Notebook", "nb_test")
-    assert nb_shell is not None
-    assert nb_shell["parts"][0]["path"] == "notebook-content.py"
-
-    lh_shell = _build_minimal_shell_payload("Lakehouse", "lh_test")
-    assert lh_shell is None  # Lakehouses do not use definition parts
+    # Test compilation for Pass 2 definition hydration
+    compiled = compile_definition_payload("DataPipeline", '{"activities": []}', "pl_test")
+    assert "parts" in compiled
+    assert compiled["parts"][0]["path"] == "pipeline-content.json"
+    import base64
+    assert base64.b64decode(compiled["parts"][0]["payload"]).decode("utf-8") == '{"activities": []}'
 
 
 def test_optimistic_two_pass_provisioning_flow():

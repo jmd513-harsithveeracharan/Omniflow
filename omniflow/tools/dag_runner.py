@@ -67,24 +67,9 @@ class DAGExecutionResult(BaseModel):
 
 
 def _build_minimal_shell_payload(item_type: str, display_name: str) -> dict[str, Any] | None:
-    """Provides a valid minimal empty shell payload for item types that require schema parts."""
-    clean_type = item_type.lower()
-    if clean_type in ("datapipeline", "pipeline"):
-        minimal_pipeline = {"properties": {"activities": []}}
-        b64 = base64.b64encode(json.dumps(minimal_pipeline).encode("utf-8")).decode("utf-8")
-        return {
-            "parts": [
-                {"path": "pipeline-content.json", "payload": b64, "payloadType": "InlineBase64"}
-            ]
-        }
-    if clean_type == "notebook":
-        # Minimal empty notebook
-        b64 = base64.b64encode(b"# Fabric AI Notebook Shell\n").decode("utf-8")
-        return {
-            "parts": [
-                {"path": "notebook-content.py", "payload": b64, "payloadType": "InlineBase64"}
-            ]
-        }
+    """Provides a valid minimal empty shell payload for item types if required by Fabric.
+    Returning None enables instant serverless shell provisioning in Fabric REST API.
+    """
     return None
 
 
