@@ -15,51 +15,8 @@ interface ThinkingDrawerProps {
   isThinking?: boolean;
 }
 
-const DEFAULT_STEPS: ThinkingStep[] = [
-  {
-    id: 'step_lineage',
-    title: '1. JIT Context Lineage Hydration',
-    description: 'Traversed NetworkX DAG 1-hop active subgraph (~85 tokens loaded)',
-    status: 'completed',
-    latencyMs: 14,
-    badge: '85 tokens',
-  },
-  {
-    id: 'step_skill',
-    title: '2. Domain Skill Classification',
-    description: 'Activated fabric_medallion_architecture & sql_transpilation_and_lineage',
-    status: 'completed',
-    latencyMs: 32,
-    badge: 'LangGraph Intent',
-  },
-  {
-    id: 'step_blast_zone',
-    title: '3. Blast-Zone Impact Analysis',
-    description: 'Scanned downstream Gold & Semantic Models — 0 destructive operations detected',
-    status: 'completed',
-    latencyMs: 18,
-    badge: 'Safe Risk: Low',
-  },
-  {
-    id: 'step_safety_gate',
-    title: '4. Human-in-the-Loop Checkpoint',
-    description: 'Verified non-destructive delta MERGE pipeline. Auto-approved safe path.',
-    status: 'completed',
-    latencyMs: 5,
-    badge: 'Gate Cleared',
-  },
-  {
-    id: 'step_spark_gen',
-    title: '5. PySpark Delta Ingestion Generation',
-    description: 'Constructed idempotent Delta Lake MERGE notebook with schema evolution',
-    status: 'completed',
-    latencyMs: 140,
-    badge: 'Delta v3',
-  },
-];
-
 export const ThinkingDrawer: React.FC<ThinkingDrawerProps> = ({
-  steps = DEFAULT_STEPS,
+  steps = [],
   isThinking = false,
 }) => {
   const [isOpen, setIsOpen] = useState<boolean>(true);
@@ -110,30 +67,36 @@ export const ThinkingDrawer: React.FC<ThinkingDrawerProps> = ({
       {/* Expanded Reasoning Step List */}
       {isOpen && (
         <div className="px-4 py-3 border-t border-border/50 max-h-48 overflow-y-auto space-y-2 font-mono text-xs">
-          {steps.map((step) => (
-            <div
-              key={step.id}
-              className="flex items-start gap-2.5 p-2 rounded-lg bg-surface-card/60 border border-border/40 hover:border-border transition-all"
-            >
-              <div className="mt-0.5">{getStatusIcon(step.status)}</div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="font-semibold text-slate-200 truncate">{step.title}</span>
-                  <div className="flex items-center gap-1.5 shrink-0">
-                    {step.badge && (
-                      <span className="px-1.5 py-0.5 rounded text-[10px] bg-brand-primary/20 text-brand-cyan border border-brand-primary/30">
-                        {step.badge}
-                      </span>
-                    )}
-                    {step.latencyMs !== undefined && (
-                      <span className="text-[10px] text-slate-500">{step.latencyMs}ms</span>
-                    )}
-                  </div>
-                </div>
-                <p className="text-[11px] text-slate-400 font-sans mt-0.5 leading-snug">{step.description}</p>
-              </div>
+          {steps.length === 0 ? (
+            <div style={{ padding: '16px', textAlign: 'center', color: '#94a3b8', fontSize: '12.5px' }}>
+              {isThinking ? 'Agent reasoning in progress...' : 'No reasoning traces currently active.'}
             </div>
-          ))}
+          ) : (
+            steps.map((step) => (
+              <div
+                key={step.id}
+                className="flex items-start gap-2.5 p-2 rounded-lg bg-surface-card/60 border border-border/40 hover:border-border transition-all"
+              >
+                <div className="mt-0.5">{getStatusIcon(step.status)}</div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-semibold text-slate-200 truncate">{step.title}</span>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      {step.badge && (
+                        <span className="px-1.5 py-0.5 rounded text-[10px] bg-brand-primary/20 text-brand-cyan border border-brand-primary/30">
+                          {step.badge}
+                        </span>
+                      )}
+                      {step.latencyMs !== undefined && (
+                        <span className="text-[10px] text-slate-500">{step.latencyMs}ms</span>
+                      )}
+                    </div>
+                  </div>
+                  <p className="text-[11px] text-slate-400 font-sans mt-0.5 leading-snug">{step.description}</p>
+                </div>
+              </div>
+            ))
+          )}
         </div>
       )}
     </div>

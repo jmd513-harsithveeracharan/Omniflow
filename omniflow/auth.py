@@ -242,6 +242,15 @@ def search_users(q: str = Query("", description="Query string")) -> dict[str, An
         u for u in _USERS_CACHE
         if query in u["name"].lower() or query in u["email"].lower()
     ]
+    if "@" in query and not any(u["email"].lower() == query for u in filtered):
+        c_name = query.split("@")[0].replace(".", " ").replace("_", " ").title()
+        filtered.append({
+            "id": f"usr_{uuid.uuid4().hex[:6]}",
+            "name": c_name,
+            "email": query,
+            "avatar_color": "#10b981",
+            "created_at": time.strftime("%Y-%m-%dT%H:%M:%SZ"),
+        })
     return {"users": filtered[:15]}
 
 

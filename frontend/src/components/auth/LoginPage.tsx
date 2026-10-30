@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
-import { UserProfile } from '../../types';
+import React, { useState, useEffect } from 'react';
+import { UserProfile, FabricAccountProfile } from '../../types';
 import { PlatformCube } from '../PlatformCube';
+import { fetchFabricAccounts, triggerBrowserLogin } from '../../services/api';
 
 interface LoginPageProps {
   onLoginSuccess: (user: UserProfile) => void;
@@ -9,6 +10,49 @@ interface LoginPageProps {
 export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
   const [email, setEmail] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [detectedAccount, setDetectedAccount] = useState<FabricAccountProfile | null>(null);
+
+  useEffect(() => {
+    fetchFabricAccounts()
+      .then((accs) => {
+        if (accs && accs.length > 0) {
+          const active = accs.find((a) => a.is_active) || accs[0];
+          setDetectedAccount(active);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  const handleMicrosoftLogin = async () => {
+    try {
+      setIsLoading(true);
+      if (detectedAccount) {
+        const msUser: UserProfile = {
+          id: detectedAccount.id,
+          name: detectedAccount.name,
+          email: detectedAccount.email,
+          avatar_color: '#0078d4',
+        };
+        onLoginSuccess(msUser);
+        return;
+      }
+      const res = await triggerBrowserLogin();
+      if (res && res.success && res.accounts && res.accounts.length > 0) {
+        const acc = res.accounts[0];
+        const msUser: UserProfile = {
+          id: acc.id,
+          name: acc.name,
+          email: acc.email,
+          avatar_color: '#0078d4',
+        };
+        onLoginSuccess(msUser);
+      }
+    } catch (e) {
+      console.error('Microsoft login failed', e);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleEmailLogin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -93,7 +137,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
             fontWeight: 400,
             fontFamily: "'Anthropic Sans', 'anthropic-sans', var(--font-sans)",
           }}>
-            Autonomous Medallion pipelines & dynamic data engineering for Microsoft Fabric
+            Your data engineering for Microsoft Fabric
           </p>
 
           {/* Form Card */}
@@ -106,47 +150,59 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
             padding: '24px',
             boxSizing: 'border-box',
           }}>
-            {/* Disabled / Non-clickable Microsoft SSO Button */}
+            {/* Interactive Microsoft SSO Button */}
             <button
               type="button"
-              disabled={true}
-              title="Microsoft Entra SSO is configured by your Fabric Tenant Administrator"
+              disabled={isLoading}
+              onClick={handleMicrosoftLogin}
+              title={detectedAccount ? `Sign in as ${detectedAccount.email}` : "Sign in with Microsoft Entra ID"}
               style={{
                 width: '100%',
                 height: '42px',
                 background: '#22211f',
-                border: '1px solid rgba(255, 255, 255, 0.06)',
+                border: '1px solid rgba(255, 255, 255, 0.12)',
                 borderRadius: '8px',
-                color: '#8c8a82',
+                color: '#f8fafc',
                 fontSize: '13px',
                 fontWeight: 500,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 gap: '10px',
-                cursor: 'not-allowed',
-                opacity: 0.65,
+                cursor: isLoading ? 'not-allowed' : 'pointer',
                 userSelect: 'none',
+                transition: 'all 0.15s ease',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = '#2a2825';
+                e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.22)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = '#22211f';
+                e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.12)';
               }}
             >
               {/* Microsoft 4-square logo */}
-              <svg width="17" height="17" viewBox="0 0 21 21" style={{ opacity: 0.7 }}>
+              <svg width="17" height="17" viewBox="0 0 21 21">
                 <rect x="1" y="1" width="9" height="9" fill="#f25022" />
                 <rect x="11" y="1" width="9" height="9" fill="#7fba00" />
                 <rect x="1" y="12" width="9" height="9" fill="#00a4ef" />
                 <rect x="11" y="12" width="9" height="9" fill="#ffb900" />
               </svg>
-              <span>Continue with Microsoft</span>
+              <span>
+                {detectedAccount ? `Continue as ${detectedAccount.name.split(' ')[0]}` : 'Continue with Microsoft'}
+              </span>
               <span style={{
                 fontSize: '10px',
-                background: 'rgba(255, 255, 255, 0.08)',
-                color: '#a1a1aa',
+                background: detectedAccount ? 'rgba(16, 185, 129, 0.15)' : 'rgba(255, 255, 255, 0.08)',
+                color: detectedAccount ? '#10b981' : '#a1a1aa',
+                border: detectedAccount ? '1px solid rgba(16, 185, 129, 0.3)' : 'none',
                 padding: '2px 6px',
                 borderRadius: '4px',
                 marginLeft: '4px',
                 fontWeight: 600,
               }}>
-                SSO
+                {detectedAccount ? 'ACTIVE' : 'SSO'}
               </span>
             </button>
 

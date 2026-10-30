@@ -132,6 +132,8 @@ class MemberRemoveRequest(BaseModel):
 
 
 DIRECTORY_USERS: list[dict[str, Any]] = [
+    {"id": "usr_charan", "name": "Veeracharan", "email": "Veeracharan99@gmail.com", "avatar_color": "#10b981", "role": "owner"},
+    {"id": "usr_harsith", "name": "Harsith Bheesetti", "email": "Bheesetti.Harsith@Pelibiothermal.com", "avatar_color": "#0078d4", "role": "admin"},
     {"id": "usr_alex", "name": "Alex Chen", "email": "alex.chen@fabric.internal", "avatar_color": "#6366f1", "role": "engineer"},
     {"id": "usr_sarah", "name": "Sarah Jenkins", "email": "sarah.j@fabric.internal", "avatar_color": "#ec4899", "role": "architect"},
     {"id": "usr_david", "name": "David Kumar", "email": "david.kumar@fabric.internal", "avatar_color": "#3b82f6", "role": "contributor"},
@@ -486,6 +488,15 @@ async def search_users(q: str = "") -> dict[str, Any]:
         u for u in DIRECTORY_USERS
         if query in u["name"].lower() or query in u["email"].lower()
     ]
+    if "@" in query and not any(u["email"].lower() == query for u in matched):
+        c_name = query.split("@")[0].replace(".", " ").replace("_", " ").title()
+        matched.append({
+            "id": f"usr_{uuid.uuid4().hex[:6]}",
+            "name": c_name,
+            "email": query,
+            "avatar_color": "#10b981",
+            "role": "contributor",
+        })
     return {"users": matched}
 
 
@@ -1434,16 +1445,33 @@ async def serve_root() -> FileResponse:
     raise HTTPException(status_code=404, detail="Fabric Studio frontend index.html not found")
 
 
+STATIC_MEDIA_TYPES: dict[str, str] = {
+    ".woff2": "font/woff2",
+    ".woff": "font/woff",
+    ".ttf": "font/ttf",
+    ".svg": "image/svg+xml",
+    ".css": "text/css; charset=utf-8",
+    ".js": "application/javascript; charset=utf-8",
+    ".json": "application/json",
+    ".png": "image/png",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".html": "text/html; charset=utf-8",
+}
+
+
 @app.get("/{filename:path}")
 async def serve_static(filename: str) -> FileResponse:
     if filename.startswith("api/"):
         raise HTTPException(status_code=404, detail="API endpoint not found")
     dist_file = os.path.join(DIST_DIR, filename)
     if os.path.isfile(dist_file):
-        return FileResponse(dist_file)
+        ext = os.path.splitext(filename)[1].lower()
+        media_type = STATIC_MEDIA_TYPES.get(ext)
+        return FileResponse(dist_file, media_type=media_type)
     index_file = os.path.join(DIST_DIR, "index.html")
     if os.path.exists(index_file):
-        return FileResponse(index_file)
+        return FileResponse(index_file, media_type="text/html; charset=utf-8")
     raise HTTPException(status_code=404, detail="Not found")
 
 

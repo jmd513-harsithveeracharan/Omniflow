@@ -181,6 +181,8 @@ export interface IngestionPlan {
   items: IngestionPlanItem[];
   notebooks: string[];
   lakehouses: string[];
+  root_folder?: string;
+  project_code?: string;
 }
 
 export type ThinkingStepStatus = 'pending' | 'running' | 'completed' | 'warning' | 'error';

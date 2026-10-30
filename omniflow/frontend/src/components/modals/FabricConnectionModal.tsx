@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Layers, X, Copy, Check, ExternalLink, RefreshCw, Loader2 } from 'lucide-react';
 import { FabricStatus } from '../../types';
+import { startDeviceCodeLogin } from '../../services/api';
 
 interface FabricConnectionModalProps {
   isOpen: boolean;
@@ -16,13 +17,19 @@ export const FabricConnectionModal: React.FC<FabricConnectionModalProps> = ({
   onRefreshStatus,
 }) => {
   const [activeTab, setActiveTab] = useState<'cli' | 'sp' | 'token'>('cli');
-  const [tenantId, setTenantId] = useState('94b62ba4-8d71-4507-9dc9-9734a149f836');
+  const [tenantId, setTenantId] = useState(status?.tenantId || '');
   const [clientId, setClientId] = useState('');
   const [clientSecret, setClientSecret] = useState('');
   const [bearerToken, setBearerToken] = useState('');
   const [deviceCode, setDeviceCode] = useState<string | null>(null);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    if (status?.tenantId && !tenantId) {
+      setTenantId(status.tenantId);
+    }
+  }, [status?.tenantId]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -40,9 +47,62 @@ export const FabricConnectionModal: React.FC<FabricConnectionModalProps> = ({
 
   if (!isOpen) return null;
 
-  const handleLaunchBrowserLogin = () => {
+  const handleLaunchBrowserLogin = async () => {
     setIsLoggingIn(true);
-    setDeviceCode('FABRIC-' + Math.random().toString(36).substring(2, 8).toUpperCase());
+    try {
+      const res = await startDeviceCodeLogin();
+      if (res && res.user_code) {
+        setDeviceCode(res.user_code);
+      }
+    } catch (e) {
+      console.error('Failed to start device code login', e);
+    } finally {
+      setIsLoggingIn(false);
+    }
+  };
+
+  const handleSaveSP = async () => {
+    if (!clientId.trim() || !clientSecret.trim()) return;
+    try {
+      setIsLoggingIn(true);
+      await fetch('/api/fabric/connect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          auth_type: 'service_principal',
+          tenant_id: tenantId,
+          client_id: clientId,
+          client_secret: clientSecret,
+        }),
+      });
+      onRefreshStatus?.();
+      onClose();
+    } catch (e) {
+      console.error('SP error', e);
+    } finally {
+      setIsLoggingIn(false);
+    }
+  };
+
+  const handleApplyToken = async () => {
+    if (!bearerToken.trim()) return;
+    try {
+      setIsLoggingIn(true);
+      await fetch('/api/fabric/connect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          auth_type: 'bearer_token',
+          token: bearerToken.trim(),
+        }),
+      });
+      onRefreshStatus?.();
+      onClose();
+    } catch (e) {
+      console.error('Token error', e);
+    } finally {
+      setIsLoggingIn(false);
+    }
   };
 
   const handleCopyCode = () => {
@@ -219,9 +279,11 @@ export const FabricConnectionModal: React.FC<FabricConnectionModalProps> = ({
               />
               <button
                 type="button"
+                onClick={handleSaveSP}
+                disabled={isLoggingIn}
                 style={{ alignSelf: 'flex-start', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', color: '#fff', padding: '7px 14px', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', marginTop: '4px' }}
               >
-                Save & Connect
+                {isLoggingIn ? 'Connecting...' : 'Save & Connect'}
               </button>
             </div>
           )}
@@ -237,9 +299,11 @@ export const FabricConnectionModal: React.FC<FabricConnectionModalProps> = ({
               />
               <button
                 type="button"
+                onClick={handleApplyToken}
+                disabled={isLoggingIn}
                 style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', color: '#fff', padding: '8px 14px', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}
               >
-                Apply
+                {isLoggingIn ? 'Applying...' : 'Apply'}
               </button>
             </div>
           )}

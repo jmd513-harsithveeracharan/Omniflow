@@ -17,39 +17,12 @@ interface GovernanceModalProps {
   report?: BlastRadiusReport | null;
 }
 
-const DEFAULT_REPORT: BlastRadiusReport = {
-  targetAssetId: 'tbl_silver_customers',
-  targetName: 'lh_silver.dim_customer',
-  isDestructive: true,
-  riskLevel: 'critical',
-  warningMessage: 'Modifying or dropping customer_id will break 3 downstream Gold tables and 2 Power BI semantic models.',
-  affectedNodes: [
-    {
-      id: 'gold_customer_ltv',
-      name: 'lh_gold.agg_customer_ltv',
-      assetType: 'table',
-      layer: 'gold',
-      schemaDefinition: [{ name: 'customer_id', type: 'BIGINT', isPk: true }],
-    },
-    {
-      id: 'pbi_exec_sales_dashboard',
-      name: 'Executive_Sales_Overview_v2',
-      assetType: 'power_bi_report',
-      layer: 'report',
-      schemaDefinition: [],
-    },
-  ],
-  affectedPipelines: ['pipe_daily_medallion_sync', 'pipe_hourly_crm_cdc'],
-  affectedReports: ['Executive Sales Dashboard', 'Customer Retention Matrix'],
-};
-
 export const GovernanceModal: React.FC<GovernanceModalProps> = ({
   isOpen,
   onClose,
-  report = DEFAULT_REPORT,
+  report = null,
 }) => {
   const [confirmed, setConfirmed] = useState(false);
-  const activeReport = report || DEFAULT_REPORT;
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -61,7 +34,8 @@ export const GovernanceModal: React.FC<GovernanceModalProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
 
-  if (!isOpen) return null;
+  if (!isOpen || !report) return null;
+  const activeReport = report;
 
   return (
     <div

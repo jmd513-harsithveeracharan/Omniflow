@@ -24,59 +24,38 @@ interface DeploymentStep {
   log: string;
 }
 
-const DEFAULT_DEPLOY_STEPS: DeploymentStep[] = [
-  {
-    id: 'step_1',
-    name: 'Create Workspace Containment Folder',
-    type: 'folder',
-    target: 'AI_Test_Folder',
-    status: 'completed',
-    log: 'POST /v1/workspaces/.../folders -> AI_Test_Folder provisioned',
-  },
-  {
-    id: 'step_2',
-    name: 'Provision Bronze Ingestion Lakehouse',
-    type: 'lakehouse',
-    target: 'lh_enterprise_bronze',
-    status: 'completed',
-    log: 'POST /v1/workspaces/.../lakehouses -> lh_enterprise_bronze created in AI_Test_Folder',
-  },
-  {
-    id: 'step_3',
-    name: 'Deploy Silver Delta Upsert Notebook',
-    type: 'notebook',
-    target: 'nb_silver_merge_orders',
-    status: 'completed',
-    log: 'PySpark SCD2 notebook compiled with Delta MERGE upsert logic',
-  },
-  {
-    id: 'step_4',
-    name: 'Deploy Gold Star-Schema Lakehouse',
-    type: 'lakehouse',
-    target: 'lh_enterprise_gold',
-    status: 'completed',
-    log: 'POST /v1/workspaces/.../lakehouses -> lh_enterprise_gold provisioned',
-  },
-  {
-    id: 'step_5',
-    name: 'Configure Daily Pipeline Trigger',
-    type: 'pipeline',
-    target: 'pipe_daily_medallion_sync',
-    status: 'completed',
-    log: 'Schedule registered for Daily 02:00 UTC with Fabric Data Factory',
-  },
-];
-
 export const DeploymentWorkbench: React.FC<DeploymentWorkbenchProps> = ({
+  plan,
   onTriggerDeploy,
 }) => {
-  const steps = DEFAULT_DEPLOY_STEPS;
+  const steps: DeploymentStep[] = plan ? [
+    {
+      id: 'step_root',
+      name: 'Create Workspace Containment Folder',
+      type: 'folder',
+      target: plan.root_folder || 'AI_Test_Folder',
+      status: 'completed',
+      log: 'Directory: ' + (plan.root_folder || 'AI_Test_Folder') + ' resolved',
+    },
+    ...(plan.lakehouses || []).map((lh, i) => ({
+      id: 'step_lh_' + i,
+      name: 'Provision Lakehouse: ' + lh,
+      type: 'lakehouse' as const,
+      target: lh,
+      status: 'pending' as const,
+      log: 'Target layer Lakehouse: ' + lh,
+    })),
+    ...(plan.notebooks || []).map((nb, i) => ({
+      id: 'step_nb_' + i,
+      name: 'Deploy PySpark Notebook: ' + nb,
+      type: 'notebook' as const,
+      target: nb,
+      status: 'pending' as const,
+      log: 'PySpark Delta logic: ' + nb,
+    })),
+  ] : [];
   const [isDeploying, setIsDeploying] = useState<boolean>(false);
-  const [logs, setLogs] = useState<string[]>([
-    '[INIT] Workspace containment verified: AI_Test_Folder',
-    '[FABRIC-API] Authenticated via DefaultAzureCredential',
-    '[DEPLOY] Deployed 5 items to Microsoft Fabric successfully.',
-  ]);
+  const [logs, setLogs] = useState<string[]>([]);
 
   const handleDeploy = async () => {
     setIsDeploying(true);

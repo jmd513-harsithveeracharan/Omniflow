@@ -28,6 +28,7 @@ export const IngestionStudioView: React.FC<IngestionStudioViewProps> = ({
   const [tableSearch, setTableSearch] = useState('');
   const [loading, setLoading] = useState(false);
   const [generatedPlan, setGeneratedPlan] = useState<IngestionPlan | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchConnectors()
@@ -58,6 +59,7 @@ export const IngestionStudioView: React.FC<IngestionStudioViewProps> = ({
   const handleDiscover = async () => {
     if (!selectedConnector) return;
     setLoading(true);
+    setError(null);
     try {
       const tables = await discoverConnectorTables(selectedConnector.id, params);
       setDiscoveredTables(
@@ -65,15 +67,9 @@ export const IngestionStudioView: React.FC<IngestionStudioViewProps> = ({
       );
       setStep(3);
     } catch (e) {
-      console.error(e);
-      // Fallback sample tables for visual feedback
-      setDiscoveredTables([
-        { name: 'orders', schema: 'sales', estimatedRows: 1250000, selected: true, primaryKey: 'order_id', strategy: 'incremental' },
-        { name: 'order_items', schema: 'sales', estimatedRows: 4800000, selected: true, primaryKey: 'item_id', strategy: 'incremental' },
-        { name: 'customers', schema: 'sales', estimatedRows: 340000, selected: true, primaryKey: 'customer_id', strategy: 'scd2' },
-        { name: 'products', schema: 'inventory', estimatedRows: 12500, selected: true, primaryKey: 'product_id', strategy: 'full' },
-      ]);
-      setStep(3);
+      console.error('Connector discovery failed', e);
+      setError(e instanceof Error ? e.message : 'Failed to discover connector tables. Verify connection parameters.');
+      setDiscoveredTables([]);
     } finally {
       setLoading(false);
     }
@@ -88,6 +84,7 @@ export const IngestionStudioView: React.FC<IngestionStudioViewProps> = ({
   const handleCreatePlan = async () => {
     if (!selectedConnector) return;
     setLoading(true);
+    setError(null);
     const selected = discoveredTables.filter((t) => t.selected);
     try {
       const plan = await generateMedallionPlan(selectedConnector.id, selected);
@@ -95,24 +92,7 @@ export const IngestionStudioView: React.FC<IngestionStudioViewProps> = ({
       onPlanGenerated(plan);
     } catch (e) {
       console.error('Plan generation failed', e);
-      const fallbackPlan: IngestionPlan = {
-        sourceId: selectedConnector.id,
-        sourceName: selectedConnector.name,
-        database: params.database || 'production_db',
-        schedule,
-        lakehouses: ['lh_enterprise_bronze', 'lh_enterprise_silver', 'lh_enterprise_gold'],
-        notebooks: selected.map((t) => `nb_${t.name}_medallion_merge`),
-        items: selected.map((t) => ({
-          name: t.name,
-          layer: 'silver',
-          type: 'table',
-          sourceTable: `${t.schema}.${t.name}`,
-          targetTable: `silver_${t.name}`,
-          strategy: t.strategy || 'incremental',
-        })),
-      };
-      setGeneratedPlan(fallbackPlan);
-      onPlanGenerated(fallbackPlan);
+      setError(e instanceof Error ? e.message : 'Failed to generate Medallion ingestion plan.');
     } finally {
       setLoading(false);
     }
@@ -134,6 +114,12 @@ export const IngestionStudioView: React.FC<IngestionStudioViewProps> = ({
               Step {step} of 3
             </span>
           </div>
+
+          {error && (
+            <div style={{ margin: '8px 12px 14px', background: 'rgba(239, 68, 68, 0.12)', border: '1px solid rgba(239, 68, 68, 0.3)', borderRadius: '8px', padding: '10px 14px', color: '#fca5a5', fontSize: '12.5px' }}>
+              ⚠️ {error}
+            </div>
+          )}
 
           {/* Step 1: Connector Picker */}
           {step === 1 && (

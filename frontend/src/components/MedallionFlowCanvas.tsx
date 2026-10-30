@@ -33,98 +33,6 @@ interface DagNode {
   code?: string;
 }
 
-const DEFAULT_NODES: DagNode[] = [
-  {
-    id: 'node_source',
-    label: 'Azure SQL (sales_db)',
-    type: 'source',
-    layer: 'SOURCE',
-    sub: 'CDC Ingestion Stream',
-    status: 'live',
-    x: 40,
-    y: 120,
-  },
-  {
-    id: 'node_bronze',
-    label: 'lh_bronze',
-    type: 'lakehouse',
-    layer: 'BRONZE',
-    sub: 'Raw Append Only Delta',
-    status: 'live',
-    x: 320,
-    y: 50,
-  },
-  {
-    id: 'node_nb_bronze',
-    label: 'nb_bronze_ingest',
-    type: 'notebook',
-    layer: 'PYSPARK',
-    sub: 'Batch Streaming Ingest',
-    status: 'live',
-    x: 320,
-    y: 180,
-  },
-  {
-    id: 'node_silver',
-    label: 'lh_silver',
-    type: 'lakehouse',
-    layer: 'SILVER',
-    sub: 'Delta MERGE Deduplication',
-    status: 'live',
-    x: 600,
-    y: 50,
-  },
-  {
-    id: 'node_nb_silver',
-    label: 'nb_silver_merge',
-    type: 'notebook',
-    layer: 'PYSPARK',
-    sub: 'SCD Type-1 / Type-2 Triage',
-    status: 'live',
-    x: 600,
-    y: 180,
-  },
-  {
-    id: 'node_gold',
-    label: 'lh_gold',
-    type: 'lakehouse',
-    layer: 'GOLD',
-    sub: 'Kimball Star Schema',
-    status: 'live',
-    x: 880,
-    y: 50,
-  },
-  {
-    id: 'node_nb_gold',
-    label: 'nb_gold_star',
-    type: 'notebook',
-    layer: 'PYSPARK',
-    sub: 'Gold Star Aggregations',
-    status: 'live',
-    x: 880,
-    y: 180,
-  },
-  {
-    id: 'node_pipeline',
-    label: 'pl_daily_sales',
-    type: 'pipeline',
-    layer: 'PIPELINE',
-    sub: 'Recurrence: 02:00 UTC',
-    status: 'live',
-    x: 1120,
-    y: 120,
-  },
-];
-
-const DEFAULT_EDGES = [
-  { from: 'node_source', to: 'node_bronze' },
-  { from: 'node_source', to: 'node_nb_bronze' },
-  { from: 'node_bronze', to: 'node_silver' },
-  { from: 'node_nb_bronze', to: 'node_nb_silver' },
-  { from: 'node_silver', to: 'node_gold' },
-  { from: 'node_nb_silver', to: 'node_nb_gold' },
-  { from: 'node_nb_gold', to: 'node_pipeline' },
-];
 
 export const MedallionFlowCanvas: React.FC<MedallionFlowCanvasProps> = ({
   plan,
@@ -319,8 +227,8 @@ export const MedallionFlowCanvas: React.FC<MedallionFlowCanvasProps> = ({
       '# PySpark code synthesized by Worker Agent';
 
     return {
-      dagNodes: nodes.length > 0 ? nodes : DEFAULT_NODES,
-      dagEdges: edges.length > 0 ? edges : DEFAULT_EDGES,
+      dagNodes: nodes,
+      dagEdges: edges,
       treeItems: tree,
       pysparkCode: primaryCode,
       jsonSpec: JSON.stringify(plan, null, 2),
