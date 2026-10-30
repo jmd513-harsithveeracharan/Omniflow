@@ -31,8 +31,9 @@ def _get_fabric_token() -> str:
             ["az", "account", "get-access-token", "--resource", "https://api.fabric.microsoft.com", "--output", "json"],
             capture_output=True,
             text=True,
-            timeout=15,
+            timeout=20,
             check=True,
+            shell=True,
         )
         data = json.loads(proc.stdout)
         return data["accessToken"]

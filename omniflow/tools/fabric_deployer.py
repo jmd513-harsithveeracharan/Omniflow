@@ -54,7 +54,7 @@ def verify_fabric_workspace_connection(workspace_id: str | None = None) -> dict[
     ws_id = workspace_id or ALLOWED_WORKSPACE_ID
     try:
         res = list_workspace_items(ws_id)
-        items = res.get("items", [])
+        items = res if isinstance(res, list) else res.get("items", res.get("value", []))
         return {
             "authenticated": True,
             "status": "LIVE_FABRIC_CONNECTED",

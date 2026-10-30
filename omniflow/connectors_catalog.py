@@ -165,3 +165,4 @@ def synthesize_dynamic_connector(source_name: str) -> ConnectorDefinition:
         sample_presets=sample_presets,
         mock_tables=mock_tables,
     )
+
