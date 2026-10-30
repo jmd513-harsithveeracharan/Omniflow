@@ -69,3 +69,6 @@ fabric_workspace/
 research_fabric_ai/
 omniflow/sessions_store.json
 omniflow/*.tmp
+
+*.fabric_asset_index.json
+.fabric_asset_index.json

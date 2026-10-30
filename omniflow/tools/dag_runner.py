@@ -23,6 +23,7 @@ import networkx as nx
 from pydantic import BaseModel, Field
 
 from omniflow.config.env_loader import get_workspace_id
+from omniflow.tools.asset_indexer import AssetIndexer
 from omniflow.tools.fabric_adapter import (
     create_item,
     get_or_create_folder,
@@ -127,6 +128,7 @@ class GenericDAGProvisioner:
     def __init__(self, workspace_id: Optional[str] = None, max_workers: int = 5) -> None:
         self.workspace_id = workspace_id or get_workspace_id()
         self.max_workers = max_workers
+        self.indexer = AssetIndexer(self.workspace_id)
 
     def plan_dag_waves(self, items: list[FabricItemSpec]) -> tuple[bool, list[list[str]]]:
         """Builds NetworkX DiGraph from arbitrary FabricItemSpecs and computes parallel waves."""
@@ -207,6 +209,15 @@ class GenericDAGProvisioner:
                         guid_registry[item_name] = item_id
                         status_map[item_name].item_id = item_id
                         status_map[item_name].pass1_status = "ALREADY_EXISTED" if res.get("already_existed") else "MINTED"
+                        # Persist into semantic AssetIndex
+                        spec_obj = item_map.get(item_name)
+                        if spec_obj:
+                            self.indexer.register(
+                                name=item_name,
+                                item_type=spec_obj.item_type,
+                                guid=item_id,
+                                summary=spec_obj.description or f"Fabric {spec_obj.item_type} '{item_name}'",
+                            )
                     else:
                         status_map[item_name].pass1_status = "FAILED"
                         status_map[item_name].error = res.get("error", "Unknown mint error")
