@@ -16,6 +16,7 @@ import {
   Trash2,
   Pin,
   Archive,
+  Folder,
 } from 'lucide-react';
 import { ChatSession, ProjectRecord, UserProfile } from '../types';
 import { AccountSwitcherModal } from './auth/AccountSwitcherModal';
@@ -35,6 +36,7 @@ interface SidebarProps {
   onSelectSession?: (sessionId: string) => void;
   onDeleteSession?: (sessionId: string) => void;
   onRenameSession?: (sessionId: string, newTitle: string) => void;
+  onMoveSessionToProject?: (sessionId: string, projectId: string) => void;
   projects?: ProjectRecord[];
   isLoadingProjects?: boolean;
   activeProjectId?: string | null;
@@ -69,6 +71,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onToggleCollapse,
   currentUser,
   onSignOut,
+  sessions = [],
+  activeSessionId = '',
+  isLoadingSessions = false,
+  onSelectSession,
+  onDeleteSession,
+  onRenameSession,
+  onMoveSessionToProject,
   projects = [],
   isLoadingProjects = false,
   activeProjectId = null,
@@ -91,6 +100,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [projectMenuPos, setProjectMenuPos] = useState<{ top: number; left: number } | null>(null);
   const projectMenuRef = useRef<HTMLDivElement>(null);
 
+  // Chats Section State
+  const [isChatsOpen, setIsChatsOpen] = useState(true);
+  const [chatMenuSessionId, setChatMenuSessionId] = useState<string | null>(null);
+  const [chatMenuPos, setChatMenuPos] = useState<{ top: number; left: number } | null>(null);
+  const [renamingSessionId, setRenamingSessionId] = useState<string | null>(null);
+  const [renamingTitle, setRenamingTitle] = useState<string>('');
+  const [isMoveSubmenuOpen, setIsMoveSubmenuOpen] = useState<boolean>(false);
+  const chatMenuRef = useRef<HTMLDivElement>(null);
+
 
   // Menus Refs
   const platformMenuRef = useRef<HTMLDivElement>(null);
@@ -104,6 +122,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
         setProjectMenuId(null);
         setProjectMenuPos(null);
       }
+      if (chatMenuRef.current && !chatMenuRef.current.contains(target)) {
+        setChatMenuSessionId(null);
+        setChatMenuPos(null);
+        setIsMoveSubmenuOpen(false);
+      }
       if (platformMenuRef.current && !platformMenuRef.current.contains(target)) {
         setIsPlatformMenuOpen(false);
       }
@@ -113,6 +136,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
       if (e.key === 'Escape') {
         setProjectMenuId(null);
         setProjectMenuPos(null);
+        setChatMenuSessionId(null);
+        setChatMenuPos(null);
+        setIsMoveSubmenuOpen(false);
+        setRenamingSessionId(null);
         setIsPlatformMenuOpen(false);
       }
     };
@@ -124,6 +151,40 @@ export const Sidebar: React.FC<SidebarProps> = ({
       window.removeEventListener('keydown', handleKeyDown);
     };
   }, []);
+
+  const handleOpenChatMenu = (e: React.MouseEvent, sid: string) => {
+    e.stopPropagation();
+    e.preventDefault();
+    if (chatMenuSessionId === sid) {
+      setChatMenuSessionId(null);
+      setChatMenuPos(null);
+      setIsMoveSubmenuOpen(false);
+      return;
+    }
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    setChatMenuPos({
+      top: Math.min(rect.bottom + 4, window.innerHeight - 240),
+      left: Math.min(rect.left, window.innerWidth - 220),
+    });
+    setChatMenuSessionId(sid);
+    setIsMoveSubmenuOpen(false);
+  };
+
+  const handleStartRename = (session: ChatSession) => {
+    const sId = session.sessionId || (session as any).id;
+    setRenamingSessionId(sId);
+    setRenamingTitle(session.title || 'Untitled Chat');
+    setChatMenuSessionId(null);
+    setChatMenuPos(null);
+  };
+
+  const handleSaveRename = (sid: string) => {
+    if (renamingTitle.trim() && onRenameSession) {
+      onRenameSession(sid, renamingTitle.trim());
+    }
+    setRenamingSessionId(null);
+    setRenamingTitle('');
+  };
 
   // Filter & Sort Projects: non-archived, pinned first, then updated_at
   const activeProjectsList = projects.filter((p) => !p.is_archived);
@@ -481,7 +542,187 @@ export const Sidebar: React.FC<SidebarProps> = ({
           })()}
         </div>
 
+        {/* Chats Accordion Section */}
+        <div className="sidebar-section sidebar-chats-section">
+          <div className="sidebar-section-header">
+            <div
+              className="sidebar-section-title-wrap"
+              onClick={() => setIsChatsOpen(!isChatsOpen)}
+            >
+              <span className="sidebar-section-title">Chats</span>
+              <span className={`sidebar-chevron-inline ${!isChatsOpen ? 'collapsed' : ''}`}>
+                <ChevronDown width={11} height={11} />
+              </span>
+            </div>
+            <button
+              type="button"
+              className="sidebar-section-action-btn"
+              onClick={onNewChat}
+              title="New Chat"
+              style={{ background: 'transparent', border: 'none', color: '#d1d5db', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '2px 4px', borderRadius: '4px' }}
+            >
+              <Plus width={13} height={13} />
+            </button>
+          </div>
 
+          <div className={`chats-scroll-list ${!isChatsOpen ? 'collapsed' : ''}`}>
+            {isLoadingSessions ? (
+              <div className="sidebar-skeleton-list" style={{ padding: '4px 6px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <div className="skeleton-line" style={{ height: '26px', borderRadius: '6px' }} />
+                <div className="skeleton-line" style={{ height: '26px', borderRadius: '6px' }} />
+                <div className="skeleton-line" style={{ height: '26px', borderRadius: '6px' }} />
+              </div>
+            ) : sessions.length === 0 ? (
+              <div className="sidebar-empty-chats">
+                No recent chats
+              </div>
+            ) : (
+              sessions.map((s) => {
+                const sId = s.sessionId || (s as any).id;
+                const isActive = activeSessionId === sId;
+                const isRenaming = renamingSessionId === sId;
+
+                if (isRenaming) {
+                  return (
+                    <div key={sId} className="sidebar-chat-item active" style={{ padding: '4px 6px' }}>
+                      <input
+                        type="text"
+                        value={renamingTitle}
+                        autoFocus
+                        onChange={(e) => setRenamingTitle(e.target.value)}
+                        onBlur={() => handleSaveRename(sId)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') handleSaveRename(sId);
+                          if (e.key === 'Escape') setRenamingSessionId(null);
+                        }}
+                        style={{
+                          width: '100%',
+                          background: '#18181b',
+                          border: '1px solid #10b981',
+                          borderRadius: '4px',
+                          color: '#fff',
+                          fontSize: '13px',
+                          padding: '3px 6px',
+                          outline: 'none',
+                        }}
+                      />
+                    </div>
+                  );
+                }
+
+                return (
+                  <div
+                    key={sId}
+                    className={`sidebar-chat-item ${isActive ? 'active' : ''} ${chatMenuSessionId === sId ? 'menu-open' : ''}`}
+                    onClick={() => onSelectSession?.(sId)}
+                    title={s.title || 'Untitled Chat'}
+                  >
+                    <span className="chat-bullet">●</span>
+                    <span className="chat-item-text">{s.title || 'Untitled Chat'}</span>
+                    <button
+                      type="button"
+                      className="sidebar-chat-more-btn"
+                      onClick={(e) => handleOpenChatMenu(e, sId)}
+                      title="Chat options"
+                    >
+                      <MoreVertical width={13} height={13} />
+                    </button>
+                  </div>
+                );
+              })
+            )}
+          </div>
+
+          {/* Floating Context Menu Popup for Chat */}
+          {chatMenuSessionId && chatMenuPos && (() => {
+            const targetSession = sessions.find((s) => (s.sessionId || (s as any).id) === chatMenuSessionId);
+            if (!targetSession) return null;
+            const targetId = targetSession.sessionId || (targetSession as any).id;
+            return (
+              <div
+                ref={chatMenuRef}
+                className="sidebar-chat-menu-popup"
+                style={{ top: `${chatMenuPos.top}px`, left: `${chatMenuPos.left}px` }}
+                onMouseDown={(e) => e.stopPropagation()}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div
+                  className="chat-menu-item"
+                  onClick={() => handleStartRename(targetSession)}
+                >
+                  <Edit3 width={14} height={14} />
+                  <span className="menu-label">Rename</span>
+                </div>
+
+                {/* Move to Project Option */}
+                <div
+                  className="chat-menu-item"
+                  onClick={() => setIsMoveSubmenuOpen(!isMoveSubmenuOpen)}
+                  style={{ position: 'relative' }}
+                >
+                  <Folder width={14} height={14} />
+                  <span className="menu-label">Move to project</span>
+                  <span className="menu-arrow">{isMoveSubmenuOpen ? '▾' : '▸'}</span>
+                </div>
+
+                {/* Project picker submenu */}
+                {isMoveSubmenuOpen && (
+                  <div
+                    style={{
+                      maxHeight: '160px',
+                      overflowY: 'auto',
+                      padding: '4px',
+                      background: '#121214',
+                      borderRadius: '8px',
+                      border: '1px solid rgba(255, 255, 255, 0.12)',
+                      margin: '4px 0',
+                    }}
+                  >
+                    {activeProjectsList.length === 0 ? (
+                      <div style={{ fontSize: '11px', color: '#71717a', padding: '6px 8px' }}>
+                        No projects available
+                      </div>
+                    ) : (
+                      activeProjectsList.map((p) => (
+                        <div
+                          key={p.id}
+                          className="chat-menu-item"
+                          style={{ padding: '5px 8px', fontSize: '12px' }}
+                          onClick={() => {
+                            setChatMenuSessionId(null);
+                            setChatMenuPos(null);
+                            setIsMoveSubmenuOpen(false);
+                            onMoveSessionToProject?.(targetId, p.id);
+                          }}
+                        >
+                          <Folder width={12} height={12} style={{ color: '#10b981' }} />
+                          <span className="menu-label" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {p.name}
+                          </span>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                )}
+
+                <div className="chat-menu-divider" />
+
+                <div
+                  className="chat-menu-item item-danger"
+                  onClick={() => {
+                    setChatMenuSessionId(null);
+                    setChatMenuPos(null);
+                    setIsMoveSubmenuOpen(false);
+                    onDeleteSession?.(targetId);
+                  }}
+                >
+                  <Trash2 width={14} height={14} />
+                  <span className="menu-label">Delete</span>
+                </div>
+              </div>
+            );
+          })()}
+        </div>
       </nav>
 
       {/* Footer User Profile Pill & Claude Menu */}

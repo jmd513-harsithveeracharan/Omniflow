@@ -25,6 +25,7 @@ import {
   fetchSessionDetail,
   deleteSession,
   renameSession,
+  moveSessionToProject,
   fetchProjects,
   fetchProjectDetail,
   updateProject,
@@ -230,6 +231,16 @@ export const App: React.FC = () => {
       );
     } catch (e) {
       console.error('Failed to rename session', e);
+    }
+  };
+
+  const handleMoveSessionToProject = async (sid: string, projId: string) => {
+    try {
+      await moveSessionToProject(sid, projId);
+      setSessions((prev) => prev.filter((s) => s.sessionId !== sid));
+      handleSelectProject(projId);
+    } catch (e) {
+      console.error('Failed to move session to project', e);
     }
   };
 
@@ -609,6 +620,7 @@ export const App: React.FC = () => {
         onSelectSession={handleSelectSession}
         onDeleteSession={handleDeleteSession}
         onRenameSession={handleRenameSession}
+        onMoveSessionToProject={handleMoveSessionToProject}
         currentUser={currentUser}
         onSignOut={handleSignOut}
         projects={projects}
@@ -650,6 +662,8 @@ export const App: React.FC = () => {
             }}
             onProjectsChanged={() => loadProjectsList(false)}
             currentUser={currentUser}
+            projects={projects}
+            isLoading={isLoadingProjects}
           />
         )}
 

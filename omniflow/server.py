@@ -168,7 +168,7 @@ async def on_startup():
 def fetch_projects_cached(force_refresh: bool = False) -> list[dict[str, Any]]:
     global PROJECTS_CACHE, PROJECTS_CACHE_TIME
     now = time.time()
-    if not force_refresh and PROJECTS_CACHE and (now - PROJECTS_CACHE_TIME < 30.0):
+    if not force_refresh and PROJECTS_CACHE and (now - PROJECTS_CACHE_TIME < 300.0):
         return PROJECTS_CACHE
 
     projects = []
@@ -250,13 +250,12 @@ async def list_sessions(user_email: str | None = None) -> dict[str, Any]:
     sess_list = []
     u = user_email.strip().lower() if user_email else None
     for sid, sdata in SESSIONS.items():
+        # Exclude internal project chats from general conversations list
+        if sid.startswith("proj_"):
+            continue
         s_user = (sdata.get("user_email") or "").strip().lower()
-        if u:
-            if s_user:
-                if s_user != u:
-                    continue
-            else:
-                continue
+        if u and s_user and s_user != u:
+            continue
         sess_list.append({
             "session_id": sid,
             "title": sdata.get("title", "New Conversation"),
@@ -306,6 +305,35 @@ async def rename_session(session_id: str, payload: dict[str, Any]) -> dict[str, 
     return {"success": True}
 
 
+@app.post("/api/sessions/{session_id}/move_to_project")
+async def move_session_to_project_endpoint(session_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+    project_id = payload.get("project_id")
+    if not project_id:
+        raise HTTPException(status_code=400, detail="project_id required")
+    sess = SESSIONS.get(session_id)
+    if not sess:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    proj_session_id = f"proj_{project_id}"
+    existing_proj_sess = SESSIONS.get(proj_session_id)
+    if existing_proj_sess:
+        existing_proj_sess["messages"].extend(sess.get("messages", []))
+        if sess.get("active_plan") and not existing_proj_sess.get("active_plan"):
+            existing_proj_sess["active_plan"] = sess.get("active_plan")
+    else:
+        SESSIONS[proj_session_id] = {
+            "session_id": proj_session_id,
+            "title": sess.get("title", "Project Conversation"),
+            "messages": sess.get("messages", []),
+            "active_plan": sess.get("active_plan"),
+            "user_email": sess.get("user_email", ""),
+            "updated_at": time.strftime("%Y-%m-%dT%H:%M:%SZ"),
+        }
+    SESSIONS.pop(session_id, None)
+    save_sessions_to_disk()
+    return {"success": True, "project_id": project_id, "proj_session_id": proj_session_id}
+
+
 @app.get("/api/projects")
 async def list_projects(user_email: str | None = None) -> dict[str, Any]:
     # Returns in < 1ms from in-memory cache with background refresh
@@ -317,9 +345,15 @@ async def list_projects(user_email: str | None = None) -> dict[str, Any]:
     scoped = []
     for p in projects:
         p_creator = (p.get("created_by") or "").strip().lower()
-        if p_creator and p_creator == u:
+        # Baseline workspace/system platform projects visible to authenticated workspace users
+        if p_creator in ["", "omniflow_cli", "system", "workspace", "none"]:
             scoped.append(p)
             continue
+        # Project creator
+        if p_creator == u:
+            scoped.append(p)
+            continue
+        # Project team member
         members = (p.get("metadata") or {}).get("members", [])
         if any(m.get("email", "").strip().lower() == u for m in members):
             scoped.append(p)
@@ -812,16 +846,23 @@ async def handle_pipeline_deploy(req: DeployPlanRequest) -> dict[str, Any]:
 @app.post("/api/chat/stream")
 async def handle_chat_stream(req: ChatRequest) -> StreamingResponse:
     sid = req.session_id or f"sess_{uuid.uuid4().hex[:9]}"
+    clean_msg_title = re.sub(r"[#*_`\n]", " ", req.message).strip()
+    clean_msg_title = re.sub(r"\s+", " ", clean_msg_title)[:42] or "New Conversation"
+
     if sid not in SESSIONS:
         SESSIONS[sid] = {
             "session_id": sid,
-            "title": "New Conversation",
+            "title": clean_msg_title,
             "messages": [],
             "user_email": (req.user_email or "").strip(),
-            "updated_at": "",
+            "updated_at": time.strftime("%Y-%m-%dT%H:%M:%SZ"),
         }
-    elif req.user_email and not SESSIONS[sid].get("user_email"):
-        SESSIONS[sid]["user_email"] = req.user_email.strip()
+    else:
+        if req.user_email and not SESSIONS[sid].get("user_email"):
+            SESSIONS[sid]["user_email"] = req.user_email.strip()
+        if SESSIONS[sid].get("title") in ["New Conversation", "Medallion Architecture Session", ""]:
+            SESSIONS[sid]["title"] = clean_msg_title
+        SESSIONS[sid]["updated_at"] = time.strftime("%Y-%m-%dT%H:%M:%SZ")
     
     SESSIONS[sid]["messages"].append({"role": "user", "content": req.message})
     save_sessions_to_disk()

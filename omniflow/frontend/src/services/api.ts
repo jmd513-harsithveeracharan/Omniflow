@@ -107,6 +107,16 @@ export async function renameSession(sessionId: string, newTitle: string): Promis
   return true;
 }
 
+export async function moveSessionToProject(sessionId: string, projectId: string): Promise<boolean> {
+  const res = await fetch(`${API_BASE}/sessions/${sessionId}/move_to_project`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ project_id: projectId }),
+  });
+  if (!res.ok) throw new Error(`Failed to move session: ${res.statusText}`);
+  return true;
+}
+
 export async function transpileSql(sql: string, sourceDialect = 'tsql'): Promise<TranspileResult> {
   const res = await fetch(`${API_BASE}/transpile`, {
     method: 'POST',

@@ -15,15 +15,19 @@ interface ProjectsViewProps {
   onNewChatWithContext?: (projectName: string) => void;
   onProjectsChanged?: () => void;
   currentUser?: import('../types').UserProfile | null;
+  projects?: ProjectRecord[];
+  isLoading?: boolean;
 }
 
 export const ProjectsView: React.FC<ProjectsViewProps> = ({
   onOpenProject,
   onProjectsChanged,
   currentUser,
+  projects: initialProjects = [],
+  isLoading: initialLoading = false,
 }) => {
-  const [projects, setProjects] = useState<ProjectRecord[]>([]);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [projects, setProjects] = useState<ProjectRecord[]>(initialProjects);
+  const [isLoading, setIsLoading] = useState<boolean>(initialProjects.length === 0 && initialLoading);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [search, setSearch] = useState<string>('');
   const [sortBy, setSortBy] = useState<'updated' | 'name' | 'created'>('updated');
@@ -41,9 +45,17 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({
   const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(null);
   const sortRef = useRef<HTMLDivElement>(null);
 
+  // Sync from props if available
+  useEffect(() => {
+    if (initialProjects && initialProjects.length > 0) {
+      setProjects(initialProjects);
+      setIsLoading(false);
+    }
+  }, [initialProjects]);
+
   const loadAllProjects = async () => {
     try {
-      setIsLoading(true);
+      if (projects.length === 0) setIsLoading(true);
       const data = await fetchProjects(currentUser?.email);
       setProjects(data || []);
     } catch (e) {
@@ -54,7 +66,9 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({
   };
 
   useEffect(() => {
-    loadAllProjects();
+    if (initialProjects.length === 0) {
+      loadAllProjects();
+    }
   }, [currentUser?.email]);
 
   useEffect(() => {
