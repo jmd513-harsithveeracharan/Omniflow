@@ -20,7 +20,7 @@ import { provisionAndInspectConnector } from '../../services/api';
 
 interface CredentialInterceptionCardProps {
   data: CredentialRequestData;
-  onConfirmResume: (connectionId: string, selectedTables: string[]) => void;
+  onConfirmResume: (connectionId: string, selectedTables: string[], pathway?: string) => void;
   onDismiss: () => void;
 }
 
@@ -98,7 +98,8 @@ export const CredentialInterceptionCard: React.FC<CredentialInterceptionCardProp
       return;
     }
 
-    onConfirmResume(inspectResult.connection_id, chosen);
+    const pathway = inspectResult.pathway || data.pathway || (data.is_fabric_native === false ? 'pyspark_notebook' : 'native_pipeline');
+    onConfirmResume(inspectResult.connection_id, chosen, pathway);
   };
 
   return (
@@ -148,6 +149,29 @@ export const CredentialInterceptionCard: React.FC<CredentialInterceptionCardProp
             <strong>Zero Secret Leakage Guarantee:</strong> Credentials are sent securely to the Fabric Connection Vault and are strictly excluded from AI prompt history.
           </span>
         </div>
+
+        {/* Ingestion Pathway Indicator Banner */}
+        {data.is_fabric_native === false ? (
+          <div className="px-5 py-2.5 bg-amber-500/10 border-b border-amber-500/20 flex items-center justify-between text-[11px] text-amber-300">
+            <div className="flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 text-amber-400 shrink-0" />
+              <span>
+                <strong>Custom PySpark Notebook Ingestion:</strong> Microsoft Fabric does not provide a native Copy connector for {data.name}. OmniFlow will synthesize an automated PySpark Ingestion Notebook with API/driver extraction into Bronze Lakehouse.
+              </span>
+            </div>
+            <span className="text-[10px] px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 font-mono whitespace-nowrap">
+              PySpark Notebook
+            </span>
+          </div>
+        ) : (
+          <div className="px-5 py-2 bg-sky-500/10 border-b border-sky-500/20 flex items-center justify-between text-[11px] text-sky-300">
+            <span className="flex items-center gap-1.5 font-medium">
+              <Zap className="w-3.5 h-3.5 text-sky-400" />
+              <span><strong>Fabric Native Connector:</strong> Serverless Data Pipeline Copy Activity supported</span>
+            </span>
+            <span className="text-[10px] text-slate-400 font-mono">/v1/connections</span>
+          </div>
+        )}
 
         {/* Form Body or Discovered Tables */}
         <div className="p-5">

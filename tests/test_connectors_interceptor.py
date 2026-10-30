@@ -94,6 +94,33 @@ def test_dummy_sandbox_inspection():
     assert "orders" in table_names
 
 
+def test_dynamic_non_native_source_synthesis():
+    from omniflow.connectors_catalog import classify_source_pathway, synthesize_dynamic_connector, IngestionPathway
+    from omniflow.connectors_interceptor import detect_connector_need
+
+    # 1. Stripe is not native in Fabric -> PySpark Notebook Ingestion
+    is_native, pathway, expl = classify_source_pathway("stripe")
+    assert is_native is False
+    assert pathway == IngestionPathway.PYSPARK_NOTEBOOK
+    assert "PySpark Ingestion Notebook" in expl
+
+    # 2. Dynamic synthesis creates API fields
+    conn = synthesize_dynamic_connector("Stripe")
+    assert conn.connector_type == "stripe"
+    assert conn.pathway == IngestionPathway.PYSPARK_NOTEBOOK
+    assert conn.is_fabric_native is False
+    field_keys = [f.key for f in conn.required_params]
+    assert "endpoint_url" in field_keys
+    assert "api_key" in field_keys
+
+    # 3. Detection from prompt dynamically synthesizes Workday
+    c_workday = detect_connector_need("Connect to Workday and extract employee records")
+    assert c_workday is not None
+    assert c_workday.connector_type == "workday"
+    assert c_workday.is_fabric_native is False
+    assert c_workday.pathway == IngestionPathway.PYSPARK_NOTEBOOK
+
+
 def test_api_connectors_endpoints():
     from fastapi.testclient import TestClient
     from omniflow.server import app
@@ -150,7 +177,7 @@ def test_chat_stream_credential_interception():
     body = res.text
     assert "credential_request" in body
     assert "sap" in body
-    assert "Connection" in body and "Required" in body
+    assert "Connector" in body or "Connection" in body
     assert "conn_interception" in body
 
 

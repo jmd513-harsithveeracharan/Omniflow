@@ -526,9 +526,14 @@ export const App: React.FC = () => {
     );
   };
 
-  const handleResumeFromCredentialInterception = (connectionId: string, selectedTables: string[]) => {
+  const handleResumeFromCredentialInterception = (
+    connectionId: string,
+    selectedTables: string[],
+    pathway?: string
+  ) => {
     setActiveCredentialRequest(null);
-    const resumePrompt = `Resume pipeline synthesis with connectionId '${connectionId}' for selected tables: ${selectedTables.join(', ')}`;
+    const pathwayTag = pathway === 'pyspark_notebook' ? ' via PySpark Notebook Ingestion' : '';
+    const resumePrompt = `Resume pipeline synthesis with connectionId '${connectionId}'${pathwayTag} for selected tables: ${selectedTables.join(', ')}`;
     handleSendMessage(resumePrompt);
   };
 

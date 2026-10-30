@@ -928,19 +928,33 @@ async def handle_chat_stream(req: ChatRequest) -> StreamingResponse:
                 "name": conn_def.name,
                 "category": conn_def.category,
                 "description": conn_def.description,
+                "is_fabric_native": conn_def.is_fabric_native,
+                "pathway": conn_def.pathway.value,
+                "pathway_explanation": conn_def.pathway_explanation,
                 "default_gateway": conn_def.default_gateway,
                 "required_params": [p.model_dump() for p in conn_def.required_params],
                 "sample_presets": conn_def.sample_presets,
             }
             yield f"data: {json.dumps({'type': 'credential_request', 'connector': payload_data})}\n\n"
 
-            interception_msg = (
-                f"### 🔒 Microsoft Fabric Connection Required: {conn_def.name}\n\n"
-                f"In Microsoft Fabric, Data Pipelines reference external connections via **`externalConnections.connectionId`** "
-                f"(registered in `/v1/connections` and bound to an On-Premises or VNet Data Gateway) rather than embedding raw credentials in the pipeline JSON.\n\n"
-                f"**Process Halted for Security**: To guarantee **zero secret leakage** into AI prompt history, please provide your connection parameters in the card below or click **⚡ Use Sandbox Demo Credentials**.\n\n"
-                f"Once verified, an on-the-fly Python script will inspect the source catalog to discover available tables for your pipeline."
-            )
+            if conn_def.is_fabric_native:
+                interception_msg = (
+                    f"### ⚡ Microsoft Fabric Native Connector: {conn_def.name}\n\n"
+                    f"Microsoft Fabric supports a native **Data Pipeline Copy Activity** for {conn_def.name}. "
+                    f"Pipelines reference external connections via **`externalConnections.connectionId`** "
+                    f"(registered in `/v1/connections`) rather than embedding raw credentials in the pipeline JSON.\n\n"
+                    f"**Process Halted for Security**: Credentials are kept strictly in the secure vault and are never leaked into prompt history. "
+                    f"Please enter your connection parameters below or click **⚡ Use Sandbox Demo Credentials** to inspect the source catalog."
+                )
+            else:
+                interception_msg = (
+                    f"### 📓 Custom PySpark Ingestion Notebook Required: {conn_def.name}\n\n"
+                    f"**Notice**: Microsoft Fabric does not have a native Copy Activity connector for **{conn_def.name}**.\n\n"
+                    f"**Strategy**: We will generate an automated **PySpark Ingestion Notebook** that retrieves credentials securely from Azure Key Vault (`mssparkutils.credentials.getSecret`), "
+                    f"connects to the {conn_def.name} API/driver with error-handled pagination, and appends records directly into your Bronze Delta Lakehouse.\n\n"
+                    f"**Process Halted for Security**: Please provide your connection parameters below or click **⚡ Use Sandbox Demo Credentials** to run the live Python inspection."
+                )
+
             for chunk in interception_msg.split(" "):
                 yield f"data: {json.dumps({'type': 'chunk', 'text': chunk + ' '})}\n\n"
                 await asyncio.sleep(0.015)
@@ -1388,29 +1402,57 @@ async def handle_chat_stream(req: ChatRequest) -> StreamingResponse:
 
             # 3-Step Human-like Cognitive Loop
             if active_conn_id:
-                tier2_steps = [
-                    {
-                        "id": "t2_conn",
-                        "title": f"Fabric Connection Verified: '{active_conn_id}' active in Connection Vault",
-                        "status": "completed",
-                        "duration": "0.2s",
-                        "target": "Fabric Vault",
-                    },
-                    {
-                        "id": "t2_pipeline",
-                        "title": f"Pipeline Activity Synthesizer: Generating Fabric Data Pipeline JSON with Copy activities",
-                        "status": "completed",
-                        "duration": "0.6s",
-                        "target": "Data Factory",
-                    },
-                    {
-                        "id": "t2_spark",
-                        "title": f"PySpark Ingestion Engine: Generating Bronze & Silver Delta MERGE notebooks for {len(chosen_tables)} tables",
-                        "status": "completed",
-                        "duration": "0.8s",
-                        "target": "PySpark Ingest",
-                    },
-                ]
+                is_notebook_pathway = "pyspark notebook" in req.message.lower() or (
+                    active_conn_id in CONNECTIONS_VAULT and CONNECTIONS_VAULT[active_conn_id].get("pathway") == "pyspark_notebook"
+                )
+                if is_notebook_pathway:
+                    tier2_steps = [
+                        {
+                            "id": "t2_conn",
+                            "title": f"Custom Source Handshake: '{active_conn_id}' registered in Fabric Connection Vault",
+                            "status": "completed",
+                            "duration": "0.2s",
+                            "target": "Fabric Vault",
+                        },
+                        {
+                            "id": "t2_notebook",
+                            "title": f"PySpark Ingestion Engine: Synthesizing API/Driver Ingestion Notebook with Key Vault secrets",
+                            "status": "completed",
+                            "duration": "0.7s",
+                            "target": "PySpark Ingest",
+                        },
+                        {
+                            "id": "t2_pipeline",
+                            "title": f"Fabric Data Factory: Synthesizing Pipeline with Trident Notebook Activity",
+                            "status": "completed",
+                            "duration": "0.6s",
+                            "target": "Data Factory",
+                        },
+                    ]
+                else:
+                    tier2_steps = [
+                        {
+                            "id": "t2_conn",
+                            "title": f"Fabric Connection Verified: '{active_conn_id}' active in Connection Vault",
+                            "status": "completed",
+                            "duration": "0.2s",
+                            "target": "Fabric Vault",
+                        },
+                        {
+                            "id": "t2_pipeline",
+                            "title": f"Pipeline Activity Synthesizer: Generating Fabric Data Pipeline JSON with Copy activities",
+                            "status": "completed",
+                            "duration": "0.6s",
+                            "target": "Data Factory",
+                        },
+                        {
+                            "id": "t2_spark",
+                            "title": f"PySpark Ingestion Engine: Generating Bronze & Silver Delta MERGE notebooks for {len(chosen_tables)} tables",
+                            "status": "completed",
+                            "duration": "0.8s",
+                            "target": "PySpark Ingest",
+                        },
+                    ]
             else:
                 tier2_steps = [
                     {
@@ -1477,16 +1519,31 @@ async def handle_chat_stream(req: ChatRequest) -> StreamingResponse:
             )
 
             if active_conn_id:
-                sys_prompt += (
-                    f"\n\nCRITICAL FABRIC CONNECTOR INTEGRATION INSTRUCTIONS:\n"
-                    f"- Microsoft Fabric Connection ID: `{active_conn_id}` (verified from Fabric Connection Vault)\n"
-                    f"- Selected Tables to Ingest: {', '.join(chosen_tables)}\n"
-                    f"- STRICT SECURITY: Never hallucinate or insert passwords, secrets, or tokens in your response.\n"
-                    f"- 1. Generate the complete Microsoft Fabric Pipeline definition JSON with Copy activities referencing:\n"
-                    f"     \"externalConnections\": {{ \"connectionId\": \"{active_conn_id}\" }}\n"
-                    f"- 2. For each table ({', '.join(chosen_tables)}), generate idempotent PySpark Delta Lake extraction & Delta MERGE code writing to `lh_bronze` and `lh_silver`.\n"
-                    f"- 3. Structure the output clearly with copyable code blocks and next deployment steps.\n"
-                )
+                if is_notebook_pathway:
+                    sys_prompt += (
+                        f"\n\nCRITICAL FABRIC NOTEBOOK INGESTION INSTRUCTIONS:\n"
+                        f"- Target System: {CONNECTIONS_VAULT.get(active_conn_id, {}).get('connector_name', 'Custom API Source')}\n"
+                        f"- Connection ID / Vault Reference: `{active_conn_id}` (verified in Fabric Connection Vault)\n"
+                        f"- Selected Tables / Collections: {', '.join(chosen_tables)}\n"
+                        f"- Pathway: CUSTOM PYSPARK INGESTION NOTEBOOK (Non-native Fabric API/Driver extraction)\n"
+                        f"- 1. Generate the complete, production-grade PySpark Ingestion Notebook:\n"
+                        f"     - Use mssparkutils.credentials.getSecret('FabricVault', 'API_KEY') for secret retrieval\n"
+                        f"     - Implement API requests with error handling, rate limiting, and pagination cursor loops\n"
+                        f"     - Write records directly into Delta Lake Bronze tables: df.write.format('delta').mode('append').saveAsTable('lh_bronze.<table_name>')\n"
+                        f"- 2. Generate the Microsoft Fabric Data Pipeline JSON definition referencing a Trident Notebook Activity (`type: 'TridentNotebook'`) running this notebook on schedule.\n"
+                    )
+                else:
+                    sys_prompt += (
+                        f"\n\nCRITICAL FABRIC CONNECTOR INTEGRATION INSTRUCTIONS:\n"
+                        f"- Microsoft Fabric Connection ID: `{active_conn_id}` (verified from Fabric Connection Vault)\n"
+                        f"- Selected Tables to Ingest: {', '.join(chosen_tables)}\n"
+                        f"- Pathway: NATIVE FABRIC DATA PIPELINE COPY ACTIVITY\n"
+                        f"- STRICT SECURITY: Never hallucinate or insert passwords, secrets, or tokens in your response.\n"
+                        f"- 1. Generate the complete Microsoft Fabric Pipeline definition JSON with Copy activities referencing:\n"
+                        f"     \"externalConnections\": {{ \"connectionId\": \"{active_conn_id}\" }}\n"
+                        f"- 2. For each table ({', '.join(chosen_tables)}), generate idempotent PySpark Delta Lake extraction & Delta MERGE code writing to `lh_bronze` and `lh_silver`.\n"
+                        f"- 3. Structure the output clearly with copyable code blocks and next deployment steps.\n"
+                    )
 
             # Ultra-low latency conversational routing:
             # Check if this is a deep architecture task or conceptual / voice conversation

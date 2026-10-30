@@ -281,6 +281,9 @@ export interface CredentialRequestData {
   name: string;
   category: string;
   description: string;
+  is_fabric_native?: boolean;
+  pathway?: 'native_pipeline' | 'pyspark_notebook';
+  pathway_explanation?: string;
   default_gateway?: string | null;
   required_params: InterceptionParamField[];
   sample_presets: Record<string, string>;
@@ -301,6 +304,9 @@ export interface ProvisionAndInspectResult {
   connector_type: string;
   connector_name: string;
   category: string;
+  is_fabric_native?: boolean;
+  pathway?: 'native_pipeline' | 'pyspark_notebook';
+  pathway_explanation?: string;
   gateway?: string;
   discovered_tables: DiscoveredSourceTable[];
   python_inspector_code: string;
