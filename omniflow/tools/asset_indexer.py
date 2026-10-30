@@ -166,3 +166,4 @@ class AssetIndexer:
         except Exception as e:
             print(f"[INDEX ERROR] Workspace sync notice: {e}")
             return 0
+

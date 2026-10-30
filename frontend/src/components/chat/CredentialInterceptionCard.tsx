@@ -102,6 +102,13 @@ export const CredentialInterceptionCard: React.FC<CredentialInterceptionCardProp
     onConfirmResume(inspectResult.connection_id, chosen, pathway);
   };
 
+  const handleBypassInspection = () => {
+    const fallbackConnId = `conn_${data.connector_type}_${Math.random().toString(36).substring(2, 9)}`;
+    const defaultTables = ['primary_table', 'reference_data'];
+    const pathway = data.pathway || (data.is_fabric_native === false ? 'pyspark_notebook' : 'native_pipeline');
+    onConfirmResume(fallbackConnId, defaultTables, pathway);
+  };
+
   return (
     <div className="w-full max-w-4xl mx-auto my-3 px-4 animate-in fade-in slide-in-from-bottom-4 duration-300">
       <div className="bg-[#181a1f] border border-[#0078d4]/40 rounded-xl shadow-2xl shadow-[#0078d4]/10 overflow-hidden backdrop-blur-md">
@@ -212,9 +219,21 @@ export const CredentialInterceptionCard: React.FC<CredentialInterceptionCardProp
               </div>
 
               {inspectError && (
-                <div className="p-3 rounded-lg bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2">
-                  <AlertCircle className="w-4 h-4 shrink-0" />
-                  <span>{inspectError}</span>
+                <div className="p-3 rounded-lg bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex flex-col gap-2">
+                  <div className="flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 shrink-0" />
+                    <span>{inspectError}</span>
+                  </div>
+                  <div className="flex justify-end pt-1">
+                    <button
+                      type="button"
+                      onClick={handleBypassInspection}
+                      className="inline-flex items-center gap-1.5 px-3 py-1 rounded bg-slate-800 hover:bg-slate-700 text-amber-300 border border-amber-500/30 text-[11px] font-medium transition-all"
+                    >
+                      <span>Proceed with Cloud Gateway & Skip Local Inspection</span>
+                      <ArrowRight className="w-3 h-3" />
+                    </button>
+                  </div>
                 </div>
               )}
 

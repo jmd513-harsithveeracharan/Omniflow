@@ -90,3 +90,4 @@ def test_persistence_reload(temp_indexer):
     loaded = new_indexer.get_by_name("test_item")
     assert loaded is not None
     assert loaded.guid == "guid-999"
+

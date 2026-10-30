@@ -37,6 +37,7 @@ from omniflow.tools.fabric_deployer import (
     deploy_medallion_architecture_to_fabric,
     verify_fabric_workspace_connection,
 )
+from omniflow.tools.dag_runner import FabricItemSpec, GenericDAGProvisioner
 from omniflow.auth import auth_router, init_auth_db
 from omniflow.git_service import git_router
 from omniflow.intent_router import (
@@ -859,24 +860,51 @@ async def handle_pipeline_deploy(req: DeployPlanRequest) -> dict[str, Any]:
     clean_d = re.sub(r"[^a-zA-Z0-9_]", "_", domain).strip("_") or "fabric"
     root_folder = plan_data.get("root_folder") or f"{clean_d.capitalize()}_Platform"
     subfolders = plan_data.get("folders") or {"raw": "01 Raw", "stage": "02 Stage", "silver": "03 Silver", "gold": "04 Gold"}
-    target_folders = {
-        "root": root_folder,
-        "raw": subfolders.get("raw", "01 Raw"),
-        "stage": subfolders.get("stage", "02 Stage"),
-        "silver": subfolders.get("silver", "03 Silver"),
-        "gold": subfolders.get("gold", "04 Gold"),
-    }
-    res = deploy_medallion_architecture_to_fabric(
-        domain=domain,
-        project_code=pcode,
-        target_folders=target_folders,
-        workspace_id=req.workspace_id,
-    )
+
+    items_to_deploy: list[FabricItemSpec] = []
+    if plan_data.get("items"):
+        for it in plan_data["items"]:
+            items_to_deploy.append(
+                FabricItemSpec(
+                    name=it.get("name") or it.get("display_name", f"item_{uuid.uuid4().hex[:4]}"),
+                    item_type=it.get("type") or it.get("item_type", "Lakehouse"),
+                    depends_on=it.get("depends_on", []),
+                    folder_name=it.get("folder_name") or root_folder,
+                    description=it.get("description", ""),
+                )
+            )
+    else:
+        raw_f = f"{root_folder}/{subfolders.get('raw', '01 Raw')}"
+        stage_f = f"{root_folder}/{subfolders.get('stage', '02 Stage')}"
+        silver_f = f"{root_folder}/{subfolders.get('silver', '03 Silver')}"
+        gold_f = f"{root_folder}/{subfolders.get('gold', '04 Gold')}"
+        items_to_deploy = [
+            FabricItemSpec(name=f"lh_{clean_d}_bronze", item_type="Lakehouse", folder_name=raw_f),
+            FabricItemSpec(name=f"lh_{clean_d}_silver", item_type="Lakehouse", folder_name=silver_f),
+            FabricItemSpec(name=f"wh_{clean_d}_gold", item_type="Warehouse", folder_name=gold_f),
+            FabricItemSpec(name=f"nb_{clean_d}_curate", item_type="Notebook", depends_on=[f"lh_{clean_d}_bronze"], folder_name=stage_f),
+            FabricItemSpec(name=f"pl_{clean_d}_bronze_ingest", item_type="DataPipeline", depends_on=[f"lh_{clean_d}_bronze"], folder_name=raw_f),
+        ]
+
+    provisioner = GenericDAGProvisioner(workspace_id=req.workspace_id)
+    dag_res = provisioner.execute_optimistic_provisioning(items_to_deploy, enable_two_pass=True)
+
+    deployed_items = [
+        {
+            "item_type": s.item_type,
+            "display_name": s.name,
+            "item_id": s.item_id,
+            "status": s.pass1_status,
+            "pass2_status": s.pass2_status,
+        }
+        for s in dag_res.items.values()
+    ]
     return {
-        "status": "success",
+        "status": "success" if dag_res.status == "SUCCESS" else "partial",
         "run_id": str(uuid.uuid4()),
-        "message": f"Successfully deployed Medallion architecture to Microsoft Fabric across folders in '{root_folder}'.",
-        "deployed_items": res.get("deployed_items", []),
+        "duration_sec": dag_res.total_duration_sec,
+        "message": f"Optimistically provisioned {dag_res.total_items} items in Microsoft Fabric in {dag_res.total_duration_sec}s.",
+        "deployed_items": deployed_items,
     }
 
 
@@ -1210,21 +1238,25 @@ async def handle_chat_stream(req: ChatRequest) -> StreamingResponse:
                 await asyncio.sleep(0.2)
                 yield f"data: {json.dumps({'type': 'thought_step', 'step': st})}\n\n"
 
-            # Execute real deployment into Microsoft Fabric
-            target_folders = {
-                "root": root_f,
-                "raw": sub_f.get("raw", "01 Raw"),
-                "stage": sub_f.get("stage", "02 Stage"),
-                "silver": sub_f.get("silver", "03 Silver"),
-                "gold": sub_f.get("gold", "04 Gold"),
-            }
-            deploy_res = deploy_medallion_architecture_to_fabric(
-                domain=clean_dom,
-                project_code=proj_code,
-                target_folders=target_folders,
-            )
+            # Execute real deployment into Microsoft Fabric via Optimistic Two-Pass Provisioning
+            raw_f = f"{root_f}/{sub_f.get('raw', '01 Raw')}"
+            stage_f = f"{root_f}/{sub_f.get('stage', '02 Stage')}"
+            silver_f = f"{root_f}/{sub_f.get('silver', '03 Silver')}"
+            gold_f = f"{root_f}/{sub_f.get('gold', '04 Gold')}"
+            items_to_deploy = [
+                FabricItemSpec(name=f"lh_{clean_dom}_bronze", item_type="Lakehouse", folder_name=raw_f),
+                FabricItemSpec(name=f"lh_{clean_dom}_silver", item_type="Lakehouse", folder_name=silver_f),
+                FabricItemSpec(name=f"wh_{clean_dom}_gold", item_type="Warehouse", folder_name=gold_f),
+                FabricItemSpec(name=f"nb_{clean_dom}_curate", item_type="Notebook", depends_on=[f"lh_{clean_dom}_bronze"], folder_name=stage_f),
+                FabricItemSpec(name=f"pl_{clean_dom}_bronze_ingest", item_type="DataPipeline", depends_on=[f"lh_{clean_dom}_bronze"], folder_name=raw_f),
+            ]
+            provisioner = GenericDAGProvisioner()
+            dag_res = provisioner.execute_optimistic_provisioning(items_to_deploy, enable_two_pass=True)
             run_id = str(uuid.uuid4())
-            dep_items = deploy_res.get("deployed_items", [])
+            dep_items = [
+                {"item_type": s.item_type, "display_name": s.name, "item_id": s.item_id, "status": s.pass1_status}
+                for s in dag_res.items.values()
+            ]
             item_bullets = "\n".join([
                 f"- 📁 **{root_f}** ➔ `{d.get('item_type')}`: **{d.get('display_name')}** (ID: `{d.get('item_id', 'provisioned')}`)"
                 for d in dep_items
@@ -1339,6 +1371,16 @@ async def handle_chat_stream(req: ChatRequest) -> StreamingResponse:
                 "schedule": "Hourly Micro-Batch",
                 "root_folder": root_f,
                 "folders": sub_f,
+                "lakehouses": [f"lh_{clean_dom}_bronze", f"lh_{clean_dom}_silver"],
+                "notebooks": [{"name": f"nb_{clean_dom}_curate", "layer": "stage"}],
+                "pipeline": f"pl_{clean_dom}_bronze_ingest",
+                "items": [
+                    {"name": f"lh_{clean_dom}_bronze", "type": "Lakehouse", "folder_name": f"{root_f}/{sub_f.get('raw', '01 Raw')}"},
+                    {"name": f"lh_{clean_dom}_silver", "type": "Lakehouse", "folder_name": f"{root_f}/{sub_f.get('silver', '03 Silver')}"},
+                    {"name": f"wh_{clean_dom}_gold", "type": "Warehouse", "folder_name": f"{root_f}/{sub_f.get('gold', '04 Gold')}"},
+                    {"name": f"nb_{clean_dom}_curate", "type": "Notebook", "depends_on": [f"lh_{clean_dom}_bronze"], "folder_name": f"{root_f}/{sub_f.get('stage', '02 Stage')}"},
+                    {"name": f"pl_{clean_dom}_bronze_ingest", "type": "DataPipeline", "depends_on": [f"lh_{clean_dom}_bronze"], "folder_name": f"{root_f}/{sub_f.get('raw', '01 Raw')}"},
+                ],
                 "tables": [
                     {"name": f"{clean_dom}_raw_stream", "target": f"{sub_f.get('raw', '01 Raw')} / lh_{clean_dom}_bronze"},
                     {"name": f"{clean_dom}_curated", "target": f"{sub_f.get('stage', '02 Stage')} / nb_{clean_dom}_curate"},
