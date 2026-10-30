@@ -281,7 +281,8 @@ export async function streamChatTurn(
   mode?: 'auto' | 'general' | 'project',
   isVoice?: boolean,
   signal?: AbortSignal,
-  userEmail?: string
+  userEmail?: string,
+  onCredentialRequest?: (data: import('../types').CredentialRequestData) => void
 ): Promise<void> {
   try {
     const res = await fetch(`${API_BASE}/chat/stream`, {
@@ -317,7 +318,9 @@ export async function streamChatTurn(
         if (line.startsWith('data: ')) {
           try {
             const payload = JSON.parse(line.slice(6));
-            if (payload.type === 'thought_step' && payload.step) {
+            if (payload.type === 'credential_request' && payload.connector) {
+              if (onCredentialRequest) onCredentialRequest(payload.connector);
+            } else if (payload.type === 'thought_step' && payload.step) {
               if (onThoughtStep) onThoughtStep(payload.step);
             } else if (payload.type === 'stage' && payload.text) {
               if (onStage) onStage(payload.text);
@@ -343,6 +346,27 @@ export async function streamChatTurn(
     }
     onError(err instanceof Error ? err.message : String(err));
   }
+}
+
+export async function provisionAndInspectConnector(
+  connectorType: string,
+  params: Record<string, string>,
+  testMode: boolean = true
+): Promise<import('../types').ProvisionAndInspectResult> {
+  const res = await fetch(`${API_BASE}/connectors/provision_and_inspect`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      connector_type: connectorType,
+      params,
+      test_mode: testMode,
+    }),
+  });
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(`Connector inspection failed: ${errText || res.statusText}`);
+  }
+  return res.json();
 }
 
 export async function fetchProjects(userEmail?: string): Promise<import('../types').ProjectRecord[]> {

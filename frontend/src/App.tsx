@@ -4,6 +4,7 @@ import { TopBar } from './components/TopBar';
 import { PlaygroundHome } from './components/PlaygroundHome';
 import { ChatTimeline } from './components/ChatTimeline';
 import { PromptDock } from './components/PromptDock';
+import { CredentialInterceptionCard } from './components/chat/CredentialInterceptionCard';
 import { MedallionFlowCanvas } from './components/MedallionFlowCanvas';
 import { SkillInspectorModal } from './components/SkillInspectorModal';
 import { ConnectorModal } from './components/ConnectorModal';
@@ -32,7 +33,7 @@ import {
   deleteProject,
   logoutFabric,
 } from './services/api';
-import { FabricStatus, ChatMessage, IngestionPlan, WorkspaceItem, ChatSession, ProjectRecord, UserProfile } from './types';
+import { FabricStatus, ChatMessage, IngestionPlan, WorkspaceItem, ChatSession, ProjectRecord, UserProfile, CredentialRequestData } from './types';
 
 export const App: React.FC = () => {
   const [activeView, setActiveView] = useState<string>('chat');
@@ -45,6 +46,7 @@ export const App: React.FC = () => {
   const [isLoadingSession, setIsLoadingSession] = useState<boolean>(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isStreaming, setIsStreaming] = useState<boolean>(false);
+  const [activeCredentialRequest, setActiveCredentialRequest] = useState<CredentialRequestData | null>(null);
 
   // Projects State
   const [projects, setProjects] = useState<ProjectRecord[]>([]);
@@ -515,8 +517,19 @@ export const App: React.FC = () => {
       mode,
       isVoiceModeActive,
       controller.signal,
-      currentUser?.email
+      currentUser?.email,
+      (credData) => {
+        if (!controller.signal.aborted) {
+          setActiveCredentialRequest(credData);
+        }
+      }
     );
+  };
+
+  const handleResumeFromCredentialInterception = (connectionId: string, selectedTables: string[]) => {
+    setActiveCredentialRequest(null);
+    const resumePrompt = `Resume pipeline synthesis with connectionId '${connectionId}' for selected tables: ${selectedTables.join(', ')}`;
+    handleSendMessage(resumePrompt);
   };
 
   // ChatGPT-Style Hands-Free Voice Mode Hook
@@ -717,6 +730,14 @@ export const App: React.FC = () => {
                   onOpenCanvas={() => setIsWorkbenchOpen(true)}
                   onOpenWorkspace={() => setActiveView('workspaces')}
                   onRetryPrompt={handleSendMessage}
+                />
+              )}
+
+              {activeCredentialRequest && (
+                <CredentialInterceptionCard
+                  data={activeCredentialRequest}
+                  onConfirmResume={handleResumeFromCredentialInterception}
+                  onDismiss={() => setActiveCredentialRequest(null)}
                 />
               )}
 

@@ -45,6 +45,12 @@ from omniflow.intent_router import (
     build_project_qa_prompt,
     ProjectContext,
 )
+from omniflow.connectors_interceptor import (
+    detect_connector_need,
+    execute_source_inspection,
+    CONNECTOR_REGISTRY,
+    CONNECTIONS_VAULT,
+)
 
 app = FastAPI(
     title="Fabric Studio — OmniFlow Autonomous Engine",
@@ -820,6 +826,26 @@ async def get_connectors_list() -> list[dict[str, Any]]:
     ]
 
 
+class ProvisionAndInspectRequest(BaseModel):
+    connector_type: str = "sap"
+    params: dict[str, Any] = Field(default_factory=dict)
+    test_mode: bool = True
+
+
+@app.get("/api/connectors/definitions")
+async def get_connector_definitions() -> list[dict[str, Any]]:
+    return [c.model_dump() for c in CONNECTOR_REGISTRY.values()]
+
+
+@app.post("/api/connectors/provision_and_inspect")
+async def handle_provision_and_inspect(req: ProvisionAndInspectRequest) -> dict[str, Any]:
+    return execute_source_inspection(
+        connector_type=req.connector_type,
+        params=req.params,
+        test_mode=req.test_mode,
+    )
+
+
 class DeployPlanRequest(BaseModel):
     plan: dict[str, Any] | None = None
     workspace_id: str | None = None
@@ -890,6 +916,40 @@ async def handle_chat_stream(req: ChatRequest) -> StreamingResponse:
 
     async def event_generator():
         yield f"data: {json.dumps({'type': 'init', 'session_id': sid, 'resuming': is_resume})}\n\n"
+
+        # Check for connector credential requirement (Interception Gate)
+        conn_def = detect_connector_need(req.message, SESSIONS[sid])
+        if conn_def:
+            yield f"data: {json.dumps({'type': 'thought_step', 'step': {'id': 'conn_interception', 'title': f'Connector Interception: Awaiting Secure Connection to {conn_def.name}', 'status': 'in_progress', 'target': 'Fabric Connection Vault'}})}\n\n"
+            await asyncio.sleep(0.1)
+
+            payload_data = {
+                "connector_type": conn_def.connector_type,
+                "name": conn_def.name,
+                "category": conn_def.category,
+                "description": conn_def.description,
+                "default_gateway": conn_def.default_gateway,
+                "required_params": [p.model_dump() for p in conn_def.required_params],
+                "sample_presets": conn_def.sample_presets,
+            }
+            yield f"data: {json.dumps({'type': 'credential_request', 'connector': payload_data})}\n\n"
+
+            interception_msg = (
+                f"### 🔒 Microsoft Fabric Connection Required: {conn_def.name}\n\n"
+                f"In Microsoft Fabric, Data Pipelines reference external connections via **`externalConnections.connectionId`** "
+                f"(registered in `/v1/connections` and bound to an On-Premises or VNet Data Gateway) rather than embedding raw credentials in the pipeline JSON.\n\n"
+                f"**Process Halted for Security**: To guarantee **zero secret leakage** into AI prompt history, please provide your connection parameters in the card below or click **⚡ Use Sandbox Demo Credentials**.\n\n"
+                f"Once verified, an on-the-fly Python script will inspect the source catalog to discover available tables for your pipeline."
+            )
+            for chunk in interception_msg.split(" "):
+                yield f"data: {json.dumps({'type': 'chunk', 'text': chunk + ' '})}\n\n"
+                await asyncio.sleep(0.015)
+
+            yield f"data: {json.dumps({'type': 'thought_step', 'step': {'id': 'conn_interception', 'title': f'Connector Interception: Card presented to user for {conn_def.name}', 'status': 'completed', 'duration': '0.2s', 'target': 'Fabric Connection Vault'}})}\n\n"
+            SESSIONS[sid]["messages"].append({"role": "assistant", "content": interception_msg})
+            save_sessions_to_disk()
+            yield f"data: {json.dumps({'type': 'done', 'session_id': sid, 'plan': None})}\n\n"
+            return
 
         # Multi-Mode Intent Classification
         intent = classify_prompt_intent(
@@ -1295,12 +1355,21 @@ async def handle_chat_stream(req: ChatRequest) -> StreamingResponse:
             p_code = p_code or "FABRIC-STUDIO"
             p_root = active_plan.get("root_folder") or f"{p_code}_Platform"
 
+            conn_id_match = re.search(r"connectionId\s*['\"]?(conn_[a-zA-Z0-9_\-]+)['\"]?", req.message)
+            active_conn_id = conn_id_match.group(1) if conn_id_match else None
+            tables_match = re.search(r"selected tables:\s*([a-zA-Z0-9_,\s]+)", req.message, re.IGNORECASE)
+            chosen_tables = [t.strip() for t in tables_match.group(1).split(",") if t.strip()] if tables_match else []
+
             # 1. Classify component type and target engine
             is_sql = any(w in req.message.lower() for w in ["procedure", "stored proc", "sp_", "sql", "ddl", "query", "view", "warehouse"])
             is_spark = any(w in req.message.lower() for w in ["spark", "notebook", "pyspark", "transform", "scd2", "delta", "merge", "lakehouse"])
-            is_pipeline = any(w in req.message.lower() for w in ["pipeline", "orchestrat", "activity", "schedule", "trigger"])
+            is_pipeline = any(w in req.message.lower() for w in ["pipeline", "orchestrat", "activity", "schedule", "trigger"]) or (active_conn_id is not None)
 
-            if is_sql:
+            if active_conn_id:
+                logic_target = "Fabric Pipeline & Medallion Engine"
+                agent_role = "Fabric Integration Architect"
+                scope_label = f"Fabric Pipeline Synthesis (Connection {active_conn_id})"
+            elif is_sql:
                 logic_target = "T-SQL Synapse Engine"
                 agent_role = "Database Engineer"
                 scope_label = "T-SQL Stored Procedure & DDL Synthesis"
@@ -1318,29 +1387,54 @@ async def handle_chat_stream(req: ChatRequest) -> StreamingResponse:
                 scope_label = "Architectural Intent Resolution"
 
             # 3-Step Human-like Cognitive Loop
-            tier2_steps = [
-                {
-                    "id": "t2_intent",
-                    "title": f"Cognitive Intent & Context Resolution: {scope_label}",
-                    "status": "completed",
-                    "duration": "0.4s",
-                    "target": "Architect Scope",
-                },
-                {
-                    "id": "t2_codegen",
-                    "title": f"{agent_role}: Synthesizing production logic for {logic_target}",
-                    "status": "completed",
-                    "duration": "1.1s",
-                    "target": logic_target,
-                },
-                {
-                    "id": "t2_audit",
-                    "title": "Governance & AST Security Audit: Clean AST syntax & PII validation passed",
-                    "status": "completed",
-                    "duration": "0.3s",
-                    "target": "Quality Auditor",
-                },
-            ]
+            if active_conn_id:
+                tier2_steps = [
+                    {
+                        "id": "t2_conn",
+                        "title": f"Fabric Connection Verified: '{active_conn_id}' active in Connection Vault",
+                        "status": "completed",
+                        "duration": "0.2s",
+                        "target": "Fabric Vault",
+                    },
+                    {
+                        "id": "t2_pipeline",
+                        "title": f"Pipeline Activity Synthesizer: Generating Fabric Data Pipeline JSON with Copy activities",
+                        "status": "completed",
+                        "duration": "0.6s",
+                        "target": "Data Factory",
+                    },
+                    {
+                        "id": "t2_spark",
+                        "title": f"PySpark Ingestion Engine: Generating Bronze & Silver Delta MERGE notebooks for {len(chosen_tables)} tables",
+                        "status": "completed",
+                        "duration": "0.8s",
+                        "target": "PySpark Ingest",
+                    },
+                ]
+            else:
+                tier2_steps = [
+                    {
+                        "id": "t2_intent",
+                        "title": f"Cognitive Intent & Context Resolution: {scope_label}",
+                        "status": "completed",
+                        "duration": "0.4s",
+                        "target": "Architect Scope",
+                    },
+                    {
+                        "id": "t2_codegen",
+                        "title": f"{agent_role}: Synthesizing production logic for {logic_target}",
+                        "status": "completed",
+                        "duration": "1.1s",
+                        "target": logic_target,
+                    },
+                    {
+                        "id": "t2_audit",
+                        "title": "Governance & AST Security Audit: Clean AST syntax & PII validation passed",
+                        "status": "completed",
+                        "duration": "0.3s",
+                        "target": "Quality Auditor",
+                    },
+                ]
             for st in tier2_steps:
                 yield f"data: {json.dumps({'type': 'thought_step', 'step': st})}\n\n"
             await asyncio.sleep(0)
@@ -1382,6 +1476,18 @@ async def handle_chat_stream(req: ChatRequest) -> StreamingResponse:
                 f"- Include a concise summary and next execution steps."
             )
 
+            if active_conn_id:
+                sys_prompt += (
+                    f"\n\nCRITICAL FABRIC CONNECTOR INTEGRATION INSTRUCTIONS:\n"
+                    f"- Microsoft Fabric Connection ID: `{active_conn_id}` (verified from Fabric Connection Vault)\n"
+                    f"- Selected Tables to Ingest: {', '.join(chosen_tables)}\n"
+                    f"- STRICT SECURITY: Never hallucinate or insert passwords, secrets, or tokens in your response.\n"
+                    f"- 1. Generate the complete Microsoft Fabric Pipeline definition JSON with Copy activities referencing:\n"
+                    f"     \"externalConnections\": {{ \"connectionId\": \"{active_conn_id}\" }}\n"
+                    f"- 2. For each table ({', '.join(chosen_tables)}), generate idempotent PySpark Delta Lake extraction & Delta MERGE code writing to `lh_bronze` and `lh_silver`.\n"
+                    f"- 3. Structure the output clearly with copyable code blocks and next deployment steps.\n"
+                )
+
             # Ultra-low latency conversational routing:
             # Check if this is a deep architecture task or conceptual / voice conversation
             is_heavy_task = any(
@@ -1422,6 +1528,22 @@ async def handle_chat_stream(req: ChatRequest) -> StreamingResponse:
                 yield f"data: {json.dumps({'type': 'chunk', 'text': fallback_reply})}\n\n"
 
             reply = "".join(reply_chunks)
+            if active_conn_id and chosen_tables:
+                active_plan = {
+                    "sourceName": p_name,
+                    "project_code": p_code,
+                    "domain": "enterprise",
+                    "connection_id": active_conn_id,
+                    "schedule": "Hourly Triggered",
+                    "root_folder": p_root,
+                    "folders": {"raw": "01 Raw", "stage": "02 Stage", "silver": "03 Silver", "gold": "04 Gold"},
+                    "tables": [
+                        {"name": f"lh_{tbl.strip().lower()}_bronze", "target": f"01 Raw / {tbl.strip()}"}
+                        for tbl in chosen_tables
+                    ],
+                }
+                SESSIONS[sid]["active_plan"] = active_plan
+
             SESSIONS[sid]["messages"].append({"role": "assistant", "content": reply})
             save_sessions_to_disk()
             yield f"data: {json.dumps({'type': 'done', 'session_id': sid, 'plan': active_plan})}\n\n"

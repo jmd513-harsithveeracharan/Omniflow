@@ -266,4 +266,46 @@ export interface ProjectRecord {
   badge?: string;
 }
 
+export interface InterceptionParamField {
+  key: string;
+  label: string;
+  type: string;
+  placeholder: string;
+  default?: string;
+  options?: string[];
+  required?: boolean;
+}
+
+export interface CredentialRequestData {
+  connector_type: string;
+  name: string;
+  category: string;
+  description: string;
+  default_gateway?: string | null;
+  required_params: InterceptionParamField[];
+  sample_presets: Record<string, string>;
+}
+
+export interface DiscoveredSourceTable {
+  name: string;
+  schema: string;
+  description?: string;
+  est_rows?: number;
+  pk?: string[];
+  watermark?: string;
+}
+
+export interface ProvisionAndInspectResult {
+  status: string;
+  connection_id: string;
+  connector_type: string;
+  connector_name: string;
+  category: string;
+  gateway?: string;
+  discovered_tables: DiscoveredSourceTable[];
+  python_inspector_code: string;
+  message: string;
+}
+
+
 
