@@ -52,6 +52,9 @@ from omniflow.connectors_interceptor import (
     CONNECTOR_REGISTRY,
     CONNECTIONS_VAULT,
 )
+from omniflow.graph_service import GraphEngine
+
+graph_engine = GraphEngine()
 
 app = FastAPI(
     title="Fabric Studio — OmniFlow Autonomous Engine",
@@ -730,6 +733,26 @@ async def get_workspace_tree() -> dict[str, Any]:
     except Exception:
         pass
     return {"folders": [{"name": "Workspace Root", "items": items}]}
+
+
+@app.get("/api/graph/mesh")
+async def get_graph_mesh() -> dict[str, Any]:
+    """Returns the multi-tier Medallion Knowledge Mesh with column-level lineage and entity DAG."""
+    try:
+        mesh = graph_engine.get_mesh()
+        return mesh.model_dump()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/graph/blast-zone/{node_id}")
+async def get_node_blast_zone(node_id: str) -> dict[str, Any]:
+    """Calculates upstream ancestors and downstream blast-zone impact for a specific node."""
+    try:
+        bz = graph_engine.analyze_blast_zone(node_id)
+        return bz.model_dump()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.get("/api/skills")

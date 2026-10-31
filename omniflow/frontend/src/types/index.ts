@@ -313,5 +313,53 @@ export interface ProvisionAndInspectResult {
   message: string;
 }
 
+export interface GraphMeshNode {
+  id: string;
+  label: string;
+  type: 'source' | 'lakehouse' | 'warehouse' | 'table' | 'column' | 'notebook' | 'pipeline' | 'metric';
+  layer: 'source' | 'bronze' | 'silver' | 'gold' | 'warehouse' | 'bi' | 'shared';
+  parent_id?: string | null;
+  data_type?: string | null;
+  is_primary_key?: boolean;
+  is_foreign_key?: boolean;
+  radius: number;
+  degree: number;
+  description?: string | null;
+}
+
+export interface GraphMeshEdge {
+  id: string;
+  source: string;
+  target: string;
+  relationship: 'FEEDS' | 'CONTAINS' | 'TRANSFORMS_TO' | 'JOINS_WITH' | 'AGGREGATES' | 'DEPENDS_ON';
+  description?: string | null;
+  is_cross_layer?: boolean;
+}
+
+export interface GraphMeshResponse {
+  nodes: GraphMeshNode[];
+  edges: GraphMeshEdge[];
+  stats: {
+    total_nodes: number;
+    total_edges: number;
+    tables_count: number;
+    columns_count: number;
+    notebooks_count: number;
+    metrics_count: number;
+  };
+  layers: string[];
+}
+
+export interface BlastZoneResponse {
+  target_node_id: string;
+  impact_level: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+  upstream_nodes: string[];
+  downstream_nodes: string[];
+  affected_tables: string[];
+  affected_notebooks: string[];
+  explanation: string;
+}
+
+
 
 

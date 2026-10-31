@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import {
   Layers,
+  Network,
   FolderTree,
   Code2,
   Table2,
@@ -14,6 +15,7 @@ import {
   X,
 } from 'lucide-react';
 import { IngestionPlan } from '../types';
+import { GraphMeshView } from './graph/GraphMeshView';
 
 interface MedallionFlowCanvasProps {
   plan?: IngestionPlan | Record<string, unknown> | null;
@@ -39,7 +41,7 @@ export const MedallionFlowCanvas: React.FC<MedallionFlowCanvasProps> = ({
   onDeploy,
   onClose,
 }) => {
-  const [activeTab, setActiveTab] = useState<'wbDAG' | 'wbTree' | 'wbCode' | 'wbTable' | 'wbJson'>('wbDAG');
+  const [activeTab, setActiveTab] = useState<'wbDAG' | 'wbMesh' | 'wbTree' | 'wbCode' | 'wbTable' | 'wbJson'>('wbDAG');
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [copied, setCopied] = useState(false);
   const [selectedNode, setSelectedNode] = useState<DagNode | null>(null);
@@ -260,6 +262,15 @@ export const MedallionFlowCanvas: React.FC<MedallionFlowCanvasProps> = ({
             <span>Pipeline Flow</span>
           </button>
           <button
+            className={`wb-tab ${activeTab === 'wbMesh' ? 'active' : ''}`}
+            onClick={() => setActiveTab('wbMesh')}
+            type="button"
+          >
+            <Network width={13} height={13} />
+            <span>Knowledge Mesh</span>
+            <span style={{ fontSize: '9px', padding: '1px 5px', borderRadius: '4px', background: 'rgba(6, 182, 212, 0.2)', color: '#06b6d4', fontWeight: 600, marginLeft: '4px' }}>Graph RAG</span>
+          </button>
+          <button
             className={`wb-tab ${activeTab === 'wbTree' ? 'active' : ''}`}
             onClick={() => setActiveTab('wbTree')}
             type="button"
@@ -328,6 +339,13 @@ export const MedallionFlowCanvas: React.FC<MedallionFlowCanvasProps> = ({
 
       {/* Workbench Tab Content */}
       <div className="workbench-content">
+        {/* Knowledge Mesh Graph RAG */}
+        {activeTab === 'wbMesh' && (
+          <div className="wb-view-pane active" style={{ padding: 0, overflow: 'hidden', position: 'relative', height: '100%', minHeight: '480px' }}>
+            <GraphMeshView />
+          </div>
+        )}
+
         {/* 1. Pipeline Flow SVG Canvas */}
         {activeTab === 'wbDAG' && (
           <div className="wb-view-pane active">

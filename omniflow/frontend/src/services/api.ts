@@ -612,5 +612,18 @@ export async function removeProjectMember(projectId: string, userId: string): Pr
   return res.ok;
 }
 
+export async function fetchGraphMesh(): Promise<import('../types').GraphMeshResponse> {
+  const res = await fetch(`${API_BASE}/graph/mesh`);
+  if (!res.ok) throw new Error(`Failed to fetch graph mesh: ${res.statusText}`);
+  return res.json();
+}
+
+export async function fetchNodeBlastZone(nodeId: string): Promise<import('../types').BlastZoneResponse> {
+  const res = await fetch(`${API_BASE}/graph/blast-zone/${encodeURIComponent(nodeId)}`);
+  if (!res.ok) throw new Error(`Failed to fetch blast zone: ${res.statusText}`);
+  return res.json();
+}
+
+
 
 
