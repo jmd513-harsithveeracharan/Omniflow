@@ -267,8 +267,8 @@ export const MedallionFlowCanvas: React.FC<MedallionFlowCanvasProps> = ({
             type="button"
           >
             <Network width={13} height={13} />
-            <span>Knowledge Mesh</span>
-            <span style={{ fontSize: '9px', padding: '1px 5px', borderRadius: '4px', background: 'rgba(6, 182, 212, 0.2)', color: '#06b6d4', fontWeight: 600, marginLeft: '4px' }}>Graph RAG</span>
+            <span>Relationship Graph</span>
+            <span style={{ fontSize: '9px', padding: '1px 5px', borderRadius: '4px', background: 'rgba(16, 185, 129, 0.15)', color: '#10b981', fontWeight: 600, marginLeft: '4px' }}>Lineage</span>
           </button>
           <button
             className={`wb-tab ${activeTab === 'wbTree' ? 'active' : ''}`}
@@ -342,7 +342,7 @@ export const MedallionFlowCanvas: React.FC<MedallionFlowCanvasProps> = ({
         {/* Knowledge Mesh Graph RAG */}
         {activeTab === 'wbMesh' && (
           <div className="wb-view-pane active" style={{ padding: 0, overflow: 'hidden', position: 'relative', height: '100%', minHeight: '480px' }}>
-            <GraphMeshView plan={plan as Record<string, unknown> | null} />
+            <GraphMeshView plan={plan as Record<string, unknown> | null} projectId={(plan as any)?.project_code || (plan as any)?.project_id} />
           </div>
         )}
 

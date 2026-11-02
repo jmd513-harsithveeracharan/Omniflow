@@ -736,10 +736,10 @@ async def get_workspace_tree() -> dict[str, Any]:
 
 
 @app.get("/api/graph/mesh")
-async def get_graph_mesh() -> dict[str, Any]:
-    """Returns the multi-tier Medallion Knowledge Mesh with column-level lineage and entity DAG."""
+async def get_graph_mesh(project_id: str | None = None) -> dict[str, Any]:
+    """Returns the multi-tier Medallion Relationship Graph with column-level lineage and entity DAG."""
     try:
-        mesh = graph_engine.get_mesh()
+        mesh = graph_engine.get_mesh(project_id=project_id)
         return mesh.model_dump()
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -747,14 +747,15 @@ async def get_graph_mesh() -> dict[str, Any]:
 
 class GraphMeshRequest(BaseModel):
     plan: dict[str, Any] | None = None
+    project_id: str | None = None
     session_id: str | None = None
 
 
 @app.post("/api/graph/mesh")
 async def post_graph_mesh(req: GraphMeshRequest) -> dict[str, Any]:
-    """Returns the Knowledge Mesh compiled dynamically from an active architecture plan."""
+    """Returns the Relationship Graph compiled dynamically from an active project or architecture plan."""
     try:
-        mesh = graph_engine.get_mesh(plan=req.plan)
+        mesh = graph_engine.get_mesh(plan=req.plan, project_id=req.project_id)
         return mesh.model_dump()
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

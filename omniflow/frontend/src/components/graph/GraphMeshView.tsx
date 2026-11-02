@@ -6,15 +6,29 @@ import { GraphMeshCanvas } from './GraphMeshCanvas';
 import { GraphMeshControls } from './GraphMeshControls';
 import { GraphMeshInspector } from './GraphMeshInspector';
 
+interface ProjectOption {
+  id: string;
+  name: string;
+}
+
 interface GraphMeshViewProps {
   plan?: IngestionPlan | Record<string, unknown> | null;
+  projectId?: string | null;
+  projects?: ProjectOption[];
+  onSelectProject?: (projectId: string) => void;
   onClose?: () => void;
 }
 
-export const GraphMeshView: React.FC<GraphMeshViewProps> = ({ plan }) => {
+export const GraphMeshView: React.FC<GraphMeshViewProps> = ({
+  plan,
+  projectId,
+  projects = [],
+  onSelectProject,
+}) => {
   const [data, setData] = useState<GraphMeshResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(projectId || null);
 
   // Filter & Camera Controls State
   const [searchQuery, setSearchQuery] = useState('');
@@ -24,15 +38,22 @@ export const GraphMeshView: React.FC<GraphMeshViewProps> = ({ plan }) => {
   const [zoomLevel, setZoomLevel] = useState(1.0);
   const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
 
-  const loadMesh = () => {
+  // Sync external projectId changes
+  useEffect(() => {
+    if (projectId !== undefined) {
+      setSelectedProjectId(projectId);
+    }
+  }, [projectId]);
+
+  const loadMesh = (pId: string | null = selectedProjectId) => {
     setIsLoading(true);
     setError(null);
-    fetchGraphMesh(plan)
+    fetchGraphMesh(plan, pId)
       .then((res) => {
         setData(res);
       })
       .catch((err) => {
-        setError(err.message || 'Failed to load Knowledge Mesh.');
+        setError(err.message || 'Failed to load Relationship Graph.');
       })
       .finally(() => {
         setIsLoading(false);
@@ -40,8 +61,14 @@ export const GraphMeshView: React.FC<GraphMeshViewProps> = ({ plan }) => {
   };
 
   useEffect(() => {
-    loadMesh();
-  }, [plan]);
+    loadMesh(selectedProjectId);
+  }, [plan, selectedProjectId]);
+
+  const handleSelectProject = (newPid: string) => {
+    const val = newPid === 'all' ? null : newPid;
+    setSelectedProjectId(val);
+    if (onSelectProject) onSelectProject(newPid);
+  };
 
   const handleSelectConnectedNode = (nodeId: string) => {
     if (!data) return;
@@ -58,21 +85,21 @@ export const GraphMeshView: React.FC<GraphMeshViewProps> = ({ plan }) => {
 
   if (isLoading) {
     return (
-      <div className="w-full h-full flex flex-col items-center justify-center bg-slate-950 text-slate-400 gap-3">
+      <div className="w-full h-full flex flex-col items-center justify-center bg-[#090d16] text-zinc-400 gap-3">
         <RefreshCw className="w-6 h-6 animate-spin text-cyan-400" />
-        <span className="text-xs font-medium tracking-wide">Compiling Medallion Knowledge DAG & Column Lineage...</span>
+        <span className="text-xs font-medium tracking-wide">Compiling Relationship Graph & Lineage...</span>
       </div>
     );
   }
 
   if (error || !data) {
     return (
-      <div className="w-full h-full flex flex-col items-center justify-center bg-slate-950 text-slate-400 gap-3 p-6 text-center">
+      <div className="w-full h-full flex flex-col items-center justify-center bg-[#090d16] text-zinc-400 gap-3 p-6 text-center">
         <AlertCircle className="w-8 h-8 text-rose-500" />
-        <p className="text-sm text-slate-300 font-semibold">{error || 'Graph unavailable'}</p>
+        <p className="text-sm text-zinc-200 font-semibold">{error || 'Graph unavailable'}</p>
         <button
-          onClick={loadMesh}
-          className="px-3 py-1.5 rounded-lg bg-slate-800 text-xs text-slate-200 hover:bg-slate-700 transition-colors"
+          onClick={() => loadMesh(selectedProjectId)}
+          className="px-3 py-1.5 rounded-lg bg-white/10 text-xs text-zinc-200 hover:bg-white/15 transition-colors border border-white/10"
         >
           Retry
         </button>
@@ -81,7 +108,7 @@ export const GraphMeshView: React.FC<GraphMeshViewProps> = ({ plan }) => {
   }
 
   return (
-    <div className="relative w-full h-full overflow-hidden select-none">
+    <div className="relative w-full h-full overflow-hidden select-none bg-[#090d16]">
       <GraphMeshControls
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
@@ -93,6 +120,9 @@ export const GraphMeshView: React.FC<GraphMeshViewProps> = ({ plan }) => {
         onZoomIn={handleZoomIn}
         onZoomOut={handleZoomOut}
         onResetView={handleResetView}
+        projects={projects}
+        selectedProjectId={selectedProjectId}
+        onSelectProject={handleSelectProject}
         stats={data.stats}
       />
 

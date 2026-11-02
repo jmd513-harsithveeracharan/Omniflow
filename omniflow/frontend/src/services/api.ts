@@ -612,16 +612,21 @@ export async function removeProjectMember(projectId: string, userId: string): Pr
   return res.ok;
 }
 
-export async function fetchGraphMesh(plan?: import('../types').IngestionPlan | Record<string, unknown> | null): Promise<import('../types').GraphMeshResponse> {
-  const options: RequestInit = plan
+export async function fetchGraphMesh(
+  plan?: import('../types').IngestionPlan | Record<string, unknown> | null,
+  projectId?: string | null
+): Promise<import('../types').GraphMeshResponse> {
+  const isPost = Boolean(plan || (projectId && projectId !== 'all'));
+  const options: RequestInit = isPost
     ? {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ plan }),
+        body: JSON.stringify({ plan: plan || null, project_id: projectId || null }),
       }
     : { method: 'GET' };
-  const res = await fetch(`${API_BASE}/graph/mesh`, options);
-  if (!res.ok) throw new Error(`Failed to fetch graph mesh: ${res.statusText}`);
+  const url = isPost ? `${API_BASE}/graph/mesh` : `${API_BASE}/graph/mesh${projectId ? `?project_id=${encodeURIComponent(projectId)}` : ''}`;
+  const res = await fetch(url, options);
+  if (!res.ok) throw new Error(`Failed to fetch relationship graph: ${res.statusText}`);
   return res.json();
 }
 

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { X, ShieldAlert, ArrowUpRight, ArrowDownRight, Key, Copy, Check, GitCommit } from 'lucide-react';
+import { X, ShieldAlert, ArrowUpRight, ArrowDownRight, Key, Copy, Check, GitCommit, Network } from 'lucide-react';
 import { GraphMeshNode, BlastZoneResponse } from '../../types';
 import { fetchNodeBlastZone } from '../../services/api';
 
@@ -51,29 +51,29 @@ export const GraphMeshInspector: React.FC<GraphMeshInspectorProps> = ({
   const getImpactBadge = (level: string) => {
     switch (level) {
       case 'CRITICAL':
-        return 'bg-red-500/20 text-red-300 border-red-500/40';
+        return 'bg-red-500/20 text-red-300 border-red-500/30';
       case 'HIGH':
-        return 'bg-amber-500/20 text-amber-300 border-amber-500/40';
+        return 'bg-amber-500/20 text-amber-300 border-amber-500/30';
       case 'MEDIUM':
-        return 'bg-yellow-500/20 text-yellow-300 border-yellow-500/40';
+        return 'bg-yellow-500/20 text-yellow-300 border-yellow-500/30';
       default:
-        return 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40';
+        return 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30';
     }
   };
 
   return (
-    <div className="absolute top-20 right-4 bottom-4 w-84 z-20 flex flex-col bg-slate-900/95 backdrop-blur-md border border-slate-800 rounded-2xl shadow-2xl shadow-black/70 overflow-hidden animate-in fade-in slide-in-from-right-4 duration-200">
+    <div className="absolute top-20 right-4 bottom-4 w-84 z-20 flex flex-col bg-[#0d1117]/95 backdrop-blur-md border border-white/10 rounded-xl shadow-2xl shadow-black/80 overflow-hidden animate-in fade-in slide-in-from-right-4 duration-200">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-slate-800 bg-slate-950/40">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-white/10 bg-black/30">
         <div className="flex items-center gap-2 min-w-0">
-          <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
-          <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-300 truncate">
-            Asset Inspector
+          <Network className="w-4 h-4 text-cyan-400 shrink-0" />
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-200 truncate">
+            Relationship Lineage
           </h3>
         </div>
         <button
           onClick={onClose}
-          className="p-1 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors"
+          className="p-1 rounded-lg text-zinc-400 hover:text-zinc-100 hover:bg-white/10 transition-colors"
         >
           <X className="w-4 h-4" />
         </button>
@@ -85,37 +85,37 @@ export const GraphMeshInspector: React.FC<GraphMeshInspectorProps> = ({
         <div>
           <div className="flex items-start justify-between gap-2">
             <div>
-              <span className="inline-block px-2 py-0.5 rounded text-[10px] font-mono font-medium uppercase tracking-wider mb-1 bg-slate-800 text-cyan-400">
+              <span className="inline-block px-2 py-0.5 rounded text-[10px] font-mono font-medium uppercase tracking-wider mb-1 bg-white/10 text-cyan-400 border border-white/10">
                 {selectedNode.type}
               </span>
               <h2 className="text-sm font-semibold text-white break-words">{selectedNode.label}</h2>
             </div>
             <button
               onClick={handleCopy}
-              className="p-1.5 rounded-lg border border-slate-800 text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors"
+              className="p-1.5 rounded-lg border border-white/10 text-zinc-400 hover:text-zinc-100 hover:bg-white/10 transition-colors"
               title="Copy name"
             >
               {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
             </button>
           </div>
           {selectedNode.description && (
-            <p className="mt-1.5 text-slate-400 text-[11px] leading-relaxed">{selectedNode.description}</p>
+            <p className="mt-1.5 text-zinc-400 text-[11px] leading-relaxed">{selectedNode.description}</p>
           )}
         </div>
 
         {/* Metadata Grid */}
-        <div className="grid grid-cols-2 gap-2 p-2.5 rounded-xl bg-slate-950/60 border border-slate-800/80">
+        <div className="grid grid-cols-2 gap-2 p-2.5 rounded-lg bg-black/40 border border-white/10">
           <div>
-            <span className="text-[10px] text-slate-500 font-medium">Layer</span>
-            <p className="text-[11px] font-medium text-slate-200 capitalize">{selectedNode.layer}</p>
+            <span className="text-[10px] text-zinc-500 font-medium">Layer</span>
+            <p className="text-[11px] font-medium text-zinc-200 capitalize">{selectedNode.layer}</p>
           </div>
           <div>
-            <span className="text-[10px] text-slate-500 font-medium">Network Degree</span>
-            <p className="text-[11px] font-medium text-slate-200">{selectedNode.degree} links</p>
+            <span className="text-[10px] text-zinc-500 font-medium">Degree</span>
+            <p className="text-[11px] font-medium text-zinc-200">{selectedNode.degree} links</p>
           </div>
           {selectedNode.data_type && (
             <div className="col-span-2">
-              <span className="text-[10px] text-slate-500 font-medium">Data Type</span>
+              <span className="text-[10px] text-zinc-500 font-medium">Data Type</span>
               <p className="text-[11px] font-mono text-indigo-300">{selectedNode.data_type}</p>
             </div>
           )}
@@ -138,7 +138,7 @@ export const GraphMeshInspector: React.FC<GraphMeshInspectorProps> = ({
         {/* Blast Zone Analysis */}
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <span className="font-semibold text-slate-300 flex items-center gap-1.5">
+            <span className="font-semibold text-zinc-300 flex items-center gap-1.5">
               <ShieldAlert className="w-3.5 h-3.5 text-amber-400" />
               Blast Zone Impact
             </span>
@@ -150,17 +150,16 @@ export const GraphMeshInspector: React.FC<GraphMeshInspectorProps> = ({
           </div>
 
           {isLoading ? (
-            <div className="p-3 text-center text-slate-500 bg-slate-950/40 rounded-xl border border-slate-800">
-              Traversing NetworkX DAG...
+            <div className="p-3 text-center text-zinc-500 bg-black/30 rounded-lg border border-white/10">
+              Traversing Network Lineage...
             </div>
           ) : blastZone ? (
-            <div className="p-2.5 rounded-xl bg-slate-950/60 border border-slate-800/80 space-y-2">
-              <p className="text-[11px] text-slate-300 leading-normal">{blastZone.explanation}</p>
-              
-              {/* Downstream Impact List */}
+            <div className="p-2.5 rounded-lg bg-black/40 border border-white/10 space-y-2">
+              <p className="text-[11px] text-zinc-300 leading-normal">{blastZone.explanation}</p>
+
               {blastZone.downstream_nodes.length > 0 && (
                 <div>
-                  <span className="text-[10px] text-slate-500 font-medium flex items-center gap-1 mb-1">
+                  <span className="text-[10px] text-zinc-500 font-medium flex items-center gap-1 mb-1">
                     <ArrowDownRight className="w-3 h-3 text-amber-400" />
                     Downstream Cascade ({blastZone.downstream_nodes.length})
                   </span>
@@ -169,7 +168,7 @@ export const GraphMeshInspector: React.FC<GraphMeshInspectorProps> = ({
                       <button
                         key={nid}
                         onClick={() => onSelectConnectedNode(nid)}
-                        className="px-1.5 py-0.5 rounded bg-slate-800 text-[10px] text-slate-300 hover:bg-cyan-500/20 hover:text-cyan-300 transition-colors"
+                        className="px-1.5 py-0.5 rounded bg-white/10 text-[10px] text-zinc-300 hover:bg-cyan-500/20 hover:text-cyan-300 transition-colors"
                       >
                         {nid}
                       </button>
@@ -178,10 +177,9 @@ export const GraphMeshInspector: React.FC<GraphMeshInspectorProps> = ({
                 </div>
               )}
 
-              {/* Upstream Lineage List */}
               {blastZone.upstream_nodes.length > 0 && (
                 <div>
-                  <span className="text-[10px] text-slate-500 font-medium flex items-center gap-1 mb-1">
+                  <span className="text-[10px] text-zinc-500 font-medium flex items-center gap-1 mb-1">
                     <ArrowUpRight className="w-3 h-3 text-emerald-400" />
                     Upstream Lineage ({blastZone.upstream_nodes.length})
                   </span>
@@ -190,7 +188,7 @@ export const GraphMeshInspector: React.FC<GraphMeshInspectorProps> = ({
                       <button
                         key={nid}
                         onClick={() => onSelectConnectedNode(nid)}
-                        className="px-1.5 py-0.5 rounded bg-slate-800 text-[10px] text-slate-300 hover:bg-emerald-500/20 hover:text-emerald-300 transition-colors"
+                        className="px-1.5 py-0.5 rounded bg-white/10 text-[10px] text-zinc-300 hover:bg-emerald-500/20 hover:text-emerald-300 transition-colors"
                       >
                         {nid}
                       </button>

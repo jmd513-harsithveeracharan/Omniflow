@@ -593,7 +593,7 @@ export const App: React.FC = () => {
   const getViewTitle = () => {
     switch (activeView) {
       case 'mesh':
-        return 'Knowledge Mesh — Graph RAG Lineage';
+        return 'Relationship Graph';
       case 'projects':
         return 'Projects';
       case 'skills':
@@ -710,8 +710,17 @@ export const App: React.FC = () => {
         )}
 
         {activeView === 'mesh' && (
-          <div className="flex-1 w-full h-full relative overflow-hidden bg-slate-950" style={{ height: 'calc(100vh - 56px)' }}>
-            <GraphMeshView plan={currentPlan} />
+          <div className="flex-1 w-full h-full relative overflow-hidden bg-[#090d16]" style={{ height: 'calc(100vh - 56px)' }}>
+            <GraphMeshView
+              plan={currentPlan}
+              projectId={activeProjectId}
+              projects={projects.map((p) => ({ id: p.id, name: p.name }))}
+              onSelectProject={(newPid) => {
+                if (newPid && newPid !== 'all') {
+                  handleSelectProject(newPid);
+                }
+              }}
+            />
           </div>
         )}
 

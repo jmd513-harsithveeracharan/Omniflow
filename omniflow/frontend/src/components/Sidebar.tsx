@@ -329,12 +329,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <button
           className={`nav-item ${activeView === 'mesh' ? 'active' : ''}`}
           onClick={() => onSelectView('mesh')}
-          title="Knowledge Mesh (Graph RAG)"
+          title="Relationship Graph"
         >
           <span className="nav-item-icon">
             <Network width={18} height={18} />
           </span>
-          <span>Knowledge Mesh</span>
+          <span>Relationship Graph</span>
         </button>
 
         <button

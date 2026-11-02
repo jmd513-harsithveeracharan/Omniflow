@@ -21,6 +21,7 @@ from omniflow.graph_generator import (
     build_mesh_from_plan,
     build_rich_medallion_galaxy,
 )
+from omniflow.graph_project_builder import build_mesh_from_project
 
 
 class GraphEngine:
@@ -29,9 +30,18 @@ class GraphEngine:
     def __init__(self, default_graph: nx.DiGraph | None = None) -> None:
         self._default_g = default_graph or build_rich_medallion_galaxy()
 
-    def get_mesh(self, plan: dict[str, Any] | None = None) -> GraphMeshResponse:
+    def get_mesh(
+        self,
+        plan: dict[str, Any] | None = None,
+        project_id: str | None = None,
+    ) -> GraphMeshResponse:
         """Serializes the NetworkX DiGraph into a client-ready GraphMeshResponse."""
-        g = build_mesh_from_plan(plan) if plan else self._default_g
+        if project_id and project_id not in ("all", "galaxy", "default"):
+            g = build_mesh_from_project(project_id)
+        elif plan:
+            g = build_mesh_from_plan(plan)
+        else:
+            g = self._default_g
         nodes: list[GraphNode] = []
         edges: list[GraphEdge] = []
 
