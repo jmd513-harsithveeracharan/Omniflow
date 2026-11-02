@@ -14,6 +14,7 @@ import { GraphMeshNode, GraphMeshEdge } from '../../types';
 export interface D3SimNode extends SimulationNodeDatum, GraphMeshNode {
   id: string;
   radius: number;
+  collisionRadius: number;
 }
 
 export interface D3SimLink extends SimulationLinkDatum<D3SimNode> {
@@ -39,18 +40,18 @@ interface GraphMeshCanvasProps {
   onPanChange: (pan: { x: number; y: number }) => void;
 }
 
-// Dark-toned, shaded, muted palette (No neon colors)
-const LAYER_SHADED_COLORS: Record<string, string> = {
-  source: '#1b4332',     // deep shaded forest green
-  bronze: '#78350f',     // dark shaded bronze/amber
-  silver: '#155e75',     // deep shaded slate-cyan
-  gold: '#713f12',       // dark shaded antique gold
-  bi: '#701a75',         // deep shaded plum/wine
-  warehouse: '#1e3a5f',  // deep shaded navy
-  shared: '#3b0764',     // deep shaded dark purple
+// Lively, brighter Obsidian colors matching reference screenshots
+const LAYER_COLORS: Record<string, string> = {
+  source: '#10b981',     // vibrant emerald
+  bronze: '#f59e0b',     // vibrant amber
+  silver: '#06b6d4',     // vibrant cyan
+  gold: '#eab308',       // vibrant gold
+  bi: '#ec4899',         // vibrant rose/pink
+  warehouse: '#3b82f6',  // vibrant blue
+  shared: '#a855f7',     // vibrant purple
 };
 
-const DEFAULT_NODE_COLOR = '#334155'; // deep slate
+const DEFAULT_NODE_COLOR = '#94a3b8';
 
 function distToSegment(px: number, py: number, x1: number, y1: number, x2: number, y2: number): number {
   const dx = x2 - x1;
@@ -85,7 +86,30 @@ export const GraphMeshCanvas: React.FC<GraphMeshCanvasProps> = ({
   const lastMousePosRef = useRef({ x: 0, y: 0 });
   const [hoveredEdgeId, setHoveredEdgeId] = useState<string | null>(null);
 
-  // Initialize D3 Force Simulation with Coulomb physical repulsion
+  const zoomLevelRef = useRef(zoomLevel);
+  zoomLevelRef.current = zoomLevel;
+
+  // Intercept Ctrl + Scroll and Wheel natively to prevent full-page browser zoom
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const handleWheelEvent = (e: WheelEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+
+      const factor = e.deltaY < 0 ? 1.12 : 0.89;
+      const newZoom = Math.max(0.25, Math.min(3.5, zoomLevelRef.current * factor));
+      onZoomChange(newZoom);
+    };
+
+    canvas.addEventListener('wheel', handleWheelEvent, { passive: false });
+    return () => {
+      canvas.removeEventListener('wheel', handleWheelEvent);
+    };
+  }, [onZoomChange]);
+
+  // Initialize D3 Force Simulation with unified Node + Text pair physics
   useEffect(() => {
     if (simulationRef.current) {
       simulationRef.current.stop();
@@ -93,19 +117,26 @@ export const GraphMeshCanvas: React.FC<GraphMeshCanvasProps> = ({
 
     const total = nodes.length;
     const sorted = [...nodes].sort((a, b) => (b.degree || 0) - (a.degree || 0));
-    const hubs = new Set(sorted.slice(0, Math.max(1, Math.min(3, Math.ceil(total * 0.1)))).map((n) => n.id));
+    const hubs = new Set(sorted.slice(0, Math.max(1, Math.min(4, Math.ceil(total * 0.1)))).map((n) => n.id));
 
-    // Smaller, refined node sizes
+    // Unified Node + Text Collision Geometry
     const simNodes: D3SimNode[] = nodes.map((n, idx) => {
-      let r = 5.0; // standard table node
-      if (hubs.has(n.id)) r = 7.5; // central hub
-      else if (n.type === 'column') r = 3.0; // column/leaf
+      let r = 5.0; // standard node
+      if (hubs.has(n.id)) r = 8.0; // hub node
+      else if (n.type === 'column') r = 3.2; // column leaf
+
+      const labelLen = (n.label || '').length;
+      // Text centered beneath node: half-width estimation
+      const textHalfWidth = Math.min(65, Math.max(12, labelLen * 2.8));
+      // Unified pair collision radius prevents text from crossing other nodes
+      const collisionRadius = Math.max(r + 14, textHalfWidth + 6);
 
       const angle = (idx / Math.max(1, total)) * Math.PI * 2;
-      const dist = 60 + (idx % 5) * 35;
+      const dist = 70 + (idx % 6) * 40;
       return {
         ...n,
         radius: r,
+        collisionRadius,
         x: Math.cos(angle) * dist + (Math.random() - 0.5) * 20,
         y: Math.sin(angle) * dist + (Math.random() - 0.5) * 20,
       };
@@ -130,17 +161,33 @@ export const GraphMeshCanvas: React.FC<GraphMeshCanvasProps> = ({
     simNodesRef.current = simNodes;
     simLinksRef.current = simLinks;
 
-    // D3 Force Simulation: True Coulomb Repulsion & Elastic Springs
+    // D3 Force: Unified Pair Repulsion & Elastic Springs
     const simulation = forceSimulation<D3SimNode>(simNodes)
-      // 1. Coulomb Repulsion: Every node strongly pushes other nodes away
-      .force('charge', forceManyBody<D3SimNode>().strength(-180).distanceMax(550))
-      // 2. Elastic Spring Links: Connects related nodes
-      .force('link', forceLink<D3SimNode, D3SimLink>(simLinks).distance(75).strength(0.35))
-      // 3. Collision Barrier: Nodes never overlap
-      .force('collide', forceCollide<D3SimNode>().radius((d) => d.radius + 12).iterations(2))
+      // 1. Coulomb Repulsion with stronger push for hub nodes
+      .force(
+        'charge',
+        forceManyBody<D3SimNode>()
+          .strength((d) => (hubs.has(d.id) ? -280 : -160))
+          .distanceMax(600)
+      )
+      // 2. Elastic Spring Links
+      .force(
+        'link',
+        forceLink<D3SimNode, D3SimLink>(simLinks)
+          .distance((l) => (l.relationship === 'CONTAINS' ? 38 : 85))
+          .strength(0.35)
+      )
+      // 3. Collision Barrier: Treats Node + Text as a single unified object
+      .force(
+        'collide',
+        forceCollide<D3SimNode>()
+          .radius((d) => d.collisionRadius)
+          .strength(0.9)
+          .iterations(3)
+      )
       // 4. Gentle Centering
       .force('center', forceCenter<D3SimNode>(0, 0))
-      .velocityDecay(0.35); // Smooth organic damping
+      .velocityDecay(0.38);
 
     if (!isPhysicsActive) {
       simulation.stop();
@@ -223,15 +270,15 @@ export const GraphMeshCanvas: React.FC<GraphMeshCanvasProps> = ({
         ctx.lineTo(nb.x, nb.y);
 
         if (isEdgeHovered) {
-          // Hovered highlighted edge: crisp white line with subtle halo
-          ctx.strokeStyle = '#f8fafc';
-          ctx.lineWidth = 1.8;
-          ctx.shadowColor = 'rgba(255, 255, 255, 0.4)';
-          ctx.shadowBlur = 6;
-        } else if (isEdgeConnected) {
-          // Connected to selected node: soft silver line
-          ctx.strokeStyle = 'rgba(226, 232, 240, 0.8)';
+          // Hovered highlighted edge: crisp vibrant green hairline
+          ctx.strokeStyle = '#10b981';
           ctx.lineWidth = 1.2;
+          ctx.shadowColor = 'rgba(16, 185, 129, 0.4)';
+          ctx.shadowBlur = 4;
+        } else if (isEdgeConnected) {
+          // Connected to selected node: thin vibrant green hairline
+          ctx.strokeStyle = '#10b981';
+          ctx.lineWidth = 1.0;
         } else {
           // Default Obsidian edge: ultra-thin hairline
           ctx.strokeStyle = isDimmed ? 'rgba(255, 255, 255, 0.03)' : 'rgba(255, 255, 255, 0.14)';
@@ -242,7 +289,7 @@ export const GraphMeshCanvas: React.FC<GraphMeshCanvasProps> = ({
         ctx.restore();
       }
 
-      // 2. Draw Solid Shaded Nodes (No neon colors)
+      // 2. Draw Solid Vibrant Nodes
       for (const n of simNodesRef.current) {
         if (n.x === undefined || n.y === undefined) continue;
 
@@ -252,36 +299,38 @@ export const GraphMeshCanvas: React.FC<GraphMeshCanvasProps> = ({
         const isDimmed = !matchesLayer || !matchesSearch || (activeId && !isConnected);
         const isCurrentActive = n.id === activeId;
 
-        const baseColor = LAYER_SHADED_COLORS[n.layer] || DEFAULT_NODE_COLOR;
+        const baseColor = LAYER_COLORS[n.layer] || DEFAULT_NODE_COLOR;
 
         ctx.save();
-        ctx.globalAlpha = isDimmed ? 0.05 : 1.0;
+        ctx.globalAlpha = isDimmed ? 0.06 : 1.0;
 
-        // Active node: soft white glow
+        // Active node: soft subtle ring
         if (isCurrentActive) {
-          ctx.shadowColor = 'rgba(255, 255, 255, 0.35)';
+          ctx.shadowColor = 'rgba(16, 185, 129, 0.5)';
           ctx.shadowBlur = 8;
         }
 
+        // Draw node circle (ABOVE the text)
         ctx.beginPath();
         ctx.arc(n.x, n.y, n.radius, 0, Math.PI * 2);
-        ctx.fillStyle = isCurrentActive ? '#f8fafc' : baseColor;
+        ctx.fillStyle = isCurrentActive ? '#ffffff' : baseColor;
         ctx.fill();
 
-        // 3. Crisp Obsidian Labels
+        // 3. Crisp White Typography (CENTERED DIRECTLY BELOW THE NODE)
         const showLabel =
           isCurrentActive ||
           (activeId && isConnected) ||
-          zoomLevel > 1.3 ||
+          zoomLevel > 1.2 ||
           (matchesSearch && searchQuery);
 
         if (showLabel) {
           ctx.shadowBlur = 0;
           ctx.font = `${isCurrentActive ? '600 10.5px' : '400 10px'} -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
-          ctx.fillStyle = isCurrentActive ? '#ffffff' : isDimmed ? 'rgba(255, 255, 255, 0.15)' : 'rgba(203, 213, 225, 0.85)';
-          ctx.textAlign = 'left';
-          ctx.textBaseline = 'middle';
-          ctx.fillText(n.label, n.x + n.radius + 5, n.y);
+          ctx.fillStyle = isCurrentActive ? '#ffffff' : isDimmed ? 'rgba(255, 255, 255, 0.15)' : '#ffffff';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'top';
+          // Node is above and at the horizontal center of the text
+          ctx.fillText(n.label, n.x, n.y + n.radius + 4);
         }
 
         ctx.restore();
@@ -295,12 +344,6 @@ export const GraphMeshCanvas: React.FC<GraphMeshCanvasProps> = ({
     return () => cancelAnimationFrame(animId);
   }, [edges, selectedLayer, searchQuery, selectedNode, hoveredEdgeId, zoomLevel, panOffset]);
 
-  const handleWheel = (e: React.WheelEvent<HTMLCanvasElement>) => {
-    e.preventDefault();
-    const factor = e.deltaY < 0 ? 1.12 : 0.89;
-    onZoomChange(Math.max(0.3, Math.min(3.2, zoomLevel * factor)));
-  };
-
   const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -310,7 +353,7 @@ export const GraphMeshCanvas: React.FC<GraphMeshCanvasProps> = ({
 
     // Check if clicked a node
     const clicked = simNodesRef.current.find(
-      (n) => n.x !== undefined && n.y !== undefined && Math.hypot(n.x - mx, n.y - my) <= n.radius + 5
+      (n) => n.x !== undefined && n.y !== undefined && Math.hypot(n.x - mx, n.y - my) <= n.radius + 6
     );
 
     if (clicked) {
@@ -360,7 +403,7 @@ export const GraphMeshCanvas: React.FC<GraphMeshCanvasProps> = ({
       return;
     }
 
-    // Edge Hover Detection: ONLY when a node is selected, test its highlighted edges
+    // Edge Hover Detection: ONLY active when a node is clicked and its edges are highlighted
     if (!selectedNode) {
       if (hoveredEdgeId) {
         setHoveredEdgeId(null);
@@ -372,7 +415,7 @@ export const GraphMeshCanvas: React.FC<GraphMeshCanvasProps> = ({
     const mx = (clientX - rect.left - canvas.clientWidth / 2 - panOffset.x) / zoomLevel;
     const my = (clientY - rect.top - canvas.clientHeight / 2 - panOffset.y) / zoomLevel;
 
-    // Find if hovering one of the highlighted connected edges
+    // Test proximity ONLY to highlighted connected edges
     const threshold = 6 / zoomLevel;
     let foundLink: D3SimLink | null = null;
 
@@ -422,7 +465,6 @@ export const GraphMeshCanvas: React.FC<GraphMeshCanvasProps> = ({
   return (
     <canvas
       ref={canvasRef}
-      onWheel={handleWheel}
       onMouseDown={handleMouseDown}
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
@@ -432,7 +474,7 @@ export const GraphMeshCanvas: React.FC<GraphMeshCanvasProps> = ({
         onHoverHighlightedEdge(null, null);
       }}
       className="w-full h-full cursor-grab active:cursor-grabbing block"
-      style={{ background: '#111111' }}
+      style={{ background: '#0b0f19' }}
     />
   );
 };
