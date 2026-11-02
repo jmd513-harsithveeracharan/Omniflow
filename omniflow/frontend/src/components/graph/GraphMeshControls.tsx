@@ -77,31 +77,40 @@ export const GraphMeshControls: React.FC<GraphMeshControlsProps> = ({
     };
   }, [isPickerOpen]);
 
+  // Ensure Peli BioThermal and all available projects are always selectable
+  const displayProjects = [...projects];
+  if (!displayProjects.some((p) => p.id === 'PRJ-PELI-BIOTHERMAL')) {
+    displayProjects.push({
+      id: 'PRJ-PELI-BIOTHERMAL',
+      name: 'Peli BioThermal Cold-Chain Platform',
+    });
+  }
+
   const activeProjectName =
     selectedProjectId && selectedProjectId !== 'all'
-      ? projects.find((p) => p.id === selectedProjectId)?.name || selectedProjectId
+      ? displayProjects.find((p) => p.id === selectedProjectId)?.name || selectedProjectId
       : 'All Projects (Galaxy Overview)';
 
   return (
     <div className="absolute top-4 left-4 right-4 z-20 flex flex-wrap items-center justify-between gap-3 pointer-events-none">
       {/* Project Selector & Search Box */}
-      <div className="flex items-center gap-2 pointer-events-auto bg-[#18181b]/95 backdrop-blur-md border border-white/10 p-1.5 rounded-xl shadow-xl shadow-black/70">
+      <div className="flex items-center gap-2 pointer-events-auto bg-[#18181b]/95 backdrop-blur-md border border-zinc-800 p-1.5 rounded-xl shadow-xl shadow-black/70">
         {/* Custom Project Dropdown */}
-        {projects.length > 0 && onSelectProject && (
+        {displayProjects.length > 0 && onSelectProject && (
           <div className="relative" ref={dropdownRef}>
             <button
               onClick={() => setIsPickerOpen(!isPickerOpen)}
-              className="flex items-center gap-2 px-2.5 py-1.5 bg-white/[0.04] hover:bg-white/[0.08] border border-white/10 rounded-lg text-xs text-zinc-200 transition-all cursor-pointer"
+              className="flex items-center gap-2 px-2.5 py-1.5 bg-white/[0.04] hover:bg-white/[0.08] border border-zinc-800 rounded-lg text-xs text-zinc-200 transition-all cursor-pointer"
             >
               <FolderGit2 className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
               <span className="font-medium text-zinc-100 max-w-[160px] truncate">{activeProjectName}</span>
               <ChevronDown className="w-3.5 h-3.5 text-zinc-400 ml-0.5 shrink-0" />
             </button>
 
-            {/* OmniFlow Modal-Styled Dropdown Card */}
+            {/* OmniFlow Modal-Styled Dropdown Card without bright white border */}
             {isPickerOpen && (
               <div
-                className="absolute top-full left-0 mt-2 w-72 bg-[#18181b] border border-white/12 rounded-xl shadow-2xl shadow-black/90 p-2 z-50 animate-in fade-in zoom-in-95 duration-100"
+                className="absolute top-full left-0 mt-2 w-72 bg-[#18181b] border border-zinc-800/90 rounded-xl shadow-2xl shadow-black/95 p-2 z-50 animate-in fade-in zoom-in-95 duration-100"
                 style={{ backdropFilter: 'blur(16px)' }}
               >
                 <div className="px-2 py-1 mb-1 text-[10px] font-semibold text-zinc-500 uppercase tracking-wider">
@@ -129,11 +138,11 @@ export const GraphMeshControls: React.FC<GraphMeshControlsProps> = ({
                   )}
                 </button>
 
-                <div className="my-1 border-t border-white/8" />
+                <div className="my-1 border-t border-zinc-800/80" />
 
                 {/* Project List */}
                 <div className="max-h-56 overflow-y-auto space-y-0.5">
-                  {projects.map((p) => {
+                  {displayProjects.map((p) => {
                     const isSelected = selectedProjectId === p.id;
                     return (
                       <button

@@ -288,3 +288,4 @@ def build_peli_biothermal_graph() -> nx.DiGraph:
             add_edge(g, src_col, tgt_col, rel, desc=sql_desc)
 
     return g
+

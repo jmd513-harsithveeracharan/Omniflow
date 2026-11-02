@@ -153,7 +153,7 @@ export const GraphMeshView: React.FC<GraphMeshViewProps> = ({
       {/* Edge Relationship Modal Card — Shown ONLY when a node is clicked and hovering its highlighted edge */}
       {hoveredHighlightedEdge && edgeTooltipPos && selectedNode && (
         <div
-          className="pointer-events-none fixed z-50 p-3 bg-[#18181b] border border-white/12 rounded-xl shadow-2xl shadow-black/90 text-xs text-zinc-200 animate-in fade-in zoom-in-95 duration-100 max-w-sm"
+          className="pointer-events-none fixed z-50 p-3 bg-[#18181b] border border-zinc-800/90 rounded-xl shadow-2xl shadow-black/95 text-xs text-zinc-200 animate-in fade-in zoom-in-95 duration-100 max-w-sm"
           style={{
             left: edgeTooltipPos.x + 16,
             top: edgeTooltipPos.y - 16,
@@ -161,7 +161,7 @@ export const GraphMeshView: React.FC<GraphMeshViewProps> = ({
           }}
         >
           {/* Header */}
-          <div className="flex items-center justify-between gap-3 pb-2 mb-2 border-b border-white/8">
+          <div className="flex items-center justify-between gap-3 pb-2 mb-2 border-b border-zinc-800/80">
             <div className="flex items-center gap-2">
               <div className="w-5 h-5 rounded-md bg-white/8 flex items-center justify-center text-zinc-300">
                 <GitBranch className="w-3 h-3" />

@@ -180,7 +180,7 @@ async def on_startup():
 def fetch_projects_cached(force_refresh: bool = False) -> list[dict[str, Any]]:
     global PROJECTS_CACHE, PROJECTS_CACHE_TIME
     now = time.time()
-    if not force_refresh and PROJECTS_CACHE and (now - PROJECTS_CACHE_TIME < 300.0):
+    if not force_refresh and PROJECTS_CACHE and (now - PROJECTS_CACHE_TIME < 5.0):
         return PROJECTS_CACHE
 
     projects = []
