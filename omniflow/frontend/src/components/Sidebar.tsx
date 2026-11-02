@@ -1,14 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { PlatformCube } from './PlatformCube';
 import {
   Plus,
-  Sparkles,
   FolderTree,
   BookOpen,
   LayoutGrid,
   Network,
   Settings2,
   ChevronDown,
+  ChevronRight,
   Search,
   PanelLeftClose,
   Sliders,
@@ -385,35 +386,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
           {isProjectsOpen && (
             <div className="sidebar-projects-list">
-              {/* Top Item: Playground / Quick Scratchpad */}
-              <div
-                className={`sidebar-project-item ${activeProjectId === 'playground' || !activeProjectId ? 'active' : ''}`}
-                onClick={() => {
-                  if (onSelectProject) {
-                    onSelectProject('playground');
-                  }
-                }}
-                title="Playground - Ad-hoc data engineering tasks and testing"
-                style={{ marginBottom: '6px' }}
-              >
-                <span className="sidebar-project-icon">
-                  <Sparkles width={13} height={13} style={{ color: '#38bdf8' }} />
-                </span>
-                <span className="sidebar-project-name" style={{ fontWeight: 600 }}>Playground</span>
-                <span
-                  style={{
-                    fontSize: '9.5px',
-                    color: '#38bdf8',
-                    background: 'rgba(56, 189, 248, 0.12)',
-                    border: '1px solid rgba(56, 189, 248, 0.25)',
-                    padding: '1px 6px',
-                    borderRadius: '4px',
-                    marginLeft: 'auto',
-                  }}
-                >
-                  Scratchpad
-                </span>
-              </div>
+
               {isLoadingProjects ? (
                 <div className="sidebar-skeleton-list" style={{ padding: '4px 6px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
                   <div className="skeleton-line" style={{ height: '28px', borderRadius: '6px' }} />
@@ -645,95 +618,124 @@ export const Sidebar: React.FC<SidebarProps> = ({
             )}
           </div>
 
-          {/* Floating Context Menu Popup for Chat */}
-          {chatMenuSessionId && chatMenuPos && (() => {
-            const targetSession = sessions.find((s) => (s.sessionId || (s as any).id) === chatMenuSessionId);
-            if (!targetSession) return null;
-            const targetId = targetSession.sessionId || (targetSession as any).id;
-            return (
-              <div
-                ref={chatMenuRef}
-                className="sidebar-chat-menu-popup"
-                style={{ top: `${chatMenuPos.top}px`, left: `${chatMenuPos.left}px` }}
-                onMouseDown={(e) => e.stopPropagation()}
-                onClick={(e) => e.stopPropagation()}
-              >
+          {/* Floating Context Menu Popup for Chat via Portal (Unclipped, No Black Box) */}
+          {chatMenuSessionId && chatMenuPos && typeof document !== 'undefined' && createPortal(
+            (() => {
+              const targetSession = sessions.find((s) => (s.sessionId || (s as any).id) === chatMenuSessionId);
+              if (!targetSession) return null;
+              const targetId = targetSession.sessionId || (targetSession as any).id;
+              return (
                 <div
-                  className="chat-menu-item"
-                  onClick={() => handleStartRename(targetSession)}
+                  ref={chatMenuRef}
+                  className="sidebar-chat-menu-popup"
+                  style={{
+                    position: 'fixed',
+                    top: `${chatMenuPos.top}px`,
+                    left: `${chatMenuPos.left}px`,
+                    zIndex: 999999,
+                    background: '#18181b',
+                    border: '1px solid rgba(255, 255, 255, 0.12)',
+                    borderRadius: '12px',
+                    boxShadow: '0 20px 48px rgba(0, 0, 0, 0.9)',
+                    padding: '6px',
+                    width: '190px',
+                  }}
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onClick={(e) => e.stopPropagation()}
                 >
-                  <Edit3 width={14} height={14} />
-                  <span className="menu-label">Rename</span>
-                </div>
-
-                {/* Move to Project Option */}
-                <div
-                  className="chat-menu-item"
-                  onClick={() => setIsMoveSubmenuOpen(!isMoveSubmenuOpen)}
-                  style={{ position: 'relative' }}
-                >
-                  <Folder width={14} height={14} />
-                  <span className="menu-label">Move to project</span>
-                  <span className="menu-arrow">{isMoveSubmenuOpen ? '▾' : '▸'}</span>
-                </div>
-
-                {/* Project picker submenu */}
-                {isMoveSubmenuOpen && (
                   <div
-                    style={{
-                      maxHeight: '160px',
-                      overflowY: 'auto',
-                      padding: '4px',
-                      background: '#121214',
-                      borderRadius: '8px',
-                      border: '1px solid rgba(255, 255, 255, 0.12)',
-                      margin: '4px 0',
-                    }}
+                    className="chat-menu-item"
+                    onClick={() => handleStartRename(targetSession)}
                   >
-                    {activeProjectsList.length === 0 ? (
-                      <div style={{ fontSize: '11px', color: '#71717a', padding: '6px 8px' }}>
-                        No projects available
-                      </div>
-                    ) : (
-                      activeProjectsList.map((p) => (
-                        <div
-                          key={p.id}
-                          className="chat-menu-item"
-                          style={{ padding: '5px 8px', fontSize: '12px' }}
-                          onClick={() => {
-                            setChatMenuSessionId(null);
-                            setChatMenuPos(null);
-                            setIsMoveSubmenuOpen(false);
-                            onMoveSessionToProject?.(targetId, p.id);
-                          }}
-                        >
-                          <Folder width={12} height={12} style={{ color: '#10b981' }} />
-                          <span className="menu-label" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                            {p.name}
-                          </span>
+                    <Edit3 width={14} height={14} />
+                    <span className="menu-label">Rename</span>
+                  </div>
+
+                  {/* Move to Project Item with Right Flyout Submenu */}
+                  <div
+                    className="chat-menu-item"
+                    onMouseEnter={() => setIsMoveSubmenuOpen(true)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setIsMoveSubmenuOpen(!isMoveSubmenuOpen);
+                    }}
+                    style={{ position: 'relative' }}
+                  >
+                    <Folder width={14} height={14} />
+                    <span className="menu-label">Move to project</span>
+                    <ChevronRight width={12} height={12} style={{ color: '#71717a', marginLeft: 'auto' }} />
+
+                    {/* Flyout Submenu popping up to the right seamlessly */}
+                    {isMoveSubmenuOpen && (
+                      <div
+                        className="chat-flyout-submenu"
+                        style={{
+                          position: 'absolute',
+                          left: 'calc(100% + 4px)',
+                          top: '-4px',
+                          width: '220px',
+                          maxHeight: '240px',
+                          overflowY: 'auto',
+                          background: '#18181b',
+                          borderRadius: '10px',
+                          border: '1px solid rgba(255, 255, 255, 0.1)',
+                          boxShadow: '0 16px 36px rgba(0, 0, 0, 0.85)',
+                          padding: '5px',
+                          zIndex: 1000000,
+                          backdropFilter: 'blur(16px)',
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <div style={{ fontSize: '10px', fontWeight: 600, color: '#71717a', padding: '4px 8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                          Select Project
                         </div>
-                      ))
+                        {activeProjectsList.length === 0 ? (
+                          <div style={{ fontSize: '11px', color: '#71717a', padding: '6px 8px' }}>
+                            No projects available
+                          </div>
+                        ) : (
+                          activeProjectsList.map((p) => (
+                            <div
+                              key={p.id}
+                              className="chat-menu-item"
+                              style={{ padding: '6px 8px', fontSize: '12px' }}
+                              onClick={() => {
+                                setChatMenuSessionId(null);
+                                setChatMenuPos(null);
+                                setIsMoveSubmenuOpen(false);
+                                onMoveSessionToProject?.(targetId, p.id);
+                              }}
+                            >
+                              <Folder width={12} height={12} style={{ color: '#10b981', flexShrink: 0 }} />
+                              <span className="menu-label" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={p.name}>
+                                {p.name}
+                              </span>
+                            </div>
+                          ))
+                        )}
+                      </div>
                     )}
                   </div>
-                )}
 
-                <div className="chat-menu-divider" />
+                  <div className="chat-menu-divider" />
 
-                <div
-                  className="chat-menu-item item-danger"
-                  onClick={() => {
-                    setChatMenuSessionId(null);
-                    setChatMenuPos(null);
-                    setIsMoveSubmenuOpen(false);
-                    onDeleteSession?.(targetId);
-                  }}
-                >
-                  <Trash2 width={14} height={14} />
-                  <span className="menu-label">Delete</span>
+                  <div
+                    className="chat-menu-item item-danger"
+                    onClick={() => {
+                      setChatMenuSessionId(null);
+                      setChatMenuPos(null);
+                      setIsMoveSubmenuOpen(false);
+                      onDeleteSession?.(targetId);
+                    }}
+                  >
+                    <Trash2 width={14} height={14} />
+                    <span className="menu-label">Delete</span>
+                  </div>
                 </div>
-              </div>
-            );
-          })()}
+              );
+            })(),
+            document.body
+          )}
         </div>
       </nav>
 

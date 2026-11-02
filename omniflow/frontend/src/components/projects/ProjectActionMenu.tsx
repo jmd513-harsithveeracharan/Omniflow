@@ -1,4 +1,5 @@
 import React, { useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { Pin, Edit3, Users, Archive, Trash2 } from 'lucide-react';
 import { ProjectRecord } from '../../types';
 
@@ -44,7 +45,9 @@ export const ProjectActionMenu: React.FC<ProjectActionMenuProps> = ({
     };
   }, [onClose]);
 
-  return (
+  if (typeof document === 'undefined') return null;
+
+  return createPortal(
     <div
       ref={menuRef}
       className="sidebar-chat-menu-popup project-action-menu-popup"
@@ -53,7 +56,7 @@ export const ProjectActionMenu: React.FC<ProjectActionMenuProps> = ({
         top: `${position.top}px`,
         left: `${position.left}px`,
         width: '185px',
-        zIndex: 9999,
+        zIndex: 999999,
       }}
       onMouseDown={(e) => e.stopPropagation()}
       onClick={(e) => e.stopPropagation()}
@@ -114,7 +117,8 @@ export const ProjectActionMenu: React.FC<ProjectActionMenuProps> = ({
         <Trash2 width={13} height={13} />
         <span className="menu-label">Delete project</span>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
 

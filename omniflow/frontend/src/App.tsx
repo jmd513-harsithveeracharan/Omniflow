@@ -42,16 +42,35 @@ export const App: React.FC = () => {
   const [isWorkbenchOpen, setIsWorkbenchOpen] = useState<boolean>(false);
   const [status, setStatus] = useState<FabricStatus | null>(null);
   const [sessionId, setSessionId] = useState<string>('');
-  const [sessions, setSessions] = useState<ChatSession[]>([]);
-  const [isLoadingSessions, setIsLoadingSessions] = useState<boolean>(true);
+  // SWR Instant Hydration for Sessions
+  const [sessions, setSessions] = useState<ChatSession[]>(() => {
+    try {
+      const cached = localStorage.getItem('omniflow_cached_sessions');
+      return cached ? JSON.parse(cached) : [];
+    } catch {
+      return [];
+    }
+  });
+  const [isLoadingSessions, setIsLoadingSessions] = useState<boolean>(() => {
+    return !localStorage.getItem('omniflow_cached_sessions');
+  });
   const [isLoadingSession, setIsLoadingSession] = useState<boolean>(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isStreaming, setIsStreaming] = useState<boolean>(false);
   const [activeCredentialRequest, setActiveCredentialRequest] = useState<CredentialRequestData | null>(null);
 
-  // Projects State
-  const [projects, setProjects] = useState<ProjectRecord[]>([]);
-  const [isLoadingProjects, setIsLoadingProjects] = useState<boolean>(true);
+  // SWR Instant Hydration for Projects
+  const [projects, setProjects] = useState<ProjectRecord[]>(() => {
+    try {
+      const cached = localStorage.getItem('omniflow_cached_projects');
+      return cached ? JSON.parse(cached) : [];
+    } catch {
+      return [];
+    }
+  });
+  const [isLoadingProjects, setIsLoadingProjects] = useState<boolean>(() => {
+    return !localStorage.getItem('omniflow_cached_projects');
+  });
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
   const [editingProject, setEditingProject] = useState<ProjectRecord | null>(null);
 
@@ -111,10 +130,12 @@ export const App: React.FC = () => {
 
   const loadSessions = async (emailOverride?: string) => {
     try {
-      setIsLoadingSessions(true);
       const email = emailOverride !== undefined ? emailOverride : currentUser?.email;
       const sessList = await fetchSessions(email);
       setSessions(sessList);
+      try {
+        localStorage.setItem('omniflow_cached_sessions', JSON.stringify(sessList));
+      } catch {}
     } catch (e) {
       console.error('Failed to load sessions', e);
     } finally {
@@ -124,10 +145,12 @@ export const App: React.FC = () => {
 
   const loadProjectsList = async (shouldAutoSelect: boolean = false, emailOverride?: string) => {
     try {
-      setIsLoadingProjects(true);
       const email = emailOverride !== undefined ? emailOverride : currentUser?.email;
       const projs = await fetchProjects(email);
       setProjects(projs || []);
+      try {
+        localStorage.setItem('omniflow_cached_projects', JSON.stringify(projs || []));
+      } catch {}
       if (projs && projs.length > 0) {
         if (shouldAutoSelect && !activeProjectId) {
           const defaultProj = projs.find((p) => p.name.toLowerCase().includes('delivery')) || projs[0];
