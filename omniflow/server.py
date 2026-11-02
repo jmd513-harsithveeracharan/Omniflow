@@ -672,10 +672,20 @@ async def list_templates() -> list[dict[str, Any]]:
     return templates
 
 
+# In-memory TTL caches for Fabric REST API responses to prevent redundant cloud roundtrips
+_WORKSPACE_CACHE_TTL = 180.0  # 3 minutes cache
+_workspaces_list_cache: dict[str, Any] = {"data": None, "expires_at": 0.0}
+_workspace_items_cache: dict[str, dict[str, Any]] = {}
+
+
 @app.get("/api/workspace/list")
 @app.get("/api/workspaces")
-async def list_fabric_workspaces() -> dict[str, Any]:
-    """Lists all Fabric workspaces the authenticated user has access to."""
+async def list_fabric_workspaces(refresh: bool = False) -> dict[str, Any]:
+    """Lists all Fabric workspaces the authenticated user has access to with in-memory TTL caching."""
+    now = time.time()
+    if not refresh and _workspaces_list_cache["data"] and _workspaces_list_cache["expires_at"] > now:
+        return _workspaces_list_cache["data"]
+
     default_ws_id = os.getenv("ALLOWED_WORKSPACE_ID", "db7344c1-ecd9-44d6-849f-f2de49484f9f")
     default_ws_name = os.getenv("ALLOWED_WORKSPACE_NAME", "PBT_DATA_AGENT")
     workspaces: list[dict[str, Any]] = []
@@ -694,11 +704,14 @@ async def list_fabric_workspaces() -> dict[str, Any]:
                     "capacityRegion": w.get("capacityRegion") or "",
                     "isActive": (w.get("id") == default_ws_id),
                 })
-            return {
+            result = {
                 "active_workspace_id": default_ws_id,
                 "active_workspace_name": default_ws_name,
                 "workspaces": workspaces,
             }
+            _workspaces_list_cache["data"] = result
+            _workspaces_list_cache["expires_at"] = now + _WORKSPACE_CACHE_TTL
+            return result
     except Exception as e:
         print(f"[Fabric Workspaces Warning]: {e}")
 
@@ -720,8 +733,16 @@ async def list_fabric_workspaces() -> dict[str, Any]:
 
 
 @app.get("/api/workspace/items")
-async def get_workspace_items(workspace_id: str | None = None) -> dict[str, Any]:
+async def get_workspace_items(workspace_id: str | None = None, refresh: bool = False) -> dict[str, Any]:
     ws_id = (workspace_id and str(workspace_id).strip()) or os.getenv("ALLOWED_WORKSPACE_ID", "db7344c1-ecd9-44d6-849f-f2de49484f9f")
+    now = time.time()
+
+    # Check cache first for instant (<2ms) retrieval
+    if not refresh and ws_id in _workspace_items_cache:
+        cached = _workspace_items_cache[ws_id]
+        if cached.get("expires_at", 0) > now:
+            return cached["data"]
+
     items_out: list[dict[str, Any]] = []
     folders_out: list[dict[str, Any]] = []
     ws_name = os.getenv("ALLOWED_WORKSPACE_NAME", "Microsoft Fabric Workspace")
@@ -750,7 +771,12 @@ async def get_workspace_items(workspace_id: str | None = None) -> dict[str, Any]
                 "folderId": it.get("parentFolderId") or it.get("folderId") or "Workspace Root",
             })
         if items_out or folders_out:
-            return {"items": items_out, "folders": folders_out, "workspace_id": ws_id, "workspace_name": ws_name}
+            result = {"items": items_out, "folders": folders_out, "workspace_id": ws_id, "workspace_name": ws_name}
+            _workspace_items_cache[ws_id] = {
+                "data": result,
+                "expires_at": now + _WORKSPACE_CACHE_TTL,
+            }
+            return result
     except Exception as e:
         print(f"[Fabric Live Items Warning]: {e}")
 
@@ -775,7 +801,12 @@ async def get_workspace_items(workspace_id: str | None = None) -> dict[str, Any]
     except Exception:
         pass
 
-    return {"items": items_out, "folders": folders_out, "workspace_id": ws_id, "workspace_name": ws_name}
+    result = {"items": items_out, "folders": folders_out, "workspace_id": ws_id, "workspace_name": ws_name}
+    _workspace_items_cache[ws_id] = {
+        "data": result,
+        "expires_at": now + 60.0,
+    }
+    return result
 
 
 @app.get("/api/workspace/tree")

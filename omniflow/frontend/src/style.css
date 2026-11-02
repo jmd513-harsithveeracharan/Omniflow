@@ -12943,6 +12943,12 @@ pre[class*="language-"] {
     border: 1px solid rgba(0, 210, 160, 0.25);
 }
 
+.badge-warehouse {
+    background: rgba(56, 189, 248, 0.1);
+    color: #38bdf8;
+    border: 1px solid rgba(56, 189, 248, 0.25);
+}
+
 .badge-notebook {
     background: rgba(16, 185, 129, 0.1);
     color: #10b981;
@@ -12953,6 +12959,48 @@ pre[class*="language-"] {
     background: rgba(168, 85, 247, 0.1);
     color: #a855f7;
     border: 1px solid rgba(168, 85, 247, 0.25);
+}
+
+.badge-report {
+    background: rgba(244, 63, 94, 0.1);
+    color: #f43f5e;
+    border: 1px solid rgba(244, 63, 94, 0.25);
+}
+
+.badge-semantic {
+    background: rgba(59, 130, 246, 0.1);
+    color: #3b82f6;
+    border: 1px solid rgba(59, 130, 246, 0.25);
+}
+
+.badge-dashboard {
+    background: rgba(249, 115, 22, 0.1);
+    color: #f97316;
+    border: 1px solid rgba(249, 115, 22, 0.25);
+}
+
+.badge-sql {
+    background: rgba(6, 182, 212, 0.1);
+    color: #06b6d4;
+    border: 1px solid rgba(6, 182, 212, 0.25);
+}
+
+.badge-reflex {
+    background: rgba(245, 158, 11, 0.1);
+    color: #f59e0b;
+    border: 1px solid rgba(245, 158, 11, 0.25);
+}
+
+.badge-environment {
+    background: rgba(20, 184, 166, 0.1);
+    color: #14b8a6;
+    border: 1px solid rgba(20, 184, 166, 0.25);
+}
+
+.badge-variables {
+    background: rgba(148, 163, 184, 0.1);
+    color: #94a3b8;
+    border: 1px solid rgba(148, 163, 184, 0.25);
 }
 
 .badge-agent {

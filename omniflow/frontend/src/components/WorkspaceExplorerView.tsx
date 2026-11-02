@@ -49,13 +49,16 @@ export const WorkspaceExplorerView: React.FC<WorkspaceExplorerViewProps> = ({
     };
   }, [workspaceName]);
 
-  const loadItems = async (wsId?: string) => {
+  const loadItems = async (wsId?: string, forceRefresh = false) => {
     const targetId = wsId || selectedWorkspace?.id;
     setLoading(true);
     try {
-      const url = targetId
+      let url = targetId
         ? `/api/workspace/items?workspace_id=${encodeURIComponent(targetId)}`
         : '/api/workspace/items';
+      if (forceRefresh) {
+        url += (url.includes('?') ? '&' : '?') + 'refresh=true';
+      }
       const resp = await fetch(url);
       const data = await resp.json();
       if (data && Array.isArray(data.folders)) {
@@ -144,7 +147,7 @@ export const WorkspaceExplorerView: React.FC<WorkspaceExplorerViewProps> = ({
             <button
               className="ws-btn-sync"
               type="button"
-              onClick={() => loadItems()}
+              onClick={() => loadItems(undefined, true)}
               disabled={loading}
               title="Synchronize with live Microsoft Fabric REST API"
             >
