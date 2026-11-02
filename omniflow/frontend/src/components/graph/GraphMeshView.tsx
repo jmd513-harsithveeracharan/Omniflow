@@ -54,6 +54,11 @@ export const GraphMeshView: React.FC<GraphMeshViewProps> = ({
     fetchGraphMesh(plan, pId)
       .then((res) => {
         setData(res);
+        if (res.nodes && res.nodes.length > 250) {
+          setZoomLevel(0.48);
+        } else {
+          setZoomLevel(1.0);
+        }
       })
       .catch((err) => {
         setError(err.message || 'Failed to load Relationship Graph.');
@@ -83,7 +88,7 @@ export const GraphMeshView: React.FC<GraphMeshViewProps> = ({
   const handleZoomIn = () => setZoomLevel((z) => Math.min(3.2, z * 1.25));
   const handleZoomOut = () => setZoomLevel((z) => Math.max(0.3, z * 0.8));
   const handleResetView = () => {
-    setZoomLevel(1.0);
+    setZoomLevel(data && data.nodes.length > 250 ? 0.48 : 1.0);
     setPanOffset({ x: 0, y: 0 });
     setSelectedNode(null);
     setHoveredHighlightedEdge(null);
@@ -91,7 +96,7 @@ export const GraphMeshView: React.FC<GraphMeshViewProps> = ({
 
   if (isLoading) {
     return (
-      <div className="w-full h-full flex flex-col items-center justify-center bg-[#111111] text-zinc-400 gap-3">
+      <div className="w-full h-full flex flex-col items-center justify-center bg-[#121214] text-zinc-400 gap-3">
         <RefreshCw className="w-5 h-5 animate-spin text-zinc-400" />
         <span className="text-xs font-medium tracking-wide text-zinc-400">Loading Relationship Graph...</span>
       </div>
@@ -100,7 +105,7 @@ export const GraphMeshView: React.FC<GraphMeshViewProps> = ({
 
   if (error || !data) {
     return (
-      <div className="w-full h-full flex flex-col items-center justify-center bg-[#111111] text-zinc-400 gap-3 p-6 text-center">
+      <div className="w-full h-full flex flex-col items-center justify-center bg-[#121214] text-zinc-400 gap-3 p-6 text-center">
         <AlertCircle className="w-7 h-7 text-rose-500" />
         <p className="text-sm text-zinc-300 font-semibold">{error || 'Graph unavailable'}</p>
         <button
@@ -114,7 +119,7 @@ export const GraphMeshView: React.FC<GraphMeshViewProps> = ({
   }
 
   return (
-    <div className="relative w-full h-full overflow-hidden select-none bg-[#111111]">
+    <div className="relative w-full h-full overflow-hidden select-none bg-[#121214]">
       <GraphMeshControls
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}

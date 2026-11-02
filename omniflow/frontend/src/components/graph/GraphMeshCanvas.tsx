@@ -81,7 +81,8 @@ export const GraphMeshCanvas: React.FC<GraphMeshCanvasProps> = ({
       simulationRef.current.stop();
     }
 
-    const { simulation, simNodes, simLinks } = createSnowflakeSimulation(nodes, edges, 330);
+    const dynamicBoundary = Math.max(340, Math.round(Math.sqrt(nodes.length) * 32));
+    const { simulation, simNodes, simLinks } = createSnowflakeSimulation(nodes, edges, dynamicBoundary);
     simNodesRef.current = simNodes;
     simLinksRef.current = simLinks;
 
@@ -267,7 +268,7 @@ export const GraphMeshCanvas: React.FC<GraphMeshCanvasProps> = ({
         onHoverHighlightedEdge(null, null);
       }}
       className="w-full h-full cursor-grab active:cursor-grabbing block"
-      style={{ background: '#0b0f19' }}
+      style={{ background: '#121214' }}
     />
   );
 };

@@ -115,14 +115,17 @@ export function createSnowflakeSimulation(
 
   // Pre-seed positions with staggered two-tier rosettes (38px / 52px)
   const posMap = new Map<string, { x: number; y: number }>();
+  const distFactor = Math.max(1, boundaryRadius / 330);
+
   hubList.forEach((hub, idx) => {
     const sector = LAYER_RADIAL_SECTORS[hub.layer] || {
       angle: (idx / Math.max(1, hubList.length)) * Math.PI * 2,
       dist: 110,
     };
-    const jitter = ((idx % 3) - 1) * 22;
-    const hx = Math.cos(sector.angle) * (sector.dist + jitter);
-    const hy = Math.sin(sector.angle) * (sector.dist + jitter);
+    const scaledDist = (sector.dist || 110) * distFactor;
+    const jitter = ((idx % 3) - 1) * (18 * distFactor);
+    const hx = Math.cos(sector.angle) * (scaledDist + jitter);
+    const hy = Math.sin(sector.angle) * (scaledDist + jitter);
     posMap.set(hub.id, { x: hx, y: hy });
 
     const spokes = spokeMap.get(hub.id) || [];
@@ -191,7 +194,7 @@ export function createSnowflakeSimulation(
       'charge',
       forceManyBody<D3SimNode>()
         .strength((d) => (d.isHub ? -340 : -26))
-        .distanceMax(450)
+        .distanceMax(Math.max(450, boundaryRadius * 1.2))
     )
     // 2. Elastic Spring Links: 44px maintains tight flower bouquet without cramping names
     .force(
