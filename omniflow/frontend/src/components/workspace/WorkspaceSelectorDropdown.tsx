@@ -87,12 +87,7 @@ export const WorkspaceSelectorDropdown: React.FC<WorkspaceSelectorDropdownProps>
             />
           </div>
 
-          <div className="px-2 py-1 text-[10px] font-semibold tracking-wider uppercase text-zinc-400 border-b border-zinc-800 flex justify-between items-center">
-            <span>Microsoft Fabric Workspaces</span>
-            <span>{workspaces.length} Available</span>
-          </div>
-
-          <div className="mt-1 overflow-y-auto max-h-60 flex flex-col gap-0.5 pr-0.5">
+          <div className="mt-1 overflow-y-auto max-h-64 flex flex-col gap-0.5 pr-0.5">
             {filtered.length === 0 ? (
               <div className="px-3 py-4 text-xs text-center text-zinc-500">
                 No matching workspaces found
@@ -141,3 +136,4 @@ export const WorkspaceSelectorDropdown: React.FC<WorkspaceSelectorDropdownProps>
     </div>
   );
 };
+

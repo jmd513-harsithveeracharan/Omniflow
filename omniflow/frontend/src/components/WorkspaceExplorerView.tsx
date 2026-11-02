@@ -96,6 +96,17 @@ export const WorkspaceExplorerView: React.FC<WorkspaceExplorerViewProps> = ({
     return true;
   });
 
+  const counts = {
+    all: items.length,
+    lakehouse: items.filter((it) => (it.type || '').toLowerCase().includes('lakehouse')).length,
+    notebook: items.filter((it) => (it.type || '').toLowerCase().includes('notebook')).length,
+    pipeline: items.filter((it) => {
+      const t = (it.type || '').toLowerCase();
+      return t.includes('pipeline') || t.includes('datapipeline');
+    }).length,
+    agent: items.filter((it) => (it.type || '').toLowerCase().includes('agent')).length,
+  };
+
   return (
     <section className="view-panel active" id="viewWorkspace">
       <div className="ws-page-container">
@@ -160,31 +171,31 @@ export const WorkspaceExplorerView: React.FC<WorkspaceExplorerViewProps> = ({
               className={`filter-pill ${activeFilter === 'all' ? 'active' : ''}`}
               onClick={() => setActiveFilter('all')}
             >
-              All Items ({items.length})
+              All Items ({counts.all})
             </button>
             <button
               className={`filter-pill ${activeFilter === 'Lakehouse' ? 'active' : ''}`}
               onClick={() => setActiveFilter('Lakehouse')}
             >
-              Lakehouses
+              Lakehouses ({counts.lakehouse})
             </button>
             <button
               className={`filter-pill ${activeFilter === 'Notebook' ? 'active' : ''}`}
               onClick={() => setActiveFilter('Notebook')}
             >
-              Notebooks
+              Notebooks ({counts.notebook})
             </button>
             <button
               className={`filter-pill ${activeFilter === 'DataPipeline' ? 'active' : ''}`}
               onClick={() => setActiveFilter('DataPipeline')}
             >
-              Pipelines
+              Pipelines ({counts.pipeline})
             </button>
             <button
               className={`filter-pill ${activeFilter === 'DataAgent' ? 'active' : ''}`}
               onClick={() => setActiveFilter('DataAgent')}
             >
-              Data Agents
+              Data Agents ({counts.agent})
             </button>
           </div>
         </div>

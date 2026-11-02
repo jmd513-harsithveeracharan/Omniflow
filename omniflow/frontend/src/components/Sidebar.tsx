@@ -165,12 +165,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
     }
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
     const menuWidth = 190;
-    const menuHeight = 150;
+    const menuHeight = 220; // Accounts for items + possible flyout
     let left = rect.right + 6;
     if (left + menuWidth > window.innerWidth - 12) {
       left = Math.max(12, rect.left - menuWidth - 6);
     }
-    const top = Math.max(12, Math.min(rect.top - 4, window.innerHeight - menuHeight - 16));
+    let top = rect.top - 4;
+    if (top + menuHeight > window.innerHeight - 16) {
+      top = Math.max(12, window.innerHeight - menuHeight - 16);
+    }
     setChatMenuPos({ top, left });
     setChatMenuSessionId(sid);
     setIsMoveSubmenuOpen(false);
@@ -217,12 +220,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
     }
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
     const menuWidth = 190;
-    const menuHeight = 160;
+    const menuHeight = 200;
     let left = rect.right + 6;
     if (left + menuWidth > window.innerWidth - 12) {
       left = Math.max(12, rect.left - menuWidth - 6);
     }
-    const top = Math.max(12, Math.min(rect.top - 4, window.innerHeight - menuHeight - 16));
+    let top = rect.top - 4;
+    if (top + menuHeight > window.innerHeight - 16) {
+      top = Math.max(12, window.innerHeight - menuHeight - 16);
+    }
     setProjectMenuPos({ top, left });
     setProjectMenuId(pid);
   };
@@ -684,56 +690,60 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     <span className="menu-label">Move to project</span>
                     <ChevronRight width={12} height={12} style={{ color: '#71717a', marginLeft: 'auto' }} />
 
-                    {/* Flyout Submenu popping up to the right seamlessly */}
-                    {isMoveSubmenuOpen && (
-                      <div
-                        className="chat-flyout-submenu"
-                        style={{
-                          position: 'absolute',
-                          left: 'calc(100% + 4px)',
-                          top: '-4px',
-                          width: '220px',
-                          maxHeight: '240px',
-                          overflowY: 'auto',
-                          background: '#18181b',
-                          borderRadius: '12px',
-                          border: '1px solid rgba(255, 255, 255, 0.12)',
-                          boxShadow: '0 20px 48px rgba(0, 0, 0, 0.9)',
-                          padding: '5px',
-                          zIndex: 1000000,
-                          backdropFilter: 'blur(16px)',
-                        }}
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <div style={{ fontSize: '10px', fontWeight: 600, color: '#71717a', padding: '4px 8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                          Select Project
-                        </div>
-                        {activeProjectsList.length === 0 ? (
-                          <div style={{ fontSize: '11px', color: '#71717a', padding: '6px 8px' }}>
-                            No projects available
+                    {/* Flyout Submenu popping up to the right seamlessly, opening upwards if near bottom */}
+                    {isMoveSubmenuOpen && (() => {
+                      const isSubmenuNearBottom = chatMenuPos.top + 250 > (typeof window !== 'undefined' ? window.innerHeight : 800) - 20;
+                      return (
+                        <div
+                          className="chat-flyout-submenu"
+                          style={{
+                            position: 'absolute',
+                            left: 'calc(100% + 4px)',
+                            top: isSubmenuNearBottom ? 'auto' : '-4px',
+                            bottom: isSubmenuNearBottom ? '-4px' : 'auto',
+                            width: '220px',
+                            maxHeight: '240px',
+                            overflowY: 'auto',
+                            background: '#18181b',
+                            borderRadius: '12px',
+                            border: '1px solid rgba(255, 255, 255, 0.12)',
+                            boxShadow: '0 20px 48px rgba(0, 0, 0, 0.9)',
+                            padding: '5px',
+                            zIndex: 1000000,
+                            backdropFilter: 'blur(16px)',
+                          }}
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <div style={{ fontSize: '11px', fontWeight: 600, color: '#a1a1aa', padding: '5px 8px 4px 8px' }}>
+                            Select project
                           </div>
-                        ) : (
-                          activeProjectsList.map((p) => (
-                            <div
-                              key={p.id}
-                              className="chat-menu-item"
-                              style={{ padding: '6px 8px', fontSize: '12px' }}
-                              onClick={() => {
-                                setChatMenuSessionId(null);
-                                setChatMenuPos(null);
-                                setIsMoveSubmenuOpen(false);
-                                onMoveSessionToProject?.(targetId, p.id);
-                              }}
-                            >
-                              <Folder width={12} height={12} style={{ color: '#10b981', flexShrink: 0 }} />
-                              <span className="menu-label" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={p.name}>
-                                {p.name}
-                              </span>
+                          {activeProjectsList.length === 0 ? (
+                            <div style={{ fontSize: '11px', color: '#71717a', padding: '6px 8px' }}>
+                              No projects available
                             </div>
-                          ))
-                        )}
-                      </div>
-                    )}
+                          ) : (
+                            activeProjectsList.map((p) => (
+                              <div
+                                key={p.id}
+                                className="chat-menu-item"
+                                style={{ padding: '6px 8px', fontSize: '12px' }}
+                                onClick={() => {
+                                  setChatMenuSessionId(null);
+                                  setChatMenuPos(null);
+                                  setIsMoveSubmenuOpen(false);
+                                  onMoveSessionToProject?.(targetId, p.id);
+                                }}
+                              >
+                                <Folder width={12} height={12} style={{ color: '#10b981', flexShrink: 0 }} />
+                                <span className="menu-label" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={p.name}>
+                                  {p.name}
+                                </span>
+                              </div>
+                            ))
+                          )}
+                        </div>
+                      );
+                    })()}
                   </div>
 
                   <div className="chat-menu-divider" />
