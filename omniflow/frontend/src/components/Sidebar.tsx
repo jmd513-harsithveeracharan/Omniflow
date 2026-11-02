@@ -6,6 +6,7 @@ import {
   FolderTree,
   BookOpen,
   LayoutGrid,
+  Network,
   Settings2,
   ChevronDown,
   Search,
@@ -323,6 +324,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <LayoutGrid width={18} height={18} />
           </span>
           <span>Workspaces</span>
+        </button>
+
+        <button
+          className={`nav-item ${activeView === 'mesh' ? 'active' : ''}`}
+          onClick={() => onSelectView('mesh')}
+          title="Knowledge Mesh (Graph RAG)"
+        >
+          <span className="nav-item-icon">
+            <Network width={18} height={18} />
+          </span>
+          <span>Knowledge Mesh</span>
         </button>
 
         <button

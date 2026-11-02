@@ -612,7 +612,7 @@ export async function removeProjectMember(projectId: string, userId: string): Pr
   return res.ok;
 }
 
-export async function fetchGraphMesh(plan?: Record<string, unknown> | null): Promise<import('../types').GraphMeshResponse> {
+export async function fetchGraphMesh(plan?: import('../types').IngestionPlan | Record<string, unknown> | null): Promise<import('../types').GraphMeshResponse> {
   const options: RequestInit = plan
     ? {
         method: 'POST',

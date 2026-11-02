@@ -19,6 +19,7 @@ import { SkillsView } from './components/SkillsView';
 import { ProjectsView } from './components/ProjectsView';
 import { WorkspaceExplorerView } from './components/WorkspaceExplorerView';
 import { IngestionStudioView } from './components/IngestionStudioView';
+import { GraphMeshView } from './components/graph/GraphMeshView';
 import {
   fetchFabricStatus,
   streamChatTurn,
@@ -591,6 +592,8 @@ export const App: React.FC = () => {
 
   const getViewTitle = () => {
     switch (activeView) {
+      case 'mesh':
+        return 'Knowledge Mesh — Graph RAG Lineage';
       case 'projects':
         return 'Projects';
       case 'skills':
@@ -704,6 +707,12 @@ export const App: React.FC = () => {
           <IngestionStudioView
             onPlanGenerated={handlePlanGenerated}
           />
+        )}
+
+        {activeView === 'mesh' && (
+          <div className="flex-1 w-full h-full relative overflow-hidden bg-slate-950" style={{ height: 'calc(100vh - 56px)' }}>
+            <GraphMeshView plan={currentPlan} />
+          </div>
         )}
 
         {activeView === 'chat' && (

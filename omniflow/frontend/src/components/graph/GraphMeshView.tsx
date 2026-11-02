@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { RefreshCw, AlertCircle } from 'lucide-react';
-import { GraphMeshNode, GraphMeshResponse } from '../../types';
+import { IngestionPlan, GraphMeshNode, GraphMeshResponse } from '../../types';
 import { fetchGraphMesh } from '../../services/api';
 import { GraphMeshCanvas } from './GraphMeshCanvas';
 import { GraphMeshControls } from './GraphMeshControls';
 import { GraphMeshInspector } from './GraphMeshInspector';
 
 interface GraphMeshViewProps {
-  plan?: Record<string, unknown> | null;
+  plan?: IngestionPlan | Record<string, unknown> | null;
   onClose?: () => void;
 }
 
