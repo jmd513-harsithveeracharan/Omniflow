@@ -192,7 +192,7 @@ def fetch_projects_cached(force_refresh: bool = False) -> list[dict[str, Any]]:
                 cur.execute("SELECT COALESCE(project_code, project_id::text) as pid, project_name, description, status, created_at, created_by FROM projects ORDER BY created_at DESC LIMIT 50;")
                 for r in cur.fetchall():
                     pid = str(r[0])
-                    def_folder = os.path.join(os.getcwd(), "omniflow", "generated_artifacts", pid)
+                    def_folder = os.path.join(BASE_DIR, "generated_artifacts", pid)
                     has_folder = os.path.isdir(def_folder)
                     old_p = existing_map.get(pid, {})
                     creator = r[5] or old_p.get("created_by") or "bheesetti.harsith@fabric.ai"
@@ -378,7 +378,7 @@ async def create_project_endpoint(req: ProjectRequest) -> dict[str, Any]:
     pid = req.id or f"PRJ-{uuid.uuid4().hex[:6].upper()}"
     pname = req.name or "New Project"
     desc = req.description or ""
-    lpath = req.local_path or os.path.join(os.getcwd(), "omniflow", "generated_artifacts", pid)
+    lpath = req.local_path or os.path.join(BASE_DIR, "generated_artifacts", pid)
     created_by = (req.created_by or "user@fabric.ai").strip()
 
     # Ensure local directory exists if specified

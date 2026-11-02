@@ -61,6 +61,10 @@ omniflow.zip
 omniflow/generated_artifacts/
 omniflow/test_run_result.json
 omniflow/agents/synthesized_tools.py
+omniflow/jman-agent-main/
+jman-agent-main/
+omniflow/omniflow/
+*.pdf
 
 *.xlsx
 database_design/

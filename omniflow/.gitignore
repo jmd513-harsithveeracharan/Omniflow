@@ -43,6 +43,10 @@ venv.bak/
 sessions_store.json
 *.log
 execution_traces/
+generated_artifacts/
+jman-agent-main/
+omniflow/
+*.pdf
 
 # Testing & Linting Caches
 .pytest_cache/
