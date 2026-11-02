@@ -57,7 +57,7 @@ def _parse_ddl_cols(filepath: str, max_cols: int = 9) -> list[tuple[str, str, bo
 
 
 def build_peli_biothermal_graph() -> nx.DiGraph:
-    """Builds the complete Peli BioThermal production platform with 600+ nodes and column lineages."""
+    """Builds the complete Peli BioThermal production platform with 620+ nodes and rich foreign key lineage."""
     global _CACHED_GRAPH
     if _CACHED_GRAPH is not None:
         return _CACHED_GRAPH
@@ -75,35 +75,37 @@ def build_peli_biothermal_graph() -> nx.DiGraph:
     for sid, sname, sdesc in sources:
         add_node(g, sid, sname, "source", "source", radius=9.0, desc=sdesc)
 
-    # 2. Bronze / Staging Lakehouse (lh_stg)
+    # 2. Bronze / Staging Lakehouse (lh_stg with explicit source schemas)
     stg_tables = [
-        ("tbl_stg_sap_vbak", "stg_sap_vbak", "src_sap_erp", [("vbeln", "string", True), ("erdat", "date", False), ("kunnr", "string", False), ("netwr", "decimal(14,2)", False), ("waerk", "string", False), ("vkorg", "string", False)]),
-        ("tbl_stg_sap_vbap", "stg_sap_vbap", "src_sap_erp", [("vbeln", "string", True), ("posnr", "string", True), ("matnr", "string", False), ("kwmeng", "decimal(10,2)", False), ("netpr", "decimal(10,2)", False)]),
-        ("tbl_stg_sap_kna1", "stg_sap_kna1", "src_sap_erp", [("kunnr", "string", True), ("name1", "string", False), ("land1", "string", False), ("ort01", "string", False), ("regio", "string", False)]),
-        ("tbl_stg_sap_mara", "stg_sap_mara", "src_sap_erp", [("matnr", "string", True), ("mtart", "string", False), ("matkl", "string", False), ("meins", "string", False)]),
-        ("tbl_stg_sap_marc", "stg_sap_marc", "src_sap_erp", [("matnr", "string", True), ("werks", "string", True), ("ekgrp", "string", False)]),
-        ("tbl_stg_sap_vbrk", "stg_sap_vbrk", "src_sap_erp", [("vbeln", "string", True), ("fkdat", "date", False), ("kunrg", "string", False), ("netwr", "decimal(14,2)", False)]),
-        ("tbl_stg_sap_vbrp", "stg_sap_vbrp", "src_sap_erp", [("vbeln", "string", True), ("posnr", "string", True), ("fkimg", "decimal(10,2)", False), ("netwr", "decimal(12,2)", False)]),
-        ("tbl_stg_sap_bkpf", "stg_sap_bkpf", "src_sap_erp", [("belnr", "string", True), ("bukrs", "string", True), ("gjahr", "int", True), ("bldat", "date", False)]),
-        ("tbl_stg_sap_bseg", "stg_sap_bseg", "src_sap_erp", [("belnr", "string", True), ("bukrs", "string", True), ("gjahr", "int", True), ("buzei", "int", True), ("dmbtr", "decimal(14,2)", False)]),
-        ("tbl_stg_sfdc_accounts", "stg_sfdc_accounts", "src_salesforce_crm", [("id", "string", True), ("name", "string", False), ("type", "string", False), ("industry", "string", False), ("annualrevenue", "decimal(14,2)", False)]),
-        ("tbl_stg_sfdc_opps", "stg_sfdc_opportunities", "src_salesforce_crm", [("id", "string", True), ("accountid", "string", False), ("stagename", "string", False), ("amount", "decimal(14,2)", False), ("closedate", "date", False)]),
-        ("tbl_stg_sfdc_contacts", "stg_sfdc_contacts", "src_salesforce_crm", [("id", "string", True), ("accountid", "string", False), ("email", "string", False), ("title", "string", False)]),
-        ("tbl_stg_evo_packout", "stg_evo_packout", "src_evo_warehouse", [("packout_id", "string", True), ("order_number", "string", False), ("shipper_sku", "string", False), ("qc_status", "string", False)]),
-        ("tbl_stg_evo_shipments", "stg_evo_shipments", "src_evo_warehouse", [("shipment_id", "string", True), ("tracking_no", "string", False), ("carrier", "string", False), ("ship_date", "date", False)]),
-        ("tbl_stg_cod_rentals", "stg_cod_rentals", "src_cod_rental", [("rental_id", "string", True), ("serial_no", "string", False), ("customer_id", "string", False), ("daily_rate", "decimal(8,2)", False)]),
-        ("tbl_stg_nanocool", "stg_nanocool_telemetry", "src_nanocool_iot", [("reading_id", "string", True), ("device_id", "string", False), ("temp_c", "decimal(5,2)", False), ("battery_pct", "int", False)]),
+        ("tbl_stg_sap_vbak", "vbak", "src_sap_erp", "sap", [("vbeln", "string", True), ("erdat", "date", False), ("kunnr", "string", False), ("netwr", "decimal(14,2)", False), ("waerk", "string", False), ("vkorg", "string", False)]),
+        ("tbl_stg_sap_vbap", "vbap", "src_sap_erp", "sap", [("vbeln", "string", True), ("posnr", "string", True), ("matnr", "string", False), ("kwmeng", "decimal(10,2)", False), ("netpr", "decimal(10,2)", False)]),
+        ("tbl_stg_sap_kna1", "kna1", "src_sap_erp", "sap", [("kunnr", "string", True), ("name1", "string", False), ("land1", "string", False), ("ort01", "string", False), ("regio", "string", False)]),
+        ("tbl_stg_sap_mara", "mara", "src_sap_erp", "sap", [("matnr", "string", True), ("mtart", "string", False), ("matkl", "string", False), ("meins", "string", False)]),
+        ("tbl_stg_sap_marc", "marc", "src_sap_erp", "sap", [("matnr", "string", True), ("werks", "string", True), ("ekgrp", "string", False)]),
+        ("tbl_stg_sap_vbrk", "vbrk", "src_sap_erp", "sap", [("vbeln", "string", True), ("fkdat", "date", False), ("kunrg", "string", False), ("netwr", "decimal(14,2)", False)]),
+        ("tbl_stg_sap_vbrp", "vbrp", "src_sap_erp", "sap", [("vbeln", "string", True), ("posnr", "string", True), ("fkimg", "decimal(10,2)", False), ("netwr", "decimal(12,2)", False)]),
+        ("tbl_stg_sap_bkpf", "bkpf", "src_sap_erp", "sap", [("belnr", "string", True), ("bukrs", "string", True), ("gjahr", "int", True), ("bldat", "date", False)]),
+        ("tbl_stg_sap_bseg", "bseg", "src_sap_erp", "sap", [("belnr", "string", True), ("bukrs", "string", True), ("gjahr", "int", True), ("buzei", "int", True), ("dmbtr", "decimal(14,2)", False)]),
+        ("tbl_stg_sfdc_accounts", "account", "src_salesforce_crm", "salesforce", [("id", "string", True), ("name", "string", False), ("type", "string", False), ("industry", "string", False), ("annualrevenue", "decimal(14,2)", False)]),
+        ("tbl_stg_sfdc_opps", "opportunity", "src_salesforce_crm", "salesforce", [("id", "string", True), ("accountid", "string", False), ("stagename", "string", False), ("amount", "decimal(14,2)", False), ("closedate", "date", False)]),
+        ("tbl_stg_sfdc_contacts", "contact", "src_salesforce_crm", "salesforce", [("id", "string", True), ("accountid", "string", False), ("email", "string", False), ("title", "string", False)]),
+        ("tbl_stg_evo_packout", "packout", "src_evo_warehouse", "evo", [("packout_id", "string", True), ("order_number", "string", False), ("shipper_sku", "string", False), ("qc_status", "string", False)]),
+        ("tbl_stg_evo_shipments", "shipments", "src_evo_warehouse", "evo", [("shipment_id", "string", True), ("tracking_no", "string", False), ("carrier", "string", False), ("ship_date", "date", False)]),
+        ("tbl_stg_cod_rentals", "rentals", "src_cod_rental", "cod", [("rental_id", "string", True), ("serial_no", "string", False), ("customer_id", "string", False), ("daily_rate", "decimal(8,2)", False)]),
+        ("tbl_stg_nanocool", "telemetry", "src_nanocool_iot", "nanocool", [("reading_id", "string", True), ("device_id", "string", False), ("temp_c", "decimal(5,2)", False), ("battery_pct", "int", False)]),
     ]
 
-    for tid, tname, src_id, cols in stg_tables:
-        add_node(g, tid, tname, "table", "bronze", radius=6.5, desc=f"Delta Staging: {tname}")
-        add_edge(g, src_id, tid, "FEEDS", desc=f"Ingestion Feed from {src_id}")
+    for tid, tname, src_id, s_schema, cols in stg_tables:
+        display_label = f"stg_{s_schema}_{tname}"
+        desc = f"[lh_stg].[{s_schema}].[{tname}] — Raw Lakehouse Delta Table"
+        add_node(g, tid, display_label, "table", "bronze", radius=6.5, desc=desc)
+        add_edge(g, src_id, tid, "FEEDS", desc=f"CDC Ingestion: {src_id} -> {display_label}")
         for cname, dtype, is_pk in cols:
             cid = f"col_{tid}_{cname}"
-            add_node(g, cid, cname, "column", "bronze", parent_id=tid, data_type=dtype, is_pk=is_pk, radius=3.0)
+            add_node(g, cid, cname, "column", "bronze", parent_id=tid, data_type=dtype, is_pk=is_pk, radius=3.0, desc=f"[{s_schema}].[{tname}].[{cname}] ({dtype})")
             add_edge(g, tid, cid, "CONTAINS", desc=f"{dtype}")
 
-    # 3. Silver Dimensions & Facts from SQL DDLs
+    # 3. Silver Dimensions & Facts from SQL DDLs (with explicit dim & fact schemas)
     dim_dir = os.path.join(WH_PATH, "dim", "Tables")
     fact_dir = os.path.join(WH_PATH, "fact", "Tables")
 
@@ -131,26 +133,26 @@ def build_peli_biothermal_graph() -> nx.DiGraph:
     for df in dim_files:
         tname = df[:-4]
         tid = f"tbl_dim_{tname}"
-        add_node(g, tid, f"dim_{tname}", "table", "silver", radius=6.5, desc=f"Conformed Dimension: dim_{tname}")
+        add_node(g, tid, f"dim_{tname}", "table", "silver", radius=6.5, desc=f"[wh_silver].[dim].[{tname}] — Conformed Dimension")
         cols = _parse_ddl_cols(os.path.join(dim_dir, df), max_cols=9)
         for cname, ctype, is_pk in cols:
             cid = f"col_dim_{tname}_{cname}"
-            add_node(g, cid, cname, "column", "silver", parent_id=tid, data_type=ctype, is_pk=is_pk, radius=3.0)
+            add_node(g, cid, cname, "column", "silver", parent_id=tid, data_type=ctype, is_pk=is_pk, radius=3.0, desc=f"[dim].[{tname}].[{cname}] ({ctype})")
             add_edge(g, tid, cid, "CONTAINS", desc=f"{ctype}")
 
     for ff in fact_files:
         tname = ff[:-4]
         tid = f"tbl_fact_{tname}"
-        add_node(g, tid, f"fact_{tname}", "table", "silver", radius=6.5, desc=f"Conformed Fact: fact_{tname}")
+        add_node(g, tid, f"fact_{tname}", "table", "silver", radius=6.5, desc=f"[wh_silver].[fact].[{tname}] — Conformed Fact")
         cols = _parse_ddl_cols(os.path.join(fact_dir, ff), max_cols=9)
         for cname, ctype, is_pk in cols:
             cid = f"col_fact_{tname}_{cname}"
-            add_node(g, cid, cname, "column", "silver", parent_id=tid, data_type=ctype, is_pk=is_pk, radius=3.0)
+            add_node(g, cid, cname, "column", "silver", parent_id=tid, data_type=ctype, is_pk=is_pk, radius=3.0, desc=f"[fact].[{tname}].[{cname}] ({ctype})")
             add_edge(g, tid, cid, "CONTAINS", desc=f"{ctype}")
 
     # 4. Gold DirectLake Marts & Semantic Models
     gold_items = [
-        ("mart_wh_report", "wh_report", "warehouse", "gold", "DirectLake Gold Reporting Warehouse Mart"),
+        ("mart_wh_report", "wh_report", "warehouse", "gold", "[wh_report] — DirectLake Gold Reporting Mart"),
         ("sm_price_overrides", "Price Overrides SemanticModel", "notebook", "gold", "Power BI DirectLake Semantic Model"),
         ("sm_sales_scorecard", "Sales KPI Scorecard", "notebook", "gold", "Executive Commercial Revenue Model"),
         ("sm_report_usage", "mdl_report_usage", "notebook", "bi", "Fabric Capacity & Report Telemetry Model"),
@@ -174,7 +176,7 @@ def build_peli_biothermal_graph() -> nx.DiGraph:
         if src_table in g:
             add_edge(g, src_table, mid, "AGGREGATES", desc=mlogic, cross_layer=True)
 
-    # 6. Column-Level Lineage & Joins
+    # 6. Column-Level Lineage & Transformations
     lineage_mappings = [
         ("col_tbl_stg_sap_vbak_vbeln", "col_fact_sales_order_sales_document", "CAST(vbeln AS INT)"),
         ("col_tbl_stg_sap_vbak_erdat", "col_fact_sales_order_order_created_date", "CAST(erdat AS DATE)"),
@@ -189,22 +191,60 @@ def build_peli_biothermal_graph() -> nx.DiGraph:
         if sc in g and tc in g:
             add_edge(g, sc, tc, "TRANSFORMS_TO", desc=expr, cross_layer=True)
 
-    # Fact -> Dimension Foreign Key Joins
-    fk_joins = [
-        ("tbl_fact_sales_order", "tbl_dim_customer", "sold_to_party -> sap_customer"),
-        ("tbl_fact_sales_order", "tbl_dim_company", "company_code -> company_code"),
-        ("tbl_fact_sales_order", "tbl_dim_calendar", "order_created_date -> date"),
-        ("tbl_fact_sales_order_line", "tbl_dim_material", "material -> material_number"),
-        ("tbl_fact_opportunities", "tbl_dim_account", "account_id -> id"),
-        ("tbl_fact_cod_rental", "tbl_dim_equipment", "equipment_id -> equipment_id"),
-        ("tbl_fact_proe_transactions", "tbl_dim_locations", "location_id -> location_id"),
-        ("tbl_fact_invoice", "tbl_dim_customer", "customer_id -> sap_customer"),
-        ("tbl_fact_bookings", "tbl_dim_customer", "customer -> sap_customer"),
-        ("tbl_fact_inventory", "tbl_dim_material", "material -> material_number"),
+    # 7. Automated Semantic Foreign Key Joins across Facts and Dimensions
+    dim_target_cols: dict[str, list[str]] = {
+        "customer": ["customer_key", "sap_customer", "sold_to_party", "customer_id", "customer"],
+        "material": ["material_key", "material_number", "material", "sku", "material_sku"],
+        "company": ["company_code", "company_key"],
+        "calendar": ["order_created_date", "date", "posting_date", "changed_on_date"],
+        "account": ["account_id", "account"],
+        "equipment": ["equipment_id", "serial_no", "equipment_key"],
+        "locations": ["location_id", "plant", "site_id"],
+        "master_vin": ["master_vin", "vin"],
+        "country": ["country_code", "country"],
+        "contract": ["contract_id", "contract_number"],
+    }
+
+    for ff in fact_files:
+        f_path = os.path.join(fact_dir, ff)
+        if not os.path.exists(f_path):
+            continue
+        try:
+            with open(f_path, "r", encoding="utf-8", errors="ignore") as fh:
+                f_content = fh.read().lower()
+        except Exception:
+            continue
+        ft = f"tbl_fact_{ff[:-4]}"
+        if ft not in g:
+            continue
+        for dim_name, target_cols in dim_target_cols.items():
+            dt = f"tbl_dim_{dim_name}"
+            if dt not in g:
+                continue
+            for tc in target_cols:
+                if re.search(r"\b" + tc + r"\b", f_content):
+                    add_edge(g, ft, dt, "JOINS_WITH", desc=f"FK Join: {tc} -> dim_{dim_name}")
+                    break
+
+    # 8. Stored Procedure & DirectLake Model Cross-Dependencies
+    sp_deps = [
+        ("tbl_dim_account", "tbl_dim_customer", "sp_dim_customer (SCD Type 1 Sync)"),
+        ("tbl_dim_customer", "tbl_dim_customer_mapping", "sp_customer_mapping_update"),
+        ("tbl_dim_locations", "tbl_dim_master_vin", "sp_dim_master_vin (Asset Calibration)"),
+        ("tbl_dim_material", "tbl_dim_master_vin", "sp_dim_master_vin (SKU BOM Mapping)"),
+        ("tbl_dim_locations", "tbl_dim_vins", "sp_dim_vins (Cold-Chain Fleet Tracker)"),
+        ("tbl_dim_material", "tbl_fact_bookings", "sp_fact_bookings (Pricing & Margin)"),
+        ("tbl_dim_material", "tbl_fact_invoice_line", "sp_fact_invoice_line (Billing Validation)"),
+        ("tbl_dim_material", "tbl_fact_open_order", "sp_fact_open_order (Fulfillment Queue)"),
+        ("tbl_dim_part", "tbl_fact_inventory", "sp_fact_inventory (Stock Reorder Point)"),
+        ("tbl_fact_sales_order", "mart_wh_report", "DirectLake Sync: wh_report"),
+        ("tbl_fact_invoice_line", "mart_wh_report", "DirectLake Sync: wh_report"),
+        ("tbl_fact_opportunities", "sm_sales_scorecard", "Pipeline DirectLake: Sales KPI Scorecard"),
+        ("tbl_fact_price_override", "sm_price_overrides", "Pricing DirectLake: Price Overrides"),
     ]
-    for ft, dt, join_expr in fk_joins:
-        if ft in g and dt in g:
-            add_edge(g, ft, dt, "JOINS_WITH", desc=f"FK Join: {join_expr}")
+    for s_tbl, t_tbl, sp_desc in sp_deps:
+        if s_tbl in g and t_tbl in g:
+            add_edge(g, s_tbl, t_tbl, "DEPENDS_ON", desc=sp_desc, cross_layer=True)
 
     _CACHED_GRAPH = g
     return g

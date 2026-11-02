@@ -107,7 +107,7 @@ export function renderGraphMesh(opts: RenderGraphOptions): void {
     }
   }
 
-  // 1. Draw Hairline Edges
+  // 1. Draw Directional & Categorized Lineage Edges
   for (const link of simLinks) {
     const na = link.source;
     const nb = link.target;
@@ -119,6 +119,7 @@ export function renderGraphMesh(opts: RenderGraphOptions): void {
     const isEdgeConnected = activeId ? connectedEdgeSet.has(link.id) : false;
     const isEdgeHovered = hoveredEdgeId === link.id;
     const isDimmed = activeId && !isEdgeConnected && !isEdgeHovered;
+    const isFlowEdge = link.relationship !== 'CONTAINS';
 
     ctx.save();
     ctx.beginPath();
@@ -127,18 +128,73 @@ export function renderGraphMesh(opts: RenderGraphOptions): void {
 
     if (isEdgeHovered) {
       ctx.strokeStyle = '#4ba473';
-      ctx.lineWidth = 1.3;
-      ctx.shadowColor = 'rgba(75, 164, 115, 0.4)';
-      ctx.shadowBlur = 4;
+      ctx.lineWidth = 1.6;
+      ctx.shadowColor = 'rgba(75, 164, 115, 0.6)';
+      ctx.shadowBlur = 6;
     } else if (isEdgeConnected) {
       ctx.strokeStyle = '#4ba473';
-      ctx.lineWidth = 1.0;
+      ctx.lineWidth = 1.2;
+      ctx.shadowColor = 'rgba(75, 164, 115, 0.3)';
+      ctx.shadowBlur = 3;
+    } else if (isDimmed) {
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.02)';
+      ctx.lineWidth = 0.5;
+    } else if (isFlowEdge) {
+      // Semantic coloring for cross-table and cross-layer flows
+      switch (link.relationship) {
+        case 'FEEDS':
+          ctx.strokeStyle = 'rgba(245, 158, 11, 0.38)';
+          break;
+        case 'TRANSFORMS_TO':
+          ctx.strokeStyle = 'rgba(56, 189, 248, 0.38)';
+          break;
+        case 'JOINS_WITH':
+          ctx.strokeStyle = 'rgba(168, 85, 247, 0.38)';
+          break;
+        case 'AGGREGATES':
+          ctx.strokeStyle = 'rgba(16, 185, 129, 0.38)';
+          break;
+        default:
+          ctx.strokeStyle = 'rgba(148, 163, 184, 0.32)';
+      }
+      ctx.lineWidth = 0.85;
     } else {
-      ctx.strokeStyle = isDimmed ? 'rgba(255, 255, 255, 0.03)' : 'rgba(255, 255, 255, 0.12)';
-      ctx.lineWidth = link.relationship === 'CONTAINS' ? 0.6 : 0.75;
+      // Subtle intra-table column containment spokes
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.06)';
+      ctx.lineWidth = 0.55;
     }
 
     ctx.stroke();
+
+    // Draw directional arrowhead for data flow edges (FEEDS, TRANSFORMS_TO, JOINS_WITH, AGGREGATES)
+    if (isFlowEdge && !isDimmed) {
+      const dx = nb.x - na.x;
+      const dy = nb.y - na.y;
+      const dist = Math.hypot(dx, dy);
+      if (dist > 18) {
+        const angle = Math.atan2(dy, dx);
+        const targetR = nb.radius || 3.0;
+        const arrowDist = dist - (targetR + 3);
+        const ax = na.x + Math.cos(angle) * arrowDist;
+        const ay = na.y + Math.sin(angle) * arrowDist;
+        const arrowSize = isEdgeHovered || isEdgeConnected ? 5.0 : 3.5;
+
+        ctx.beginPath();
+        ctx.moveTo(ax, ay);
+        ctx.lineTo(
+          ax - Math.cos(angle - Math.PI / 6) * arrowSize,
+          ay - Math.sin(angle - Math.PI / 6) * arrowSize
+        );
+        ctx.lineTo(
+          ax - Math.cos(angle + Math.PI / 6) * arrowSize,
+          ay - Math.sin(angle + Math.PI / 6) * arrowSize
+        );
+        ctx.closePath();
+        ctx.fillStyle = ctx.strokeStyle;
+        ctx.fill();
+      }
+    }
+
     ctx.restore();
   }
 
