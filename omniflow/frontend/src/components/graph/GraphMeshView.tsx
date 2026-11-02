@@ -94,7 +94,7 @@ export const GraphMeshView: React.FC<GraphMeshViewProps> = ({
     setHoveredHighlightedEdge(null);
   };
 
-  if (isLoading) {
+  if (isLoading && !data) {
     return (
       <div className="w-full h-full flex flex-col items-center justify-center bg-[#121214] text-zinc-400 gap-3">
         <RefreshCw className="w-5 h-5 animate-spin text-zinc-400" />
@@ -120,6 +120,12 @@ export const GraphMeshView: React.FC<GraphMeshViewProps> = ({
 
   return (
     <div className="relative w-full h-full overflow-hidden select-none bg-[#121214]">
+      {isLoading && (
+        <div className="absolute top-16 left-1/2 -translate-x-1/2 z-40 flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-zinc-900/90 border border-zinc-700/80 shadow-2xl text-xs text-zinc-300 backdrop-blur-md pointer-events-none animate-in fade-in duration-150">
+          <RefreshCw className="w-3.5 h-3.5 animate-spin text-emerald-400" />
+          <span>Updating project graph...</span>
+        </div>
+      )}
       <GraphMeshControls
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}

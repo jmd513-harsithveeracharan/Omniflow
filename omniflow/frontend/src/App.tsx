@@ -302,7 +302,14 @@ export const App: React.FC = () => {
             }))
           );
         } else {
-          setMessages([]);
+          const projName = detail.project?.name || projectId;
+          const projDesc = detail.project?.description || 'Active Enterprise Medallion Workspace';
+          setMessages([
+            {
+              role: 'assistant',
+              content: `### 📁 Project: ${projName}\n\n**Status**: \`Active\` • **ID**: \`${projectId}\`\n\n${projDesc}\n\n---\n\n*Medallion schemas, PySpark notebooks, and pipeline DAGs are active for this workspace.*`,
+            },
+          ]);
         }
         setSessionId(`proj_${projectId}`);
       }
@@ -670,7 +677,13 @@ export const App: React.FC = () => {
         projects={projects}
         isLoadingProjects={isLoadingProjects}
         activeProjectId={activeProjectId}
-        onSelectProject={handleSelectProject}
+        onSelectProject={(pId) => {
+          if (activeView === 'mesh') {
+            handleSelectProject(pId, false);
+          } else {
+            handleSelectProject(pId, true);
+          }
+        }}
         onTogglePinProject={handleTogglePinProject}
         onEditProject={handleEditProject}
         onArchiveProject={handleArchiveProject}

@@ -77,16 +77,6 @@ export function forceRadialGravity(gravity = 0.045) {
   return force;
 }
 
-const LAYER_RADIAL_SECTORS: Record<string, { angle: number; dist: number }> = {
-  source: { angle: -Math.PI * 0.75, dist: 160 },
-  bronze: { angle: -Math.PI * 0.45, dist: 120 },
-  silver: { angle: 0, dist: 70 },
-  gold: { angle: Math.PI * 0.45, dist: 120 },
-  bi: { angle: Math.PI * 0.75, dist: 160 },
-  warehouse: { angle: Math.PI * 0.5, dist: 130 },
-  shared: { angle: -Math.PI * 0.1, dist: 100 },
-};
-
 /**
  * Seeds and configures a snowflake radial tree simulation with two-tier petal clearance.
  */
@@ -113,29 +103,51 @@ export function createSnowflakeSimulation(
     }
   }
 
-  // Pre-seed positions with staggered two-tier rosettes (38px / 52px)
+  // Assign smooth angular arcs per layer so hubs never overlap initially
+  const layerArcs: Record<string, { startAngle: number; endAngle: number; distRatio: number }> = {
+    source: { startAngle: -Math.PI * 0.85, endAngle: -Math.PI * 0.65, distRatio: 0.82 },
+    bronze: { startAngle: -Math.PI * 0.6, endAngle: -Math.PI * 0.15, distRatio: 0.58 },
+    silver: { startAngle: -Math.PI * 0.1, endAngle: Math.PI * 0.5, distRatio: 0.42 },
+    gold: { startAngle: Math.PI * 0.55, endAngle: Math.PI * 0.78, distRatio: 0.65 },
+    bi: { startAngle: Math.PI * 0.82, endAngle: Math.PI * 1.05, distRatio: 0.85 },
+    warehouse: { startAngle: 0, endAngle: Math.PI * 0.35, distRatio: 0.45 },
+    shared: { startAngle: -Math.PI * 0.9, endAngle: -Math.PI * 0.75, distRatio: 0.7 },
+  };
+
+  const hubsByLayer = new Map<string, GraphMeshNode[]>();
+  for (const hub of hubList) {
+    const list = hubsByLayer.get(hub.layer) || [];
+    list.push(hub);
+    hubsByLayer.set(hub.layer, list);
+  }
+
   const posMap = new Map<string, { x: number; y: number }>();
-  const distFactor = Math.max(1, boundaryRadius / 330);
-
-  hubList.forEach((hub, idx) => {
-    const sector = LAYER_RADIAL_SECTORS[hub.layer] || {
-      angle: (idx / Math.max(1, hubList.length)) * Math.PI * 2,
-      dist: 110,
+  hubsByLayer.forEach((layerHubs, layer) => {
+    const arc = layerArcs[layer] || {
+      startAngle: -Math.PI,
+      endAngle: Math.PI,
+      distRatio: 0.5,
     };
-    const scaledDist = (sector.dist || 110) * distFactor;
-    const jitter = ((idx % 3) - 1) * (18 * distFactor);
-    const hx = Math.cos(sector.angle) * (scaledDist + jitter);
-    const hy = Math.sin(sector.angle) * (scaledDist + jitter);
-    posMap.set(hub.id, { x: hx, y: hy });
+    const count = layerHubs.length;
+    layerHubs.forEach((hub, idx) => {
+      const angle =
+        count <= 1
+          ? (arc.startAngle + arc.endAngle) / 2
+          : arc.startAngle + (idx / (count - 1)) * (arc.endAngle - arc.startAngle);
+      const stagger = idx % 2 === 0 ? 0.92 : 1.08;
+      const hubDist = boundaryRadius * arc.distRatio * stagger;
+      const hx = Math.cos(angle) * hubDist;
+      const hy = Math.sin(angle) * hubDist;
+      posMap.set(hub.id, { x: hx, y: hy });
 
-    const spokes = spokeMap.get(hub.id) || [];
-    spokes.forEach((spoke, sIdx) => {
-      const spokeAngle = (sIdx / Math.max(1, spokes.length)) * Math.PI * 2;
-      // Stagger adjacent petals to prevent text overlap
-      const rSpoke = 38 + (sIdx % 2) * 14;
-      posMap.set(spoke.id, {
-        x: hx + Math.cos(spokeAngle) * rSpoke,
-        y: hy + Math.sin(spokeAngle) * rSpoke,
+      const spokes = spokeMap.get(hub.id) || [];
+      spokes.forEach((spoke, sIdx) => {
+        const spokeAngle = (sIdx / Math.max(1, spokes.length)) * Math.PI * 2;
+        const rSpoke = 34 + (sIdx % 2) * 12;
+        posMap.set(spoke.id, {
+          x: hx + Math.cos(spokeAngle) * rSpoke,
+          y: hy + Math.sin(spokeAngle) * rSpoke,
+        });
       });
     });
   });
@@ -215,7 +227,9 @@ export function createSnowflakeSimulation(
     .force('gravity', forceRadialGravity(0.045))
     // 5. Circular Boundary Enclosure
     .force('circular_boundary', forceCircularBoundary(boundaryRadius, 0.32))
-    .velocityDecay(0.38);
+    .alpha(0.28)
+    .alphaDecay(0.04)
+    .velocityDecay(0.42);
 
   return { simulation, simNodes, simLinks };
 }
