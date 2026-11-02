@@ -1,29 +1,8 @@
 import React, { useRef, useEffect, useState } from 'react';
-import {
-  forceSimulation,
-  forceManyBody,
-  forceLink,
-  forceCollide,
-  forceCenter,
-  Simulation,
-  SimulationNodeDatum,
-  SimulationLinkDatum,
-} from 'd3-force';
+import { Simulation } from 'd3-force';
 import { GraphMeshNode, GraphMeshEdge } from '../../types';
-
-export interface D3SimNode extends SimulationNodeDatum, GraphMeshNode {
-  id: string;
-  radius: number;
-  collisionRadius: number;
-}
-
-export interface D3SimLink extends SimulationLinkDatum<D3SimNode> {
-  id: string;
-  source: D3SimNode;
-  target: D3SimNode;
-  relationship: 'FEEDS' | 'CONTAINS' | 'TRANSFORMS_TO' | 'JOINS_WITH' | 'AGGREGATES' | 'DEPENDS_ON';
-  description?: string | null;
-}
+import { D3SimNode, D3SimLink, createSnowflakeSimulation } from './graphSimulation';
+import { renderGraphMesh } from './graphRenderer';
 
 interface GraphMeshCanvasProps {
   nodes: GraphMeshNode[];
@@ -39,19 +18,6 @@ interface GraphMeshCanvasProps {
   panOffset: { x: number; y: number };
   onPanChange: (pan: { x: number; y: number }) => void;
 }
-
-// Lively, brighter Obsidian colors matching reference screenshots
-const LAYER_COLORS: Record<string, string> = {
-  source: '#10b981',     // vibrant emerald
-  bronze: '#f59e0b',     // vibrant amber
-  silver: '#06b6d4',     // vibrant cyan
-  gold: '#eab308',       // vibrant gold
-  bi: '#ec4899',         // vibrant rose/pink
-  warehouse: '#3b82f6',  // vibrant blue
-  shared: '#a855f7',     // vibrant purple
-};
-
-const DEFAULT_NODE_COLOR = '#94a3b8';
 
 function distToSegment(px: number, py: number, x1: number, y1: number, x2: number, y2: number): number {
   const dx = x2 - x1;
@@ -89,7 +55,7 @@ export const GraphMeshCanvas: React.FC<GraphMeshCanvasProps> = ({
   const zoomLevelRef = useRef(zoomLevel);
   zoomLevelRef.current = zoomLevel;
 
-  // Intercept Ctrl + Scroll and Wheel natively to prevent full-page browser zoom
+  // Intercept Ctrl + Scroll and Wheel to prevent full-page browser zoom
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -109,90 +75,19 @@ export const GraphMeshCanvas: React.FC<GraphMeshCanvasProps> = ({
     };
   }, [onZoomChange]);
 
-  // Initialize D3 Force Simulation with unified Node + Text pair physics
+  // Initialize Snowflake Simulation with Circular Boundary
   useEffect(() => {
     if (simulationRef.current) {
       simulationRef.current.stop();
     }
 
-    const total = nodes.length;
-    const sorted = [...nodes].sort((a, b) => (b.degree || 0) - (a.degree || 0));
-    const hubs = new Set(sorted.slice(0, Math.max(1, Math.min(4, Math.ceil(total * 0.1)))).map((n) => n.id));
-
-    // Unified Node + Text Collision Geometry
-    const simNodes: D3SimNode[] = nodes.map((n, idx) => {
-      let r = 5.0; // standard node
-      if (hubs.has(n.id)) r = 8.0; // hub node
-      else if (n.type === 'column') r = 3.2; // column leaf
-
-      const labelLen = (n.label || '').length;
-      // Text centered beneath node: half-width estimation
-      const textHalfWidth = Math.min(65, Math.max(12, labelLen * 2.8));
-      // Unified pair collision radius prevents text from crossing other nodes
-      const collisionRadius = Math.max(r + 14, textHalfWidth + 6);
-
-      const angle = (idx / Math.max(1, total)) * Math.PI * 2;
-      const dist = 70 + (idx % 6) * 40;
-      return {
-        ...n,
-        radius: r,
-        collisionRadius,
-        x: Math.cos(angle) * dist + (Math.random() - 0.5) * 20,
-        y: Math.sin(angle) * dist + (Math.random() - 0.5) * 20,
-      };
-    });
-
-    const nodeMap = new Map(simNodes.map((n) => [n.id, n]));
-    const simLinks: D3SimLink[] = [];
-    for (const e of edges) {
-      const src = nodeMap.get(e.source);
-      const tgt = nodeMap.get(e.target);
-      if (src && tgt) {
-        simLinks.push({
-          id: e.id,
-          source: src,
-          target: tgt,
-          relationship: e.relationship,
-          description: e.description,
-        });
-      }
-    }
-
+    const { simulation, simNodes, simLinks } = createSnowflakeSimulation(nodes, edges, 330);
     simNodesRef.current = simNodes;
     simLinksRef.current = simLinks;
-
-    // D3 Force: Unified Pair Repulsion & Elastic Springs
-    const simulation = forceSimulation<D3SimNode>(simNodes)
-      // 1. Coulomb Repulsion with stronger push for hub nodes
-      .force(
-        'charge',
-        forceManyBody<D3SimNode>()
-          .strength((d) => (hubs.has(d.id) ? -280 : -160))
-          .distanceMax(600)
-      )
-      // 2. Elastic Spring Links
-      .force(
-        'link',
-        forceLink<D3SimNode, D3SimLink>(simLinks)
-          .distance((l) => (l.relationship === 'CONTAINS' ? 38 : 85))
-          .strength(0.35)
-      )
-      // 3. Collision Barrier: Treats Node + Text as a single unified object
-      .force(
-        'collide',
-        forceCollide<D3SimNode>()
-          .radius((d) => d.collisionRadius)
-          .strength(0.9)
-          .iterations(3)
-      )
-      // 4. Gentle Centering
-      .force('center', forceCenter<D3SimNode>(0, 0))
-      .velocityDecay(0.38);
 
     if (!isPhysicsActive) {
       simulation.stop();
     }
-
     simulationRef.current = simulation;
 
     return () => {
@@ -204,13 +99,13 @@ export const GraphMeshCanvas: React.FC<GraphMeshCanvasProps> = ({
   useEffect(() => {
     if (!simulationRef.current) return;
     if (isPhysicsActive) {
-      simulationRef.current.alpha(0.25).restart();
+      simulationRef.current.alpha(0.2).restart();
     } else {
       simulationRef.current.stop();
     }
   }, [isPhysicsActive]);
 
-  // Main 60 FPS Render Loop
+  // 60 FPS Canvas Render Loop
   useEffect(() => {
     let animId: number;
     const canvas = canvasRef.current;
@@ -228,113 +123,20 @@ export const GraphMeshCanvas: React.FC<GraphMeshCanvasProps> = ({
       }
       ctx.save();
       ctx.scale(dpr, dpr);
-      ctx.clearRect(0, 0, w, h);
 
-      // Camera Transform
-      ctx.translate(w / 2 + panOffset.x, h / 2 + panOffset.y);
-      ctx.scale(zoomLevel, zoomLevel);
-
-      const activeId = selectedNode?.id || null;
-      const connectedNodeSet = new Set<string>();
-      const connectedEdgeSet = new Set<string>();
-      if (activeId) {
-        connectedNodeSet.add(activeId);
-        for (const e of edges) {
-          if (e.source === activeId) {
-            connectedNodeSet.add(e.target);
-            connectedEdgeSet.add(e.id);
-          }
-          if (e.target === activeId) {
-            connectedNodeSet.add(e.source);
-            connectedEdgeSet.add(e.id);
-          }
-        }
-      }
-
-      // 1. Draw Hairline Edges
-      for (const link of simLinksRef.current) {
-        const na = link.source;
-        const nb = link.target;
-        if (na.x === undefined || na.y === undefined || nb.x === undefined || nb.y === undefined) continue;
-
-        const isLayerVis = selectedLayer === 'all' || na.layer === selectedLayer || nb.layer === selectedLayer;
-        if (!isLayerVis) continue;
-
-        const isEdgeConnected = activeId ? connectedEdgeSet.has(link.id) : false;
-        const isEdgeHovered = hoveredEdgeId === link.id;
-        const isDimmed = activeId && !isEdgeConnected && !isEdgeHovered;
-
-        ctx.save();
-        ctx.beginPath();
-        ctx.moveTo(na.x, na.y);
-        ctx.lineTo(nb.x, nb.y);
-
-        if (isEdgeHovered) {
-          // Hovered highlighted edge: crisp vibrant green hairline
-          ctx.strokeStyle = '#10b981';
-          ctx.lineWidth = 1.2;
-          ctx.shadowColor = 'rgba(16, 185, 129, 0.4)';
-          ctx.shadowBlur = 4;
-        } else if (isEdgeConnected) {
-          // Connected to selected node: thin vibrant green hairline
-          ctx.strokeStyle = '#10b981';
-          ctx.lineWidth = 1.0;
-        } else {
-          // Default Obsidian edge: ultra-thin hairline
-          ctx.strokeStyle = isDimmed ? 'rgba(255, 255, 255, 0.03)' : 'rgba(255, 255, 255, 0.14)';
-          ctx.lineWidth = 0.75;
-        }
-
-        ctx.stroke();
-        ctx.restore();
-      }
-
-      // 2. Draw Solid Vibrant Nodes
-      for (const n of simNodesRef.current) {
-        if (n.x === undefined || n.y === undefined) continue;
-
-        const matchesLayer = selectedLayer === 'all' || n.layer === selectedLayer;
-        const matchesSearch = !searchQuery || n.label.toLowerCase().includes(searchQuery.toLowerCase());
-        const isConnected = activeId ? connectedNodeSet.has(n.id) : true;
-        const isDimmed = !matchesLayer || !matchesSearch || (activeId && !isConnected);
-        const isCurrentActive = n.id === activeId;
-
-        const baseColor = LAYER_COLORS[n.layer] || DEFAULT_NODE_COLOR;
-
-        ctx.save();
-        ctx.globalAlpha = isDimmed ? 0.06 : 1.0;
-
-        // Active node: soft subtle ring
-        if (isCurrentActive) {
-          ctx.shadowColor = 'rgba(16, 185, 129, 0.5)';
-          ctx.shadowBlur = 8;
-        }
-
-        // Draw node circle (ABOVE the text)
-        ctx.beginPath();
-        ctx.arc(n.x, n.y, n.radius, 0, Math.PI * 2);
-        ctx.fillStyle = isCurrentActive ? '#ffffff' : baseColor;
-        ctx.fill();
-
-        // 3. Crisp White Typography (CENTERED DIRECTLY BELOW THE NODE)
-        const showLabel =
-          isCurrentActive ||
-          (activeId && isConnected) ||
-          zoomLevel > 1.2 ||
-          (matchesSearch && searchQuery);
-
-        if (showLabel) {
-          ctx.shadowBlur = 0;
-          ctx.font = `${isCurrentActive ? '600 10.5px' : '400 10px'} -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
-          ctx.fillStyle = isCurrentActive ? '#ffffff' : isDimmed ? 'rgba(255, 255, 255, 0.15)' : '#ffffff';
-          ctx.textAlign = 'center';
-          ctx.textBaseline = 'top';
-          // Node is above and at the horizontal center of the text
-          ctx.fillText(n.label, n.x, n.y + n.radius + 4);
-        }
-
-        ctx.restore();
-      }
+      renderGraphMesh({
+        ctx,
+        width: w,
+        height: h,
+        simNodes: simNodesRef.current,
+        simLinks: simLinksRef.current,
+        selectedNode,
+        hoveredEdgeId,
+        selectedLayer,
+        searchQuery,
+        zoomLevel,
+        panOffset,
+      });
 
       ctx.restore();
       animId = requestAnimationFrame(render);
@@ -351,7 +153,6 @@ export const GraphMeshCanvas: React.FC<GraphMeshCanvasProps> = ({
     const mx = (e.clientX - rect.left - canvas.clientWidth / 2 - panOffset.x) / zoomLevel;
     const my = (e.clientY - rect.top - canvas.clientHeight / 2 - panOffset.y) / zoomLevel;
 
-    // Check if clicked a node
     const clicked = simNodesRef.current.find(
       (n) => n.x !== undefined && n.y !== undefined && Math.hypot(n.x - mx, n.y - my) <= n.radius + 6
     );
@@ -372,7 +173,6 @@ export const GraphMeshCanvas: React.FC<GraphMeshCanvasProps> = ({
         onHoverHighlightedEdge(null, null);
       }
     } else {
-      // Clicked empty canvas: clear selection
       onSelectNode(null);
       onHoverHighlightedEdge(null, null);
       isDraggingCanvasRef.current = true;
@@ -388,10 +188,8 @@ export const GraphMeshCanvas: React.FC<GraphMeshCanvasProps> = ({
     const clientY = e.clientY;
 
     if (draggedNodeRef.current) {
-      const mx = (clientX - rect.left - canvas.clientWidth / 2 - panOffset.x) / zoomLevel;
-      const my = (clientY - rect.top - canvas.clientHeight / 2 - panOffset.y) / zoomLevel;
-      draggedNodeRef.current.fx = mx;
-      draggedNodeRef.current.fy = my;
+      draggedNodeRef.current.fx = (clientX - rect.left - canvas.clientWidth / 2 - panOffset.x) / zoomLevel;
+      draggedNodeRef.current.fy = (clientY - rect.top - canvas.clientHeight / 2 - panOffset.y) / zoomLevel;
       return;
     }
 
@@ -403,7 +201,6 @@ export const GraphMeshCanvas: React.FC<GraphMeshCanvasProps> = ({
       return;
     }
 
-    // Edge Hover Detection: ONLY active when a node is clicked and its edges are highlighted
     if (!selectedNode) {
       if (hoveredEdgeId) {
         setHoveredEdgeId(null);
@@ -414,19 +211,15 @@ export const GraphMeshCanvas: React.FC<GraphMeshCanvasProps> = ({
 
     const mx = (clientX - rect.left - canvas.clientWidth / 2 - panOffset.x) / zoomLevel;
     const my = (clientY - rect.top - canvas.clientHeight / 2 - panOffset.y) / zoomLevel;
-
-    // Test proximity ONLY to highlighted connected edges
     const threshold = 6 / zoomLevel;
     let foundLink: D3SimLink | null = null;
 
     for (const link of simLinksRef.current) {
-      const isConnectedToSelected = link.source.id === selectedNode.id || link.target.id === selectedNode.id;
-      if (!isConnectedToSelected) continue;
-
+      const isConnected = link.source.id === selectedNode.id || link.target.id === selectedNode.id;
+      if (!isConnected) continue;
       if (link.source.x === undefined || link.source.y === undefined || link.target.x === undefined || link.target.y === undefined) continue;
 
-      const d = distToSegment(mx, my, link.source.x, link.source.y, link.target.x, link.target.y);
-      if (d <= threshold) {
+      if (distToSegment(mx, my, link.source.x, link.source.y, link.target.x, link.target.y) <= threshold) {
         foundLink = link;
         break;
       }
@@ -434,19 +227,19 @@ export const GraphMeshCanvas: React.FC<GraphMeshCanvasProps> = ({
 
     if (foundLink) {
       setHoveredEdgeId(foundLink.id);
-      const rawEdge: GraphMeshEdge = {
-        id: foundLink.id,
-        source: foundLink.source.id,
-        target: foundLink.target.id,
-        relationship: foundLink.relationship,
-        description: foundLink.description,
-      };
-      onHoverHighlightedEdge(rawEdge, { x: clientX, y: clientY });
-    } else {
-      if (hoveredEdgeId) {
-        setHoveredEdgeId(null);
-        onHoverHighlightedEdge(null, null);
-      }
+      onHoverHighlightedEdge(
+        {
+          id: foundLink.id,
+          source: foundLink.source.id,
+          target: foundLink.target.id,
+          relationship: foundLink.relationship,
+          description: foundLink.description,
+        },
+        { x: clientX, y: clientY }
+      );
+    } else if (hoveredEdgeId) {
+      setHoveredEdgeId(null);
+      onHoverHighlightedEdge(null, null);
     }
   };
 
