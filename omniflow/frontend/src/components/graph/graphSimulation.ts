@@ -8,6 +8,7 @@ import {
   SimulationLinkDatum,
 } from 'd3-force';
 import { GraphMeshNode, GraphMeshEdge } from '../../types';
+import { wrapLabel } from './graphRenderer';
 
 export interface D3SimNode extends SimulationNodeDatum, GraphMeshNode {
   id: string;
@@ -26,8 +27,7 @@ export interface D3SimLink extends SimulationLinkDatum<D3SimNode> {
 
 /**
  * Custom D3 Force: Soft Circular Boundary Enclosure
- * Pulls any node that drifts outside the circular radius back into the sphere,
- * creating Obsidian's signature encompassed circular silhouette.
+ * Pulls any node that drifts outside the circular radius back into the sphere.
  */
 export function forceCircularBoundary(radius: number, pullStrength = 0.28) {
   let nodes: D3SimNode[] = [];
@@ -55,7 +55,7 @@ export function forceCircularBoundary(radius: number, pullStrength = 0.28) {
 
 /**
  * Custom D3 Force: Radial Gravitational Well
- * Gently pulls all clusters toward (0, 0) to balance Coulomb repulsion.
+ * Pulls clusters gently toward (0, 0) to balance Coulomb repulsion.
  */
 export function forceRadialGravity(gravity = 0.045) {
   let nodes: D3SimNode[] = [];
@@ -88,7 +88,7 @@ const LAYER_RADIAL_SECTORS: Record<string, { angle: number; dist: number }> = {
 };
 
 /**
- * Seeds and configures a snowflake radial tree simulation encompassed in a circular sphere.
+ * Seeds and configures a snowflake radial tree simulation with two-tier petal clearance.
  */
 export function createSnowflakeSimulation(
   nodes: GraphMeshNode[],
@@ -102,7 +102,6 @@ export function createSnowflakeSimulation(
   const total = nodes.length;
   const isHubNode = (n: GraphMeshNode) => n.type !== 'column' || n.degree >= 3;
 
-  // Identify Table Hubs and their Child Spoke Columns
   const hubList = nodes.filter(isHubNode);
   const spokeMap = new Map<string, GraphMeshNode[]>();
   for (const e of edges) {
@@ -114,7 +113,7 @@ export function createSnowflakeSimulation(
     }
   }
 
-  // Pre-seed positions in a growing radial pattern with snowflake rosettes
+  // Pre-seed positions with staggered two-tier rosettes (38px / 52px)
   const posMap = new Map<string, { x: number; y: number }>();
   hubList.forEach((hub, idx) => {
     const sector = LAYER_RADIAL_SECTORS[hub.layer] || {
@@ -126,11 +125,11 @@ export function createSnowflakeSimulation(
     const hy = Math.sin(sector.angle) * (sector.dist + jitter);
     posMap.set(hub.id, { x: hx, y: hy });
 
-    // Snowflake Rosette: Arrange spoke columns 360° evenly around the hub
     const spokes = spokeMap.get(hub.id) || [];
     spokes.forEach((spoke, sIdx) => {
       const spokeAngle = (sIdx / Math.max(1, spokes.length)) * Math.PI * 2;
-      const rSpoke = 28 + (sIdx % 2) * 6;
+      // Stagger adjacent petals to prevent text overlap
+      const rSpoke = 38 + (sIdx % 2) * 14;
       posMap.set(spoke.id, {
         x: hx + Math.cos(spokeAngle) * rSpoke,
         y: hy + Math.sin(spokeAngle) * rSpoke,
@@ -138,7 +137,7 @@ export function createSnowflakeSimulation(
     });
   });
 
-  // Position any remaining leaf or singleton nodes along the outer circle
+  // Peripheral singletons
   let singletonIdx = 0;
   nodes.forEach((n) => {
     if (!posMap.has(n.id)) {
@@ -151,9 +150,12 @@ export function createSnowflakeSimulation(
   const simNodes: D3SimNode[] = nodes.map((n) => {
     const isHub = isHubNode(n);
     const r = isHub ? (n.degree > 6 ? 7.5 : 5.5) : 3.0;
-    const labelLen = (n.label || '').length;
-    const textHalfWidth = Math.min(65, Math.max(12, labelLen * 2.8));
-    const collisionRadius = Math.max(r + 8, textHalfWidth + 4);
+
+    // Use 2-line wrapped text dimensions to compute anti-overlap collision bounds
+    const lines = wrapLabel(n.label, isHub ? 16 : 12);
+    const maxLineChars = Math.max(...lines.map((l) => l.length));
+    const textHalfWidth = Math.min(48, Math.max(10, maxLineChars * (isHub ? 2.5 : 1.9)));
+    const collisionRadius = Math.max(r + 6, textHalfWidth + 3);
     const initPos = posMap.get(n.id) || { x: 0, y: 0 };
 
     return {
@@ -182,33 +184,33 @@ export function createSnowflakeSimulation(
     }
   }
 
-  // Configure D3 Force Layout with Snowflake Physics
+  // Configure D3 Force Layout with Anti-Clutter Physics
   const simulation = forceSimulation<D3SimNode>(simNodes)
-    // 1. Multi-Body Repulsion: Strong push for hubs, mild push for spoke petals
+    // 1. Multi-Body Repulsion
     .force(
       'charge',
       forceManyBody<D3SimNode>()
-        .strength((d) => (d.isHub ? -360 : -22))
+        .strength((d) => (d.isHub ? -340 : -26))
         .distanceMax(450)
     )
-    // 2. Elastic Spring Links: Tight for spoke columns, spacious for cross-layer flow
+    // 2. Elastic Spring Links: 44px maintains tight flower bouquet without cramping names
     .force(
       'link',
       forceLink<D3SimNode, D3SimLink>(simLinks)
-        .distance((l) => (l.relationship === 'CONTAINS' ? 28 : 125))
-        .strength((l) => (l.relationship === 'CONTAINS' ? 0.92 : 0.25))
+        .distance((l) => (l.relationship === 'CONTAINS' ? 44 : 125))
+        .strength((l) => (l.relationship === 'CONTAINS' ? 0.94 : 0.25))
     )
-    // 3. Collision Barrier: Keeps node + text unified without overlapping
+    // 3. Collision Barrier: Active on ALL nodes (including columns) to prevent overlapping text
     .force(
       'collide',
       forceCollide<D3SimNode>()
-        .radius((d) => (d.isHub ? d.collisionRadius : d.radius + 4))
-        .strength(0.85)
-        .iterations(2)
+        .radius((d) => d.collisionRadius)
+        .strength(0.88)
+        .iterations(3)
     )
-    // 4. Inward Radial Gravity: Keeps whole graph tightly bound
-    .force('gravity', forceRadialGravity(0.04))
-    // 5. Circular Boundary Enclosure: Encompasses all nodes strictly within a circle
+    // 4. Inward Radial Gravity
+    .force('gravity', forceRadialGravity(0.045))
+    // 5. Circular Boundary Enclosure
     .force('circular_boundary', forceCircularBoundary(boundaryRadius, 0.32))
     .velocityDecay(0.38);
 

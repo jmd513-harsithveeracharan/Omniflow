@@ -1,17 +1,58 @@
 import { D3SimNode, D3SimLink } from './graphSimulation';
 import { GraphMeshNode } from '../../types';
 
+// Half-bright, shaded Obsidian tones matching user reference screenshots
 export const LAYER_COLORS: Record<string, string> = {
-  source: '#10b981',    // vibrant emerald
-  bronze: '#f59e0b',    // vibrant amber
-  silver: '#06b6d4',    // vibrant cyan
-  gold: '#eab308',      // vibrant gold
-  bi: '#ec4899',        // vibrant rose/pink
-  warehouse: '#3b82f6', // vibrant blue
-  shared: '#a855f7',    // vibrant purple
+  source: '#4ba473',    // half-bright muted sage/emerald
+  bronze: '#c98539',    // half-bright warm bronze/amber
+  silver: '#469bb0',    // half-bright muted slate cyan
+  gold: '#cbaf49',      // half-bright soft straw gold
+  bi: '#ba5884',        // half-bright muted rose/mauve
+  warehouse: '#507eb3', // half-bright steel blue
+  shared: '#8c6ebd',    // half-bright soft lavender
 };
 
-const DEFAULT_NODE_COLOR = '#94a3b8';
+export const DEFAULT_NODE_COLOR = '#788290';
+
+/**
+ * Wraps long identifiers and note titles into at most 2 lines.
+ * Splits cleanly on spaces, underscores, or dots.
+ */
+export function wrapLabel(text: string, maxLineChars = 14): string[] {
+  if (!text || text.length <= maxLineChars) {
+    return [text || ''];
+  }
+
+  // 1. Split on space if present
+  if (text.includes(' ')) {
+    const words = text.split(' ');
+    const mid = Math.ceil(words.length / 2);
+    const line1 = words.slice(0, mid).join(' ');
+    const line2 = words.slice(mid).join(' ');
+    if (line1.length <= maxLineChars * 1.6 && line2.length <= maxLineChars * 1.6) {
+      return [line1, line2];
+    }
+  }
+
+  // 2. Split on underscore for database identifiers (e.g. customer_name, order_item_id)
+  if (text.includes('_')) {
+    const parts = text.split('_');
+    const mid = Math.ceil(parts.length / 2);
+    const line1 = parts.slice(0, mid).join('_') + '_';
+    const line2 = parts.slice(mid).join('_');
+    return [line1, line2];
+  }
+
+  // 3. Split on dot (e.g. bronze.orders)
+  if (text.includes('.')) {
+    const parts = text.split('.');
+    return [parts[0] + '.', parts.slice(1).join('.')];
+  }
+
+  // 4. Fallback midpoint split
+  const half = Math.ceil(text.length / 2);
+  return [text.slice(0, half) + '-', text.slice(half)];
+}
 
 export interface RenderGraphOptions {
   ctx: CanvasRenderingContext2D;
@@ -85,12 +126,12 @@ export function renderGraphMesh(opts: RenderGraphOptions): void {
     ctx.lineTo(nb.x, nb.y);
 
     if (isEdgeHovered) {
-      ctx.strokeStyle = '#10b981';
+      ctx.strokeStyle = '#4ba473';
       ctx.lineWidth = 1.3;
-      ctx.shadowColor = 'rgba(16, 185, 129, 0.4)';
+      ctx.shadowColor = 'rgba(75, 164, 115, 0.4)';
       ctx.shadowBlur = 4;
     } else if (isEdgeConnected) {
-      ctx.strokeStyle = '#10b981';
+      ctx.strokeStyle = '#4ba473';
       ctx.lineWidth = 1.0;
     } else {
       ctx.strokeStyle = isDimmed ? 'rgba(255, 255, 255, 0.03)' : 'rgba(255, 255, 255, 0.12)';
@@ -101,7 +142,7 @@ export function renderGraphMesh(opts: RenderGraphOptions): void {
     ctx.restore();
   }
 
-  // 2. Draw Solid Vibrant Nodes
+  // 2. Draw Solid Half-Bright Nodes
   for (const n of simNodes) {
     if (n.x === undefined || n.y === undefined) continue;
 
@@ -117,31 +158,63 @@ export function renderGraphMesh(opts: RenderGraphOptions): void {
     ctx.globalAlpha = isDimmed ? 0.06 : 1.0;
 
     if (isCurrentActive) {
-      ctx.shadowColor = 'rgba(16, 185, 129, 0.5)';
-      ctx.shadowBlur = 8;
+      ctx.shadowColor = 'rgba(75, 164, 115, 0.5)';
+      ctx.shadowBlur = 7;
     }
 
     // Node Circle
     ctx.beginPath();
     ctx.arc(n.x, n.y, n.radius, 0, Math.PI * 2);
-    ctx.fillStyle = isCurrentActive ? '#ffffff' : baseColor;
+    ctx.fillStyle = isCurrentActive ? '#f1f5f9' : baseColor;
     ctx.fill();
 
-    // 3. Crisp Pure White Typography Centered Below Node
+    // 3. Proportional, 2-Liner Greyish Typography Below Node
     const showLabel =
       isCurrentActive ||
       (activeId && isConnected) ||
-      (n.isHub && zoomLevel > 0.8) ||
-      zoomLevel > 1.35 ||
+      (n.isHub && zoomLevel > 0.75) ||
+      zoomLevel > 1.45 ||
       (matchesSearch && searchQuery);
 
     if (showLabel) {
       ctx.shadowBlur = 0;
-      ctx.font = `${isCurrentActive ? '600 10.5px' : '400 9.5px'} -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
-      ctx.fillStyle = isCurrentActive ? '#ffffff' : isDimmed ? 'rgba(255, 255, 255, 0.15)' : '#ffffff';
+
+      // Font size relative to node size
+      let fontSize = 7.8;
+      let fontWeight = '400';
+      if (n.radius >= 7.0) {
+        fontSize = 10.5;
+        fontWeight = isCurrentActive ? '600' : '500';
+      } else if (n.radius >= 5.0) {
+        fontSize = 9.2;
+        fontWeight = isCurrentActive ? '600' : '500';
+      } else {
+        fontSize = 7.8;
+        fontWeight = '400';
+      }
+
+      // Slightly greyish font coloring (slate-300 / slate-400)
+      let fontColor = '#cbd5e1';
+      if (isCurrentActive) {
+        fontColor = '#f8fafc';
+      } else if (n.type === 'column') {
+        fontColor = '#94a3b8';
+      } else if (isDimmed) {
+        fontColor = 'rgba(203, 213, 225, 0.15)';
+      }
+
+      ctx.font = `${fontWeight} ${fontSize}px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
+      ctx.fillStyle = fontColor;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'top';
-      ctx.fillText(n.label, n.x, n.y + n.radius + 3.5);
+
+      const lines = wrapLabel(n.label, n.isHub ? 16 : 12);
+      const lineHeight = fontSize * 1.2;
+      const startY = n.y + n.radius + 3.0;
+
+      for (let i = 0; i < lines.length; i++) {
+        ctx.fillText(lines[i], n.x, startY + i * lineHeight);
+      }
     }
 
     ctx.restore();
