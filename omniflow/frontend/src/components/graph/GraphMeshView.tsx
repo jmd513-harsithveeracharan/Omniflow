@@ -37,10 +37,9 @@ export const GraphMeshView: React.FC<GraphMeshViewProps> = ({
   const [zoomLevel, setZoomLevel] = useState(1.0);
   const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
 
-  // Lightweight Obsidian Hover Tooltips
-  const [hoveredNode, setHoveredNode] = useState<GraphMeshNode | null>(null);
-  const [hoveredEdge, setHoveredEdge] = useState<GraphMeshEdge | null>(null);
-  const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number } | null>(null);
+  // Highlighted Edge Hover Tooltip State (Active ONLY when a node is selected)
+  const [hoveredHighlightedEdge, setHoveredHighlightedEdge] = useState<GraphMeshEdge | null>(null);
+  const [edgeTooltipPos, setEdgeTooltipPos] = useState<{ x: number; y: number } | null>(null);
 
   // Sync external projectId changes
   useEffect(() => {
@@ -72,25 +71,13 @@ export const GraphMeshView: React.FC<GraphMeshViewProps> = ({
     const val = newPid === 'all' ? null : newPid;
     setSelectedProjectId(val);
     setSelectedNode(null);
+    setHoveredHighlightedEdge(null);
     if (onSelectProject) onSelectProject(newPid);
   };
 
-  const handleHoverNode = (node: GraphMeshNode | null, pos: { x: number; y: number } | null) => {
-    setHoveredNode(node);
-    if (node && pos) {
-      setTooltipPos(pos);
-    } else if (!hoveredEdge) {
-      setTooltipPos(null);
-    }
-  };
-
-  const handleHoverEdge = (edge: GraphMeshEdge | null, pos: { x: number; y: number } | null) => {
-    setHoveredEdge(edge);
-    if (edge && pos) {
-      setTooltipPos(pos);
-    } else if (!hoveredNode) {
-      setTooltipPos(null);
-    }
+  const handleHoverHighlightedEdge = (edge: GraphMeshEdge | null, pos: { x: number; y: number } | null) => {
+    setHoveredHighlightedEdge(edge);
+    setEdgeTooltipPos(pos);
   };
 
   const handleZoomIn = () => setZoomLevel((z) => Math.min(3.2, z * 1.25));
@@ -99,12 +86,13 @@ export const GraphMeshView: React.FC<GraphMeshViewProps> = ({
     setZoomLevel(1.0);
     setPanOffset({ x: 0, y: 0 });
     setSelectedNode(null);
+    setHoveredHighlightedEdge(null);
   };
 
   if (isLoading) {
     return (
       <div className="w-full h-full flex flex-col items-center justify-center bg-[#111111] text-zinc-400 gap-3">
-        <RefreshCw className="w-5 h-5 animate-spin text-zinc-300" />
+        <RefreshCw className="w-5 h-5 animate-spin text-zinc-400" />
         <span className="text-xs font-medium tracking-wide text-zinc-400">Loading Relationship Graph...</span>
       </div>
     );
@@ -151,51 +139,52 @@ export const GraphMeshView: React.FC<GraphMeshViewProps> = ({
         searchQuery={searchQuery}
         isPhysicsActive={isPhysicsActive}
         selectedNode={selectedNode}
-        onSelectNode={setSelectedNode}
-        onHoverNode={handleHoverNode}
-        onHoverEdge={handleHoverEdge}
+        onSelectNode={(node) => {
+          setSelectedNode(node);
+          if (!node) setHoveredHighlightedEdge(null);
+        }}
+        onHoverHighlightedEdge={handleHoverHighlightedEdge}
         zoomLevel={zoomLevel}
         onZoomChange={setZoomLevel}
         panOffset={panOffset}
         onPanChange={setPanOffset}
       />
 
-      {/* Edge Hover Tooltip */}
-      {hoveredEdge && tooltipPos && (
+      {/* Edge Relationship Modal Card — Shown ONLY when a node is clicked and hovering its highlighted edge */}
+      {hoveredHighlightedEdge && edgeTooltipPos && selectedNode && (
         <div
-          className="pointer-events-none fixed z-50 px-3 py-2 bg-[#18181b]/95 border border-white/20 rounded-lg shadow-2xl shadow-black/90 backdrop-blur-md text-xs text-zinc-200 animate-in fade-in zoom-in-95 duration-100"
-          style={{ left: tooltipPos.x + 14, top: tooltipPos.y - 12 }}
+          className="pointer-events-none fixed z-50 p-3 bg-[#18181b] border border-white/12 rounded-xl shadow-2xl shadow-black/90 text-xs text-zinc-200 animate-in fade-in zoom-in-95 duration-100 max-w-sm"
+          style={{
+            left: edgeTooltipPos.x + 16,
+            top: edgeTooltipPos.y - 16,
+            backdropFilter: 'blur(16px)',
+          }}
         >
-          <div className="flex items-center gap-1.5 font-semibold text-[11px] text-cyan-400 mb-0.5">
-            <GitBranch className="w-3.5 h-3.5 shrink-0" />
-            <span className="uppercase tracking-wider">{hoveredEdge.relationship}</span>
+          {/* Header */}
+          <div className="flex items-center justify-between gap-3 pb-2 mb-2 border-b border-white/8">
+            <div className="flex items-center gap-2">
+              <div className="w-5 h-5 rounded-md bg-white/8 flex items-center justify-center text-zinc-300">
+                <GitBranch className="w-3 h-3" />
+              </div>
+              <span className="font-semibold text-zinc-100 text-xs">Relationship Link</span>
+            </div>
+            <span className="px-1.5 py-0.5 rounded bg-white/8 text-[10px] font-mono font-medium text-zinc-300 border border-white/10 uppercase">
+              {hoveredHighlightedEdge.relationship}
+            </span>
           </div>
-          {hoveredEdge.description && (
-            <div className="text-[11px] text-zinc-200 font-normal leading-tight max-w-xs">
-              {hoveredEdge.description}
+
+          {/* Description / Casting */}
+          {hoveredHighlightedEdge.description && (
+            <div className="text-[11px] text-zinc-300 leading-relaxed mb-2.5 bg-black/40 p-2 rounded-lg border border-white/5">
+              {hoveredHighlightedEdge.description}
             </div>
           )}
-          <div className="flex items-center gap-1.5 text-[10px] text-zinc-400 mt-1.5 font-mono pt-1 border-t border-white/10">
-            <span className="text-zinc-300">{hoveredEdge.source.split('.').pop()}</span>
-            <ArrowRight className="w-2.5 h-2.5 text-zinc-500" />
-            <span className="text-zinc-300">{hoveredEdge.target.split('.').pop()}</span>
-          </div>
-        </div>
-      )}
 
-      {/* Node Hover Tooltip (when not hovering an edge) */}
-      {hoveredNode && !hoveredEdge && tooltipPos && (
-        <div
-          className="pointer-events-none fixed z-50 px-2.5 py-1.5 bg-[#18181b]/95 border border-white/20 rounded-lg shadow-2xl shadow-black/90 backdrop-blur-md text-xs text-zinc-200 animate-in fade-in zoom-in-95 duration-100"
-          style={{ left: tooltipPos.x + 14, top: tooltipPos.y - 12 }}
-        >
-          <div className="font-semibold text-white text-xs">{hoveredNode.label}</div>
-          <div className="flex items-center gap-1.5 text-[10px] text-zinc-400 mt-0.5 capitalize font-medium">
-            <span className="capitalize">{hoveredNode.layer}</span>
-            <span>•</span>
-            <span className="capitalize">{hoveredNode.type}</span>
-            <span>•</span>
-            <span>{hoveredNode.degree} links</span>
+          {/* Source -> Target Path */}
+          <div className="flex items-center gap-1.5 text-[10px] font-mono text-zinc-400 bg-white/[0.03] px-2 py-1.5 rounded-md border border-white/5">
+            <span className="text-zinc-200 truncate">{hoveredHighlightedEdge.source.split('.').pop()}</span>
+            <ArrowRight className="w-3 h-3 text-zinc-500 shrink-0" />
+            <span className="text-zinc-200 truncate">{hoveredHighlightedEdge.target.split('.').pop()}</span>
           </div>
         </div>
       )}

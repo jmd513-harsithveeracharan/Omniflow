@@ -1,5 +1,18 @@
-import React from 'react';
-import { Search, Play, Pause, ZoomIn, ZoomOut, RotateCcw, FolderGit2, Layers, Network } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import {
+  Search,
+  Play,
+  Pause,
+  ZoomIn,
+  ZoomOut,
+  RotateCcw,
+  FolderGit2,
+  ChevronDown,
+  Check,
+  Globe,
+  Layers,
+  Network,
+} from 'lucide-react';
 
 interface ProjectOption {
   id: string;
@@ -46,28 +59,106 @@ export const GraphMeshControls: React.FC<GraphMeshControlsProps> = ({
   onSelectProject,
   stats,
 }) => {
+  const [isPickerOpen, setIsPickerOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setIsPickerOpen(false);
+      }
+    };
+    if (isPickerOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isPickerOpen]);
+
+  const activeProjectName =
+    selectedProjectId && selectedProjectId !== 'all'
+      ? projects.find((p) => p.id === selectedProjectId)?.name || selectedProjectId
+      : 'All Projects (Galaxy Overview)';
+
   return (
     <div className="absolute top-4 left-4 right-4 z-20 flex flex-wrap items-center justify-between gap-3 pointer-events-none">
       {/* Project Selector & Search Box */}
-      <div className="flex items-center gap-2 pointer-events-auto bg-[#18181b]/90 backdrop-blur-md border border-white/10 p-1.5 rounded-xl shadow-xl shadow-black/60">
-        {/* Project Dropdown */}
+      <div className="flex items-center gap-2 pointer-events-auto bg-[#18181b]/95 backdrop-blur-md border border-white/10 p-1.5 rounded-xl shadow-xl shadow-black/70">
+        {/* Custom Project Dropdown */}
         {projects.length > 0 && onSelectProject && (
-          <div className="flex items-center gap-1.5 px-2 py-1 bg-white/[0.04] border border-white/10 rounded-lg text-xs text-zinc-200">
-            <FolderGit2 className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
-            <select
-              value={selectedProjectId || 'all'}
-              onChange={(e) => onSelectProject(e.target.value)}
-              className="bg-transparent text-xs text-zinc-100 font-medium focus:outline-none cursor-pointer pr-1"
+          <div className="relative" ref={dropdownRef}>
+            <button
+              onClick={() => setIsPickerOpen(!isPickerOpen)}
+              className="flex items-center gap-2 px-2.5 py-1.5 bg-white/[0.04] hover:bg-white/[0.08] border border-white/10 rounded-lg text-xs text-zinc-200 transition-all cursor-pointer"
             >
-              <option value="all" className="bg-[#18181b] text-zinc-200">
-                All Projects (Overview Galaxy)
-              </option>
-              {projects.map((p) => (
-                <option key={p.id} value={p.id} className="bg-[#18181b] text-zinc-200">
-                  {p.name || p.id}
-                </option>
-              ))}
-            </select>
+              <FolderGit2 className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+              <span className="font-medium text-zinc-100 max-w-[160px] truncate">{activeProjectName}</span>
+              <ChevronDown className="w-3.5 h-3.5 text-zinc-400 ml-0.5 shrink-0" />
+            </button>
+
+            {/* OmniFlow Modal-Styled Dropdown Card */}
+            {isPickerOpen && (
+              <div
+                className="absolute top-full left-0 mt-2 w-72 bg-[#18181b] border border-white/12 rounded-xl shadow-2xl shadow-black/90 p-2 z-50 animate-in fade-in zoom-in-95 duration-100"
+                style={{ backdropFilter: 'blur(16px)' }}
+              >
+                <div className="px-2 py-1 mb-1 text-[10px] font-semibold text-zinc-500 uppercase tracking-wider">
+                  Scope Relationship Graph
+                </div>
+
+                {/* Option 1: All Projects Galaxy */}
+                <button
+                  onClick={() => {
+                    onSelectProject('all');
+                    setIsPickerOpen(false);
+                  }}
+                  className={`w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-xs transition-colors ${
+                    !selectedProjectId || selectedProjectId === 'all'
+                      ? 'bg-white/10 text-white font-medium'
+                      : 'text-zinc-300 hover:bg-white/5 hover:text-white'
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <Globe className="w-3.5 h-3.5 text-zinc-400" />
+                    <span>All Projects (Overview Galaxy)</span>
+                  </div>
+                  {(!selectedProjectId || selectedProjectId === 'all') && (
+                    <Check className="w-3.5 h-3.5 text-zinc-200" />
+                  )}
+                </button>
+
+                <div className="my-1 border-t border-white/8" />
+
+                {/* Project List */}
+                <div className="max-h-56 overflow-y-auto space-y-0.5">
+                  {projects.map((p) => {
+                    const isSelected = selectedProjectId === p.id;
+                    return (
+                      <button
+                        key={p.id}
+                        onClick={() => {
+                          onSelectProject(p.id);
+                          setIsPickerOpen(false);
+                        }}
+                        className={`w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-xs transition-colors text-left ${
+                          isSelected
+                            ? 'bg-white/10 text-white font-medium'
+                            : 'text-zinc-300 hover:bg-white/5 hover:text-white'
+                        }`}
+                      >
+                        <div className="min-w-0 pr-2">
+                          <div className="truncate font-medium">{p.name || p.id}</div>
+                          <div className="text-[10px] text-zinc-500 font-mono truncate">{p.id}</div>
+                        </div>
+                        {isSelected && <Check className="w-3.5 h-3.5 text-zinc-200 shrink-0" />}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -79,7 +170,7 @@ export const GraphMeshControls: React.FC<GraphMeshControlsProps> = ({
             value={searchQuery}
             onChange={(e) => onSearchChange(e.target.value)}
             placeholder="Search nodes..."
-            className="w-44 bg-black/40 border border-white/10 rounded-lg pl-8 pr-3 py-1 text-xs text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-zinc-400 transition-colors"
+            className="w-40 bg-black/40 border border-white/10 rounded-lg pl-8 pr-3 py-1.5 text-xs text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-zinc-400 transition-colors"
           />
         </div>
 
@@ -90,22 +181,20 @@ export const GraphMeshControls: React.FC<GraphMeshControlsProps> = ({
             {stats.total_nodes} nodes
           </span>
           <span>•</span>
-          <span className="font-medium text-zinc-400">
-            {stats.total_edges} links
-          </span>
+          <span className="font-medium text-zinc-400">{stats.total_edges} links</span>
         </div>
       </div>
 
       {/* Layer Filter Chips */}
-      <div className="flex items-center gap-1 pointer-events-auto bg-[#18181b]/90 backdrop-blur-md border border-white/10 p-1.5 rounded-xl shadow-xl shadow-black/60">
+      <div className="flex items-center gap-1 pointer-events-auto bg-[#18181b]/95 backdrop-blur-md border border-white/10 p-1.5 rounded-xl shadow-xl shadow-black/70">
         <div className="flex items-center gap-1 text-[11px] text-zinc-400 px-2 font-medium">
           <Layers className="w-3.5 h-3.5 text-zinc-400" />
         </div>
         <button
           onClick={() => onLayerSelect('all')}
-          className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all ${
+          className={`px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
             selectedLayer === 'all'
-              ? 'bg-white/20 text-white border border-white/20'
+              ? 'bg-white/15 text-white border border-white/15'
               : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/5'
           }`}
         >
@@ -115,9 +204,9 @@ export const GraphMeshControls: React.FC<GraphMeshControlsProps> = ({
           <button
             key={layer}
             onClick={() => onLayerSelect(layer)}
-            className={`px-2.5 py-1 rounded-lg text-xs font-medium capitalize transition-all ${
+            className={`px-2.5 py-1.5 rounded-lg text-xs font-medium capitalize transition-all ${
               selectedLayer === layer
-                ? 'bg-white/20 text-white border border-white/20'
+                ? 'bg-white/15 text-white border border-white/15'
                 : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/5'
             }`}
           >
@@ -127,7 +216,7 @@ export const GraphMeshControls: React.FC<GraphMeshControlsProps> = ({
       </div>
 
       {/* Camera Actions */}
-      <div className="flex items-center gap-1 pointer-events-auto bg-[#18181b]/90 backdrop-blur-md border border-white/10 p-1.5 rounded-xl shadow-xl shadow-black/60">
+      <div className="flex items-center gap-1 pointer-events-auto bg-[#18181b]/95 backdrop-blur-md border border-white/10 p-1.5 rounded-xl shadow-xl shadow-black/70">
         <button
           onClick={onTogglePhysics}
           title={isPhysicsActive ? 'Pause force physics' : 'Resume force physics'}

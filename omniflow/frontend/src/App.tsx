@@ -717,7 +717,9 @@ export const App: React.FC = () => {
               projects={projects.map((p) => ({ id: p.id, name: p.name }))}
               onSelectProject={(newPid) => {
                 if (newPid && newPid !== 'all') {
-                  handleSelectProject(newPid);
+                  handleSelectProject(newPid, false);
+                } else {
+                  setActiveProjectId(null);
                 }
               }}
             />
