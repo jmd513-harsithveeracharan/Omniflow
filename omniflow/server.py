@@ -16,6 +16,7 @@ import time
 import uuid
 import sys
 from typing import Any
+import requests
 
 # Ensure both omniflow folder and parent folder are on sys.path for standalone or monorepo execution
 _current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -671,32 +672,85 @@ async def list_templates() -> list[dict[str, Any]]:
     return templates
 
 
+@app.get("/api/workspace/list")
+@app.get("/api/workspaces")
+async def list_fabric_workspaces() -> dict[str, Any]:
+    """Lists all Fabric workspaces the authenticated user has access to."""
+    default_ws_id = os.getenv("ALLOWED_WORKSPACE_ID", "db7344c1-ecd9-44d6-849f-f2de49484f9f")
+    default_ws_name = os.getenv("ALLOWED_WORKSPACE_NAME", "PBT_DATA_AGENT")
+    workspaces: list[dict[str, Any]] = []
+
+    try:
+        from app.fabric_client import list_workspaces as fc_list_workspaces
+        live_ws = fc_list_workspaces()
+        if live_ws:
+            for w in live_ws:
+                workspaces.append({
+                    "id": w.get("id"),
+                    "displayName": w.get("displayName") or w.get("name") or "Workspace",
+                    "description": w.get("description") or "",
+                    "type": w.get("type") or "Workspace",
+                    "capacityId": w.get("capacityId") or "",
+                    "capacityRegion": w.get("capacityRegion") or "",
+                    "isActive": (w.get("id") == default_ws_id),
+                })
+            return {
+                "active_workspace_id": default_ws_id,
+                "active_workspace_name": default_ws_name,
+                "workspaces": workspaces,
+            }
+    except Exception as e:
+        print(f"[Fabric Workspaces Warning]: {e}")
+
+    # Fallback to single configured workspace if API is unreachable
+    workspaces.append({
+        "id": default_ws_id,
+        "displayName": default_ws_name,
+        "description": "Primary configured workspace",
+        "type": "Workspace",
+        "capacityId": "",
+        "capacityRegion": "",
+        "isActive": True,
+    })
+    return {
+        "active_workspace_id": default_ws_id,
+        "active_workspace_name": default_ws_name,
+        "workspaces": workspaces,
+    }
+
+
 @app.get("/api/workspace/items")
-async def get_workspace_items() -> dict[str, Any]:
-    ws_id = os.getenv("ALLOWED_WORKSPACE_ID", "db7344c1-ecd9-44d6-849f-f2de49484f9f")
+async def get_workspace_items(workspace_id: str | None = None) -> dict[str, Any]:
+    ws_id = (workspace_id and str(workspace_id).strip()) or os.getenv("ALLOWED_WORKSPACE_ID", "db7344c1-ecd9-44d6-849f-f2de49484f9f")
     items_out: list[dict[str, Any]] = []
     folders_out: list[dict[str, Any]] = []
+    ws_name = os.getenv("ALLOWED_WORKSPACE_NAME", "Microsoft Fabric Workspace")
 
     # 1. Try Live Microsoft Fabric REST API
     try:
-        from omniflow.tools.fabric_adapter import _headers, _BASE
-        h = _headers()
-        r_f = requests.get(f"{_BASE}/workspaces/{ws_id}/folders", headers=h, timeout=8)
-        if r_f.status_code == 200:
-            folders_out = r_f.json().get("value", [])
+        from app.fabric_client import list_workspace_items as fc_list_items, list_folders as fc_list_folders, list_workspaces as fc_list_workspaces
+        all_ws = fc_list_workspaces()
+        for w in all_ws:
+            if w.get("id") == ws_id:
+                ws_name = w.get("displayName", ws_name)
+                break
 
-        r_i = requests.get(f"{_BASE}/workspaces/{ws_id}/items", headers=h, timeout=8)
-        if r_i.status_code == 200:
-            for it in r_i.json().get("value", []):
-                items_out.append({
-                    "id": it.get("id"),
-                    "displayName": it.get("displayName"),
-                    "type": it.get("type"),
-                    "description": it.get("description") or f"Microsoft Fabric {it.get('type')}",
-                    "folderId": it.get("folderId") or "Workspace Root",
-                })
-            if items_out:
-                return {"items": items_out, "folders": folders_out, "workspace_id": ws_id}
+        folders_res = fc_list_folders(ws_id)
+        if folders_res:
+            folders_out = folders_res
+
+        items_res = fc_list_items(ws_id)
+        raw_items = items_res.get("items", []) if isinstance(items_res, dict) else []
+        for it in raw_items:
+            items_out.append({
+                "id": it.get("id"),
+                "displayName": it.get("displayName") or it.get("name") or "Unnamed Item",
+                "type": it.get("type") or "Item",
+                "description": it.get("description") or f"Microsoft Fabric {it.get('type')}",
+                "folderId": it.get("parentFolderId") or it.get("folderId") or "Workspace Root",
+            })
+        if items_out or folders_out:
+            return {"items": items_out, "folders": folders_out, "workspace_id": ws_id, "workspace_name": ws_name}
     except Exception as e:
         print(f"[Fabric Live Items Warning]: {e}")
 
@@ -705,7 +759,11 @@ async def get_workspace_items() -> dict[str, Any]:
     try:
         with repo._connect() as conn:
             with conn.cursor() as cur:
-                cur.execute("SELECT item_name, item_type, status, workspace_id, COALESCE(folder_location, 'Workspace Root') FROM fabric_items ORDER BY created_at DESC LIMIT 50;")
+                cur.execute(
+                    "SELECT item_name, item_type, status, workspace_id, COALESCE(folder_location, 'Workspace Root') "
+                    "FROM fabric_items WHERE workspace_id = %s OR %s IS NULL ORDER BY created_at DESC LIMIT 50;",
+                    (ws_id, ws_id)
+                )
                 for r in cur.fetchall():
                     items_out.append({
                         "id": r[0],
@@ -717,17 +775,30 @@ async def get_workspace_items() -> dict[str, Any]:
     except Exception:
         pass
 
-    return {"items": items_out, "folders": folders_out, "workspace_id": ws_id}
+    return {"items": items_out, "folders": folders_out, "workspace_id": ws_id, "workspace_name": ws_name}
 
 
 @app.get("/api/workspace/tree")
-async def get_workspace_tree() -> dict[str, Any]:
+async def get_workspace_tree(workspace_id: str | None = None) -> dict[str, Any]:
+    ws_id = (workspace_id and str(workspace_id).strip()) or os.getenv("ALLOWED_WORKSPACE_ID", "db7344c1-ecd9-44d6-849f-f2de49484f9f")
+    try:
+        from app.fabric_client import get_workspace_tree as fc_get_tree
+        tree = fc_get_tree(ws_id)
+        if tree and "folders" in tree:
+            return tree
+    except Exception as e:
+        print(f"[Fabric Tree Warning]: {e}")
+
     repo = PostgresRepository()
     items = []
     try:
         with repo._connect() as conn:
             with conn.cursor() as cur:
-                cur.execute("SELECT item_name, item_type, status, workspace_id FROM fabric_items ORDER BY created_at DESC LIMIT 30;")
+                cur.execute(
+                    "SELECT item_name, item_type, status, workspace_id "
+                    "FROM fabric_items WHERE workspace_id = %s OR %s IS NULL ORDER BY created_at DESC LIMIT 30;",
+                    (ws_id, ws_id)
+                )
                 for r in cur.fetchall():
                     items.append({"name": r[0], "type": r[1], "status": r[2], "workspace": r[3]})
     except Exception:

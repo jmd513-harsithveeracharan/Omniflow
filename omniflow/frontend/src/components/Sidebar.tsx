@@ -164,10 +164,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
       return;
     }
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-    setChatMenuPos({
-      top: Math.min(rect.bottom + 4, window.innerHeight - 240),
-      left: Math.min(rect.left, window.innerWidth - 220),
-    });
+    const menuWidth = 190;
+    const menuHeight = 150;
+    let left = rect.right + 6;
+    if (left + menuWidth > window.innerWidth - 12) {
+      left = Math.max(12, rect.left - menuWidth - 6);
+    }
+    const top = Math.max(12, Math.min(rect.top - 4, window.innerHeight - menuHeight - 16));
+    setChatMenuPos({ top, left });
     setChatMenuSessionId(sid);
     setIsMoveSubmenuOpen(false);
   };
@@ -212,10 +216,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
       return;
     }
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-    setProjectMenuPos({
-      top: Math.min(rect.bottom + 4, window.innerHeight - 200),
-      left: Math.min(rect.left, window.innerWidth - 180),
-    });
+    const menuWidth = 190;
+    const menuHeight = 160;
+    let left = rect.right + 6;
+    if (left + menuWidth > window.innerWidth - 12) {
+      left = Math.max(12, rect.left - menuWidth - 6);
+    }
+    const top = Math.max(12, Math.min(rect.top - 4, window.innerHeight - menuHeight - 16));
+    setProjectMenuPos({ top, left });
     setProjectMenuId(pid);
   };
 
@@ -456,75 +464,86 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </div>
           )}
 
-          {/* Floating Context Menu Popup for Project */}
-          {projectMenuId && projectMenuPos && (() => {
-            const targetProject = sortedProjects.find((p) => p.id === projectMenuId);
-            if (!targetProject) return null;
-            const isPinned = Boolean(targetProject.is_pinned);
-            return (
-              <div
-                ref={projectMenuRef}
-                className="sidebar-project-menu-popup"
-                style={{ top: `${projectMenuPos.top}px`, left: `${projectMenuPos.left}px` }}
-                onMouseDown={(e) => e.stopPropagation()}
-                onClick={(e) => e.stopPropagation()}
-              >
-                <button
-                  type="button"
-                  className="sidebar-project-menu-item"
-                  onClick={() => {
-                    setProjectMenuId(null);
-                    setProjectMenuPos(null);
-                    onTogglePinProject?.(targetProject.id, targetProject.is_pinned || 0);
+          {/* Floating Context Menu Popup for Project via Portal (Matching Chat Menu Design) */}
+          {projectMenuId && projectMenuPos && typeof document !== 'undefined' && createPortal(
+            (() => {
+              const targetProject = sortedProjects.find((p) => p.id === projectMenuId);
+              if (!targetProject) return null;
+              const isPinned = Boolean(targetProject.is_pinned);
+              return (
+                <div
+                  ref={projectMenuRef}
+                  className="sidebar-chat-menu-popup"
+                  style={{
+                    position: 'fixed',
+                    top: `${projectMenuPos.top}px`,
+                    left: `${projectMenuPos.left}px`,
+                    zIndex: 999999,
+                    background: '#18181b',
+                    border: '1px solid rgba(255, 255, 255, 0.12)',
+                    borderRadius: '12px',
+                    boxShadow: '0 20px 48px rgba(0, 0, 0, 0.9)',
+                    padding: '6px',
+                    width: '190px',
+                    backdropFilter: 'blur(16px)',
                   }}
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onClick={(e) => e.stopPropagation()}
                 >
-                  <Pin width={13} height={13} style={isPinned ? { color: '#10b981' } : undefined} />
-                  <span>{isPinned ? 'Unpin' : 'Pin to top'}</span>
-                </button>
+                  <div
+                    className="chat-menu-item"
+                    onClick={() => {
+                      setProjectMenuId(null);
+                      setProjectMenuPos(null);
+                      onTogglePinProject?.(targetProject.id, targetProject.is_pinned || 0);
+                    }}
+                  >
+                    <Pin width={14} height={14} style={isPinned ? { color: '#10b981' } : undefined} />
+                    <span className="menu-label">{isPinned ? 'Unpin' : 'Pin to top'}</span>
+                  </div>
 
-                <button
-                  type="button"
-                  className="sidebar-project-menu-item"
-                  onClick={() => {
-                    setProjectMenuId(null);
-                    setProjectMenuPos(null);
-                    onEditProject?.(targetProject);
-                  }}
-                >
-                  <Edit3 width={13} height={13} />
-                  <span>Edit details</span>
-                </button>
+                  <div
+                    className="chat-menu-item"
+                    onClick={() => {
+                      setProjectMenuId(null);
+                      setProjectMenuPos(null);
+                      onEditProject?.(targetProject);
+                    }}
+                  >
+                    <Edit3 width={14} height={14} />
+                    <span className="menu-label">Edit details</span>
+                  </div>
 
-                <button
-                  type="button"
-                  className="sidebar-project-menu-item"
-                  onClick={() => {
-                    setProjectMenuId(null);
-                    setProjectMenuPos(null);
-                    onArchiveProject?.(targetProject.id);
-                  }}
-                >
-                  <Archive width={13} height={13} />
-                  <span>Archive</span>
-                </button>
+                  <div
+                    className="chat-menu-item"
+                    onClick={() => {
+                      setProjectMenuId(null);
+                      setProjectMenuPos(null);
+                      onArchiveProject?.(targetProject.id);
+                    }}
+                  >
+                    <Archive width={14} height={14} />
+                    <span className="menu-label">Archive</span>
+                  </div>
 
-                <div className="chat-menu-divider" />
+                  <div className="chat-menu-divider" />
 
-                <button
-                  type="button"
-                  className="sidebar-project-menu-item item-danger"
-                  onClick={() => {
-                    setProjectMenuId(null);
-                    setProjectMenuPos(null);
-                    onDeleteProject?.(targetProject.id);
-                  }}
-                >
-                  <Trash2 width={13} height={13} />
-                  <span>Delete</span>
-                </button>
-              </div>
-            );
-          })()}
+                  <div
+                    className="chat-menu-item item-danger"
+                    onClick={() => {
+                      setProjectMenuId(null);
+                      setProjectMenuPos(null);
+                      onDeleteProject?.(targetProject.id);
+                    }}
+                  >
+                    <Trash2 width={14} height={14} />
+                    <span className="menu-label">Delete</span>
+                  </div>
+                </div>
+              );
+            })(),
+            document.body
+          )}
         </div>
 
         {/* Chats Accordion Section */}
@@ -677,9 +696,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
                           maxHeight: '240px',
                           overflowY: 'auto',
                           background: '#18181b',
-                          borderRadius: '10px',
-                          border: '1px solid rgba(255, 255, 255, 0.1)',
-                          boxShadow: '0 16px 36px rgba(0, 0, 0, 0.85)',
+                          borderRadius: '12px',
+                          border: '1px solid rgba(255, 255, 255, 0.12)',
+                          boxShadow: '0 20px 48px rgba(0, 0, 0, 0.9)',
                           padding: '5px',
                           zIndex: 1000000,
                           backdropFilter: 'blur(16px)',

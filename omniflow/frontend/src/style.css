@@ -947,15 +947,15 @@ nav.sidebar-nav {
 /* Floating Sidebar Context Menu Popup (Matching Image 2) */
 .sidebar-chat-menu-popup {
     position: fixed;
-    width: 205px;
-    background: #1e1f20;
+    width: 190px;
+    background: #18181b;
     border: 1px solid rgba(255, 255, 255, 0.12);
     border-radius: 12px;
-    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.75);
+    box-shadow: 0 20px 48px rgba(0, 0, 0, 0.9);
     padding: 6px;
-    z-index: 99999;
+    z-index: 999999;
     animation: fadeInMsg 0.12s ease forwards;
-    backdrop-filter: blur(8px);
+    backdrop-filter: blur(16px);
 }
 
 .chat-menu-item {
