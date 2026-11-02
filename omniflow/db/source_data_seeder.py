@@ -1,9 +1,10 @@
 """
 omniflow/db/source_data_seeder.py
 ---------------------------------
-Seeds a realistic operational PostgreSQL database schema ('source_crm') with
-genuine eCommerce & commercial sales tables and rows inside Neon PostgreSQL.
-Provides a real live source system that OmniFlow agents can dynamically introspect.
+Seeds an operational PostgreSQL database schema ('source_crm') with
+sample eCommerce & commercial sales tables and rows inside Neon PostgreSQL.
+Provides a live source system that OmniFlow agents can dynamically introspect.
+All connection parameters are dynamically resolved from environment variables.
 """
 
 from __future__ import annotations
@@ -14,12 +15,15 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-DB_URI = os.getenv("NEON_DATABASE_URL") or os.getenv("DATABASE_URL", "")
+
+def get_source_crm_db_uri() -> str:
+    """Resolves PostgreSQL connection string strictly from environment variables."""
+    return os.getenv("NEON_DATABASE_URL") or os.getenv("DATABASE_URL") or ""
 
 
 def seed_live_source_crm(db_uri: str = "") -> dict[str, int]:
     """Provisions schema 'source_crm' and populates 4 realistic tables with sample business data."""
-    target_uri = db_uri or DB_URI or os.getenv("NEON_DATABASE_URL", "") or os.getenv("DATABASE_URL", "")
+    target_uri = db_uri or get_source_crm_db_uri()
     if not target_uri:
         raise ValueError(
             "CRITICAL: PostgreSQL connection string not configured!\n"
