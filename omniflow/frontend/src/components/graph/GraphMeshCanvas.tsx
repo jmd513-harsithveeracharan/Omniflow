@@ -7,6 +7,7 @@ interface SimNode extends GraphMeshNode {
   vx: number;
   vy: number;
   targetX: number;
+  targetY: number;
 }
 
 interface GraphMeshCanvasProps {
@@ -17,31 +18,34 @@ interface GraphMeshCanvasProps {
   isPhysicsActive: boolean;
   selectedNode: GraphMeshNode | null;
   onSelectNode: (node: GraphMeshNode | null) => void;
+  onHoverNode: (node: GraphMeshNode | null, clientPos: { x: number; y: number } | null) => void;
+  onHoverEdge: (edge: GraphMeshEdge | null, clientPos: { x: number; y: number } | null) => void;
   zoomLevel: number;
   onZoomChange: (zoom: number) => void;
   panOffset: { x: number; y: number };
   onPanChange: (pan: { x: number; y: number }) => void;
 }
 
+// Obsidian-style refined palette: soft monochromatic & muted layer accents
 const LAYER_COLORS: Record<string, string> = {
-  source: '#10b981',
-  bronze: '#f59e0b',
-  silver: '#06b6d4',
-  gold: '#eab308',
-  bi: '#ec4899',
-  warehouse: '#3b82f6',
-  shared: '#a855f7',
+  source: '#34d399',     // soft mint
+  bronze: '#fbbf24',     // soft amber
+  silver: '#38bdf8',     // soft sky blue
+  gold: '#facc15',       // soft gold
+  bi: '#f472b6',         // soft rose
+  warehouse: '#60a5fa',  // soft blue
+  shared: '#a78bfa',     // soft lavender
 };
 
-const LAYER_X_OFFSETS: Record<string, number> = {
-  source: -420,
-  bronze: -210,
-  silver: 0,
-  gold: 210,
-  warehouse: 260,
-  bi: 440,
-  shared: -100,
-};
+function distToSegment(px: number, py: number, x1: number, y1: number, x2: number, y2: number): number {
+  const dx = x2 - x1;
+  const dy = y2 - y1;
+  const l2 = dx * dx + dy * dy;
+  if (l2 === 0) return Math.hypot(px - x1, py - y1);
+  let t = ((px - x1) * dx + (py - y1) * dy) / l2;
+  t = Math.max(0, Math.min(1, t));
+  return Math.hypot(px - (x1 + t * dx), py - (y1 + t * dy));
+}
 
 export const GraphMeshCanvas: React.FC<GraphMeshCanvasProps> = ({
   nodes,
@@ -51,6 +55,8 @@ export const GraphMeshCanvas: React.FC<GraphMeshCanvasProps> = ({
   isPhysicsActive,
   selectedNode,
   onSelectNode,
+  onHoverNode,
+  onHoverEdge,
   zoomLevel,
   onZoomChange,
   panOffset,
@@ -62,58 +68,52 @@ export const GraphMeshCanvas: React.FC<GraphMeshCanvasProps> = ({
   const isDraggingCanvasRef = useRef(false);
   const draggedNodeRef = useRef<SimNode | null>(null);
   const lastMousePosRef = useRef({ x: 0, y: 0 });
-  const [hoveredNode, setHoveredNode] = useState<SimNode | null>(null);
+  const [internalHoveredNode, setInternalHoveredNode] = useState<SimNode | null>(null);
+  const [internalHoveredEdge, setInternalHoveredEdge] = useState<GraphMeshEdge | null>(null);
 
-  // Initialize nodes into clean, structured Medallion columns
+  // Initialize nodes in an organic Obsidian galaxy constellation
   useEffect(() => {
-    const layerGroups: Record<string, GraphMeshNode[]> = {};
-    nodes.forEach((n) => {
-      const l = n.layer || 'shared';
-      if (!layerGroups[l]) layerGroups[l] = [];
-      layerGroups[l].push(n);
-    });
+    const total = nodes.length;
+    // Identify top connected nodes as central hubs (like 'Graph view' in Obsidian)
+    const sorted = [...nodes].sort((a, b) => (b.degree || 0) - (a.degree || 0));
+    const hubs = new Set(sorted.slice(0, Math.max(1, Math.min(3, Math.ceil(total * 0.1)))).map((n) => n.id));
 
-    const tablePosMap = new Map<string, { x: number; y: number }>();
-    Object.entries(layerGroups).forEach(([layer, group]) => {
-      const baseX = LAYER_X_OFFSETS[layer] ?? 0;
-      const count = group.length;
-      const spacing = Math.max(48, Math.min(84, 460 / Math.max(1, count)));
-      group.forEach((node, idx) => {
-        const y = (idx - (count - 1) / 2) * spacing;
-        tablePosMap.set(node.id, { x: baseX, y });
-      });
-    });
+    const simNodes: SimNode[] = nodes.map((n, idx) => {
+      let r = 8.0;
+      if (hubs.has(n.id)) r = 14.0;
+      else if (n.type === 'table' || n.type === 'lakehouse' || n.type === 'warehouse') r = 10.0;
+      else if (n.type === 'column') r = 5.0;
 
-    const colIndexMap = new Map<string, number>();
-    const simNodes: SimNode[] = nodes.map((n) => {
-      let x = 0;
-      let y = 0;
-      const targetX = LAYER_X_OFFSETS[n.layer] ?? 0;
-
-      if (n.parent_id && tablePosMap.has(n.parent_id)) {
-        const pPos = tablePosMap.get(n.parent_id)!;
-        const idx = colIndexMap.get(n.parent_id) || 0;
-        colIndexMap.set(n.parent_id, idx + 1);
-        const angle = (idx / 8) * Math.PI * 2;
-        const r = 36 + (idx % 2) * 14;
-        x = pPos.x + Math.cos(angle) * r;
-        y = pPos.y + Math.sin(angle) * r;
-      } else if (tablePosMap.has(n.id)) {
-        const pos = tablePosMap.get(n.id)!;
-        x = pos.x + (Math.random() - 0.5) * 16;
-        y = pos.y + (Math.random() - 0.5) * 16;
+      // Radial galaxy distribution around center (0, 0)
+      let initX = 0;
+      let initY = 0;
+      if (hubs.has(n.id)) {
+        initX = (idx - (hubs.size - 1) / 2) * 60;
+        initY = 0;
       } else {
-        x = targetX + (Math.random() - 0.5) * 40;
-        y = (Math.random() - 0.5) * 200;
+        const angle = (idx / Math.max(1, total)) * Math.PI * 2 + (Math.random() - 0.5) * 0.4;
+        const dist = 110 + (idx % 4) * 45 + (Math.random() - 0.5) * 30;
+        initX = Math.cos(angle) * dist;
+        initY = Math.sin(angle) * dist;
       }
-      return { ...n, x, y, vx: 0, vy: 0, targetX };
+
+      return {
+        ...n,
+        radius: r,
+        x: initX,
+        y: initY,
+        vx: 0,
+        vy: 0,
+        targetX: initX,
+        targetY: initY,
+      };
     });
 
     simNodesRef.current = simNodes;
     alphaRef.current = 1.0; // Reset cooling energy
   }, [nodes]);
 
-  // Main 60 FPS Physics & Render Loop
+  // Main 60 FPS Physics & Obsidian Render Loop
   useEffect(() => {
     let animId: number;
     const canvas = canvasRef.current;
@@ -133,7 +133,7 @@ export const GraphMeshCanvas: React.FC<GraphMeshCanvasProps> = ({
       ctx.scale(dpr, dpr);
       ctx.clearRect(0, 0, w, h);
 
-      // Stable Plummer Force Simulation
+      // Stable Organic Force Physics
       if (isPhysicsActive && alphaRef.current > 0.008) {
         const alpha = alphaRef.current;
         const sim = simNodesRef.current;
@@ -148,29 +148,29 @@ export const GraphMeshCanvas: React.FC<GraphMeshCanvasProps> = ({
             let dy = nb.y - na.y;
             if (Math.abs(dx) < 0.01) dx = (Math.random() - 0.5) * 4;
             const dist = Math.hypot(dx, dy) || 1;
-            const softDistSq = dist * dist + 625; // Plummer softening
-            const rep = (na.type === 'column' && nb.type === 'column' ? 400 : 950) / softDistSq;
-            const fx = (dx / dist) * rep * alpha;
-            const fy = (dy / dist) * rep * alpha;
-            na.vx -= fx;
-            na.vy -= fy;
-            nb.vx += fx;
-            nb.vy += fy;
+            if (dist < 260) {
+              const rep = 480 / (dist * dist + 700);
+              const fx = (dx / dist) * rep * alpha;
+              const fy = (dy / dist) * rep * alpha;
+              na.vx -= fx;
+              na.vy -= fy;
+              nb.vx += fx;
+              nb.vy += fy;
+            }
           }
         }
 
-        // Soft Hooke spring on active edges
+        // Soft elastic springs on edges
         const nodeMap = new Map(sim.map((n) => [n.id, n]));
         for (const e of edges) {
           const na = nodeMap.get(e.source);
           const nb = nodeMap.get(e.target);
           if (na && nb) {
-            let dx = nb.x - na.x;
-            let dy = nb.y - na.y;
-            if (Math.abs(dx) < 0.01) dx = (Math.random() - 0.5) * 2;
+            const dx = nb.x - na.x;
+            const dy = nb.y - na.y;
             const dist = Math.hypot(dx, dy) || 1;
-            const idealDist = e.relationship === 'CONTAINS' ? 38 : 105;
-            const spring = (dist - idealDist) * 0.022 * alpha;
+            const idealDist = 95;
+            const spring = (dist - idealDist) * 0.018 * alpha;
             const fx = (dx / dist) * spring;
             const fy = (dy / dist) * spring;
             na.vx += fx;
@@ -180,52 +180,42 @@ export const GraphMeshCanvas: React.FC<GraphMeshCanvasProps> = ({
           }
         }
 
-        // Medallion column anchor & velocity clamping
+        // Damping, subtle center gravitation, and velocity clamping
         for (const n of sim) {
           if (n === draggedNodeRef.current) continue;
-          n.vx += (n.targetX - n.x) * 0.012 * alpha;
-          n.vy -= n.y * 0.005 * alpha;
-          // Strict velocity clamping prevents explosions
-          n.vx = Math.max(-5.0, Math.min(5.0, n.vx * 0.82));
-          n.vy = Math.max(-5.0, Math.min(5.0, n.vy * 0.82));
+          n.vx -= n.x * 0.002 * alpha;
+          n.vy -= n.y * 0.002 * alpha;
+          n.vx = Math.max(-4.5, Math.min(4.5, n.vx * 0.85));
+          n.vy = Math.max(-4.5, Math.min(4.5, n.vy * 0.85));
           n.x += n.vx;
           n.y += n.vy;
         }
 
-        alphaRef.current *= 0.988; // Cool down smoothly
+        alphaRef.current *= 0.988; // Settle gracefully
       }
 
       // Camera Transform
       ctx.translate(w / 2 + panOffset.x, h / 2 + panOffset.y);
       ctx.scale(zoomLevel, zoomLevel);
 
-      // Draw faint blueprint background grid
-      const gridSize = 40;
-      const viewLeft = (-w / 2 - panOffset.x) / zoomLevel;
-      const viewRight = (w / 2 - panOffset.x) / zoomLevel;
-      const viewTop = (-h / 2 - panOffset.y) / zoomLevel;
-      const viewBottom = (h / 2 - panOffset.y) / zoomLevel;
-
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.035)';
-      const startX = Math.floor(viewLeft / gridSize) * gridSize;
-      const startY = Math.floor(viewTop / gridSize) * gridSize;
-      for (let x = startX; x < viewRight; x += gridSize) {
-        for (let y = startY; y < viewBottom; y += gridSize) {
-          ctx.fillRect(x - 1, y - 1, 2, 2);
-        }
-      }
-
-      const activeId = selectedNode?.id || hoveredNode?.id;
-      const connectedSet = new Set<string>();
+      const activeId = selectedNode?.id || internalHoveredNode?.id;
+      const connectedNodeSet = new Set<string>();
+      const connectedEdgeSet = new Set<string>();
       if (activeId) {
-        connectedSet.add(activeId);
+        connectedNodeSet.add(activeId);
         for (const e of edges) {
-          if (e.source === activeId) connectedSet.add(e.target);
-          if (e.target === activeId) connectedSet.add(e.source);
+          if (e.source === activeId) {
+            connectedNodeSet.add(e.target);
+            connectedEdgeSet.add(e.id);
+          }
+          if (e.target === activeId) {
+            connectedNodeSet.add(e.source);
+            connectedEdgeSet.add(e.id);
+          }
         }
       }
 
-      // Draw Edges
+      // 1. Draw Obsidian Hairline Edges
       const nodeMap = new Map(simNodesRef.current.map((n) => [n.id, n]));
       for (const e of edges) {
         const na = nodeMap.get(e.source);
@@ -235,81 +225,77 @@ export const GraphMeshCanvas: React.FC<GraphMeshCanvasProps> = ({
         const isLayerVis = selectedLayer === 'all' || na.layer === selectedLayer || nb.layer === selectedLayer;
         if (!isLayerVis) continue;
 
-        const isHighlighted = activeId ? connectedSet.has(na.id) && connectedSet.has(nb.id) : true;
+        const isEdgeConnected = activeId ? connectedEdgeSet.has(e.id) : false;
+        const isEdgeHovered = internalHoveredEdge?.id === e.id;
+        const isDimmed = activeId && !isEdgeConnected && !isEdgeHovered;
+
         ctx.save();
         ctx.beginPath();
         ctx.moveTo(na.x, na.y);
         ctx.lineTo(nb.x, nb.y);
 
-        if (e.relationship === 'JOINS_WITH') {
-          ctx.strokeStyle = isHighlighted ? 'rgba(236, 72, 153, 0.85)' : 'rgba(236, 72, 153, 0.15)';
-          ctx.setLineDash([4, 4]);
-          ctx.lineWidth = isHighlighted ? 2.0 : 0.8;
+        if (isEdgeHovered) {
+          // Hovered edge: luminous vibrant cyan stroke
+          ctx.strokeStyle = '#38bdf8';
+          ctx.lineWidth = 2.2;
+          ctx.shadowColor = 'rgba(56, 189, 248, 0.6)';
+          ctx.shadowBlur = 8;
+        } else if (isEdgeConnected) {
+          // Connected to selected node: crisp silver-white
+          ctx.strokeStyle = 'rgba(241, 245, 249, 0.85)';
+          ctx.lineWidth = 1.5;
         } else {
-          ctx.strokeStyle = isHighlighted ? 'rgba(6, 182, 212, 0.65)' : 'rgba(148, 163, 184, 0.12)';
-          ctx.lineWidth = isHighlighted ? 1.6 : 0.7;
+          // Default Obsidian edge: ultra-thin hairline
+          ctx.strokeStyle = isDimmed ? 'rgba(255, 255, 255, 0.04)' : 'rgba(255, 255, 255, 0.16)';
+          ctx.lineWidth = 0.75;
         }
-        ctx.stroke();
 
-        // Arrowhead
-        const angle = Math.atan2(nb.y - na.y, nb.x - na.x);
-        const arrowDist = nb.radius + 4;
-        const arrowX = nb.x - Math.cos(angle) * arrowDist;
-        const arrowY = nb.y - Math.sin(angle) * arrowDist;
-        ctx.fillStyle = ctx.strokeStyle;
-        ctx.beginPath();
-        ctx.moveTo(arrowX, arrowY);
-        ctx.lineTo(arrowX - 5 * Math.cos(angle - Math.PI / 6), arrowY - 5 * Math.sin(angle - Math.PI / 6));
-        ctx.lineTo(arrowX - 5 * Math.cos(angle + Math.PI / 6), arrowY - 5 * Math.sin(angle + Math.PI / 6));
-        ctx.closePath();
-        ctx.fill();
+        ctx.stroke();
         ctx.restore();
       }
 
-      // Draw Nodes
+      // 2. Draw Obsidian Solid Circular Nodes
       for (const n of simNodesRef.current) {
         const matchesLayer = selectedLayer === 'all' || n.layer === selectedLayer;
         const matchesSearch = !searchQuery || n.label.toLowerCase().includes(searchQuery.toLowerCase());
-        const isDimmed = (activeId && !connectedSet.has(n.id)) || !matchesLayer || !matchesSearch;
-        const baseColor = LAYER_COLORS[n.layer] || '#94a3b8';
+        const isConnected = activeId ? connectedNodeSet.has(n.id) : true;
+        const isDimmed = !matchesLayer || !matchesSearch || (activeId && !isConnected);
+        const isCurrentActive = n.id === activeId;
+
+        const baseColor = LAYER_COLORS[n.layer] || '#d1d5db';
 
         ctx.save();
-        ctx.globalAlpha = isDimmed ? 0.15 : 1.0;
+        ctx.globalAlpha = isDimmed ? 0.08 : 1.0;
 
-        // Glow ring for active/searched node
-        if (n.id === activeId || (matchesSearch && searchQuery)) {
-          ctx.beginPath();
-          ctx.arc(n.x, n.y, n.radius + 7, 0, Math.PI * 2);
-          ctx.fillStyle = baseColor;
-          ctx.globalAlpha = 0.22;
-          ctx.fill();
-          ctx.globalAlpha = isDimmed ? 0.15 : 1.0;
+        // Active/connected node glow
+        if (isCurrentActive) {
+          ctx.shadowColor = 'rgba(255, 255, 255, 0.7)';
+          ctx.shadowBlur = 14;
         }
 
+        // Solid circular node (Obsidian graph style)
         ctx.beginPath();
         ctx.arc(n.x, n.y, n.radius, 0, Math.PI * 2);
-        ctx.fillStyle = n.type === 'column' ? '#0f172a' : baseColor;
+        ctx.fillStyle = isCurrentActive ? '#ffffff' : baseColor;
         ctx.fill();
-        ctx.lineWidth = n.type === 'column' ? 1.2 : 2.0;
-        ctx.strokeStyle = baseColor;
-        ctx.stroke();
 
-        if (n.is_primary_key) {
-          ctx.beginPath();
-          ctx.arc(n.x, n.y, n.radius + 2.5, 0, Math.PI * 2);
-          ctx.strokeStyle = '#eab308';
-          ctx.lineWidth = 1;
-          ctx.stroke();
-        }
+        // 3. Crisp Obsidian Typography (Beside the node)
+        const showLabel =
+          n.radius >= 10.0 ||
+          isCurrentActive ||
+          (activeId && isConnected) ||
+          zoomLevel > 1.25 ||
+          (matchesSearch && searchQuery);
 
-        const showLabel = n.radius >= 11 || n.id === activeId || zoomLevel > 1.2 || (matchesSearch && searchQuery);
         if (showLabel) {
-          ctx.font = `${n.radius >= 15 ? '600 11px' : '500 9px'} -apple-system, sans-serif`;
-          ctx.fillStyle = '#f1f5f9';
-          ctx.textAlign = 'center';
-          ctx.textBaseline = 'top';
-          ctx.fillText(n.label, n.x, n.y + n.radius + 4);
+          ctx.shadowBlur = 0;
+          ctx.font = `${isCurrentActive ? '600 11px' : '400 10.5px'} -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
+          ctx.fillStyle = isCurrentActive ? '#ffffff' : isDimmed ? 'rgba(255, 255, 255, 0.2)' : 'rgba(226, 232, 240, 0.9)';
+          ctx.textAlign = 'left';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(n.label, n.x + n.radius + 6, n.y);
         }
+
         ctx.restore();
       }
 
@@ -319,12 +305,12 @@ export const GraphMeshCanvas: React.FC<GraphMeshCanvasProps> = ({
 
     animId = requestAnimationFrame(render);
     return () => cancelAnimationFrame(animId);
-  }, [edges, selectedLayer, searchQuery, isPhysicsActive, selectedNode, hoveredNode, zoomLevel, panOffset]);
+  }, [edges, selectedLayer, searchQuery, isPhysicsActive, selectedNode, internalHoveredNode, internalHoveredEdge, zoomLevel, panOffset]);
 
   const handleWheel = (e: React.WheelEvent<HTMLCanvasElement>) => {
     e.preventDefault();
     const factor = e.deltaY < 0 ? 1.12 : 0.89;
-    onZoomChange(Math.max(0.3, Math.min(3.0, zoomLevel * factor)));
+    onZoomChange(Math.max(0.3, Math.min(3.2, zoomLevel * factor)));
   };
 
   const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -334,12 +320,20 @@ export const GraphMeshCanvas: React.FC<GraphMeshCanvasProps> = ({
     const mx = (e.clientX - rect.left - canvas.clientWidth / 2 - panOffset.x) / zoomLevel;
     const my = (e.clientY - rect.top - canvas.clientHeight / 2 - panOffset.y) / zoomLevel;
 
-    const clicked = simNodesRef.current.find((n) => Math.hypot(n.x - mx, n.y - my) <= n.radius + 4);
+    // Check if clicked a node
+    const clicked = simNodesRef.current.find((n) => Math.hypot(n.x - mx, n.y - my) <= n.radius + 5);
     if (clicked) {
       draggedNodeRef.current = clicked;
-      alphaRef.current = 0.25;
-      onSelectNode(clicked);
+      alphaRef.current = 0.2;
+      // Toggle node selection: if clicking the already selected node, deselect
+      if (selectedNode?.id === clicked.id) {
+        onSelectNode(null);
+      } else {
+        onSelectNode(clicked);
+      }
     } else {
+      // Clicked empty canvas: clear selection
+      onSelectNode(null);
       isDraggingCanvasRef.current = true;
       lastMousePosRef.current = { x: e.clientX, y: e.clientY };
     }
@@ -349,25 +343,65 @@ export const GraphMeshCanvas: React.FC<GraphMeshCanvasProps> = ({
     const canvas = canvasRef.current;
     if (!canvas) return;
     const rect = canvas.getBoundingClientRect();
+    const clientX = e.clientX;
+    const clientY = e.clientY;
 
     if (draggedNodeRef.current) {
-      const mx = (e.clientX - rect.left - canvas.clientWidth / 2 - panOffset.x) / zoomLevel;
-      const my = (e.clientY - rect.top - canvas.clientHeight / 2 - panOffset.y) / zoomLevel;
+      const mx = (clientX - rect.left - canvas.clientWidth / 2 - panOffset.x) / zoomLevel;
+      const my = (clientY - rect.top - canvas.clientHeight / 2 - panOffset.y) / zoomLevel;
       draggedNodeRef.current.x = mx;
       draggedNodeRef.current.y = my;
       draggedNodeRef.current.vx = 0;
       draggedNodeRef.current.vy = 0;
-      alphaRef.current = 0.25;
-    } else if (isDraggingCanvasRef.current) {
-      const dx = e.clientX - lastMousePosRef.current.x;
-      const dy = e.clientY - lastMousePosRef.current.y;
+      alphaRef.current = 0.2;
+      return;
+    }
+
+    if (isDraggingCanvasRef.current) {
+      const dx = clientX - lastMousePosRef.current.x;
+      const dy = clientY - lastMousePosRef.current.y;
       onPanChange({ x: panOffset.x + dx, y: panOffset.y + dy });
-      lastMousePosRef.current = { x: e.clientX, y: e.clientY };
+      lastMousePosRef.current = { x: clientX, y: clientY };
+      return;
+    }
+
+    // Hover Detection
+    const mx = (clientX - rect.left - canvas.clientWidth / 2 - panOffset.x) / zoomLevel;
+    const my = (clientY - rect.top - canvas.clientHeight / 2 - panOffset.y) / zoomLevel;
+
+    // 1. Check Node Hover first
+    const hoveredNode = simNodesRef.current.find((n) => Math.hypot(n.x - mx, n.y - my) <= n.radius + 4) || null;
+    setInternalHoveredNode(hoveredNode);
+    if (hoveredNode) {
+      onHoverNode(hoveredNode, { x: clientX, y: clientY });
+      setInternalHoveredEdge(null);
+      onHoverEdge(null, null);
+      return;
     } else {
-      const mx = (e.clientX - rect.left - canvas.clientWidth / 2 - panOffset.x) / zoomLevel;
-      const my = (e.clientY - rect.top - canvas.clientHeight / 2 - panOffset.y) / zoomLevel;
-      const hovered = simNodesRef.current.find((n) => Math.hypot(n.x - mx, n.y - my) <= n.radius + 4) || null;
-      setHoveredNode(hovered);
+      onHoverNode(null, null);
+    }
+
+    // 2. Check Edge Hover (distance to edge segment)
+    const nodeMap = new Map(simNodesRef.current.map((n) => [n.id, n]));
+    const threshold = 6 / zoomLevel;
+    let foundEdge: GraphMeshEdge | null = null;
+
+    for (const edge of edges) {
+      const na = nodeMap.get(edge.source);
+      const nb = nodeMap.get(edge.target);
+      if (!na || !nb) continue;
+      const d = distToSegment(mx, my, na.x, na.y, nb.x, nb.y);
+      if (d <= threshold) {
+        foundEdge = edge;
+        break;
+      }
+    }
+
+    setInternalHoveredEdge(foundEdge);
+    if (foundEdge) {
+      onHoverEdge(foundEdge, { x: clientX, y: clientY });
+    } else {
+      onHoverEdge(null, null);
     }
   };
 
@@ -383,9 +417,13 @@ export const GraphMeshCanvas: React.FC<GraphMeshCanvasProps> = ({
       onMouseDown={handleMouseDown}
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
-      onMouseLeave={handleMouseUp}
+      onMouseLeave={() => {
+        handleMouseUp();
+        onHoverNode(null, null);
+        onHoverEdge(null, null);
+      }}
       className="w-full h-full cursor-grab active:cursor-grabbing block"
-      style={{ background: '#090d16' }}
+      style={{ background: '#111111' }}
     />
   );
 };
