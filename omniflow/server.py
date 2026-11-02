@@ -745,6 +745,21 @@ async def get_graph_mesh() -> dict[str, Any]:
         raise HTTPException(status_code=500, detail=str(e))
 
 
+class GraphMeshRequest(BaseModel):
+    plan: dict[str, Any] | None = None
+    session_id: str | None = None
+
+
+@app.post("/api/graph/mesh")
+async def post_graph_mesh(req: GraphMeshRequest) -> dict[str, Any]:
+    """Returns the Knowledge Mesh compiled dynamically from an active architecture plan."""
+    try:
+        mesh = graph_engine.get_mesh(plan=req.plan)
+        return mesh.model_dump()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.get("/api/graph/blast-zone/{node_id}")
 async def get_node_blast_zone(node_id: str) -> dict[str, Any]:
     """Calculates upstream ancestors and downstream blast-zone impact for a specific node."""

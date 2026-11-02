@@ -342,7 +342,7 @@ export const MedallionFlowCanvas: React.FC<MedallionFlowCanvasProps> = ({
         {/* Knowledge Mesh Graph RAG */}
         {activeTab === 'wbMesh' && (
           <div className="wb-view-pane active" style={{ padding: 0, overflow: 'hidden', position: 'relative', height: '100%', minHeight: '480px' }}>
-            <GraphMeshView />
+            <GraphMeshView plan={plan as Record<string, unknown> | null} />
           </div>
         )}
 

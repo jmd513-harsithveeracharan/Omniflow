@@ -612,8 +612,15 @@ export async function removeProjectMember(projectId: string, userId: string): Pr
   return res.ok;
 }
 
-export async function fetchGraphMesh(): Promise<import('../types').GraphMeshResponse> {
-  const res = await fetch(`${API_BASE}/graph/mesh`);
+export async function fetchGraphMesh(plan?: Record<string, unknown> | null): Promise<import('../types').GraphMeshResponse> {
+  const options: RequestInit = plan
+    ? {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ plan }),
+      }
+    : { method: 'GET' };
+  const res = await fetch(`${API_BASE}/graph/mesh`, options);
   if (!res.ok) throw new Error(`Failed to fetch graph mesh: ${res.statusText}`);
   return res.json();
 }

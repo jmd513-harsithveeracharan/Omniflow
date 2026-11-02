@@ -7,10 +7,11 @@ import { GraphMeshControls } from './GraphMeshControls';
 import { GraphMeshInspector } from './GraphMeshInspector';
 
 interface GraphMeshViewProps {
+  plan?: Record<string, unknown> | null;
   onClose?: () => void;
 }
 
-export const GraphMeshView: React.FC<GraphMeshViewProps> = () => {
+export const GraphMeshView: React.FC<GraphMeshViewProps> = ({ plan }) => {
   const [data, setData] = useState<GraphMeshResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -26,7 +27,7 @@ export const GraphMeshView: React.FC<GraphMeshViewProps> = () => {
   const loadMesh = () => {
     setIsLoading(true);
     setError(null);
-    fetchGraphMesh()
+    fetchGraphMesh(plan)
       .then((res) => {
         setData(res);
       })
@@ -40,7 +41,7 @@ export const GraphMeshView: React.FC<GraphMeshViewProps> = () => {
 
   useEffect(() => {
     loadMesh();
-  }, []);
+  }, [plan]);
 
   const handleSelectConnectedNode = (nodeId: string) => {
     if (!data) return;
@@ -48,8 +49,8 @@ export const GraphMeshView: React.FC<GraphMeshViewProps> = () => {
     if (found) setSelectedNode(found);
   };
 
-  const handleZoomIn = () => setZoomLevel((z) => Math.min(2.5, z * 1.25));
-  const handleZoomOut = () => setZoomLevel((z) => Math.max(0.4, z * 0.8));
+  const handleZoomIn = () => setZoomLevel((z) => Math.min(2.8, z * 1.25));
+  const handleZoomOut = () => setZoomLevel((z) => Math.max(0.35, z * 0.8));
   const handleResetView = () => {
     setZoomLevel(1.0);
     setPanOffset({ x: 0, y: 0 });
@@ -81,7 +82,6 @@ export const GraphMeshView: React.FC<GraphMeshViewProps> = () => {
 
   return (
     <div className="relative w-full h-full overflow-hidden select-none">
-      {/* Top Controls Overlay */}
       <GraphMeshControls
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
@@ -96,7 +96,6 @@ export const GraphMeshView: React.FC<GraphMeshViewProps> = () => {
         stats={data.stats}
       />
 
-      {/* Physics Canvas Simulation */}
       <GraphMeshCanvas
         nodes={data.nodes}
         edges={data.edges}
@@ -106,11 +105,11 @@ export const GraphMeshView: React.FC<GraphMeshViewProps> = () => {
         selectedNode={selectedNode}
         onSelectNode={setSelectedNode}
         zoomLevel={zoomLevel}
+        onZoomChange={setZoomLevel}
         panOffset={panOffset}
         onPanChange={setPanOffset}
       />
 
-      {/* Slide-out Node Inspector */}
       <GraphMeshInspector
         selectedNode={selectedNode}
         onClose={() => setSelectedNode(null)}

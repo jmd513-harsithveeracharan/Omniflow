@@ -17,6 +17,7 @@ interface GraphMeshCanvasProps {
   selectedNode: GraphMeshNode | null;
   onSelectNode: (node: GraphMeshNode | null) => void;
   zoomLevel: number;
+  onZoomChange: (zoom: number) => void;
   panOffset: { x: number; y: number };
   onPanChange: (pan: { x: number; y: number }) => void;
 }
@@ -40,6 +41,7 @@ export const GraphMeshCanvas: React.FC<GraphMeshCanvasProps> = ({
   selectedNode,
   onSelectNode,
   zoomLevel,
+  onZoomChange,
   panOffset,
   onPanChange,
 }) => {
@@ -50,24 +52,53 @@ export const GraphMeshCanvas: React.FC<GraphMeshCanvasProps> = ({
   const lastMousePosRef = useRef({ x: 0, y: 0 });
   const [hoveredNode, setHoveredNode] = useState<SimNode | null>(null);
 
-  // Initialize node positions circularly
+  // Initialize nodes with planetary orbit layout matching Obsidian galaxy style
   useEffect(() => {
-    const total = nodes.length;
-    const simNodes: SimNode[] = nodes.map((n, i) => {
-      const angle = (i / total) * Math.PI * 2;
-      const dist = 140 + (n.type === 'column' ? 120 : 0) + Math.random() * 80;
-      return {
-        ...n,
-        x: Math.cos(angle) * dist,
-        y: Math.sin(angle) * dist,
-        vx: 0,
-        vy: 0,
-      };
+    const tableNodes = nodes.filter((n) => n.type === 'table' || n.type === 'lakehouse' || n.type === 'source');
+    const tablePosMap = new Map<string, { x: number; y: number }>();
+
+    tableNodes.forEach((t, i) => {
+      let baseAngle = (i / Math.max(1, tableNodes.length)) * Math.PI * 2;
+      if (t.layer === 'source') baseAngle = -Math.PI * 0.8;
+      else if (t.layer === 'bronze') baseAngle = -Math.PI * 0.4 + (i * 0.2);
+      else if (t.layer === 'silver') baseAngle = Math.PI * 0.3 + (i * 0.2);
+      else if (t.layer === 'gold') baseAngle = Math.PI * 0.8 + (i * 0.2);
+
+      const clusterDist = t.type === 'source' ? 320 : t.type === 'lakehouse' ? 240 : 180;
+      tablePosMap.set(t.id, {
+        x: Math.cos(baseAngle) * clusterDist + (Math.random() - 0.5) * 40,
+        y: Math.sin(baseAngle) * clusterDist + (Math.random() - 0.5) * 40,
+      });
+    });
+
+    const colIndexMap = new Map<string, number>();
+    const simNodes: SimNode[] = nodes.map((n) => {
+      let x = 0;
+      let y = 0;
+      if (tablePosMap.has(n.id)) {
+        const pos = tablePosMap.get(n.id)!;
+        x = pos.x;
+        y = pos.y;
+      } else if (n.parent_id && tablePosMap.has(n.parent_id)) {
+        const parentPos = tablePosMap.get(n.parent_id)!;
+        const idx = colIndexMap.get(n.parent_id) || 0;
+        colIndexMap.set(n.parent_id, idx + 1);
+        const colAngle = (idx / 6) * Math.PI * 2;
+        const orbitRadius = 42 + (idx % 2) * 16;
+        x = parentPos.x + Math.cos(colAngle) * orbitRadius;
+        y = parentPos.y + Math.sin(colAngle) * orbitRadius;
+      } else {
+        const rndAngle = Math.random() * Math.PI * 2;
+        const rndDist = 120 + Math.random() * 150;
+        x = Math.cos(rndAngle) * rndDist;
+        y = Math.sin(rndAngle) * rndDist;
+      }
+      return { ...n, x, y, vx: 0, vy: 0 };
     });
     simNodesRef.current = simNodes;
   }, [nodes]);
 
-  // Main Physics & Render Animation Loop
+  // Main 60 FPS Physics & Render Loop
   useEffect(() => {
     let animId: number;
     const canvas = canvasRef.current;
@@ -91,7 +122,6 @@ export const GraphMeshCanvas: React.FC<GraphMeshCanvasProps> = ({
       if (isPhysicsActive) {
         const sim = simNodesRef.current;
         const count = sim.length;
-        // 1. Repulsion between all node pairs
         for (let i = 0; i < count; i++) {
           for (let j = i + 1; j < count; j++) {
             const na = sim[i];
@@ -99,8 +129,9 @@ export const GraphMeshCanvas: React.FC<GraphMeshCanvasProps> = ({
             const dx = nb.x - na.x;
             const dy = nb.y - na.y;
             const dist = Math.hypot(dx, dy) || 1;
-            if (dist < 350) {
-              const rep = 800 / (dist * dist);
+            const minDist = na.parent_id === nb.parent_id ? 100 : 260;
+            if (dist < minDist) {
+              const rep = (na.type === 'column' && nb.type === 'column' ? 350 : 750) / (dist * dist);
               const fx = (dx / dist) * rep;
               const fy = (dy / dist) * rep;
               na.vx -= fx;
@@ -111,7 +142,6 @@ export const GraphMeshCanvas: React.FC<GraphMeshCanvasProps> = ({
           }
         }
 
-        // 2. Spring Hooke attraction along edges
         const nodeMap = new Map(sim.map((n) => [n.id, n]));
         for (const e of edges) {
           const na = nodeMap.get(e.source);
@@ -120,8 +150,8 @@ export const GraphMeshCanvas: React.FC<GraphMeshCanvasProps> = ({
             const dx = nb.x - na.x;
             const dy = nb.y - na.y;
             const dist = Math.hypot(dx, dy) || 1;
-            const idealDist = e.relationship === 'CONTAINS' ? 45 : 120;
-            const spring = (dist - idealDist) * 0.008;
+            const idealDist = e.relationship === 'CONTAINS' ? 44 : 115;
+            const spring = (dist - idealDist) * 0.007;
             const fx = (dx / dist) * spring;
             const fy = (dy / dist) * spring;
             na.vx += fx;
@@ -131,23 +161,20 @@ export const GraphMeshCanvas: React.FC<GraphMeshCanvasProps> = ({
           }
         }
 
-        // 3. Center gravity & velocity damping
         for (const n of sim) {
           if (n === draggedNodeRef.current) continue;
-          n.vx -= n.x * 0.002;
-          n.vy -= n.y * 0.002;
-          n.vx *= 0.86;
-          n.vy *= 0.86;
+          n.vx -= n.x * 0.0018;
+          n.vy -= n.y * 0.0018;
+          n.vx *= 0.88;
+          n.vy *= 0.88;
           n.x += n.vx;
           n.y += n.vy;
         }
       }
 
-      // Camera Transform
       ctx.translate(w / 2 + panOffset.x, h / 2 + panOffset.y);
       ctx.scale(zoomLevel, zoomLevel);
 
-      // Connected nodes set for selective highlighting
       const activeId = selectedNode?.id || hoveredNode?.id;
       const connectedSet = new Set<string>();
       if (activeId) {
@@ -158,15 +185,14 @@ export const GraphMeshCanvas: React.FC<GraphMeshCanvasProps> = ({
         }
       }
 
-      // Draw Edges with Directional Arrows
+      // Draw Edges
       const nodeMap = new Map(simNodesRef.current.map((n) => [n.id, n]));
       for (const e of edges) {
         const na = nodeMap.get(e.source);
         const nb = nodeMap.get(e.target);
         if (!na || !nb) continue;
 
-        const isLayerVisible =
-          selectedLayer === 'all' || na.layer === selectedLayer || nb.layer === selectedLayer;
+        const isLayerVisible = selectedLayer === 'all' || na.layer === selectedLayer || nb.layer === selectedLayer;
         if (!isLayerVisible) continue;
 
         const isHighlighted = activeId ? connectedSet.has(na.id) && connectedSet.has(nb.id) : true;
@@ -176,25 +202,25 @@ export const GraphMeshCanvas: React.FC<GraphMeshCanvasProps> = ({
         ctx.lineTo(nb.x, nb.y);
 
         if (e.relationship === 'JOINS_WITH') {
-          ctx.strokeStyle = isHighlighted ? 'rgba(236, 72, 153, 0.7)' : 'rgba(236, 72, 153, 0.15)';
+          ctx.strokeStyle = isHighlighted ? 'rgba(236, 72, 153, 0.75)' : 'rgba(236, 72, 153, 0.15)';
           ctx.setLineDash([4, 4]);
           ctx.lineWidth = isHighlighted ? 1.8 : 0.8;
         } else {
-          ctx.strokeStyle = isHighlighted ? 'rgba(6, 182, 212, 0.5)' : 'rgba(100, 116, 139, 0.15)';
-          ctx.lineWidth = isHighlighted ? 1.5 : 0.8;
+          ctx.strokeStyle = isHighlighted ? 'rgba(6, 182, 212, 0.55)' : 'rgba(148, 163, 184, 0.12)';
+          ctx.lineWidth = isHighlighted ? 1.4 : 0.7;
         }
         ctx.stroke();
 
-        // Directional Arrowhead
+        // Arrowhead
         const angle = Math.atan2(nb.y - na.y, nb.x - na.x);
-        const arrowDist = nb.radius + 6;
+        const arrowDist = nb.radius + 5;
         const arrowX = nb.x - Math.cos(angle) * arrowDist;
         const arrowY = nb.y - Math.sin(angle) * arrowDist;
         ctx.fillStyle = ctx.strokeStyle;
         ctx.beginPath();
         ctx.moveTo(arrowX, arrowY);
-        ctx.lineTo(arrowX - 6 * Math.cos(angle - Math.PI / 6), arrowY - 6 * Math.sin(angle - Math.PI / 6));
-        ctx.lineTo(arrowX - 6 * Math.cos(angle + Math.PI / 6), arrowY - 6 * Math.sin(angle + Math.PI / 6));
+        ctx.lineTo(arrowX - 5 * Math.cos(angle - Math.PI / 6), arrowY - 5 * Math.sin(angle - Math.PI / 6));
+        ctx.lineTo(arrowX - 5 * Math.cos(angle + Math.PI / 6), arrowY - 5 * Math.sin(angle + Math.PI / 6));
         ctx.closePath();
         ctx.fill();
         ctx.restore();
@@ -208,28 +234,25 @@ export const GraphMeshCanvas: React.FC<GraphMeshCanvasProps> = ({
 
         const baseColor = LAYER_COLORS[n.layer] || '#94a3b8';
         ctx.save();
-        ctx.globalAlpha = isDimmed ? 0.2 : 1.0;
+        ctx.globalAlpha = isDimmed ? 0.18 : 1.0;
 
-        // Outer Glow for Selected or Hovered
-        if (n.id === activeId || matchesSearch && searchQuery) {
+        if (n.id === activeId || (matchesSearch && searchQuery)) {
           ctx.beginPath();
           ctx.arc(n.x, n.y, n.radius + 8, 0, Math.PI * 2);
           ctx.fillStyle = baseColor;
           ctx.globalAlpha = 0.25;
           ctx.fill();
-          ctx.globalAlpha = isDimmed ? 0.2 : 1.0;
+          ctx.globalAlpha = isDimmed ? 0.18 : 1.0;
         }
 
-        // Node Circle Body
         ctx.beginPath();
         ctx.arc(n.x, n.y, n.radius, 0, Math.PI * 2);
-        ctx.fillStyle = n.type === 'column' ? '#0f172a' : baseColor;
+        ctx.fillStyle = n.type === 'column' ? '#0b1120' : baseColor;
         ctx.fill();
-        ctx.lineWidth = n.type === 'column' ? 1.5 : 2;
+        ctx.lineWidth = n.type === 'column' ? 1.4 : 2;
         ctx.strokeStyle = baseColor;
         ctx.stroke();
 
-        // PK / FK Indicator Rings
         if (n.is_primary_key) {
           ctx.beginPath();
           ctx.arc(n.x, n.y, n.radius + 2.5, 0, Math.PI * 2);
@@ -238,8 +261,8 @@ export const GraphMeshCanvas: React.FC<GraphMeshCanvasProps> = ({
           ctx.stroke();
         }
 
-        // Node Label Typography
-        if (n.radius >= 10 || n.id === activeId || zoomLevel > 1.2 || (matchesSearch && searchQuery)) {
+        const shouldShowLabel = n.radius >= 11 || n.id === activeId || zoomLevel > 1.2 || (matchesSearch && searchQuery);
+        if (shouldShowLabel) {
           ctx.font = `${n.radius >= 14 ? 'bold 11px' : '9px'} sans-serif`;
           ctx.fillStyle = '#f8fafc';
           ctx.textAlign = 'center';
@@ -257,7 +280,13 @@ export const GraphMeshCanvas: React.FC<GraphMeshCanvasProps> = ({
     return () => cancelAnimationFrame(animId);
   }, [edges, selectedLayer, searchQuery, isPhysicsActive, selectedNode, hoveredNode, zoomLevel, panOffset]);
 
-  // Mouse & Drag Handlers
+  const handleWheel = (e: React.WheelEvent<HTMLCanvasElement>) => {
+    e.preventDefault();
+    const factor = e.deltaY < 0 ? 1.12 : 0.89;
+    const newZoom = Math.max(0.3, Math.min(3.0, zoomLevel * factor));
+    onZoomChange(newZoom);
+  };
+
   const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -308,6 +337,7 @@ export const GraphMeshCanvas: React.FC<GraphMeshCanvasProps> = ({
   return (
     <canvas
       ref={canvasRef}
+      onWheel={handleWheel}
       onMouseDown={handleMouseDown}
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
