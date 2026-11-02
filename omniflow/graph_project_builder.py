@@ -97,6 +97,12 @@ def build_mesh_from_project(project_id: str | None) -> nx.DiGraph:
         return build_rich_medallion_galaxy()
 
     clean_pid = project_id.strip()
+
+    # Dedicated production-grade builder for Peli BioThermal Cold-Chain Platform
+    if "PELI" in clean_pid.upper() or "BIOTHERMAL" in clean_pid.upper():
+        from omniflow.graph_peli_builder import build_peli_biothermal_graph
+        return build_peli_biothermal_graph()
+
     proj_folder = os.path.join(BASE_DIR, "generated_artifacts", clean_pid)
 
     lineage_files = []

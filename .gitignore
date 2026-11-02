@@ -76,3 +76,7 @@ omniflow/*.tmp
 
 *.fabric_asset_index.json
 .fabric_asset_index.json
+
+# Peli BioThermal Fabric Platform
+peli-fabric-data-platform/
+omniflow/peli-fabric-data-platform/
