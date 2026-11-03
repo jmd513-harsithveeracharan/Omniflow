@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Sparkles, X, Loader2 } from 'lucide-react';
 
 interface AddCustomConnectorModalProps {
@@ -37,9 +38,36 @@ export const AddCustomConnectorModal: React.FC<AddCustomConnectorModalProps> = (
     onClose();
   };
 
-  return (
-    <div className="sso-modal-backdrop" style={{ display: 'flex', position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(6px)', zIndex: 1200, alignItems: 'center', justifyContent: 'center' }}>
-      <div style={{ width: '520px', background: '#141417', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', overflow: 'hidden', boxShadow: '0 24px 48px rgba(0,0,0,0.6)' }}>
+  return createPortal(
+    <div
+      className="sso-modal-backdrop"
+      style={{
+        display: 'flex',
+        position: 'fixed',
+        inset: 0,
+        background: 'rgba(0, 0, 0, 0.75)',
+        backdropFilter: 'blur(8px)',
+        WebkitBackdropFilter: 'blur(8px)',
+        zIndex: 100050,
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
+      onClick={onClose}
+    >
+      <div
+        style={{
+          width: '520px',
+          maxWidth: '92vw',
+          background: '#141417',
+          border: '1px solid rgba(255, 255, 255, 0.12)',
+          borderRadius: '12px',
+          overflow: 'hidden',
+          boxShadow: '0 24px 48px rgba(0, 0, 0, 0.6)',
+          position: 'relative',
+          zIndex: 100051,
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
           <div>
@@ -146,6 +174,7 @@ export const AddCustomConnectorModal: React.FC<AddCustomConnectorModalProps> = (
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };

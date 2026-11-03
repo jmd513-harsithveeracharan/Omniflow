@@ -19,6 +19,8 @@ import { AccountTab } from './settings/AccountTab';
 import { CapabilitiesTab } from './settings/CapabilitiesTab';
 import { FabricConnectionModal } from './modals/FabricConnectionModal';
 import { AddCustomConnectorModal } from './modals/AddCustomConnectorModal';
+import { AccountSwitcherModal } from './auth/AccountSwitcherModal';
+import { ConnectorModal } from './ConnectorModal';
 import { FabricStatus } from '../types';
 
 interface SettingsModalProps {
@@ -39,6 +41,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [activeTab, setActiveTab] = useState<string>(initialTab);
   const [searchQuery, setSearchQuery] = useState('');
   const [isFabricModalOpen, setIsFabricModalOpen] = useState(false);
+  const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
+  const [isConnectorModalOpen, setIsConnectorModalOpen] = useState(false);
+  const [selectedConnectorId, setSelectedConnectorId] = useState<string>('postgres');
   const [isAddConnectorOpen, setIsAddConnectorOpen] = useState(false);
 
   React.useEffect(() => {
@@ -137,23 +142,42 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               <ConnectorsTab
                 onClose={onClose}
                 onOpenFabricModal={() => setIsFabricModalOpen(true)}
+                onOpenAccountModal={() => setIsAccountModalOpen(true)}
+                onOpenConnectorModal={(id) => {
+                  setSelectedConnectorId(id);
+                  setIsConnectorModalOpen(true);
+                }}
               />
             )}
             {activeTab === 'tabSourceSystems' && (
               <SourceSystemsTab
                 onClose={onClose}
                 onAddCustomConnector={() => setIsAddConnectorOpen(true)}
+                onOpenConnectorModal={(id) => {
+                  setSelectedConnectorId(id);
+                  setIsConnectorModalOpen(true);
+                }}
               />
             )}
             {activeTab === 'tabApiKeys' && <ApiKeysTab onClose={onClose} />}
             {activeTab === 'tabMemory' && <MemoryTab onClose={onClose} />}
-            {activeTab === 'tabAccount' && <AccountTab onClose={onClose} />}
+            {activeTab === 'tabAccount' && (
+              <AccountTab
+                onClose={onClose}
+                onOpenAccountModal={() => setIsAccountModalOpen(true)}
+              />
+            )}
             {activeTab === 'tabCapabilities' && <CapabilitiesTab onClose={onClose} />}
             {activeTab === 'tabNotifications' && <CapabilitiesTab onClose={onClose} />}
             {activeTab === 'tabPlugins' && (
               <ConnectorsTab
                 onClose={onClose}
                 onOpenFabricModal={() => setIsFabricModalOpen(true)}
+                onOpenAccountModal={() => setIsAccountModalOpen(true)}
+                onOpenConnectorModal={(id) => {
+                  setSelectedConnectorId(id);
+                  setIsConnectorModalOpen(true);
+                }}
               />
             )}
           </main>
@@ -165,6 +189,24 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         onClose={() => setIsFabricModalOpen(false)}
         status={status}
         onRefreshStatus={onRefreshStatus}
+        onOpenAccountSwitcher={() => {
+          setIsFabricModalOpen(false);
+          setIsAccountModalOpen(true);
+        }}
+      />
+
+      <AccountSwitcherModal
+        isOpen={isAccountModalOpen}
+        onClose={() => setIsAccountModalOpen(false)}
+        onAccountSwitched={() => {
+          onRefreshStatus?.();
+        }}
+      />
+
+      <ConnectorModal
+        isOpen={isConnectorModalOpen}
+        onClose={() => setIsConnectorModalOpen(false)}
+        initialConnectorId={selectedConnectorId}
       />
 
       <AddCustomConnectorModal

@@ -4,11 +4,13 @@ import { X, Search } from 'lucide-react';
 interface SourceSystemsTabProps {
   onClose?: () => void;
   onAddCustomConnector?: () => void;
+  onOpenConnectorModal?: (connectorId: string) => void;
 }
 
 export const SourceSystemsTab: React.FC<SourceSystemsTabProps> = ({
   onClose,
   onAddCustomConnector,
+  onOpenConnectorModal,
 }) => {
   const [filter, setFilter] = useState<'all' | 'connected' | 'not_connected'>('all');
 
@@ -155,7 +157,7 @@ export const SourceSystemsTab: React.FC<SourceSystemsTabProps> = ({
               </span>
               <span className="popular-card-name">SAP S/4HANA</span>
             </div>
-            <button type="button" className="btn-pill-connect">Connect</button>
+            <button type="button" className="btn-pill-connect" onClick={() => onOpenConnectorModal?.('postgres')}>Connect</button>
           </div>
 
           <div className="popular-card">
@@ -170,7 +172,7 @@ export const SourceSystemsTab: React.FC<SourceSystemsTabProps> = ({
               </span>
               <span className="popular-card-name">Azure SQL</span>
             </div>
-            <button type="button" className="btn-pill-connect">Connect</button>
+            <button type="button" className="btn-pill-connect" onClick={() => onOpenConnectorModal?.('azure_sql')}>Connect</button>
           </div>
 
           <div className="popular-card">
@@ -183,7 +185,7 @@ export const SourceSystemsTab: React.FC<SourceSystemsTabProps> = ({
               </span>
               <span className="popular-card-name">Oracle DB</span>
             </div>
-            <button type="button" className="btn-pill-connect">Connect</button>
+            <button type="button" className="btn-pill-connect" onClick={() => onOpenConnectorModal?.('postgres')}>Connect</button>
           </div>
         </div>
       </div>
@@ -235,7 +237,13 @@ export const SourceSystemsTab: React.FC<SourceSystemsTabProps> = ({
               </div>
               <div className="connector-cell-type">{s.type}</div>
               <div className="connector-cell-action">
-                <button type="button" className="btn-pill-connect">Connect</button>
+                <button
+                  type="button"
+                  className="btn-pill-connect"
+                  onClick={() => onOpenConnectorModal?.(s.id === 'azuresql' ? 'azure_sql' : s.id === 'snowflake' ? 'snowflake' : 'postgres')}
+                >
+                  Connect
+                </button>
               </div>
             </div>
           ))}

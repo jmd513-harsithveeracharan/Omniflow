@@ -1,4 +1,5 @@
 import React from 'react';
+import { createPortal } from 'react-dom';
 import { X, Shield, LogIn, LogOut } from 'lucide-react';
 import { UserProfile } from '../../types';
 
@@ -26,16 +27,17 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     onUserChanged(null);
   };
 
-  return (
+  return createPortal(
     <div
       className="sso-modal-backdrop"
       style={{
         display: 'flex',
         position: 'fixed',
         inset: 0,
-        zIndex: 9999,
+        zIndex: 100050,
         background: 'rgba(0, 0, 0, 0.75)',
-        backdropFilter: 'blur(6px)',
+        backdropFilter: 'blur(8px)',
+        WebkitBackdropFilter: 'blur(8px)',
         alignItems: 'center',
         justifyContent: 'center',
       }}
@@ -52,6 +54,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           border: '1px solid rgba(255, 255, 255, 0.12)',
           boxShadow: '0 24px 60px rgba(0, 0, 0, 0.8)',
           position: 'relative',
+          zIndex: 100051,
         }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -177,6 +180,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           </button>
         )}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };

@@ -4,9 +4,16 @@ import { X, Search } from 'lucide-react';
 interface ConnectorsTabProps {
   onClose?: () => void;
   onOpenFabricModal?: () => void;
+  onOpenAccountModal?: () => void;
+  onOpenConnectorModal?: (connectorId: string) => void;
 }
 
-export const ConnectorsTab: React.FC<ConnectorsTabProps> = ({ onClose, onOpenFabricModal }) => {
+export const ConnectorsTab: React.FC<ConnectorsTabProps> = ({
+  onClose,
+  onOpenFabricModal,
+  onOpenAccountModal,
+  onOpenConnectorModal,
+}) => {
   return (
     <div className="settings-tab-pane" id="paneConnectors">
       <div className="pane-header-row">
@@ -43,10 +50,23 @@ export const ConnectorsTab: React.FC<ConnectorsTabProps> = ({ onClose, onOpenFab
               </span>
               <span className="popular-card-name">MS Fabric</span>
             </div>
-            <button type="button" className="btn-pill-connected" onClick={onOpenFabricModal}>
-              <span className="status-dot-green" />
-              <span>Connected</span>
-            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <button type="button" className="btn-pill-connected" onClick={onOpenFabricModal} title="Manage Microsoft Fabric Connection">
+                <span className="status-dot-green" />
+                <span>Connected</span>
+              </button>
+              {onOpenAccountModal && (
+                <button
+                  type="button"
+                  className="btn-pill-connect"
+                  onClick={onOpenAccountModal}
+                  title="Switch or connect Fabric identity"
+                  style={{ fontSize: '10.5px', padding: '3px 7px' }}
+                >
+                  Accounts
+                </button>
+              )}
+            </div>
           </div>
 
           <div className="popular-card">
@@ -60,7 +80,7 @@ export const ConnectorsTab: React.FC<ConnectorsTabProps> = ({ onClose, onOpenFab
               </span>
               <span className="popular-card-name">Databricks</span>
             </div>
-            <button type="button" className="btn-pill-connect">Connect</button>
+            <button type="button" className="btn-pill-connect" onClick={() => onOpenConnectorModal?.('databricks')}>Connect</button>
           </div>
 
           <div className="popular-card">
@@ -73,7 +93,7 @@ export const ConnectorsTab: React.FC<ConnectorsTabProps> = ({ onClose, onOpenFab
               </span>
               <span className="popular-card-name">Snowflake</span>
             </div>
-            <button type="button" className="btn-pill-connect">Connect</button>
+            <button type="button" className="btn-pill-connect" onClick={() => onOpenConnectorModal?.('snowflake')}>Connect</button>
           </div>
         </div>
       </div>
@@ -103,11 +123,22 @@ export const ConnectorsTab: React.FC<ConnectorsTabProps> = ({ onClose, onOpenFab
               </div>
             </div>
             <div className="connector-cell-type">Lakehouse Platform</div>
-            <div className="connector-cell-action">
-              <button type="button" className="btn-pill-connected" onClick={onOpenFabricModal}>
+            <div className="connector-cell-action" style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '6px' }}>
+              <button type="button" className="btn-pill-connected" onClick={onOpenFabricModal} title="Manage Fabric Connection">
                 <span className="status-dot-green" />
                 <span>Connected</span>
               </button>
+              {onOpenAccountModal && (
+                <button
+                  type="button"
+                  className="btn-pill-connect"
+                  onClick={onOpenAccountModal}
+                  title="Switch or connect Fabric identity"
+                  style={{ fontSize: '10.5px', padding: '3px 7px' }}
+                >
+                  Accounts
+                </button>
+              )}
             </div>
           </div>
 
@@ -128,7 +159,7 @@ export const ConnectorsTab: React.FC<ConnectorsTabProps> = ({ onClose, onOpenFab
             </div>
             <div className="connector-cell-type">Lakehouse Compute</div>
             <div className="connector-cell-action">
-              <button type="button" className="btn-pill-connect">Connect</button>
+              <button type="button" className="btn-pill-connect" onClick={() => onOpenConnectorModal?.('databricks')}>Connect</button>
             </div>
           </div>
 
@@ -148,7 +179,7 @@ export const ConnectorsTab: React.FC<ConnectorsTabProps> = ({ onClose, onOpenFab
             </div>
             <div className="connector-cell-type">Cloud Data Warehouse</div>
             <div className="connector-cell-action">
-              <button type="button" className="btn-pill-connect">Connect</button>
+              <button type="button" className="btn-pill-connect" onClick={() => onOpenConnectorModal?.('snowflake')}>Connect</button>
             </div>
           </div>
 
@@ -169,7 +200,7 @@ export const ConnectorsTab: React.FC<ConnectorsTabProps> = ({ onClose, onOpenFab
             </div>
             <div className="connector-cell-type">Transformations</div>
             <div className="connector-cell-action">
-              <button type="button" className="btn-pill-connect">Connect</button>
+              <button type="button" className="btn-pill-connect" onClick={() => onOpenConnectorModal?.('dbt')}>Connect</button>
             </div>
           </div>
 
@@ -188,7 +219,7 @@ export const ConnectorsTab: React.FC<ConnectorsTabProps> = ({ onClose, onOpenFab
             </div>
             <div className="connector-cell-type">Source Control</div>
             <div className="connector-cell-action">
-              <button type="button" className="btn-pill-connect">Connect</button>
+              <button type="button" className="btn-pill-connect" onClick={() => onOpenConnectorModal?.('github')}>Connect</button>
             </div>
           </div>
 
@@ -209,7 +240,7 @@ export const ConnectorsTab: React.FC<ConnectorsTabProps> = ({ onClose, onOpenFab
             </div>
             <div className="connector-cell-type">Business Intelligence</div>
             <div className="connector-cell-action">
-              <button type="button" className="btn-pill-connect">Connect</button>
+              <button type="button" className="btn-pill-connect" onClick={() => onOpenConnectorModal?.('powerbi')}>Connect</button>
             </div>
           </div>
         </div>

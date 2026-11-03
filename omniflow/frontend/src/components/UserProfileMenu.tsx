@@ -9,6 +9,7 @@ import {
   ChevronDown,
   LogOut,
   User,
+  Users,
 } from 'lucide-react';
 import { UserProfile } from '../types';
 
@@ -18,6 +19,7 @@ interface UserProfileMenuProps {
   onSignOut?: () => void;
   onSelectView?: (view: string) => void;
   onOpenAuthModal?: () => void;
+  onOpenAccountSwitcher?: () => void;
 }
 
 export const UserProfileMenu: React.FC<UserProfileMenuProps> = ({
@@ -26,6 +28,7 @@ export const UserProfileMenu: React.FC<UserProfileMenuProps> = ({
   onSignOut,
   onSelectView,
   onOpenAuthModal,
+  onOpenAccountSwitcher,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -79,6 +82,20 @@ export const UserProfileMenu: React.FC<UserProfileMenuProps> = ({
             <span>Settings</span>
             <span className="claude-popover-shortcut">Ctrl+Shift+,</span>
           </button>
+
+          {onOpenAccountSwitcher && (
+            <button
+              type="button"
+              className="claude-popover-item"
+              onClick={() => {
+                setIsOpen(false);
+                onOpenAccountSwitcher();
+              }}
+            >
+              <Users size={15} strokeWidth={1.75} />
+              <span>Fabric Accounts & Tenancy</span>
+            </button>
+          )}
 
           <button
             type="button"

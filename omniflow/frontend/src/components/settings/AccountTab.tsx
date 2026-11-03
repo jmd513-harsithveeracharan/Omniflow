@@ -1,15 +1,16 @@
 import React from 'react';
-import { LogOut, X } from 'lucide-react';
+import { LogOut, X, Users } from 'lucide-react';
 
 interface AccountTabProps {
   onClose?: () => void;
+  onOpenAccountModal?: () => void;
 }
 
-export const AccountTab: React.FC<AccountTabProps> = ({ onClose }) => {
+export const AccountTab: React.FC<AccountTabProps> = ({ onClose, onOpenAccountModal }) => {
   return (
     <div className="settings-tab-pane" id="paneAccount">
       <div className="pane-header-row">
-        <h2 className="pane-title">Account</h2>
+        <h2 className="pane-title">Account & Tenancy</h2>
         <div className="pane-header-actions">
           {onClose && (
             <button type="button" className="btn-subtle-icon btn-close-modal-icon" title="Close dialog" onClick={onClose}>
@@ -32,7 +33,31 @@ export const AccountTab: React.FC<AccountTabProps> = ({ onClose }) => {
           <div style={{ fontSize: '13px', fontWeight: 500, color: '#f4f4f5' }}>Active Target Workspace</div>
           <div style={{ fontSize: '11.5px', color: '#71717a' }}>db7344c1-ecd9-44d6-849f-f2de49484f9f</div>
         </div>
-        <span style={{ fontSize: '12.5px', color: '#10b981', fontWeight: 500 }}>PBT_DATA_AGENT</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <span style={{ fontSize: '12.5px', color: '#10b981', fontWeight: 500 }}>PBT_DATA_AGENT</span>
+          {onOpenAccountModal && (
+            <button
+              type="button"
+              onClick={onOpenAccountModal}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '5px',
+                background: 'rgba(255,255,255,0.06)',
+                border: '1px solid rgba(255,255,255,0.15)',
+                color: '#fff',
+                padding: '4px 10px',
+                borderRadius: '6px',
+                fontSize: '11.5px',
+                fontWeight: 500,
+                cursor: 'pointer',
+              }}
+            >
+              <Users width={12} height={12} />
+              <span>Switch Account</span>
+            </button>
+          )}
+        </div>
       </div>
 
       <div style={{ padding: '16px 0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>

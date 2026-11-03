@@ -776,6 +776,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           onSignOut={onSignOut}
           onSelectView={onSelectView}
           onOpenAuthModal={onOpenAuthModal}
+          onOpenAccountSwitcher={() => setIsAccountModalOpen(true)}
         />
       </div>
 

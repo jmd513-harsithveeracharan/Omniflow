@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import {
   X,
   Database,
@@ -9,56 +10,23 @@ import {
   Server,
 } from 'lucide-react';
 import { testConnectorConnection, generateMedallionPlan } from '../services/api';
-import { ConnectorSummary, DiscoveredTable, IngestionPlan } from '../types';
+import { DiscoveredTable, IngestionPlan } from '../types';
+import { CONNECTORS } from './connectors/connectorPresets';
 
 interface ConnectorModalProps {
   isOpen: boolean;
   onClose: () => void;
   onPlanGenerated?: (plan: IngestionPlan) => void;
+  initialConnectorId?: string;
 }
-
-const CONNECTORS: ConnectorSummary[] = [
-  {
-    id: 'postgres',
-    name: 'PostgreSQL Database',
-    category: 'RDBMS',
-    description: 'PostgreSQL 12+ on-prem or cloud (Azure Database, AWS RDS, GCP)',
-    fields: [
-      { name: 'host', label: 'Host / Endpoint', type: 'string', required: true, default: 'localhost' },
-      { name: 'port', label: 'Port', type: 'number', required: true, default: 5432 },
-      { name: 'database', label: 'Database Name', type: 'string', required: true, default: 'enterprise_dw' },
-      { name: 'user', label: 'Username', type: 'string', required: true, default: 'postgres' },
-      { name: 'password', label: 'Password', type: 'password', required: true, default: '********' },
-    ],
-  },
-  {
-    id: 'azure_sql',
-    name: 'Azure SQL / Fabric SQL',
-    category: 'Cloud DW',
-    description: 'Native Azure SQL Database and Fabric SQL Analytics Endpoint',
-    fields: [
-      { name: 'server', label: 'Server FQDN', type: 'string', required: true, default: 'fabric-demo.database.windows.net' },
-      { name: 'database', label: 'Database Name', type: 'string', required: true, default: 'sales_prod' },
-    ],
-  },
-  {
-    id: 'snowflake',
-    name: 'Snowflake Data Cloud',
-    category: 'Cloud DW',
-    description: 'Enterprise Snowflake account with warehouse and schema discovery',
-    fields: [
-      { name: 'account', label: 'Account Identifier', type: 'string', required: true, default: 'xy12345.east-us-2' },
-      { name: 'warehouse', label: 'Warehouse', type: 'string', required: true, default: 'COMPUTE_WH' },
-    ],
-  },
-];
 
 export const ConnectorModal: React.FC<ConnectorModalProps> = ({
   isOpen,
   onClose,
   onPlanGenerated,
+  initialConnectorId = 'postgres',
 }) => {
-  const [selectedConnectorId, setSelectedConnectorId] = useState<string>('postgres');
+  const [selectedConnectorId, setSelectedConnectorId] = useState<string>(initialConnectorId);
   const [tables, setTables] = useState<DiscoveredTable[]>([
     { name: 'dim_customer', schema: 'public', estimatedRows: 125000, selected: true, primaryKey: 'customer_id', strategy: 'scd2' },
     { name: 'fact_orders', schema: 'public', estimatedRows: 4500000, selected: true, primaryKey: 'order_id', strategy: 'incremental' },
@@ -67,6 +35,12 @@ export const ConnectorModal: React.FC<ConnectorModalProps> = ({
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
   const [generating, setGenerating] = useState(false);
+
+  useEffect(() => {
+    if (initialConnectorId) {
+      setSelectedConnectorId(initialConnectorId);
+    }
+  }, [initialConnectorId, isOpen]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -124,13 +98,15 @@ export const ConnectorModal: React.FC<ConnectorModalProps> = ({
     );
   };
 
-  return (
+  return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-md p-4 animate-in fade-in"
+      className="fixed inset-0 flex items-center justify-center bg-black/75 backdrop-blur-md p-4 animate-in fade-in"
+      style={{ position: 'fixed', inset: 0, zIndex: 100050 }}
       onClick={onClose}
     >
       <div
         className="w-full max-w-4xl h-[80vh] bg-[#0c1222] border border-border/80 rounded-2xl shadow-2xl flex flex-col overflow-hidden"
+        style={{ position: 'relative', zIndex: 100051 }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -259,6 +235,7 @@ export const ConnectorModal: React.FC<ConnectorModalProps> = ({
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };

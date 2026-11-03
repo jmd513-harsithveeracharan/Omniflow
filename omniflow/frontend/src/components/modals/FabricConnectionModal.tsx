@@ -1,13 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { Layers, X, Copy, Check, ExternalLink, RefreshCw, Loader2 } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import { Layers, X, RefreshCw, Users } from 'lucide-react';
 import { FabricStatus } from '../../types';
-import { startDeviceCodeLogin } from '../../services/api';
+import { BrowserLoginTab } from './fabric/BrowserLoginTab';
+import { ServicePrincipalTab } from './fabric/ServicePrincipalTab';
+import { BearerTokenTab } from './fabric/BearerTokenTab';
 
 interface FabricConnectionModalProps {
   isOpen: boolean;
   onClose: () => void;
   status: FabricStatus | null;
   onRefreshStatus?: () => void;
+  onOpenAccountSwitcher?: () => void;
 }
 
 export const FabricConnectionModal: React.FC<FabricConnectionModalProps> = ({
@@ -15,27 +19,11 @@ export const FabricConnectionModal: React.FC<FabricConnectionModalProps> = ({
   onClose,
   status,
   onRefreshStatus,
+  onOpenAccountSwitcher,
 }) => {
   const [activeTab, setActiveTab] = useState<'cli' | 'sp' | 'token'>('cli');
-  const [tenantId, setTenantId] = useState(status?.tenantId || '');
-  const [clientId, setClientId] = useState('');
-  const [clientSecret, setClientSecret] = useState('');
-  const [bearerToken, setBearerToken] = useState('');
-  const [deviceCode, setDeviceCode] = useState<string | null>(null);
-  const [isLoggingIn, setIsLoggingIn] = useState(false);
-  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
-    if (status?.tenantId && !tenantId) {
-      setTenantId(status.tenantId);
-    }
-  }, [status?.tenantId]);
-
-  useEffect(() => {
-    if (!isOpen) {
-      setDeviceCode(null);
-      setIsLoggingIn(false);
-    }
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && isOpen) {
         onClose();
@@ -47,85 +35,44 @@ export const FabricConnectionModal: React.FC<FabricConnectionModalProps> = ({
 
   if (!isOpen) return null;
 
-  const handleLaunchBrowserLogin = async () => {
-    setIsLoggingIn(true);
-    try {
-      const res = await startDeviceCodeLogin();
-      if (res && res.user_code) {
-        setDeviceCode(res.user_code);
-      }
-    } catch (e) {
-      console.error('Failed to start device code login', e);
-    } finally {
-      setIsLoggingIn(false);
-    }
+  const handleSuccess = () => {
+    onRefreshStatus?.();
+    onClose();
   };
 
-  const handleSaveSP = async () => {
-    if (!clientId.trim() || !clientSecret.trim()) return;
-    try {
-      setIsLoggingIn(true);
-      await fetch('/api/fabric/connect', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          auth_type: 'service_principal',
-          tenant_id: tenantId,
-          client_id: clientId,
-          client_secret: clientSecret,
-        }),
-      });
-      onRefreshStatus?.();
-      onClose();
-    } catch (e) {
-      console.error('SP error', e);
-    } finally {
-      setIsLoggingIn(false);
-    }
-  };
-
-  const handleApplyToken = async () => {
-    if (!bearerToken.trim()) return;
-    try {
-      setIsLoggingIn(true);
-      await fetch('/api/fabric/connect', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          auth_type: 'bearer_token',
-          token: bearerToken.trim(),
-        }),
-      });
-      onRefreshStatus?.();
-      onClose();
-    } catch (e) {
-      console.error('Token error', e);
-    } finally {
-      setIsLoggingIn(false);
-    }
-  };
-
-  const handleCopyCode = () => {
-    if (deviceCode) {
-      navigator.clipboard.writeText(deviceCode);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    }
-  };
-
-  return (
+  return createPortal(
     <div
       className="sso-modal-backdrop"
-      style={{ display: 'flex', position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(6px)', zIndex: 1100, alignItems: 'center', justifyContent: 'center' }}
+      style={{
+        display: 'flex',
+        position: 'fixed',
+        inset: 0,
+        background: 'rgba(0, 0, 0, 0.75)',
+        backdropFilter: 'blur(8px)',
+        WebkitBackdropFilter: 'blur(8px)',
+        zIndex: 100050,
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
       onClick={onClose}
     >
       <div
         className="connections-modal-card"
-        style={{ width: '560px', background: '#121215', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', overflow: 'hidden', boxShadow: '0 20px 40px rgba(0,0,0,0.5)' }}
+        style={{
+          width: '560px',
+          maxWidth: '92vw',
+          background: '#121215',
+          border: '1px solid rgba(255, 255, 255, 0.12)',
+          borderRadius: '14px',
+          overflow: 'hidden',
+          boxShadow: '0 24px 60px rgba(0, 0, 0, 0.8)',
+          position: 'relative',
+          zIndex: 100051,
+        }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '1px solid rgba(255, 255, 255, 0.08)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: 'rgba(0, 210, 160, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <Layers width={20} height={20} style={{ color: '#00d2a0' }} />
@@ -146,14 +93,14 @@ export const FabricConnectionModal: React.FC<FabricConnectionModalProps> = ({
 
         <div style={{ padding: '20px' }}>
           {/* Active Status Strip */}
-          <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '8px', padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '18px' }}>
+          <div style={{ background: 'rgba(255, 255, 255, 0.03)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '8px', padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '18px' }}>
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
                 <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: status?.authenticated ? '#10b981' : '#ef4444' }} />
                 <span style={{ fontSize: '13px', fontWeight: 500, color: '#fff' }}>
                   {status?.authenticated ? 'Authenticated User' : 'Not Connected'}
                 </span>
-                <span style={{ fontSize: '11px', background: 'rgba(255,255,255,0.08)', padding: '2px 6px', borderRadius: '4px', color: '#38bdf8' }}>
+                <span style={{ fontSize: '11px', background: 'rgba(255, 255, 255, 0.08)', padding: '2px 6px', borderRadius: '4px', color: '#38bdf8' }}>
                   Azure CLI
                 </span>
               </div>
@@ -161,20 +108,47 @@ export const FabricConnectionModal: React.FC<FabricConnectionModalProps> = ({
                 Workspace: {status?.workspaceId || 'PBT_DATA_AGENT'}
               </div>
             </div>
-            {onRefreshStatus && (
-              <button
-                type="button"
-                onClick={onRefreshStatus}
-                title="Refresh token status"
-                style={{ background: 'none', border: 'none', color: '#38bdf8', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11.5px' }}
-              >
-                <RefreshCw width={12} height={12} /> Sync
-              </button>
-            )}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              {onOpenAccountSwitcher && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onClose();
+                    onOpenAccountSwitcher();
+                  }}
+                  title="Switch or connect Fabric identity"
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.06)',
+                    border: '1px solid rgba(255, 255, 255, 0.14)',
+                    color: '#e4e4e7',
+                    padding: '5px 9px',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    fontSize: '11.5px',
+                    fontWeight: 500,
+                  }}
+                >
+                  <Users width={12} height={12} /> Accounts
+                </button>
+              )}
+              {onRefreshStatus && (
+                <button
+                  type="button"
+                  onClick={onRefreshStatus}
+                  title="Refresh token status"
+                  style={{ background: 'none', border: 'none', color: '#38bdf8', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11.5px' }}
+                >
+                  <RefreshCw width={12} height={12} /> Sync
+                </button>
+              )}
+            </div>
           </div>
 
           {/* Connection Methods Navigation */}
-          <div style={{ display: 'flex', gap: '4px', background: 'rgba(255,255,255,0.04)', padding: '3px', borderRadius: '8px', marginBottom: '16px' }}>
+          <div style={{ display: 'flex', gap: '4px', background: 'rgba(255, 255, 255, 0.04)', padding: '3px', borderRadius: '8px', marginBottom: '16px' }}>
             {[
               { id: 'cli', label: 'Browser Login (fab)' },
               { id: 'sp', label: 'Service Principal' },
@@ -189,7 +163,7 @@ export const FabricConnectionModal: React.FC<FabricConnectionModalProps> = ({
                   padding: '6px 10px',
                   borderRadius: '6px',
                   border: 'none',
-                  background: activeTab === tab.id ? 'rgba(255,255,255,0.12)' : 'none',
+                  background: activeTab === tab.id ? 'rgba(255, 255, 255, 0.12)' : 'none',
                   color: activeTab === tab.id ? '#fff' : '#a1a1aa',
                   fontSize: '12px',
                   fontWeight: 500,
@@ -202,113 +176,17 @@ export const FabricConnectionModal: React.FC<FabricConnectionModalProps> = ({
           </div>
 
           {/* Method Content */}
-          {activeTab === 'cli' && (
-            <div>
-              {!deviceCode ? (
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 0' }}>
-                  <div>
-                    <div style={{ fontSize: '13px', fontWeight: 500, color: '#fff' }}>Interactive Browser Auth</div>
-                    <div style={{ fontSize: '11.5px', color: '#71717a' }}>Opens Microsoft sign-in to capture Fabric session token</div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handleLaunchBrowserLogin}
-                    disabled={isLoggingIn}
-                    style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: '#0078d4', border: 'none', color: '#fff', padding: '8px 14px', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}
-                  >
-                    {isLoggingIn ? <Loader2 width={13} height={13} className="animate-spin" /> : <ExternalLink width={13} height={13} />}
-                    <span>Launch Browser Login</span>
-                  </button>
-                </div>
-              ) : (
-                <div style={{ background: 'rgba(0,120,212,0.08)', border: '1px solid rgba(0,120,212,0.2)', borderRadius: '8px', padding: '14px' }}>
-                  <div style={{ fontSize: '12px', color: '#93c5fd', marginBottom: '8px' }}>
-                    1. Go to <a href="https://login.microsoft.com/device" target="_blank" rel="noreferrer" style={{ color: '#38bdf8', textDecoration: 'underline' }}>microsoft.com/device ↗</a> and enter code:
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', margin: '8px 0' }}>
-                    <div style={{ background: '#000', padding: '8px 14px', borderRadius: '6px', fontFamily: 'monospace', fontSize: '16px', fontWeight: 700, color: '#38bdf8', letterSpacing: '2px' }}>
-                      {deviceCode}
-                    </div>
-                    <button
-                      type="button"
-                      onClick={handleCopyCode}
-                      style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', color: '#fff', padding: '8px 12px', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}
-                    >
-                      {copied ? <Check width={13} height={13} style={{ color: '#10b981' }} /> : <Copy width={13} height={13} />}
-                      <span>{copied ? 'Copied!' : 'Copy'}</span>
-                    </button>
-                    <a
-                      href="https://login.microsoft.com/device"
-                      target="_blank"
-                      rel="noreferrer"
-                      style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: '#0078d4', color: '#fff', padding: '8px 12px', borderRadius: '6px', fontSize: '12px', textDecoration: 'none' }}
-                    >
-                      <span>Open Page ↗</span>
-                    </a>
-                  </div>
-                  <div style={{ fontSize: '11px', color: '#71717a', marginTop: '6px' }}>
-                    Waiting for Microsoft sign-in approval...
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
+          {activeTab === 'cli' && <BrowserLoginTab />}
           {activeTab === 'sp' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              <input
-                type="text"
-                placeholder="Tenant ID (e.g. 94b62ba4-...)"
-                value={tenantId}
-                onChange={(e) => setTenantId(e.target.value)}
-                style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', padding: '8px 10px', color: '#fff', fontSize: '12.5px' }}
-              />
-              <input
-                type="text"
-                placeholder="Client / Application ID"
-                value={clientId}
-                onChange={(e) => setClientId(e.target.value)}
-                style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', padding: '8px 10px', color: '#fff', fontSize: '12.5px' }}
-              />
-              <input
-                type="password"
-                placeholder="Client Secret"
-                value={clientSecret}
-                onChange={(e) => setClientSecret(e.target.value)}
-                style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', padding: '8px 10px', color: '#fff', fontSize: '12.5px' }}
-              />
-              <button
-                type="button"
-                onClick={handleSaveSP}
-                disabled={isLoggingIn}
-                style={{ alignSelf: 'flex-start', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', color: '#fff', padding: '7px 14px', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', marginTop: '4px' }}
-              >
-                {isLoggingIn ? 'Connecting...' : 'Save & Connect'}
-              </button>
-            </div>
+            <ServicePrincipalTab
+              initialTenantId={status?.tenantId || ''}
+              onSuccess={handleSuccess}
+            />
           )}
-
-          {activeTab === 'token' && (
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <input
-                type="password"
-                placeholder="Paste Bearer Token (JWT)..."
-                value={bearerToken}
-                onChange={(e) => setBearerToken(e.target.value)}
-                style={{ flex: 1, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', padding: '8px 10px', color: '#fff', fontSize: '12.5px' }}
-              />
-              <button
-                type="button"
-                onClick={handleApplyToken}
-                disabled={isLoggingIn}
-                style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', color: '#fff', padding: '8px 14px', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}
-              >
-                {isLoggingIn ? 'Applying...' : 'Apply'}
-              </button>
-            </div>
-          )}
+          {activeTab === 'token' && <BearerTokenTab onSuccess={handleSuccess} />}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };

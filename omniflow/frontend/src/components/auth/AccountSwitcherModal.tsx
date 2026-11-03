@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { X, Laptop, KeyRound, RefreshCw } from 'lucide-react';
 import { FabricAccountProfile } from '../../types';
 import {
@@ -143,7 +144,7 @@ export const AccountSwitcherModal: React.FC<AccountSwitcherModalProps> = ({
     }
   };
 
-  return (
+  return createPortal(
     <div
       className="modal-backdrop open active"
       onClick={onClose}
@@ -151,9 +152,10 @@ export const AccountSwitcherModal: React.FC<AccountSwitcherModalProps> = ({
         display: 'flex',
         position: 'fixed',
         inset: 0,
-        zIndex: 9999,
+        zIndex: 100050,
         background: 'rgba(0, 0, 0, 0.75)',
         backdropFilter: 'blur(8px)',
+        WebkitBackdropFilter: 'blur(8px)',
         alignItems: 'center',
         justifyContent: 'center',
       }}
@@ -169,7 +171,7 @@ export const AccountSwitcherModal: React.FC<AccountSwitcherModalProps> = ({
           border: '1px solid rgba(255, 255, 255, 0.12)',
           boxShadow: '0 24px 60px rgba(0, 0, 0, 0.8)',
           position: 'relative',
-          zIndex: 10000,
+          zIndex: 100051,
         }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -200,18 +202,8 @@ export const AccountSwitcherModal: React.FC<AccountSwitcherModalProps> = ({
               borderRadius: '8px',
               fontSize: '12.5px',
               marginBottom: '14px',
-              background:
-                statusMsg.type === 'success'
-                  ? 'rgba(16, 185, 129, 0.15)'
-                  : statusMsg.type === 'error'
-                  ? 'rgba(239, 68, 68, 0.15)'
-                  : 'rgba(59, 130, 246, 0.15)',
-              border:
-                statusMsg.type === 'success'
-                  ? '1px solid #10b981'
-                  : statusMsg.type === 'error'
-                  ? '1px solid #ef4444'
-                  : '1px solid #3b82f6',
+              background: statusMsg.type === 'success' ? 'rgba(16, 185, 129, 0.15)' : statusMsg.type === 'error' ? 'rgba(239, 68, 68, 0.15)' : 'rgba(59, 130, 246, 0.15)',
+              border: statusMsg.type === 'success' ? '1px solid #10b981' : statusMsg.type === 'error' ? '1px solid #ef4444' : '1px solid #3b82f6',
               color: statusMsg.type === 'success' ? '#34d399' : statusMsg.type === 'error' ? '#fca5a5' : '#93c5fd',
             }}
           >
@@ -299,6 +291,7 @@ export const AccountSwitcherModal: React.FC<AccountSwitcherModalProps> = ({
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
