@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import {
   Search,
+  X,
   Play,
   Pause,
   ZoomIn,
@@ -94,7 +95,7 @@ export const GraphMeshControls: React.FC<GraphMeshControlsProps> = ({
   // Filter out any legacy 'all' projects; only real projects
   const displayProjects = projects.filter((p) => p.id !== 'all');
   if (!displayProjects.some((p) => p.id === 'PRJ-PELI-BIOTHERMAL')) {
-    displayProjects.push({
+    displayProjects.unshift({
       id: 'PRJ-PELI-BIOTHERMAL',
       name: 'Peli BioThermal Cold-Chain Platform',
     });
@@ -141,8 +142,18 @@ export const GraphMeshControls: React.FC<GraphMeshControlsProps> = ({
               value={searchQuery}
               onChange={(e) => onSearchChange(e.target.value)}
               placeholder="Search nodes..."
-              className="w-44 bg-black/40 border border-zinc-800 rounded-lg pl-8 pr-3 py-1.5 text-xs text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-zinc-700 transition-colors"
+              className="w-44 bg-black/40 border border-zinc-800 rounded-lg pl-8 pr-7 py-1.5 text-xs text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-zinc-700 transition-colors"
             />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => onSearchChange('')}
+                className="absolute right-2 p-0.5 rounded text-zinc-400 hover:text-white transition-colors cursor-pointer"
+                title="Clear search"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            )}
           </div>
           <div className="hidden sm:flex items-center gap-1.5 px-2 border-l border-zinc-800 text-[11px] text-zinc-300">
             <span className="flex items-center gap-1 font-medium text-zinc-200">

@@ -100,6 +100,25 @@ export const GraphMeshCanvas: React.FC<GraphMeshCanvasProps> = ({
     }
   }, [autoCenterTrigger]);
 
+  // Auto-focus matched nodes when search query changes
+  useEffect(() => {
+    const query = searchQuery.trim().toLowerCase();
+    if (!query) return;
+    const matches = simNodesRef.current.filter(
+      (n) =>
+        n.x !== undefined &&
+        n.y !== undefined &&
+        (n.label.toLowerCase().includes(query) || n.id.toLowerCase().includes(query))
+    );
+    if (matches.length > 0 && matches.length <= 4) {
+      const avgX = matches.reduce((sum, n) => sum + (n.x || 0), 0) / matches.length;
+      const avgY = matches.reduce((sum, n) => sum + (n.y || 0), 0) / matches.length;
+      const targetZoom = Math.max(0.95, Math.min(1.35, zoomLevelRef.current));
+      onPanChange({ x: -avgX * targetZoom, y: -avgY * targetZoom });
+      onZoomChange(targetZoom);
+    }
+  }, [searchQuery]);
+
   // Intercept Ctrl + Scroll and Wheel to prevent full-page browser zoom
   useEffect(() => {
     const canvas = canvasRef.current;

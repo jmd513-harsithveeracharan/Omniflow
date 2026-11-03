@@ -27,7 +27,8 @@ export const GraphMeshView: React.FC<GraphMeshViewProps> = ({
   const [data, setData] = useState<GraphMeshResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(projectId || null);
+  const initialProjectId = projectId || (projects.length > 0 ? projects[0].id : 'PRJ-PELI-BIOTHERMAL');
+  const [selectedProjectId, setSelectedProjectId] = useState<string>(initialProjectId);
 
   // Filter & Camera Controls State
   const [searchQuery, setSearchQuery] = useState('');
@@ -44,15 +45,16 @@ export const GraphMeshView: React.FC<GraphMeshViewProps> = ({
 
   // Sync external projectId changes
   useEffect(() => {
-    if (projectId !== undefined) {
+    if (projectId && projectId !== selectedProjectId) {
       setSelectedProjectId(projectId);
     }
   }, [projectId]);
 
-  const loadMesh = (pId: string | null = selectedProjectId) => {
+  const loadMesh = (pId: string = selectedProjectId) => {
+    const targetId = pId || selectedProjectId || (projects.length > 0 ? projects[0].id : 'PRJ-PELI-BIOTHERMAL');
     setIsLoading(true);
     setError(null);
-    fetchGraphMesh(plan, pId)
+    fetchGraphMesh(plan, targetId)
       .then((res) => {
         setData(res);
         // Automatically center the graph after data arrives
@@ -77,6 +79,7 @@ export const GraphMeshView: React.FC<GraphMeshViewProps> = ({
     setSelectedNode(null);
     setHoveredHighlightedEdge(null);
     if (onSelectProject) onSelectProject(newPid);
+    loadMesh(newPid);
   };
 
   const handleHoverHighlightedEdge = (edge: GraphMeshEdge | null, pos: { x: number; y: number } | null) => {

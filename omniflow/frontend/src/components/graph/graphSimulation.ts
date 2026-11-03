@@ -8,7 +8,7 @@ import {
   SimulationLinkDatum,
 } from 'd3-force';
 import { GraphMeshNode, GraphMeshEdge } from '../../types';
-import { wrapLabel } from './graphRenderer';
+import { wrapLabel } from './graphTheme';
 
 export interface D3SimNode extends SimulationNodeDatum, GraphMeshNode {
   id: string;
@@ -168,7 +168,7 @@ export function createSnowflakeSimulation(
 
     // Use 2-line wrapped text dimensions to compute anti-overlap collision bounds
     const lines = wrapLabel(n.label, isHub ? 16 : 12);
-    const maxLineChars = Math.max(...lines.map((l) => l.length));
+    const maxLineChars = Math.max(...lines.map((l: string) => l.length));
     const textHalfWidth = Math.min(48, Math.max(10, maxLineChars * (isHub ? 2.5 : 1.9)));
     const collisionRadius = Math.max(r + 6, textHalfWidth + 3);
     const initPos = posMap.get(n.id) || { x: 0, y: 0 };

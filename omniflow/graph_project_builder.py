@@ -94,9 +94,9 @@ def _extract_project_table_columns(proj_folder: str) -> dict[str, list[dict[str,
 def build_mesh_from_project(project_id: str | None) -> nx.DiGraph:
     """Compiles a scoped NetworkX Relationship Graph for a specific project."""
     if not project_id or project_id in ("all", "galaxy", "default"):
-        return build_rich_medallion_galaxy()
-
-    clean_pid = project_id.strip()
+        clean_pid = "PRJ-PELI-BIOTHERMAL"
+    else:
+        clean_pid = project_id.strip()
 
     # Dedicated production-grade builder for Peli BioThermal Cold-Chain Platform
     if "PELI" in clean_pid.upper() or "BIOTHERMAL" in clean_pid.upper():
