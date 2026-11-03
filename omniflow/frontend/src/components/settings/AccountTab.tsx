@@ -1,12 +1,18 @@
 import React from 'react';
 import { LogOut, X, Users } from 'lucide-react';
+import { FabricStatus } from '../../types';
 
 interface AccountTabProps {
   onClose?: () => void;
   onOpenAccountModal?: () => void;
+  status?: FabricStatus | null;
 }
 
-export const AccountTab: React.FC<AccountTabProps> = ({ onClose, onOpenAccountModal }) => {
+export const AccountTab: React.FC<AccountTabProps> = ({ onClose, onOpenAccountModal, status = null }) => {
+  const displayTenantId = status?.tenantId || 'Primary Organization';
+  const displayWorkspaceId = status?.workspaceId || 'Default Workspace';
+  const displayWorkspaceName = status?.workspaceName || status?.workspaceId || 'Active Target Workspace';
+
   return (
     <div className="settings-tab-pane" id="paneAccount">
       <div className="pane-header-row">
@@ -23,18 +29,18 @@ export const AccountTab: React.FC<AccountTabProps> = ({ onClose, onOpenAccountMo
       <div style={{ padding: '14px 0', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div>
           <div style={{ fontSize: '13px', fontWeight: 500, color: '#f4f4f5' }}>Organization ID</div>
-          <div style={{ fontSize: '11.5px', color: '#71717a' }}>94b62ba4-8d71-4507-9dc9-9734a149f836</div>
+          <div style={{ fontSize: '11.5px', color: '#71717a' }}>{displayTenantId}</div>
         </div>
-        <code style={{ background: 'rgba(255,255,255,0.06)', padding: '3px 8px', borderRadius: '4px', fontSize: '11px', color: '#38bdf8' }}>PBT_TENANT</code>
+        <code style={{ background: 'rgba(255,255,255,0.06)', padding: '3px 8px', borderRadius: '4px', fontSize: '11px', color: '#38bdf8' }}>TENANT ACTIVE</code>
       </div>
 
       <div style={{ padding: '14px 0', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div>
           <div style={{ fontSize: '13px', fontWeight: 500, color: '#f4f4f5' }}>Active Target Workspace</div>
-          <div style={{ fontSize: '11.5px', color: '#71717a' }}>db7344c1-ecd9-44d6-849f-f2de49484f9f</div>
+          <div style={{ fontSize: '11.5px', color: '#71717a' }}>{displayWorkspaceId}</div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <span style={{ fontSize: '12.5px', color: '#10b981', fontWeight: 500 }}>PBT_DATA_AGENT</span>
+          <span style={{ fontSize: '12.5px', color: '#10b981', fontWeight: 500 }}>{displayWorkspaceName}</span>
           {onOpenAccountModal && (
             <button
               type="button"

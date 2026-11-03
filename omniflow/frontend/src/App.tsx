@@ -37,7 +37,13 @@ import {
 import { FabricStatus, ChatMessage, IngestionPlan, WorkspaceItem, ChatSession, ProjectRecord, UserProfile, CredentialRequestData } from './types';
 
 export const App: React.FC = () => {
-  const [activeView, setActiveView] = useState<string>('chat');
+  const [activeView, setActiveView] = useState<string>(() => {
+    try {
+      return localStorage.getItem('omniflow_active_view') || 'chat';
+    } catch {
+      return 'chat';
+    }
+  });
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(false);
   const [isWorkbenchOpen, setIsWorkbenchOpen] = useState<boolean>(false);
   const [status, setStatus] = useState<FabricStatus | null>(null);
@@ -218,6 +224,7 @@ export const App: React.FC = () => {
     try {
       localStorage.removeItem('omniflow_active_project_id');
       localStorage.setItem('omniflow_active_session_id', newSid);
+      localStorage.setItem('omniflow_active_view', 'chat');
     } catch {}
   };
 
@@ -301,6 +308,13 @@ export const App: React.FC = () => {
 
   // Projects Handlers
   const handleSelectProject = async (projectId: string, shouldSwitchToChat: boolean = true) => {
+    if (projectId === activeProjectId && sessionId === ('proj_' + projectId) && messages.length > 0) {
+      if (shouldSwitchToChat) {
+        setActiveView('chat');
+        try { localStorage.setItem('omniflow_active_view', 'chat'); } catch {}
+      }
+      return;
+    }
     setActiveProjectId(projectId);
     try {
       localStorage.setItem('omniflow_active_project_id', projectId);
@@ -619,6 +633,9 @@ export const App: React.FC = () => {
       setIsSettingsModalOpen(true);
     } else {
       setActiveView(view);
+      try {
+        localStorage.setItem('omniflow_active_view', view);
+      } catch {}
     }
   };
 

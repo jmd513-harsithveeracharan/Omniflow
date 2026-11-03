@@ -1,11 +1,13 @@
 import React from 'react';
 import { X, Search } from 'lucide-react';
+import { FabricStatus } from '../../types';
 
 interface ConnectorsTabProps {
   onClose?: () => void;
   onOpenFabricModal?: () => void;
   onOpenAccountModal?: () => void;
   onOpenConnectorModal?: (connectorId: string) => void;
+  status?: FabricStatus | null;
 }
 
 export const ConnectorsTab: React.FC<ConnectorsTabProps> = ({
@@ -13,6 +15,7 @@ export const ConnectorsTab: React.FC<ConnectorsTabProps> = ({
   onOpenFabricModal,
   onOpenAccountModal,
   onOpenConnectorModal,
+  status = null,
 }) => {
   return (
     <div className="settings-tab-pane" id="paneConnectors">
@@ -119,7 +122,9 @@ export const ConnectorsTab: React.FC<ConnectorsTabProps> = ({
               </span>
               <div className="connector-name-details">
                 <span className="connector-name">Microsoft Fabric REST API</span>
-                <span className="connector-meta" id="tableActiveWsName">Active Workspace: PBT_DATA_AGENT</span>
+                <span className="connector-meta" id="tableActiveWsName">
+                  Active Workspace: {status?.workspaceName || status?.workspaceId || 'Default'}
+                </span>
               </div>
             </div>
             <div className="connector-cell-type">Lakehouse Platform</div>

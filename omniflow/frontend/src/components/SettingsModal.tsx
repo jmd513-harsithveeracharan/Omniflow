@@ -143,6 +143,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 onClose={onClose}
                 onOpenFabricModal={() => setIsFabricModalOpen(true)}
                 onOpenAccountModal={() => setIsAccountModalOpen(true)}
+                status={status}
                 onOpenConnectorModal={(id) => {
                   setSelectedConnectorId(id);
                   setIsConnectorModalOpen(true);
@@ -165,6 +166,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               <AccountTab
                 onClose={onClose}
                 onOpenAccountModal={() => setIsAccountModalOpen(true)}
+                status={status}
               />
             )}
             {activeTab === 'tabCapabilities' && <CapabilitiesTab onClose={onClose} />}

@@ -19,20 +19,27 @@ import {
 const API_BASE = '/api';
 
 export async function fetchFabricStatus(): Promise<FabricStatus> {
-  const res = await fetch(`${API_BASE}/fabric/status`);
-  if (!res.ok) throw new Error(`Failed to fetch Fabric status: ${res.statusText}`);
-  const data = await res.json();
-  return {
-    authenticated: Boolean(data.authenticated),
-    workspaceId: data.workspace_id || '',
-    targetFolder: data.target_folder || 'AI_Test_Folder',
-    workspacesCount: data.workspaces_count || 0,
-    message: data.message || '',
-    userIdentity: data.user_identity || '',
-    authMethod: data.auth_method || '',
-    tenantId: data.tenant_id || '',
-    expiresInMinutes: data.expires_in_minutes || 0,
-  };
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 8000);
+  try {
+    const res = await fetch(`${API_BASE}/fabric/status`, { signal: controller.signal });
+    if (!res.ok) throw new Error(`Failed to fetch Fabric status: ${res.statusText}`);
+    const data = await res.json();
+    return {
+      authenticated: Boolean(data.authenticated),
+      workspaceId: data.workspace_id || '',
+      workspaceName: data.workspace_name || data.workspace_id || '',
+      targetFolder: data.target_folder || 'AI_Test_Folder',
+      workspacesCount: data.workspaces_count || 0,
+      message: data.message || '',
+      userIdentity: data.user_identity || '',
+      authMethod: data.auth_method || '',
+      tenantId: data.tenant_id || '',
+      expiresInMinutes: data.expires_in_minutes || 0,
+    };
+  } finally {
+    clearTimeout(timeoutId);
+  }
 }
 
 export async function fetchSessions(userEmail?: string): Promise<ChatSession[]> {
