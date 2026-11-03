@@ -183,7 +183,22 @@ export const App: React.FC = () => {
       });
     } else if (savedSid && !savedSid.startsWith('proj_')) {
       loadProjectsList(false, activeEmail);
-      handleSelectSession(savedSid);
+      let cachedSessionsList: ChatSession[] = [];
+      try {
+        const raw = localStorage.getItem('omniflow_cached_sessions');
+        if (raw) cachedSessionsList = JSON.parse(raw);
+      } catch {}
+      const found = cachedSessionsList.find((s) => s.sessionId === savedSid);
+      if (!found || found.messageCount === 0) {
+        setActiveProjectId(null);
+        setCurrentPlan(null);
+        setActiveView('chat');
+        setSessionId(savedSid);
+        setMessages([]);
+        setIsLoadingSession(false);
+      } else {
+        handleSelectSession(savedSid);
+      }
     } else {
       loadProjectsList(true, activeEmail);
       const initialSid = generateNewSessionId();
@@ -209,6 +224,20 @@ export const App: React.FC = () => {
   const handleSelectSession = async (sid: string) => {
     if (isStreaming) return;
     if (sid === sessionId && messages.length > 0) return;
+    const knownSession = sessions.find((s) => s.sessionId === sid);
+    if (knownSession && knownSession.messageCount === 0) {
+      setActiveProjectId(null);
+      setCurrentPlan(null);
+      setActiveView('chat');
+      setSessionId(sid);
+      setMessages([]);
+      setIsLoadingSession(false);
+      try {
+        localStorage.removeItem('omniflow_active_project_id');
+        localStorage.setItem('omniflow_active_session_id', sid);
+      } catch {}
+      return;
+    }
     try {
       setIsLoadingSession(true);
       setActiveProjectId(null);
@@ -278,13 +307,6 @@ export const App: React.FC = () => {
       localStorage.setItem('omniflow_active_session_id', `proj_${projectId}`);
     } catch {}
 
-    if (projectId === 'playground') {
-      setCurrentPlan(null);
-      if (shouldSwitchToChat) setActiveView('chat');
-      setSessionId('sess_playground');
-      setMessages([]);
-      return;
-    }
 
     try {
       setIsLoadingSession(true);
@@ -633,21 +655,22 @@ export const App: React.FC = () => {
       case 'apps':
         return 'Apps & Ingestion Studio';
       default: {
-        if (activeProjectId && activeProjectId !== 'playground') {
+        if (activeProjectId) {
           const currentProj = projects.find((p) => p.id === activeProjectId);
           return currentProj ? currentProj.name : 'Project';
         }
-        if (sessionId && sessionId !== 'sess_playground') {
+        if (sessionId) {
           const currentSess = sessions.find((s) => s.sessionId === sessionId);
           if (
             currentSess?.title &&
             currentSess.title !== 'Medallion Architecture Session' &&
-            currentSess.title !== 'Architect Orders Medallion Flow'
+            currentSess.title !== 'Architect Orders Medallion Flow' &&
+            currentSess.title !== 'New Conversation'
           ) {
             return currentSess.title;
           }
         }
-        return 'Playground';
+        return 'New Chat';
       }
     }
   };
