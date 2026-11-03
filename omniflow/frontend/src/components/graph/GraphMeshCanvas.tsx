@@ -3,6 +3,7 @@ import { Simulation } from 'd3-force';
 import { GraphMeshNode, GraphMeshEdge } from '../../types';
 import { D3SimNode, D3SimLink, createSnowflakeSimulation } from './graphSimulation';
 import { renderGraphMesh } from './graphRenderer';
+import { distToSegment } from './graphTheme';
 
 interface GraphMeshCanvasProps {
   nodes: GraphMeshNode[];
@@ -19,16 +20,6 @@ interface GraphMeshCanvasProps {
   panOffset: { x: number; y: number };
   onPanChange: (pan: { x: number; y: number }) => void;
   autoCenterTrigger?: number;
-}
-
-function distToSegment(px: number, py: number, x1: number, y1: number, x2: number, y2: number): number {
-  const dx = x2 - x1;
-  const dy = y2 - y1;
-  const l2 = dx * dx + dy * dy;
-  if (l2 === 0) return Math.hypot(px - x1, py - y1);
-  let t = ((px - x1) * dx + (py - y1) * dy) / l2;
-  t = Math.max(0, Math.min(1, t));
-  return Math.hypot(px - (x1 + t * dx), py - (y1 + t * dy));
 }
 
 export const GraphMeshCanvas: React.FC<GraphMeshCanvasProps> = ({
@@ -61,6 +52,10 @@ export const GraphMeshCanvas: React.FC<GraphMeshCanvasProps> = ({
   const hoverTimeoutRef = useRef<number | null>(null);
   const currentHoveredIdRef = useRef<string | null>(null);
   const pendingCandidateRef = useRef<D3SimNode | null>(null);
+
+  // Smooth "Ooze Out" Focus Animation (0.0 to 1.0)
+  const focusTransitionRef = useRef<number>(0.0);
+  const lastRenderTimeRef = useRef<number>(performance.now());
 
   const zoomLevelRef = useRef(zoomLevel);
   zoomLevelRef.current = zoomLevel;
@@ -193,6 +188,23 @@ export const GraphMeshCanvas: React.FC<GraphMeshCanvasProps> = ({
     if (!ctx) return;
 
     const render = () => {
+      const now = performance.now();
+      const dt = Math.min(0.05, (now - lastRenderTimeRef.current) / 1000);
+      lastRenderTimeRef.current = now;
+
+      // Active focal item (either explicitly selected or hovered)
+      const hasActive = Boolean(selectedNode || hoveredNode);
+      const targetFocus = hasActive ? 1.0 : 0.0;
+
+      // Smooth exponential easing for the "ooze out" bloom
+      // Blooming in: ~250ms organic expansion; Easing out: ~280ms smooth fade back to baseline
+      const speed = targetFocus > focusTransitionRef.current ? 5.8 : 6.8;
+      focusTransitionRef.current += (targetFocus - focusTransitionRef.current) * (1 - Math.exp(-speed * dt));
+
+      if (Math.abs(focusTransitionRef.current - targetFocus) < 0.003) {
+        focusTransitionRef.current = targetFocus;
+      }
+
       const dpr = window.devicePixelRatio || 1;
       const w = canvas.clientWidth;
       const h = canvas.clientHeight;
@@ -217,6 +229,7 @@ export const GraphMeshCanvas: React.FC<GraphMeshCanvasProps> = ({
         searchQuery,
         zoomLevel,
         panOffset,
+        focusProgress: focusTransitionRef.current,
       });
 
       ctx.restore();
@@ -320,7 +333,7 @@ export const GraphMeshCanvas: React.FC<GraphMeshCanvasProps> = ({
       }
       pendingCandidateRef.current = foundHovered;
 
-      const dwellMs = foundHovered ? 120 : 80;
+      const dwellMs = foundHovered ? 60 : 70;
 
       hoverTimeoutRef.current = window.setTimeout(() => {
         currentHoveredIdRef.current = foundId;

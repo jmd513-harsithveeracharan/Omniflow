@@ -18,6 +18,7 @@ export interface RenderGraphOptions {
   searchQuery: string;
   zoomLevel: number;
   panOffset: { x: number; y: number };
+  focusProgress?: number; // 0.0 (neutral baseline) to 1.0 (fully focused)
 }
 
 export function renderGraphMesh(opts: RenderGraphOptions): void {
@@ -33,6 +34,7 @@ export function renderGraphMesh(opts: RenderGraphOptions): void {
     searchQuery,
     zoomLevel,
     panOffset,
+    focusProgress,
   } = opts;
 
   const isLayerVisible = (layer: string) => {
@@ -78,6 +80,9 @@ export function renderGraphMesh(opts: RenderGraphOptions): void {
   const connectedNodeSet = new Set<string>();
   const connectedEdgeSet = new Set<string>();
 
+  // Smooth focus interpolation factor (0.0 = neutral galaxy, 1.0 = fully focused)
+  const t = focusProgress !== undefined ? focusProgress : (activeId ? 1.0 : 0.0);
+
   if (activeId && !hasSearch) {
     connectedNodeSet.add(activeId);
     for (const link of simLinks) {
@@ -108,9 +113,6 @@ export function renderGraphMesh(opts: RenderGraphOptions): void {
     const isEdgeHovered = hoveredEdgeId === link.id;
     const isEdgeConnected = !hasSearch && activeId ? connectedEdgeSet.has(link.id) : false;
     const isSearchEdge = hasSearch && searchConnectedEdgeIds.has(link.id);
-    const isDimmed = !hasSearch && activeId && !isEdgeConnected && !isEdgeHovered;
-    if (isDimmed) continue;
-
     const isFlowEdge = link.relationship !== 'CONTAINS';
 
     ctx.save();
@@ -118,26 +120,45 @@ export function renderGraphMesh(opts: RenderGraphOptions): void {
     ctx.moveTo(na.x, na.y);
     ctx.lineTo(nb.x, nb.y);
 
+    let strokeColor = '';
+    let lineWidth = 0.85;
+
     if (isEdgeHovered) {
-      ctx.strokeStyle = '#f4f4f5';
-      ctx.lineWidth = 2.0;
+      strokeColor = '#f4f4f5';
+      lineWidth = 2.0;
       ctx.shadowColor = 'rgba(255, 255, 255, 0.6)';
       ctx.shadowBlur = 8;
-    } else if (isEdgeConnected || isSearchEdge) {
-      ctx.strokeStyle = 'rgba(244, 244, 245, 0.75)';
-      ctx.lineWidth = 1.35;
-      ctx.shadowColor = 'rgba(255, 255, 255, 0.2)';
-      ctx.shadowBlur = 4;
+    } else if (hasSearch) {
+      if (isSearchEdge) {
+        strokeColor = 'rgba(244, 244, 245, 0.75)';
+        lineWidth = 1.35;
+      } else {
+        ctx.restore();
+        continue;
+      }
+    } else if (isEdgeConnected) {
+      // Connected edges smoothly brighten and thicken with focus transition
+      const alpha = 0.28 + t * 0.50;
+      lineWidth = 0.85 + t * 0.55;
+      strokeColor = `rgba(244, 244, 245, ${alpha.toFixed(3)})`;
+      if (t > 0.25) {
+        ctx.shadowColor = `rgba(255, 255, 255, ${(t * 0.25).toFixed(3)})`;
+        ctx.shadowBlur = t * 4;
+      }
     } else if (isFlowEdge) {
-      // Neutral clean grey for all cross-table and pipeline flows
-      ctx.strokeStyle = 'rgba(161, 161, 170, 0.28)';
-      ctx.lineWidth = 0.85;
+      // Background flow edges gently ease down to 0.07 (never zero/empty void)
+      const alpha = 0.28 - t * 0.21;
+      lineWidth = 0.85 - t * 0.30;
+      strokeColor = `rgba(161, 161, 170, ${alpha.toFixed(3)})`;
     } else {
-      // Subtle intra-table column containment spokes
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.06)';
-      ctx.lineWidth = 0.5;
+      // Intra-table column containment spokes
+      const alpha = 0.06 - t * 0.04;
+      lineWidth = 0.5;
+      strokeColor = `rgba(255, 255, 255, ${alpha.toFixed(3)})`;
     }
 
+    ctx.strokeStyle = strokeColor;
+    ctx.lineWidth = lineWidth;
     ctx.stroke();
 
     // Directional Arrowhead for data flows
@@ -151,7 +172,11 @@ export function renderGraphMesh(opts: RenderGraphOptions): void {
         const arrowDist = dist - (targetR + 3);
         const ax = na.x + Math.cos(angle) * arrowDist;
         const ay = na.y + Math.sin(angle) * arrowDist;
-        const arrowSize = isEdgeHovered || isEdgeConnected || isSearchEdge ? 5.2 : 3.8;
+        const arrowSize = isEdgeHovered
+          ? 5.2
+          : isEdgeConnected
+          ? 3.8 + t * 1.4
+          : Math.max(2.5, 3.8 - t * 1.0);
 
         ctx.beginPath();
         ctx.moveTo(ax, ay);
@@ -164,7 +189,7 @@ export function renderGraphMesh(opts: RenderGraphOptions): void {
           ay - Math.sin(angle + Math.PI / 6) * arrowSize
         );
         ctx.closePath();
-        ctx.fillStyle = ctx.strokeStyle;
+        ctx.fillStyle = strokeColor;
         ctx.fill();
       }
     }
@@ -184,7 +209,6 @@ export function renderGraphMesh(opts: RenderGraphOptions): void {
     const isClickConnected = activeId ? connectedNodeSet.has(n.id) : true;
 
     let opacity = 1.0;
-    let isDimmed = false;
 
     if (hasSearch) {
       if (isDirectMatch) {
@@ -193,14 +217,13 @@ export function renderGraphMesh(opts: RenderGraphOptions): void {
         opacity = 0.65;
       } else {
         opacity = 0.03;
-        isDimmed = true;
       }
     } else if (activeId) {
       if (isClickConnected) {
         opacity = 1.0;
       } else {
-        opacity = 0.05;
-        isDimmed = true;
+        // Smoothly eases into half-black depth (0.22 opacity) - never completely black or empty!
+        opacity = 1.0 - t * 0.78;
       }
     }
 
@@ -209,7 +232,7 @@ export function renderGraphMesh(opts: RenderGraphOptions): void {
     const baseColor = LAYER_COLORS[n.layer] || DEFAULT_NODE_COLOR;
 
     ctx.save();
-    ctx.globalAlpha = opacity;
+    ctx.globalAlpha = Math.max(0.04, opacity);
 
     // Node Circle
     ctx.beginPath();
@@ -244,12 +267,21 @@ export function renderGraphMesh(opts: RenderGraphOptions): void {
       ctx.shadowBlur = 8;
       ctx.stroke();
       ctx.restore();
-    } else if (isCurrentHovered) {
+    } else if (isCurrentHovered && t > 0.04) {
+      // Dynamic "Ooze Out" Halo: ring smoothly expands outward as focus blooms
       ctx.save();
+      const ringExpand = 1.0 + t * 2.2;
+      const ringAlpha = Math.min(1.0, t * 0.9);
+      const blurAmount = t * 8.0;
+
       ctx.beginPath();
-      ctx.arc(n.x, n.y, n.radius + 2.8, 0, Math.PI * 2);
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.7)';
-      ctx.lineWidth = 1.4;
+      ctx.arc(n.x, n.y, n.radius + ringExpand, 0, Math.PI * 2);
+      ctx.strokeStyle = `rgba(255, 255, 255, ${ringAlpha.toFixed(3)})`;
+      ctx.lineWidth = 1.1 + t * 0.4;
+      if (blurAmount > 1) {
+        ctx.shadowColor = `rgba(255, 255, 255, ${(t * 0.4).toFixed(3)})`;
+        ctx.shadowBlur = blurAmount;
+      }
       ctx.stroke();
       ctx.restore();
     }
@@ -264,7 +296,7 @@ export function renderGraphMesh(opts: RenderGraphOptions): void {
       (n.isHub && zoomLevel > 0.75) ||
       zoomLevel > 1.45;
 
-    if (showLabel && !isDimmed) {
+    if (showLabel) {
       let fontSize = 7.8;
       let fontWeight = '400';
       if (isDirectMatch) {
@@ -289,6 +321,9 @@ export function renderGraphMesh(opts: RenderGraphOptions): void {
       } else if (n.type === 'column') {
         fontColor = '#94a3b8';
       }
+
+      const textDimAlpha = activeId && !isClickConnected ? Math.max(0.12, 1.0 - t * 0.88) : 1.0;
+      ctx.globalAlpha = textDimAlpha * opacity;
 
       ctx.font = `${fontWeight} ${fontSize}px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
       ctx.fillStyle = fontColor;

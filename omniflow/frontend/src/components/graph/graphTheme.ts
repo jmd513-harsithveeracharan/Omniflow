@@ -53,3 +53,23 @@ export function wrapLabel(text: string, maxLineChars = 14): string[] {
   return [text.slice(0, half) + '-', text.slice(half)];
 }
 
+/**
+ * Calculates perpendicular distance from point (px, py) to line segment (x1, y1) - (x2, y2).
+ */
+export function distToSegment(
+  px: number,
+  py: number,
+  x1: number,
+  y1: number,
+  x2: number,
+  y2: number
+): number {
+  const dx = x2 - x1;
+  const dy = y2 - y1;
+  const l2 = dx * dx + dy * dy;
+  if (l2 === 0) return Math.hypot(px - x1, py - y1);
+  let t = ((px - x1) * dx + (py - y1) * dy) / l2;
+  t = Math.max(0, Math.min(1, t));
+  return Math.hypot(px - (x1 + t * dx), py - (y1 + t * dy));
+}
+
