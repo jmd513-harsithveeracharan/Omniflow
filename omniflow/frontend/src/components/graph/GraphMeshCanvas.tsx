@@ -57,8 +57,22 @@ export const GraphMeshCanvas: React.FC<GraphMeshCanvasProps> = ({
   const [hoveredEdgeId, setHoveredEdgeId] = useState<string | null>(null);
   const [hoveredNode, setHoveredNode] = useState<D3SimNode | null>(null);
 
+  // Hover Intent / Debounce refs to prevent jitter on cursor sweeps
+  const hoverTimeoutRef = useRef<number | null>(null);
+  const currentHoveredIdRef = useRef<string | null>(null);
+  const pendingCandidateRef = useRef<D3SimNode | null>(null);
+
   const zoomLevelRef = useRef(zoomLevel);
   zoomLevelRef.current = zoomLevel;
+
+  // Cleanup pending hover timer on unmount
+  useEffect(() => {
+    return () => {
+      if (hoverTimeoutRef.current) {
+        window.clearTimeout(hoverTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const autoCenter = () => {
     const canvas = canvasRef.current;
@@ -225,6 +239,14 @@ export const GraphMeshCanvas: React.FC<GraphMeshCanvasProps> = ({
     );
 
     if (clicked) {
+      if (hoverTimeoutRef.current) {
+        window.clearTimeout(hoverTimeoutRef.current);
+        hoverTimeoutRef.current = null;
+      }
+      currentHoveredIdRef.current = clicked.id;
+      pendingCandidateRef.current = clicked;
+      setHoveredNode(clicked);
+
       draggedNodeRef.current = clicked;
       if (simulationRef.current) {
         simulationRef.current.alphaTarget(0.3).restart();
@@ -240,6 +262,13 @@ export const GraphMeshCanvas: React.FC<GraphMeshCanvasProps> = ({
         onHoverHighlightedEdge(null, null);
       }
     } else {
+      if (hoverTimeoutRef.current) {
+        window.clearTimeout(hoverTimeoutRef.current);
+        hoverTimeoutRef.current = null;
+      }
+      currentHoveredIdRef.current = null;
+      pendingCandidateRef.current = null;
+      setHoveredNode(null);
       onSelectNode(null);
       onHoverHighlightedEdge(null, null);
       isDraggingCanvasRef.current = true;
@@ -271,16 +300,41 @@ export const GraphMeshCanvas: React.FC<GraphMeshCanvasProps> = ({
     const mx = (clientX - rect.left - canvas.clientWidth / 2 - panOffset.x) / zoomLevel;
     const my = (clientY - rect.top - canvas.clientHeight / 2 - panOffset.y) / zoomLevel;
 
-    // Detect hovered node for instant hover-highlighting
+    // Detect hovered node with Hover Intent Debounce (120ms) to eliminate cursor sweep jitter
     const foundHovered = simNodesRef.current.find(
       (n) => n.x !== undefined && n.y !== undefined && Math.hypot(n.x - mx, n.y - my) <= n.radius + 6
-    );
+    ) || null;
 
-    if (foundHovered?.id !== hoveredNode?.id) {
-      setHoveredNode(foundHovered || null);
+    const foundId = foundHovered?.id || null;
+
+    if (foundId === currentHoveredIdRef.current) {
+      if (hoverTimeoutRef.current && pendingCandidateRef.current?.id !== foundId) {
+        window.clearTimeout(hoverTimeoutRef.current);
+        hoverTimeoutRef.current = null;
+        pendingCandidateRef.current = null;
+      }
+    } else if (foundId !== pendingCandidateRef.current?.id) {
+      if (hoverTimeoutRef.current) {
+        window.clearTimeout(hoverTimeoutRef.current);
+        hoverTimeoutRef.current = null;
+      }
+      pendingCandidateRef.current = foundHovered;
+
+      const dwellMs = foundHovered ? 120 : 80;
+
+      hoverTimeoutRef.current = window.setTimeout(() => {
+        currentHoveredIdRef.current = foundId;
+        setHoveredNode(foundHovered);
+        if (!foundHovered) {
+          setHoveredEdgeId(null);
+          onHoverHighlightedEdge(null, null);
+        }
+        hoverTimeoutRef.current = null;
+        pendingCandidateRef.current = null;
+      }, dwellMs);
     }
 
-    const focalNode = selectedNode || foundHovered || hoveredNode;
+    const focalNode = selectedNode || hoveredNode;
     if (focalNode) {
       const threshold = 7 / zoomLevel;
       let foundLink: D3SimLink | null = null;
@@ -338,6 +392,12 @@ export const GraphMeshCanvas: React.FC<GraphMeshCanvasProps> = ({
       onMouseUp={handleMouseUp}
       onMouseLeave={() => {
         handleMouseUp();
+        if (hoverTimeoutRef.current) {
+          window.clearTimeout(hoverTimeoutRef.current);
+          hoverTimeoutRef.current = null;
+        }
+        pendingCandidateRef.current = null;
+        currentHoveredIdRef.current = null;
         setHoveredNode(null);
         setHoveredEdgeId(null);
         onHoverHighlightedEdge(null, null);

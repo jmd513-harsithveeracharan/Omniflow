@@ -52,3 +52,4 @@ export function wrapLabel(text: string, maxLineChars = 14): string[] {
   const half = Math.ceil(text.length / 2);
   return [text.slice(0, half) + '-', text.slice(half)];
 }
+
