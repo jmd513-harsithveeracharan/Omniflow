@@ -703,44 +703,48 @@ export const Sidebar: React.FC<SidebarProps> = ({
                             bottom: isSubmenuNearBottom ? '-4px' : 'auto',
                             width: '220px',
                             maxHeight: '240px',
-                            overflowY: 'auto',
+                            overflow: 'hidden',
+                            display: 'flex',
+                            flexDirection: 'column',
                             background: '#18181b',
                             borderRadius: '12px',
                             border: '1px solid rgba(255, 255, 255, 0.12)',
                             boxShadow: '0 20px 48px rgba(0, 0, 0, 0.9)',
-                            padding: '5px',
+                            padding: '6px 0',
                             zIndex: 1000000,
                             backdropFilter: 'blur(16px)',
                           }}
                           onClick={(e) => e.stopPropagation()}
                         >
-                          <div style={{ fontSize: '11px', fontWeight: 600, color: '#a1a1aa', padding: '5px 8px 4px 8px' }}>
+                          <div style={{ fontSize: '11px', fontWeight: 600, color: '#a1a1aa', padding: '2px 10px 5px 10px', flexShrink: 0 }}>
                             Select project
                           </div>
-                          {activeProjectsList.length === 0 ? (
-                            <div style={{ fontSize: '11px', color: '#71717a', padding: '6px 8px' }}>
-                              No projects available
-                            </div>
-                          ) : (
-                            activeProjectsList.map((p) => (
-                              <div
-                                key={p.id}
-                                className="chat-menu-item"
-                                style={{ padding: '6px 8px', fontSize: '12px' }}
-                                onClick={() => {
-                                  setChatMenuSessionId(null);
-                                  setChatMenuPos(null);
-                                  setIsMoveSubmenuOpen(false);
-                                  onMoveSessionToProject?.(targetId, p.id);
-                                }}
-                              >
-                                <Folder width={12} height={12} style={{ color: '#10b981', flexShrink: 0 }} />
-                                <span className="menu-label" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={p.name}>
-                                  {p.name}
-                                </span>
+                          <div style={{ overflowY: 'auto', flex: 1, paddingLeft: '5px', paddingRight: '2px' }}>
+                            {activeProjectsList.length === 0 ? (
+                              <div style={{ fontSize: '11px', color: '#71717a', padding: '6px 8px' }}>
+                                No projects available
                               </div>
-                            ))
-                          )}
+                            ) : (
+                              activeProjectsList.map((p) => (
+                                <div
+                                  key={p.id}
+                                  className="chat-menu-item"
+                                  style={{ padding: '6px 8px', fontSize: '12px' }}
+                                  onClick={() => {
+                                    setChatMenuSessionId(null);
+                                    setChatMenuPos(null);
+                                    setIsMoveSubmenuOpen(false);
+                                    onMoveSessionToProject?.(targetId, p.id);
+                                  }}
+                                >
+                                  <Folder width={12} height={12} style={{ color: '#10b981', flexShrink: 0 }} />
+                                  <span className="menu-label" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={p.name}>
+                                    {p.name}
+                                  </span>
+                                </div>
+                              ))
+                            )}
+                          </div>
                         </div>
                       );
                     })()}

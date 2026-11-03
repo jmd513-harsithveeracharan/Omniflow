@@ -72,10 +72,10 @@ export const WorkspaceSelectorDropdown: React.FC<WorkspaceSelectorDropdownProps>
 
       {isOpen && (
         <div
-          className="absolute left-0 top-[calc(100%+6px)] z-50 w-80 rounded-xl bg-[#18181b] border border-zinc-700/80 shadow-[0_20px_48px_rgba(0,0,0,0.9)] backdrop-blur-xl p-2 animate-in fade-in zoom-in-95 duration-100"
+          className="absolute left-0 top-[calc(100%+6px)] z-50 w-80 rounded-xl bg-[#18181b] border border-zinc-700/80 shadow-[0_20px_48px_rgba(0,0,0,0.9)] backdrop-blur-xl py-2 overflow-hidden animate-in fade-in zoom-in-95 duration-100"
           style={{ maxHeight: '380px' }}
         >
-          <div className="flex items-center gap-2 px-2.5 py-1.5 mb-2 rounded-lg bg-zinc-900/90 border border-zinc-800 text-xs text-zinc-300">
+          <div className="flex items-center gap-2 px-2.5 py-1.5 mx-2 mb-2 rounded-lg bg-zinc-900/90 border border-zinc-800 text-xs text-zinc-300">
             <Search className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
             <input
               type="text"
@@ -87,7 +87,7 @@ export const WorkspaceSelectorDropdown: React.FC<WorkspaceSelectorDropdownProps>
             />
           </div>
 
-          <div className="mt-1 overflow-y-auto max-h-64 flex flex-col gap-0.5 pr-0.5">
+          <div className="mt-1 overflow-y-auto max-h-64 flex flex-col gap-0.5 pl-2 pr-1">
             {filtered.length === 0 ? (
               <div className="px-3 py-4 text-xs text-center text-zinc-500">
                 No matching workspaces found

@@ -2297,7 +2297,8 @@ nav.sidebar-nav {
     border: 1px solid rgba(255, 255, 255, 0.12);
     border-radius: 14px;
     box-shadow: 0 16px 40px rgba(0, 0, 0, 0.75);
-    padding: 6px;
+    padding: 6px 0 6px 6px;
+    overflow: hidden;
     z-index: 1005;
     animation: fadeInMsg 0.12s ease forwards;
     max-height: 290px;
@@ -2321,7 +2322,7 @@ nav.sidebar-nav {
     gap: 2px;
     overflow-y: auto;
     max-height: 275px;
-    padding-right: 3px;
+    padding-right: 4px;
 }
 
 .dock-effort-submenu .submenu-model-list {

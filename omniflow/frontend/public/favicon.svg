@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
+  <!-- Left Face (Shadowed) -->
+  <path d="M16 3L3 10.5V21.5L16 29L29 21.5V10.5L16 3Z" fill="#008272" />
+  <!-- Right Face (Mid-tone) -->
+  <path d="M16 3L29 10.5V21.5L16 29V3Z" fill="#00a88f" />
+  <!-- Top Face (Highlight) -->
+  <path d="M16 3L29 10.5L16 18L3 10.5L16 3Z" fill="#00d2a0" />
+</svg>
+

@@ -150,8 +150,8 @@ export const ConnectorModal: React.FC<ConnectorModalProps> = ({
           </div>
 
           {/* Table Discovery & Strategy Configuration */}
-          <div className="flex-1 flex flex-col bg-[#080d1a] overflow-hidden p-5">
-            <div className="flex items-center justify-between mb-4">
+          <div className="flex-1 flex flex-col bg-[#080d1a] overflow-hidden py-5">
+            <div className="flex items-center justify-between mb-4 px-5">
               <div>
                 <h3 className="text-xs font-semibold text-white uppercase tracking-wider">Discovered Schema Tables</h3>
                 <p className="text-[11px] text-slate-400">Select tables to ingest and configure Medallion Delta strategies</p>
@@ -167,7 +167,7 @@ export const ConnectorModal: React.FC<ConnectorModalProps> = ({
             </div>
 
             {testResult && (
-              <div className={`p-2.5 rounded-lg mb-3 border text-xs flex items-center gap-2 ${
+              <div className={`mx-5 p-2.5 rounded-lg mb-3 border text-xs flex items-center gap-2 ${
                 testResult.success ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300' : 'bg-rose-500/10 border-rose-500/30 text-rose-300'
               }`}>
                 {testResult.success ? <CheckCircle2 className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
@@ -176,7 +176,7 @@ export const ConnectorModal: React.FC<ConnectorModalProps> = ({
             )}
 
             {/* Tables List */}
-            <div className="flex-1 overflow-y-auto space-y-2">
+            <div className="flex-1 overflow-y-auto pl-5 pr-2 space-y-2">
               {tables.map((tbl, idx) => (
                 <div
                   key={tbl.name}
