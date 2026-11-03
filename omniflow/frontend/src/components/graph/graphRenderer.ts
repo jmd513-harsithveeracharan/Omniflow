@@ -61,8 +61,10 @@ export interface RenderGraphOptions {
   simNodes: D3SimNode[];
   simLinks: D3SimLink[];
   selectedNode: GraphMeshNode | null;
+  hoveredNode?: GraphMeshNode | null;
   hoveredEdgeId: string | null;
-  selectedLayer: string;
+  selectedLayer?: string;
+  selectedLayers?: string[] | string;
   searchQuery: string;
   zoomLevel: number;
   panOffset: { x: number; y: number };
@@ -76,12 +78,20 @@ export function renderGraphMesh(opts: RenderGraphOptions): void {
     simNodes,
     simLinks,
     selectedNode,
+    hoveredNode = null,
     hoveredEdgeId,
-    selectedLayer,
     searchQuery,
     zoomLevel,
     panOffset,
   } = opts;
+
+  const isLayerVisible = (layer: string) => {
+    const layers = opts.selectedLayers ?? opts.selectedLayer ?? 'all';
+    if (Array.isArray(layers)) {
+      return layers.includes('all') || layers.includes(layer);
+    }
+    return layers === 'all' || layers === layer;
+  };
 
   ctx.clearRect(0, 0, w, h);
 
@@ -90,7 +100,7 @@ export function renderGraphMesh(opts: RenderGraphOptions): void {
   ctx.translate(w / 2 + panOffset.x, h / 2 + panOffset.y);
   ctx.scale(zoomLevel, zoomLevel);
 
-  const activeId = selectedNode?.id || null;
+  const activeId = selectedNode?.id || hoveredNode?.id || null;
   const connectedNodeSet = new Set<string>();
   const connectedEdgeSet = new Set<string>();
 
@@ -113,7 +123,7 @@ export function renderGraphMesh(opts: RenderGraphOptions): void {
     const nb = link.target;
     if (na.x === undefined || na.y === undefined || nb.x === undefined || nb.y === undefined) continue;
 
-    const isLayerVis = selectedLayer === 'all' || na.layer === selectedLayer || nb.layer === selectedLayer;
+    const isLayerVis = isLayerVisible(na.layer) || isLayerVisible(nb.layer);
     if (!isLayerVis) continue;
 
     const isEdgeConnected = activeId ? connectedEdgeSet.has(link.id) : false;
@@ -127,15 +137,15 @@ export function renderGraphMesh(opts: RenderGraphOptions): void {
     ctx.lineTo(nb.x, nb.y);
 
     if (isEdgeHovered) {
-      ctx.strokeStyle = '#4ba473';
-      ctx.lineWidth = 1.6;
-      ctx.shadowColor = 'rgba(75, 164, 115, 0.6)';
-      ctx.shadowBlur = 6;
+      ctx.strokeStyle = '#38bdf8';
+      ctx.lineWidth = 1.8;
+      ctx.shadowColor = 'rgba(56, 189, 248, 0.7)';
+      ctx.shadowBlur = 7;
     } else if (isEdgeConnected) {
       ctx.strokeStyle = '#4ba473';
-      ctx.lineWidth = 1.2;
-      ctx.shadowColor = 'rgba(75, 164, 115, 0.3)';
-      ctx.shadowBlur = 3;
+      ctx.lineWidth = 1.25;
+      ctx.shadowColor = 'rgba(75, 164, 115, 0.35)';
+      ctx.shadowBlur = 3.5;
     } else if (isDimmed) {
       ctx.strokeStyle = 'rgba(255, 255, 255, 0.02)';
       ctx.lineWidth = 0.5;
@@ -198,35 +208,53 @@ export function renderGraphMesh(opts: RenderGraphOptions): void {
     ctx.restore();
   }
 
-  // 2. Draw Solid Half-Bright Nodes
+  // 2. Draw Solid Half-Bright Nodes (Never washed out to pure white)
   for (const n of simNodes) {
     if (n.x === undefined || n.y === undefined) continue;
 
-    const matchesLayer = selectedLayer === 'all' || n.layer === selectedLayer;
+    const matchesLayer = isLayerVisible(n.layer);
     const matchesSearch = !searchQuery || n.label.toLowerCase().includes(searchQuery.toLowerCase());
     const isConnected = activeId ? connectedNodeSet.has(n.id) : true;
     const isDimmed = !matchesLayer || !matchesSearch || (activeId && !isConnected);
-    const isCurrentActive = n.id === activeId;
+    const isCurrentActive = n.id === selectedNode?.id;
+    const isCurrentHovered = n.id === hoveredNode?.id;
 
     const baseColor = LAYER_COLORS[n.layer] || DEFAULT_NODE_COLOR;
 
     ctx.save();
     ctx.globalAlpha = isDimmed ? 0.06 : 1.0;
 
-    if (isCurrentActive) {
-      ctx.shadowColor = 'rgba(75, 164, 115, 0.5)';
-      ctx.shadowBlur = 7;
-    }
-
-    // Node Circle
+    // Node Circle: retains its distinct medallion layer color!
     ctx.beginPath();
     ctx.arc(n.x, n.y, n.radius, 0, Math.PI * 2);
-    ctx.fillStyle = isCurrentActive ? '#f1f5f9' : baseColor;
+    ctx.fillStyle = baseColor;
     ctx.fill();
 
-    // 3. Proportional, 2-Liner Greyish Typography Below Node
+    // Vibrant accent ring & halo when active or hovered (instead of coloring the node white)
+    if (isCurrentActive) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(n.x, n.y, n.radius + 3.2, 0, Math.PI * 2);
+      ctx.strokeStyle = '#38bdf8';
+      ctx.lineWidth = 1.8;
+      ctx.shadowColor = 'rgba(56, 189, 248, 0.75)';
+      ctx.shadowBlur = 8;
+      ctx.stroke();
+      ctx.restore();
+    } else if (isCurrentHovered) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(n.x, n.y, n.radius + 2.8, 0, Math.PI * 2);
+      ctx.strokeStyle = 'rgba(56, 189, 248, 0.65)';
+      ctx.lineWidth = 1.4;
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // 3. Proportional, 2-Liner Typography Below Node
     const showLabel =
       isCurrentActive ||
+      isCurrentHovered ||
       (activeId && isConnected) ||
       (n.isHub && zoomLevel > 0.75) ||
       zoomLevel > 1.45 ||
@@ -240,18 +268,17 @@ export function renderGraphMesh(opts: RenderGraphOptions): void {
       let fontWeight = '400';
       if (n.radius >= 7.0) {
         fontSize = 10.5;
-        fontWeight = isCurrentActive ? '600' : '500';
+        fontWeight = isCurrentActive || isCurrentHovered ? '600' : '500';
       } else if (n.radius >= 5.0) {
         fontSize = 9.2;
-        fontWeight = isCurrentActive ? '600' : '500';
+        fontWeight = isCurrentActive || isCurrentHovered ? '600' : '500';
       } else {
         fontSize = 7.8;
         fontWeight = '400';
       }
 
-      // Slightly greyish font coloring (slate-300 / slate-400)
       let fontColor = '#cbd5e1';
-      if (isCurrentActive) {
+      if (isCurrentActive || isCurrentHovered) {
         fontColor = '#f8fafc';
       } else if (n.type === 'column') {
         fontColor = '#94a3b8';

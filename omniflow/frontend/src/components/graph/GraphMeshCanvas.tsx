@@ -7,7 +7,8 @@ import { renderGraphMesh } from './graphRenderer';
 interface GraphMeshCanvasProps {
   nodes: GraphMeshNode[];
   edges: GraphMeshEdge[];
-  selectedLayer: string;
+  selectedLayer?: string;
+  selectedLayers?: string[];
   searchQuery: string;
   isPhysicsActive: boolean;
   selectedNode: GraphMeshNode | null;
@@ -17,6 +18,7 @@ interface GraphMeshCanvasProps {
   onZoomChange: (zoom: number) => void;
   panOffset: { x: number; y: number };
   onPanChange: (pan: { x: number; y: number }) => void;
+  autoCenterTrigger?: number;
 }
 
 function distToSegment(px: number, py: number, x1: number, y1: number, x2: number, y2: number): number {
@@ -32,7 +34,8 @@ function distToSegment(px: number, py: number, x1: number, y1: number, x2: numbe
 export const GraphMeshCanvas: React.FC<GraphMeshCanvasProps> = ({
   nodes,
   edges,
-  selectedLayer,
+  selectedLayer = 'all',
+  selectedLayers,
   searchQuery,
   isPhysicsActive,
   selectedNode,
@@ -42,6 +45,7 @@ export const GraphMeshCanvas: React.FC<GraphMeshCanvasProps> = ({
   onZoomChange,
   panOffset,
   onPanChange,
+  autoCenterTrigger,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const simulationRef = useRef<Simulation<D3SimNode, D3SimLink> | null>(null);
@@ -51,9 +55,50 @@ export const GraphMeshCanvas: React.FC<GraphMeshCanvasProps> = ({
   const draggedNodeRef = useRef<D3SimNode | null>(null);
   const lastMousePosRef = useRef({ x: 0, y: 0 });
   const [hoveredEdgeId, setHoveredEdgeId] = useState<string | null>(null);
+  const [hoveredNode, setHoveredNode] = useState<D3SimNode | null>(null);
 
   const zoomLevelRef = useRef(zoomLevel);
   zoomLevelRef.current = zoomLevel;
+
+  const autoCenter = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const activeNodes = simNodesRef.current.filter((n) => n.x !== undefined && n.y !== undefined);
+    if (activeNodes.length === 0) return;
+
+    let minX = Infinity;
+    let maxX = -Infinity;
+    let minY = Infinity;
+    let maxY = -Infinity;
+    for (const n of activeNodes) {
+      if (n.x! < minX) minX = n.x!;
+      if (n.x! > maxX) maxX = n.x!;
+      if (n.y! < minY) minY = n.y!;
+      if (n.y! > maxY) maxY = n.y!;
+    }
+
+    const graphWidth = Math.max(120, maxX - minX);
+    const graphHeight = Math.max(120, maxY - minY);
+    const centerX = (minX + maxX) / 2;
+    const centerY = (minY + maxY) / 2;
+
+    const cw = canvas.clientWidth || 1000;
+    const ch = canvas.clientHeight || 700;
+
+    const zoomX = (cw - 220) / graphWidth;
+    const zoomY = (ch - 160) / graphHeight;
+    const fitZoom = Math.max(0.35, Math.min(1.35, Math.min(zoomX, zoomY)));
+
+    onPanChange({ x: -centerX * fitZoom, y: -centerY * fitZoom });
+    onZoomChange(fitZoom);
+  };
+
+  // Re-center when autoCenterTrigger changes
+  useEffect(() => {
+    if (autoCenterTrigger !== undefined) {
+      autoCenter();
+    }
+  }, [autoCenterTrigger]);
 
   // Intercept Ctrl + Scroll and Wheel to prevent full-page browser zoom
   useEffect(() => {
@@ -132,8 +177,10 @@ export const GraphMeshCanvas: React.FC<GraphMeshCanvasProps> = ({
         simNodes: simNodesRef.current,
         simLinks: simLinksRef.current,
         selectedNode,
+        hoveredNode,
         hoveredEdgeId,
         selectedLayer,
+        selectedLayers,
         searchQuery,
         zoomLevel,
         panOffset,
@@ -145,7 +192,7 @@ export const GraphMeshCanvas: React.FC<GraphMeshCanvasProps> = ({
 
     animId = requestAnimationFrame(render);
     return () => cancelAnimationFrame(animId);
-  }, [edges, selectedLayer, searchQuery, selectedNode, hoveredEdgeId, zoomLevel, panOffset]);
+  }, [edges, selectedLayer, selectedLayers, searchQuery, selectedNode, hoveredNode, hoveredEdgeId, zoomLevel, panOffset]);
 
   const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
@@ -202,42 +249,50 @@ export const GraphMeshCanvas: React.FC<GraphMeshCanvasProps> = ({
       return;
     }
 
-    if (!selectedNode) {
-      if (hoveredEdgeId) {
+    const mx = (clientX - rect.left - canvas.clientWidth / 2 - panOffset.x) / zoomLevel;
+    const my = (clientY - rect.top - canvas.clientHeight / 2 - panOffset.y) / zoomLevel;
+
+    // Detect hovered node for instant hover-highlighting
+    const foundHovered = simNodesRef.current.find(
+      (n) => n.x !== undefined && n.y !== undefined && Math.hypot(n.x - mx, n.y - my) <= n.radius + 6
+    );
+
+    if (foundHovered?.id !== hoveredNode?.id) {
+      setHoveredNode(foundHovered || null);
+    }
+
+    const focalNode = selectedNode || foundHovered || hoveredNode;
+    if (focalNode) {
+      const threshold = 7 / zoomLevel;
+      let foundLink: D3SimLink | null = null;
+
+      for (const link of simLinksRef.current) {
+        const isConnected = link.source.id === focalNode.id || link.target.id === focalNode.id;
+        if (!isConnected) continue;
+        if (link.source.x === undefined || link.source.y === undefined || link.target.x === undefined || link.target.y === undefined) continue;
+
+        if (distToSegment(mx, my, link.source.x, link.source.y, link.target.x, link.target.y) <= threshold) {
+          foundLink = link;
+          break;
+        }
+      }
+
+      if (foundLink) {
+        setHoveredEdgeId(foundLink.id);
+        onHoverHighlightedEdge(
+          {
+            id: foundLink.id,
+            source: foundLink.source.id,
+            target: foundLink.target.id,
+            relationship: foundLink.relationship,
+            description: foundLink.description,
+          },
+          { x: clientX, y: clientY }
+        );
+      } else if (hoveredEdgeId) {
         setHoveredEdgeId(null);
         onHoverHighlightedEdge(null, null);
       }
-      return;
-    }
-
-    const mx = (clientX - rect.left - canvas.clientWidth / 2 - panOffset.x) / zoomLevel;
-    const my = (clientY - rect.top - canvas.clientHeight / 2 - panOffset.y) / zoomLevel;
-    const threshold = 6 / zoomLevel;
-    let foundLink: D3SimLink | null = null;
-
-    for (const link of simLinksRef.current) {
-      const isConnected = link.source.id === selectedNode.id || link.target.id === selectedNode.id;
-      if (!isConnected) continue;
-      if (link.source.x === undefined || link.source.y === undefined || link.target.x === undefined || link.target.y === undefined) continue;
-
-      if (distToSegment(mx, my, link.source.x, link.source.y, link.target.x, link.target.y) <= threshold) {
-        foundLink = link;
-        break;
-      }
-    }
-
-    if (foundLink) {
-      setHoveredEdgeId(foundLink.id);
-      onHoverHighlightedEdge(
-        {
-          id: foundLink.id,
-          source: foundLink.source.id,
-          target: foundLink.target.id,
-          relationship: foundLink.relationship,
-          description: foundLink.description,
-        },
-        { x: clientX, y: clientY }
-      );
     } else if (hoveredEdgeId) {
       setHoveredEdgeId(null);
       onHoverHighlightedEdge(null, null);
@@ -264,6 +319,7 @@ export const GraphMeshCanvas: React.FC<GraphMeshCanvasProps> = ({
       onMouseUp={handleMouseUp}
       onMouseLeave={() => {
         handleMouseUp();
+        setHoveredNode(null);
         setHoveredEdgeId(null);
         onHoverHighlightedEdge(null, null);
       }}

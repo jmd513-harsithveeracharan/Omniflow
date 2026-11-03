@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { RefreshCw, AlertCircle, ArrowRight, GitBranch } from 'lucide-react';
+import { RefreshCw, AlertCircle, ArrowRight } from 'lucide-react';
 import { IngestionPlan, GraphMeshNode, GraphMeshEdge, GraphMeshResponse } from '../../types';
 import { fetchGraphMesh } from '../../services/api';
 import { GraphMeshCanvas } from './GraphMeshCanvas';
@@ -31,13 +31,14 @@ export const GraphMeshView: React.FC<GraphMeshViewProps> = ({
 
   // Filter & Camera Controls State
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedLayer, setSelectedLayer] = useState('all');
+  const [selectedLayers, setSelectedLayers] = useState<string[]>(['all']);
   const [isPhysicsActive, setIsPhysicsActive] = useState(true);
   const [selectedNode, setSelectedNode] = useState<GraphMeshNode | null>(null);
   const [zoomLevel, setZoomLevel] = useState(1.0);
   const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
+  const [autoCenterTrigger, setAutoCenterTrigger] = useState(0);
 
-  // Highlighted Edge Hover Tooltip State (Active ONLY when a node is selected)
+  // Highlighted Edge Hover Tooltip State
   const [hoveredHighlightedEdge, setHoveredHighlightedEdge] = useState<GraphMeshEdge | null>(null);
   const [edgeTooltipPos, setEdgeTooltipPos] = useState<{ x: number; y: number } | null>(null);
 
@@ -54,11 +55,10 @@ export const GraphMeshView: React.FC<GraphMeshViewProps> = ({
     fetchGraphMesh(plan, pId)
       .then((res) => {
         setData(res);
-        if (res.nodes && res.nodes.length > 250) {
-          setZoomLevel(0.48);
-        } else {
-          setZoomLevel(1.0);
-        }
+        // Automatically center the graph after data arrives
+        setTimeout(() => {
+          setAutoCenterTrigger((prev) => prev + 1);
+        }, 150);
       })
       .catch((err) => {
         setError(err.message || 'Failed to load Relationship Graph.');
@@ -73,8 +73,7 @@ export const GraphMeshView: React.FC<GraphMeshViewProps> = ({
   }, [plan, selectedProjectId]);
 
   const handleSelectProject = (newPid: string) => {
-    const val = newPid === 'all' ? null : newPid;
-    setSelectedProjectId(val);
+    setSelectedProjectId(newPid);
     setSelectedNode(null);
     setHoveredHighlightedEdge(null);
     if (onSelectProject) onSelectProject(newPid);
@@ -87,18 +86,22 @@ export const GraphMeshView: React.FC<GraphMeshViewProps> = ({
 
   const handleZoomIn = () => setZoomLevel((z) => Math.min(3.2, z * 1.25));
   const handleZoomOut = () => setZoomLevel((z) => Math.max(0.3, z * 0.8));
+  const handleAutoCenter = () => {
+    setAutoCenterTrigger((prev) => prev + 1);
+  };
   const handleResetView = () => {
-    setZoomLevel(data && data.nodes.length > 250 ? 0.48 : 1.0);
+    setZoomLevel(1.0);
     setPanOffset({ x: 0, y: 0 });
     setSelectedNode(null);
     setHoveredHighlightedEdge(null);
+    setAutoCenterTrigger((prev) => prev + 1);
   };
 
   if (isLoading && !data) {
     return (
       <div className="w-full h-full flex flex-col items-center justify-center bg-[#121214] text-zinc-400 gap-3">
-        <RefreshCw className="w-5 h-5 animate-spin text-zinc-400" />
-        <span className="text-xs font-medium tracking-wide text-zinc-400">Loading Relationship Graph...</span>
+        <RefreshCw className="w-5 h-5 animate-spin text-zinc-200" />
+        <span className="text-xs font-medium tracking-wide text-zinc-300">Loading Relationship Graph...</span>
       </div>
     );
   }
@@ -121,32 +124,36 @@ export const GraphMeshView: React.FC<GraphMeshViewProps> = ({
   return (
     <div className="relative w-full h-full overflow-hidden select-none bg-[#121214]">
       {isLoading && (
-        <div className="absolute top-16 left-1/2 -translate-x-1/2 z-40 flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-zinc-900/90 border border-zinc-700/80 shadow-2xl text-xs text-zinc-300 backdrop-blur-md pointer-events-none animate-in fade-in duration-150">
+        <div className="absolute top-16 left-1/2 -translate-x-1/2 z-40 flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-zinc-900/90 border border-zinc-700/80 shadow-2xl text-xs text-zinc-200 backdrop-blur-md pointer-events-none animate-in fade-in duration-150">
           <RefreshCw className="w-3.5 h-3.5 animate-spin text-emerald-400" />
           <span>Updating project graph...</span>
         </div>
       )}
+
+      {/* Top and Bottom Controls */}
       <GraphMeshControls
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
-        selectedLayer={selectedLayer}
-        onLayerSelect={setSelectedLayer}
+        selectedLayers={selectedLayers}
+        onLayersChange={setSelectedLayers}
         layers={data.layers}
         isPhysicsActive={isPhysicsActive}
         onTogglePhysics={() => setIsPhysicsActive((p) => !p)}
         onZoomIn={handleZoomIn}
         onZoomOut={handleZoomOut}
         onResetView={handleResetView}
+        onAutoCenter={handleAutoCenter}
         projects={projects}
         selectedProjectId={selectedProjectId}
         onSelectProject={handleSelectProject}
         stats={data.stats}
       />
 
+      {/* Interactive Graph Canvas */}
       <GraphMeshCanvas
         nodes={data.nodes}
         edges={data.edges}
-        selectedLayer={selectedLayer}
+        selectedLayers={selectedLayers}
         searchQuery={searchQuery}
         isPhysicsActive={isPhysicsActive}
         selectedNode={selectedNode}
@@ -159,43 +166,39 @@ export const GraphMeshView: React.FC<GraphMeshViewProps> = ({
         onZoomChange={setZoomLevel}
         panOffset={panOffset}
         onPanChange={setPanOffset}
+        autoCenterTrigger={autoCenterTrigger}
       />
 
-      {/* Edge Relationship Modal Card — Shown ONLY when a node is clicked and hovering its highlighted edge */}
-      {hoveredHighlightedEdge && edgeTooltipPos && selectedNode && (
+      {/* Sleek Single-Point-of-Info Relationship Card (Redesigned) */}
+      {hoveredHighlightedEdge && edgeTooltipPos && (
         <div
-          className="pointer-events-none fixed z-50 p-3 bg-[#18181b] border border-zinc-800/90 rounded-xl shadow-2xl shadow-black/95 text-xs text-zinc-200 animate-in fade-in zoom-in-95 duration-100 max-w-sm"
+          className="pointer-events-none fixed z-50 p-2.5 bg-[#18181b]/95 border border-white/15 rounded-xl shadow-2xl shadow-black/95 text-xs text-zinc-100 animate-in fade-in zoom-in-95 duration-100 min-w-[240px] max-w-sm backdrop-blur-xl"
           style={{
-            left: edgeTooltipPos.x + 16,
-            top: edgeTooltipPos.y - 16,
-            backdropFilter: 'blur(16px)',
+            left: Math.min(typeof window !== 'undefined' ? window.innerWidth - 300 : 800, Math.max(16, edgeTooltipPos.x + 16)),
+            top: Math.min(typeof window !== 'undefined' ? window.innerHeight - 100 : 600, Math.max(16, edgeTooltipPos.y - 20)),
           }}
         >
-          {/* Header */}
-          <div className="flex items-center justify-between gap-3 pb-2 mb-2 border-b border-zinc-800/80">
-            <div className="flex items-center gap-2">
-              <div className="w-5 h-5 rounded-md bg-white/8 flex items-center justify-center text-zinc-300">
-                <GitBranch className="w-3 h-3" />
-              </div>
-              <span className="font-semibold text-zinc-100 text-xs">Relationship Link</span>
-            </div>
-            <span className="px-1.5 py-0.5 rounded bg-white/8 text-[10px] font-mono font-medium text-zinc-300 border border-white/10 uppercase">
-              {hoveredHighlightedEdge.relationship}
+          {/* Hero Lineage Path: Source ➔ Target */}
+          <div className="flex items-center gap-2 mb-1.5 font-mono text-[11.5px]">
+            <span className="font-semibold text-zinc-100 truncate">
+              {hoveredHighlightedEdge.source.split('.').pop()}
+            </span>
+            <ArrowRight className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+            <span className="font-semibold text-zinc-100 truncate">
+              {hoveredHighlightedEdge.target.split('.').pop()}
             </span>
           </div>
 
-          {/* Description / Casting */}
-          {hoveredHighlightedEdge.description && (
-            <div className="text-[11px] text-zinc-300 leading-relaxed mb-2.5 bg-black/40 p-2 rounded-lg border border-white/5">
-              {hoveredHighlightedEdge.description}
-            </div>
-          )}
-
-          {/* Source -> Target Path */}
-          <div className="flex items-center gap-1.5 text-[10px] font-mono text-zinc-400 bg-white/[0.03] px-2 py-1.5 rounded-md border border-white/5">
-            <span className="text-zinc-200 truncate">{hoveredHighlightedEdge.source.split('.').pop()}</span>
-            <ArrowRight className="w-3 h-3 text-zinc-500 shrink-0" />
-            <span className="text-zinc-200 truncate">{hoveredHighlightedEdge.target.split('.').pop()}</span>
+          {/* Unified Relationship Meta Row */}
+          <div className="flex items-center gap-2 pt-1.5 border-t border-white/10 text-[11px]">
+            <span className="px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-400 font-mono text-[9.5px] font-semibold uppercase tracking-wider border border-emerald-500/25 shrink-0">
+              {hoveredHighlightedEdge.relationship.replace(/_/g, ' ')}
+            </span>
+            {hoveredHighlightedEdge.description && (
+              <span className="text-zinc-300 truncate text-[11px]">
+                {hoveredHighlightedEdge.description}
+              </span>
+            )}
           </div>
         </div>
       )}
