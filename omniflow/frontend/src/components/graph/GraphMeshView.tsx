@@ -172,7 +172,7 @@ export const GraphMeshView: React.FC<GraphMeshViewProps> = ({
       {/* Sleek Single-Point-of-Info Relationship Card (Redesigned) */}
       {hoveredHighlightedEdge && edgeTooltipPos && (
         <div
-          className="pointer-events-none fixed z-50 p-2.5 bg-[#18181b]/95 border border-white/15 rounded-xl shadow-2xl shadow-black/95 text-xs text-zinc-100 animate-in fade-in zoom-in-95 duration-100 min-w-[240px] max-w-sm backdrop-blur-xl"
+          className="pointer-events-none fixed z-50 p-2.5 bg-[#18181b]/95 border border-zinc-800/90 rounded-xl shadow-2xl shadow-black/95 text-xs text-zinc-100 animate-in fade-in zoom-in-95 duration-100 min-w-[240px] max-w-sm backdrop-blur-xl"
           style={{
             left: Math.min(typeof window !== 'undefined' ? window.innerWidth - 300 : 800, Math.max(16, edgeTooltipPos.x + 16)),
             top: Math.min(typeof window !== 'undefined' ? window.innerHeight - 100 : 600, Math.max(16, edgeTooltipPos.y - 20)),
@@ -190,7 +190,7 @@ export const GraphMeshView: React.FC<GraphMeshViewProps> = ({
           </div>
 
           {/* Unified Relationship Meta Row */}
-          <div className="flex items-center gap-2 pt-1.5 border-t border-white/10 text-[11px]">
+          <div className="flex items-center gap-2 pt-1.5 border-t border-zinc-800/80 text-[11px]">
             <span className="px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-400 font-mono text-[9.5px] font-semibold uppercase tracking-wider border border-emerald-500/25 shrink-0">
               {hoveredHighlightedEdge.relationship.replace(/_/g, ' ')}
             </span>
