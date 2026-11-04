@@ -1,19 +1,28 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Plus, ChevronDown, Mic, MicOff, ArrowUp, AudioWaveform } from 'lucide-react';
+import { SlidersHorizontal, ChevronDown, Mic, MicOff, ArrowUp } from 'lucide-react';
+import {
+  isSpeechRecognitionSupported,
+  createSpeechRecognition,
+  IBrowserSpeechRecognition,
+} from '../voice/speechService';
+import { normalizeDataEngineeringTerms } from '../voice/termNormalizer';
 
 interface ProjectPromptBoxProps {
   projectName: string;
-  onSubmit: (prompt: string, model: string, mode: 'chat' | 'cowork') => void;
+  onSubmit: (prompt: string, model: string, effort?: string) => void;
   disabled?: boolean;
 }
 
 const AVAILABLE_MODELS = [
-  { id: 'Sonnet 3.5 Medium', name: 'Sonnet 3.5', tier: 'Medium' },
-  { id: 'Claude 3.7 Sonnet', name: 'Claude 3.7', tier: 'Thinking' },
-  { id: 'Tenali AI Medium', name: 'Tenali AI', tier: 'Medium' },
-  { id: 'Gemini 3.6 Flash', name: 'Gemini 3.6', tier: 'Flash' },
-  { id: 'GPT-4o Omniflow', name: 'GPT-4o', tier: 'Omni' },
+  { id: 'Tenali AI', name: 'Tenali AI', desc: 'OmniFlow Multi-Agent Core Engine' },
+  { id: 'Claude Sonnet', name: 'Claude Sonnet', desc: 'PySpark & schema mapping' },
+  { id: 'Claude Opus', name: 'Claude Opus', desc: 'Deep reasoning & SQL AST transpilation' },
+  { id: 'Gemini 3.6 Flash', name: 'Gemini 3.6 Flash', desc: 'Ultra-fast metadata discovery' },
+  { id: 'Gemini 1.5 Pro', name: 'Gemini 1.5 Pro', desc: '1M+ context for large DAGs' },
+  { id: 'GPT-4o', name: 'GPT-4o', desc: 'Advanced reasoning & Lakehouse DDL' },
 ];
+
+const EFFORT_LEVELS = ['High', 'Medium', 'Low'];
 
 export const ProjectPromptBox: React.FC<ProjectPromptBoxProps> = ({
   projectName,
@@ -21,37 +30,140 @@ export const ProjectPromptBox: React.FC<ProjectPromptBoxProps> = ({
   disabled = false,
 }) => {
   const [prompt, setPrompt] = useState<string>('');
-  const [selectedModel, setSelectedModel] = useState<string>('Sonnet 3.5 Medium');
-  const [activeMode, setActiveMode] = useState<'chat' | 'cowork'>('chat');
-  const [isModelMenuOpen, setIsModelMenuOpen] = useState<boolean>(false);
-  const [isRecording, setIsRecording] = useState<boolean>(false);
+  const [selectedModel, setSelectedModel] = useState<string>('Tenali AI');
+  const [selectedEffort, setSelectedEffort] = useState<string>('Medium');
+  const [isMenuOpen, setIsMenuOpen] = useState<boolean>(false);
+  const [activeMenuTab, setActiveMenuTab] = useState<'models' | 'effort'>('models');
+  const [isTuningOpen, setIsTuningOpen] = useState<boolean>(false);
+  const [temperature, setTemperature] = useState<number>(0.2);
+
+  // Dedicated speech-to-text dictation
+  const [isDictating, setIsDictating] = useState<boolean>(false);
+  const dictationRecRef = useRef<IBrowserSpeechRecognition | null>(null);
+  const baseInputRef = useRef<string>('');
+
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const modelMenuRef = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const tuningRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
-      textareaRef.current.style.height = `${Math.min(Math.max(textareaRef.current.scrollHeight, 64), 220)}px`;
+      textareaRef.current.style.height = `${Math.min(Math.max(textareaRef.current.scrollHeight, 60), 220)}px`;
     }
   }, [prompt]);
 
   useEffect(() => {
     const handleOutsideClick = (e: MouseEvent) => {
-      if (modelMenuRef.current && !modelMenuRef.current.contains(e.target as Node)) {
-        setIsModelMenuOpen(false);
+      const target = e.target as Node;
+      if (menuRef.current && !menuRef.current.contains(target)) {
+        setIsMenuOpen(false);
+      }
+      if (tuningRef.current && !tuningRef.current.contains(target)) {
+        setIsTuningOpen(false);
       }
     };
     window.addEventListener('mousedown', handleOutsideClick);
     return () => window.removeEventListener('mousedown', handleOutsideClick);
   }, []);
 
+  useEffect(() => {
+    return () => {
+      if (dictationRecRef.current) {
+        try {
+          dictationRecRef.current.abort();
+        } catch {
+          // ignore
+        }
+        dictationRecRef.current = null;
+      }
+    };
+  }, []);
+
+  const handleToggleDictation = () => {
+    if (!isSpeechRecognitionSupported()) {
+      alert(
+        'Speech Recognition is not supported by your browser engine.\nPlease use Google Chrome or Microsoft Edge for voice dictation.'
+      );
+      return;
+    }
+
+    if (isDictating) {
+      if (dictationRecRef.current) {
+        try {
+          dictationRecRef.current.stop();
+        } catch {
+          // ignore
+        }
+        dictationRecRef.current = null;
+      }
+      setIsDictating(false);
+      return;
+    }
+
+    const rec = createSpeechRecognition();
+    if (!rec) return;
+
+    baseInputRef.current = prompt.trim().length > 0 ? `${prompt.trim()} ` : '';
+    let sessionTranscript = '';
+
+    rec.onstart = () => {
+      setIsDictating(true);
+    };
+
+    rec.onresult = (event) => {
+      let interim = '';
+      let finalized = '';
+      for (let i = 0; i < event.results.length; i++) {
+        const res = event.results[i];
+        const piece = res[0]?.transcript || '';
+        if (res.isFinal) {
+          finalized += `${piece} `;
+        } else {
+          interim += piece;
+        }
+      }
+      sessionTranscript = normalizeDataEngineeringTerms(`${finalized}${interim}`.trim());
+      setPrompt(`${baseInputRef.current}${sessionTranscript}`);
+    };
+
+    rec.onerror = (e) => {
+      if (e.error !== 'no-speech' && e.error !== 'aborted') {
+        console.warn('[Dictation] Speech recognition notice:', e.error);
+      }
+      setIsDictating(false);
+    };
+
+    rec.onend = () => {
+      setIsDictating(false);
+      dictationRecRef.current = null;
+    };
+
+    dictationRecRef.current = rec;
+    try {
+      rec.start();
+    } catch (err) {
+      console.error('Failed to start dictation:', err);
+      setIsDictating(false);
+    }
+  };
+
   const handleSubmit = () => {
+    if (dictationRecRef.current) {
+      try {
+        dictationRecRef.current.stop();
+      } catch {
+        // ignore
+      }
+      dictationRecRef.current = null;
+      setIsDictating(false);
+    }
     const trimmed = prompt.trim();
     if (!trimmed || disabled) return;
-    onSubmit(trimmed, selectedModel, activeMode);
+    onSubmit(trimmed, selectedModel, selectedEffort.toLowerCase());
     setPrompt('');
     if (textareaRef.current) {
-      textareaRef.current.style.height = '64px';
+      textareaRef.current.style.height = '60px';
     }
   };
 
@@ -62,11 +174,9 @@ export const ProjectPromptBox: React.FC<ProjectPromptBoxProps> = ({
     }
   };
 
-  const activeModelObj = AVAILABLE_MODELS.find((m) => m.id === selectedModel) || AVAILABLE_MODELS[0];
-
   return (
     <div className="w-full rounded-2xl bg-[#1a1a1c] border border-[#2a2b30] hover:border-[#34353a] transition-all duration-200 shadow-xl overflow-hidden flex flex-col justify-between">
-      {/* Textarea Input without separator lines */}
+      {/* Textarea Input */}
       <div className="p-4 pt-4 pb-1">
         <textarea
           ref={textareaRef}
@@ -82,112 +192,157 @@ export const ProjectPromptBox: React.FC<ProjectPromptBoxProps> = ({
         />
       </div>
 
-      {/* Seamless Dock Controls Footer (No top border line!) */}
+      {/* Dock Controls Footer */}
       <div className="flex items-center justify-between px-3.5 pb-3 pt-1">
-        {/* Left: + icon followed by Chat & Cowork pills */}
-        <div className="flex items-center gap-1.5">
+        {/* Left: Model Tuning Popover */}
+        <div className="relative" ref={tuningRef}>
           <button
             type="button"
-            className="p-1 text-[#8e918f] hover:text-[#f0f0f2] transition-colors"
-            title="Add attachment"
+            onClick={() => setIsTuningOpen((prev) => !prev)}
+            className={`p-1.5 rounded-lg text-[#8e918f] hover:text-[#f0f0f2] hover:bg-[#222225] transition-colors ${
+              isTuningOpen ? 'bg-[#222225] text-emerald-400' : ''
+            }`}
+            title="System prompt & model temperature tuning"
           >
-            <Plus width={17} height={17} strokeWidth={1.8} />
+            <SlidersHorizontal width={15} height={15} />
           </button>
 
-          <button
-            type="button"
-            onClick={() => setActiveMode('chat')}
-            className={`px-3 py-1 rounded-lg text-xs font-normal transition-all ${
-              activeMode === 'chat'
-                ? 'bg-[#28282c] text-[#f0f0f2] shadow-sm'
-                : 'text-[#8e918f] hover:text-[#f0f0f2]'
-            }`}
-          >
-            Chat
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveMode('cowork')}
-            className={`px-3 py-1 rounded-lg text-xs font-normal transition-all ${
-              activeMode === 'cowork'
-                ? 'bg-[#28282c] text-[#f0f0f2] shadow-sm'
-                : 'text-[#8e918f] hover:text-[#f0f0f2]'
-            }`}
-          >
-            Cowork
-          </button>
+          {isTuningOpen && (
+            <div className="absolute left-0 bottom-full mb-2 w-64 p-3.5 bg-[#1a1a1c] border border-[#2a2b30] rounded-xl shadow-2xl z-50 animate-in fade-in-50 zoom-in-95">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-semibold text-[#f0f0f2]">Model Temperature</span>
+                <span className="text-xs font-mono text-emerald-400 font-medium">{temperature}</span>
+              </div>
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.05"
+                value={temperature}
+                onChange={(e) => setTemperature(parseFloat(e.target.value))}
+                className="w-full accent-emerald-500 mb-2 cursor-pointer"
+              />
+              <p className="text-[11px] text-[#8e918f] leading-relaxed">
+                Lower values produce deterministic PySpark code; higher values increase architectural exploration.
+              </p>
+            </div>
+          )}
         </div>
 
-        {/* Right: Model Name, Voice Icon, Audio / Submit */}
-        <div className="flex items-center gap-2.5">
-          {/* Model Selector Dropdown */}
-          <div className="relative" ref={modelMenuRef}>
+        {/* Right: Model & Effort Pill + Mic + Submit */}
+        <div className="flex items-center gap-2">
+          {/* Model & Effort Selector */}
+          <div className="relative" ref={menuRef}>
             <button
               type="button"
-              onClick={() => setIsModelMenuOpen((prev) => !prev)}
-              className="flex items-center gap-1.5 text-xs font-normal text-[#8e918f] hover:text-[#f0f0f2] transition-colors"
+              onClick={() => setIsMenuOpen((prev) => !prev)}
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#222225] hover:bg-[#28282c] border border-[#2a2b30] text-xs font-normal text-[#f0f0f2] transition-colors"
             >
-              <span>{activeModelObj.name} <span className="text-[#5f6368]">{activeModelObj.tier}</span></span>
-              <ChevronDown width={12} height={12} className="text-[#5f6368]" />
+              <span>{selectedModel}</span>
+              <span className="text-[10px] text-[#8e918f] font-mono">{selectedEffort}</span>
+              <ChevronDown width={12} height={12} className="text-[#8e918f]" />
             </button>
 
-            {isModelMenuOpen && (
-              <div className="absolute right-0 bottom-full mb-2 w-48 py-1 bg-[#1a1a1c] border border-[#2a2b30] rounded-xl shadow-2xl z-50 animate-in fade-in-50 zoom-in-95">
-                {AVAILABLE_MODELS.map((m) => (
+            {isMenuOpen && (
+              <div className="absolute right-0 bottom-full mb-2 w-60 bg-[#1a1a1c] border border-[#2a2b30] rounded-xl shadow-2xl z-50 overflow-hidden animate-in fade-in-50 zoom-in-95">
+                {/* Tabs: Models vs Effort */}
+                <div className="flex border-b border-[#232326] bg-[#141416]">
                   <button
-                    key={m.id}
                     type="button"
-                    onClick={() => {
-                      setSelectedModel(m.id);
-                      setIsModelMenuOpen(false);
-                    }}
-                    className={`w-full flex items-center justify-between px-3 py-2 text-xs text-left transition-colors ${
-                      selectedModel === m.id
-                        ? 'bg-[#222225] text-emerald-400 font-medium'
-                        : 'text-[#c4c7c5] hover:bg-[#222225] hover:text-white'
+                    onClick={() => setActiveMenuTab('models')}
+                    className={`flex-1 py-1.5 text-[11px] font-medium transition-colors ${
+                      activeMenuTab === 'models'
+                        ? 'text-white border-b-2 border-emerald-500'
+                        : 'text-[#8e918f] hover:text-[#c4c7c5]'
                     }`}
                   >
-                    <span>{m.name}</span>
-                    <span className="text-[10px] text-[#5f6368]">{m.tier}</span>
+                    Models
                   </button>
-                ))}
+                  <button
+                    type="button"
+                    onClick={() => setActiveMenuTab('effort')}
+                    className={`flex-1 py-1.5 text-[11px] font-medium transition-colors ${
+                      activeMenuTab === 'effort'
+                        ? 'text-white border-b-2 border-emerald-500'
+                        : 'text-[#8e918f] hover:text-[#c4c7c5]'
+                    }`}
+                  >
+                    Effort ({selectedEffort})
+                  </button>
+                </div>
+
+                {/* Tab Content */}
+                <div className="p-1 max-h-56 overflow-y-auto">
+                  {activeMenuTab === 'models' ? (
+                    AVAILABLE_MODELS.map((m) => (
+                      <button
+                        key={m.id}
+                        type="button"
+                        onClick={() => {
+                          setSelectedModel(m.id);
+                          setIsMenuOpen(false);
+                        }}
+                        className={`w-full flex flex-col items-start px-2.5 py-1.5 rounded-lg text-left transition-colors ${
+                          selectedModel === m.id
+                            ? 'bg-[#222225] text-emerald-400'
+                            : 'text-[#c4c7c5] hover:bg-[#222225] hover:text-white'
+                        }`}
+                      >
+                        <span className="text-xs font-medium">{m.name}</span>
+                        <span className="text-[10px] text-[#8e918f] truncate w-full">{m.desc}</span>
+                      </button>
+                    ))
+                  ) : (
+                    EFFORT_LEVELS.map((eff) => (
+                      <button
+                        key={eff}
+                        type="button"
+                        onClick={() => {
+                          setSelectedEffort(eff);
+                          setIsMenuOpen(false);
+                        }}
+                        className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs transition-colors ${
+                          selectedEffort === eff
+                            ? 'bg-[#222225] text-emerald-400 font-medium'
+                            : 'text-[#c4c7c5] hover:bg-[#222225] hover:text-white'
+                        }`}
+                      >
+                        <span>{eff} Effort</span>
+                        {selectedEffort === eff && <span>✓</span>}
+                      </button>
+                    ))
+                  )}
+                </div>
               </div>
             )}
           </div>
 
-          {/* Voice Input Button */}
+          {/* Voice Input / Dictation Button */}
           <button
             type="button"
-            onClick={() => setIsRecording((prev) => !prev)}
-            title={isRecording ? 'Listening...' : 'Voice mode'}
-            className={`p-1 text-[#8e918f] hover:text-[#f0f0f2] transition-colors ${
-              isRecording ? 'text-red-400 animate-pulse' : ''
+            onClick={handleToggleDictation}
+            title={isDictating ? 'Listening... click to stop' : 'Speech-to-text voice dictation'}
+            className={`p-1.5 rounded-lg text-[#8e918f] hover:text-[#f0f0f2] hover:bg-[#222225] transition-colors ${
+              isDictating ? 'text-red-400 bg-red-500/10 animate-pulse' : ''
             }`}
           >
-            {isRecording ? <MicOff width={16} height={16} /> : <Mic width={16} height={16} strokeWidth={1.8} />}
+            {isDictating ? <MicOff width={16} height={16} /> : <Mic width={16} height={16} />}
           </button>
 
-          {/* Audio Waveform / Submit Button */}
-          {prompt.trim() ? (
-            <button
-              type="button"
-              onClick={handleSubmit}
-              disabled={disabled}
-              aria-label="Send prompt"
-              className="p-1 text-[#f0f0f2] hover:text-white transition-colors"
-            >
-              <ArrowUp width={17} height={17} strokeWidth={2.2} />
-            </button>
-          ) : (
-            <button
-              type="button"
-              className="p-1 text-[#8e918f] hover:text-[#f0f0f2] transition-colors"
-              title="Voice waveform"
-            >
-              <AudioWaveform width={16} height={16} strokeWidth={1.8} />
-            </button>
-          )}
+          {/* Submit Button */}
+          <button
+            type="button"
+            onClick={handleSubmit}
+            disabled={disabled || !prompt.trim()}
+            aria-label="Send prompt"
+            className={`p-1.5 rounded-lg transition-all ${
+              prompt.trim() && !disabled
+                ? 'bg-emerald-600 text-white hover:bg-emerald-500 shadow-md'
+                : 'text-[#5f6368] cursor-not-allowed'
+            }`}
+          >
+            <ArrowUp width={16} height={16} strokeWidth={2.2} />
+          </button>
         </div>
       </div>
     </div>

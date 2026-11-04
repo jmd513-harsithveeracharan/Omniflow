@@ -1,6 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Loader2, Globe, Layers, Paperclip, X, Mic, MicOff, Volume2, Headphones } from 'lucide-react';
-import { IntakeSpecModal } from './modals/IntakeSpecModal';
+import { Loader2, Globe, Layers, X, Mic, MicOff, Volume2, Headphones } from 'lucide-react';
 import { FloatingVoiceOrb, VoiceModeState } from './voice/FloatingVoiceOrb';
 import {
   unlockSpeechEngine,
@@ -57,7 +56,6 @@ export const PromptDock: React.FC<PromptDockProps> = ({
   const [isModelDropdownOpen, setIsModelDropdownOpen] = useState(false);
   const [activeSubmenu, setActiveSubmenu] = useState<'none' | 'effort' | 'models'>('none');
   const [isTuningOpen, setIsTuningOpen] = useState(false);
-  const [isIntakeModalOpen, setIsIntakeModalOpen] = useState(false);
   const [temperature, setTemperature] = useState(0.2);
 
   // Dedicated speech-to-text dictation state (Microphone only)
@@ -171,18 +169,6 @@ export const PromptDock: React.FC<PromptDockProps> = ({
     unlockSpeechEngine();
     if (onToggleVoiceMode) {
       onToggleVoiceMode();
-    }
-  };
-
-  const handleIntakeSubmit = (intakeJson: string, resume: boolean) => {
-    try {
-      const parsed = JSON.parse(intakeJson);
-      const pName = parsed.project_context?.project_summary?.project_name || 'Enterprise Medallion Platform';
-      const pCode = parsed.project_context?.project_summary?.project_code || 'PRJ-FABRIC';
-      const prompt = `Deploy Microsoft Fabric Medallion Architecture for ${pName} (${pCode})${resume ? ' with --resume mode' : ''} based on intake specification:\n\`\`\`json\n${intakeJson}\n\`\`\``;
-      onSendMessage(prompt, selectedModel, selectedEffort.toLowerCase(), 'project');
-    } catch {
-      onSendMessage(intakeJson, selectedModel, selectedEffort.toLowerCase(), 'project');
     }
   };
 
@@ -330,31 +316,6 @@ export const PromptDock: React.FC<PromptDockProps> = ({
                     <line x1="9" y1="8" x2="15" y2="8" />
                     <line x1="17" y1="16" x2="23" y2="16" />
                   </svg>
-                </button>
-
-                {/* Project Intake JSON Spec Attachment Button */}
-                <button
-                  type="button"
-                  className={`dock-tool-pill ${isIntakeModalOpen ? 'active' : ''}`}
-                  id="btnIntakeJson"
-                  onClick={() => setIsIntakeModalOpen(true)}
-                  title="Attach, Upload, or Edit Project Intake JSON Spec"
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    padding: '4px 11px',
-                    color: isIntakeModalOpen ? '#10b981' : '#e4e4e7',
-                    background: isIntakeModalOpen ? 'rgba(16, 185, 129, 0.15)' : 'rgba(255, 255, 255, 0.04)',
-                    border: isIntakeModalOpen ? '1px solid rgba(16, 185, 129, 0.4)' : '1px solid rgba(255, 255, 255, 0.1)',
-                    borderRadius: '8px',
-                    fontSize: '11.5px',
-                    fontWeight: 500,
-                    cursor: 'pointer',
-                  }}
-                >
-                  <Paperclip width={13} height={13} style={{ color: '#10b981' }} />
-                  <span>Intake Spec</span>
                 </button>
 
                 {/* Tuning Popover */}
@@ -685,13 +646,6 @@ export const PromptDock: React.FC<PromptDockProps> = ({
             </div>
           </div>
           <div className="dock-disclaimer">Omniflow can make mistakes. Please double-check responses.</div>
-
-      {/* Project Intake Specification Modal */}
-      <IntakeSpecModal
-        isOpen={isIntakeModalOpen}
-        onClose={() => setIsIntakeModalOpen(false)}
-        onSubmit={handleIntakeSubmit}
-      />
     </div>
   );
 };

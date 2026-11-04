@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Pin, MoreHorizontal, Network, Edit2, Users, PanelLeftOpen } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { Pin, MoreHorizontal, Network, Edit3, Users, PanelLeftOpen, FolderTree } from 'lucide-react';
 import { ProjectRecord, ChatSession, ProjectContextFile, ProjectMetadata } from '../../types';
 import { ProjectPromptBox } from './ProjectPromptBox';
 import { ProjectRecentsList } from './ProjectRecentsList';
@@ -12,7 +12,7 @@ interface ProjectWorkspaceHubProps {
   isSidebarCollapsed?: boolean;
   onToggleSidebar?: () => void;
   onSelectSession: (sessionId: string) => void;
-  onStartNewChat: (prompt: string, model: string, mode: 'chat' | 'cowork') => void;
+  onStartNewChat: (prompt: string, model: string, effort?: string) => void;
   onOpenRelationshipGraph: (projectId: string) => void;
   onBackToProjects: () => void;
   onUpdateProject: (updated: ProjectRecord) => Promise<void>;
@@ -39,10 +39,21 @@ export const ProjectWorkspaceHub: React.FC<ProjectWorkspaceHubProps> = ({
   onDeleteSession,
 }) => {
   const [isMenuOpen, setIsMenuOpen] = useState<boolean>(false);
+  const menuContainerRef = useRef<HTMLDivElement>(null);
   const isPinned = Boolean(project.is_pinned);
   const metadata = project.metadata || {};
   const contextFiles = metadata.context_files || [];
   const instructions = metadata.instructions || '';
+
+  useEffect(() => {
+    const handleOutsideClick = (e: MouseEvent) => {
+      if (menuContainerRef.current && !menuContainerRef.current.contains(e.target as Node)) {
+        setIsMenuOpen(false);
+      }
+    };
+    window.addEventListener('mousedown', handleOutsideClick);
+    return () => window.removeEventListener('mousedown', handleOutsideClick);
+  }, []);
 
   const handleSaveInstructions = async (newInstructions: string) => {
     const updatedMeta: ProjectMetadata = {
@@ -90,7 +101,7 @@ export const ProjectWorkspaceHub: React.FC<ProjectWorkspaceHubProps> = ({
 
   return (
     <div className="flex-1 w-full h-full overflow-y-auto bg-[#131314] text-[#f0f0f2] selection:bg-emerald-500/30">
-      <div className="max-w-[1020px] mx-auto px-8 pt-5 pb-16">
+      <div className="max-w-[1060px] mx-auto px-8 pt-5 pb-16">
         {/* Top Breadcrumb Navigation */}
         <div className="flex items-center gap-2 mb-8 text-[13px] text-[#8e918f]">
           {isSidebarCollapsed && onToggleSidebar && (
@@ -111,25 +122,25 @@ export const ProjectWorkspaceHub: React.FC<ProjectWorkspaceHubProps> = ({
             Projects
           </button>
           <span>/</span>
-          <span className="text-[#c4c7c5] truncate max-w-xs">{displayName}</span>
+          <span className="text-[#c4c7c5] truncate max-w-lg">{displayName}</span>
         </div>
 
-        {/* Project Header (Seamless, No harsh line!) */}
+        {/* Project Header (Full width, No premature wrap!) */}
         <div className="flex items-start justify-between mb-8">
-          <div className="space-y-1.5 max-w-2xl">
+          <div className="space-y-2 flex-1 min-w-0 pr-6">
             <h1
-              className="text-[32px] sm:text-[34px] font-normal tracking-tight text-[#f0f0f2] leading-tight"
+              className="text-[32px] sm:text-[34px] font-normal tracking-tight text-[#f0f0f2] leading-snug break-words"
               style={{ fontFamily: 'Georgia, Cambria, "Times New Roman", Times, serif' }}
             >
               {displayName}
             </h1>
-            <p className="text-[14px] text-[#8e918f] leading-relaxed">
+            <p className="text-[14px] text-[#8e918f] leading-relaxed max-w-4xl">
               {displayDesc}
             </p>
           </div>
 
           {/* Top Right Header Controls: Pin and ... */}
-          <div className="flex items-center gap-2 pt-1">
+          <div className="flex items-center gap-2 pt-1 flex-shrink-0">
             <button
               type="button"
               onClick={onTogglePin}
@@ -139,7 +150,7 @@ export const ProjectWorkspaceHub: React.FC<ProjectWorkspaceHubProps> = ({
               <Pin width={17} height={17} className={isPinned ? 'fill-emerald-400 text-emerald-400' : ''} />
             </button>
 
-            <div className="relative">
+            <div className="relative" ref={menuContainerRef}>
               <button
                 type="button"
                 onClick={() => setIsMenuOpen((prev) => !prev)}
@@ -151,13 +162,13 @@ export const ProjectWorkspaceHub: React.FC<ProjectWorkspaceHubProps> = ({
 
               {isMenuOpen && (
                 <div
-                  className="absolute right-0 mt-2 w-52 py-1 bg-[#1a1a1c] border border-[#2a2b30] rounded-xl shadow-2xl z-50 animate-in fade-in-50 zoom-in-95"
+                  className="absolute right-0 mt-2 w-56 p-1.5 bg-[#1c1c1f]/95 backdrop-blur-xl border border-[#2e2f35] rounded-xl shadow-[0_16px_36px_rgba(0,0,0,0.7)] z-50 animate-in fade-in-50 zoom-in-95"
                   onClick={() => setIsMenuOpen(false)}
                 >
                   <button
                     type="button"
                     onClick={() => onOpenRelationshipGraph(project.id)}
-                    className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-[#c4c7c5] hover:bg-[#222225] hover:text-white text-left transition-colors"
+                    className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-[#c4c7c5] hover:bg-[#28282c] hover:text-white rounded-lg text-left transition-colors"
                   >
                     <Network width={14} height={14} className="text-emerald-400" />
                     <span>Relationship Graph</span>
@@ -166,9 +177,9 @@ export const ProjectWorkspaceHub: React.FC<ProjectWorkspaceHubProps> = ({
                     <button
                       type="button"
                       onClick={() => onEditProject(project)}
-                      className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-[#c4c7c5] hover:bg-[#222225] hover:text-white text-left transition-colors"
+                      className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-[#c4c7c5] hover:bg-[#28282c] hover:text-white rounded-lg text-left transition-colors"
                     >
-                      <Edit2 width={14} height={14} />
+                      <Edit3 width={14} height={14} className="text-[#a1a1aa]" />
                       <span>Edit Project</span>
                     </button>
                   )}
@@ -176,12 +187,21 @@ export const ProjectWorkspaceHub: React.FC<ProjectWorkspaceHubProps> = ({
                     <button
                       type="button"
                       onClick={() => onManageMembers(project)}
-                      className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-[#c4c7c5] hover:bg-[#222225] hover:text-white text-left transition-colors"
+                      className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-[#c4c7c5] hover:bg-[#28282c] hover:text-white rounded-lg text-left transition-colors"
                     >
-                      <Users width={14} height={14} />
+                      <Users width={14} height={14} className="text-[#a1a1aa]" />
                       <span>Manage Members</span>
                     </button>
                   )}
+                  <div className="border-t border-[#28282c] my-1" />
+                  <button
+                    type="button"
+                    onClick={onBackToProjects}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-[#8e918f] hover:bg-[#28282c] hover:text-white rounded-lg text-left transition-colors"
+                  >
+                    <FolderTree width={14} height={14} />
+                    <span>View All Projects</span>
+                  </button>
                 </div>
               )}
             </div>
@@ -190,7 +210,7 @@ export const ProjectWorkspaceHub: React.FC<ProjectWorkspaceHubProps> = ({
 
         {/* 2-Column Responsive Layout */}
         <div className="flex flex-col lg:flex-row gap-10 items-start">
-          {/* Main Column: Prompt Dock + Recents */}
+          {/* Main Column: Functional Prompt Dock + Recents */}
           <div className="flex-1 min-w-0 w-full flex flex-col">
             <ProjectPromptBox
               projectName={displayName}

@@ -188,12 +188,13 @@ export const App: React.FC = () => {
     const activeEmail = currentUser?.email;
     loadSessions(activeEmail);
 
+    const savedView = localStorage.getItem('omniflow_active_view');
     const savedProjId = localStorage.getItem('omniflow_active_project_id');
     const savedSid = localStorage.getItem('omniflow_active_session_id');
 
-    if (savedProjId) {
+    if (savedView === 'project' && savedProjId) {
       loadProjectsList(false, activeEmail).then(() => {
-        handleSelectProject(savedProjId, false);
+        handleSelectProject(savedProjId, true);
       });
     } else if (savedSid && !savedSid.startsWith('proj_')) {
       loadProjectsList(false, activeEmail);
@@ -214,10 +215,11 @@ export const App: React.FC = () => {
         handleSelectSession(savedSid);
       }
     } else {
-      loadProjectsList(true, activeEmail);
+      loadProjectsList(false, activeEmail);
       const initialSid = generateNewSessionId();
       setSessionId(initialSid);
       setMessages([]);
+      setActiveView('chat');
     }
   }, [currentUser?.email]);
 
@@ -328,17 +330,19 @@ export const App: React.FC = () => {
       localStorage.setItem('omniflow_active_project_id', projectId);
     } catch {}
 
+    if (shouldSwitchToView) {
+      setActiveView('project');
+      try {
+        localStorage.setItem('omniflow_active_view', 'project');
+      } catch {}
+    }
+
     // Load sessions belonging to this project
     try {
       const pSessions = await fetchSessions(currentUser?.email, projectId);
       setProjectSessions(pSessions);
     } catch (e) {
       console.warn('Failed to fetch project sessions', e);
-    }
-
-    if (shouldSwitchToView) {
-      setActiveView('project');
-      try { localStorage.setItem('omniflow_active_view', 'project'); } catch {}
     }
 
     try {
@@ -736,11 +740,7 @@ export const App: React.FC = () => {
         isLoadingProjects={isLoadingProjects}
         activeProjectId={activeProjectId}
         onSelectProject={(pId) => {
-          if (activeView === 'mesh') {
-            handleSelectProject(pId, false);
-          } else {
-            handleSelectProject(pId, true);
-          }
+          handleSelectProject(pId, true);
         }}
         onTogglePinProject={handleTogglePinProject}
         onEditProject={handleEditProject}
@@ -801,7 +801,7 @@ export const App: React.FC = () => {
             onSelectSession={(sid) => {
               handleSelectSession(sid);
             }}
-            onStartNewChat={(prompt, model) => {
+            onStartNewChat={(prompt, model, effort) => {
               const newSid = `proj_${activeProjectId}_${Math.random().toString(36).substring(2, 9)}`;
               setSessionId(newSid);
               setMessages([]);
@@ -810,7 +810,7 @@ export const App: React.FC = () => {
                 localStorage.setItem('omniflow_active_session_id', newSid);
                 localStorage.setItem('omniflow_active_view', 'chat');
               } catch {}
-              handleSendMessage(prompt, model, undefined, 'project');
+              handleSendMessage(prompt, model, effort, 'project');
             }}
             onOpenRelationshipGraph={(pId) => {
               setActiveProjectId(pId);
