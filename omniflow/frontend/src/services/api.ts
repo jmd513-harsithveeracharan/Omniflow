@@ -305,7 +305,8 @@ export async function streamChatTurn(
   isVoice?: boolean,
   signal?: AbortSignal,
   userEmail?: string,
-  onCredentialRequest?: (data: import('../types').CredentialRequestData) => void
+  onCredentialRequest?: (data: import('../types').CredentialRequestData) => void,
+  projectId?: string
 ): Promise<void> {
   try {
     const res = await fetch(`${API_BASE}/chat/stream`, {
@@ -320,6 +321,7 @@ export async function streamChatTurn(
         mode: mode || 'auto',
         is_voice: Boolean(isVoice),
         user_email: userEmail || undefined,
+        project_id: projectId || undefined,
       }),
       signal,
     });

@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Pin, MoreHorizontal, Network, Edit3, Users, PanelLeftOpen, FolderTree } from 'lucide-react';
 import { ProjectRecord, ChatSession, ProjectContextFile, ProjectMetadata } from '../../types';
-import { ProjectPromptBox } from './ProjectPromptBox';
+import { PromptDock } from '../PromptDock';
 import { ProjectRecentsList } from './ProjectRecentsList';
 import { ProjectRightPanel } from './ProjectRightPanel';
 
@@ -90,7 +90,7 @@ export const ProjectWorkspaceHub: React.FC<ProjectWorkspaceHubProps> = ({
     });
   };
 
-  // Clean formatted name matching Claude screenshot
+  // Clean formatted name
   const isPeliProject = project.id === 'PRJ-PELI-BIOTHERMAL' || project.name.toLowerCase().includes('peli');
   const displayName = isPeliProject ? 'Peli Bio Thermal' : project.name;
   const displayDesc = isPeliProject
@@ -125,13 +125,10 @@ export const ProjectWorkspaceHub: React.FC<ProjectWorkspaceHubProps> = ({
           <span className="text-[#c4c7c5] truncate max-w-lg">{displayName}</span>
         </div>
 
-        {/* Project Header (Full width, No premature wrap!) */}
+        {/* Project Header (Full width, Sans-serif Modern Typography) */}
         <div className="flex items-start justify-between mb-8">
           <div className="space-y-2 flex-1 min-w-0 pr-6">
-            <h1
-              className="text-[32px] sm:text-[34px] font-normal tracking-tight text-[#f0f0f2] leading-snug break-words"
-              style={{ fontFamily: 'Georgia, Cambria, "Times New Roman", Times, serif' }}
-            >
+            <h1 className="text-[30px] sm:text-[34px] font-semibold tracking-tight text-[#f0f0f2] leading-snug break-words">
               {displayName}
             </h1>
             <p className="text-[14px] text-[#8e918f] leading-relaxed max-w-4xl">
@@ -210,12 +207,17 @@ export const ProjectWorkspaceHub: React.FC<ProjectWorkspaceHubProps> = ({
 
         {/* 2-Column Responsive Layout */}
         <div className="flex flex-col lg:flex-row gap-10 items-start">
-          {/* Main Column: Functional Prompt Dock + Recents */}
+          {/* Main Column: Exact Native Omniflow Prompt Dock + Recents */}
           <div className="flex-1 min-w-0 w-full flex flex-col">
-            <ProjectPromptBox
-              projectName={displayName}
-              onSubmit={onStartNewChat}
-            />
+            <div className="w-full project-prompt-dock-container">
+              <PromptDock
+                onSendMessage={(text, model, effort) => {
+                  onStartNewChat(text, model || 'Tenali AI', effort || 'medium');
+                }}
+                isStreaming={false}
+                activeProjectId={project.id}
+              />
+            </div>
 
             <ProjectRecentsList
               sessions={sessions}

@@ -543,6 +543,11 @@ export const App: React.FC = () => {
           setCurrentPlan(plan as unknown as IngestionPlan);
         }
         loadSessions();
+        if (activeProjectId) {
+          fetchSessions(currentUser?.email, activeProjectId)
+            .then(setProjectSessions)
+            .catch((e) => console.warn('Failed to refresh project sessions', e));
+        }
       },
       (err) => {
         if (controller.signal.aborted || err.includes('aborted') || err.includes('AbortError')) {
@@ -607,7 +612,8 @@ export const App: React.FC = () => {
         if (!controller.signal.aborted) {
           setActiveCredentialRequest(credData);
         }
-      }
+      },
+      activeProjectId || undefined
     );
   };
 
@@ -803,6 +809,16 @@ export const App: React.FC = () => {
             }}
             onStartNewChat={(prompt, model, effort) => {
               const newSid = `proj_${activeProjectId}_${Math.random().toString(36).substring(2, 9)}`;
+              const optimisticSession: ChatSession = {
+                sessionId: newSid,
+                projectId: activeProjectId,
+                workspaceId: status?.workspaceId || 'PBT_DATA_AGENT',
+                title: prompt.trim().slice(0, 42) || 'New Conversation',
+                messageCount: 1,
+                runCount: 1,
+                lastActive: 'Just now',
+              };
+              setProjectSessions((prev) => [optimisticSession, ...prev.filter((s) => s.sessionId !== newSid)]);
               setSessionId(newSid);
               setMessages([]);
               setActiveView('chat');

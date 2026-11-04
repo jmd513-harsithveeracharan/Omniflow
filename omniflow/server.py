@@ -322,10 +322,11 @@ async def list_sessions(user_email: str | None = None, project_id: str | None = 
             # Exclude internal project chats from general conversations list
             if sid.startswith("proj_") or s_proj:
                 continue
+            s_user = (sdata.get("user_email") or "").strip().lower()
+            if u and s_user and s_user != u:
+                continue
 
         s_user = (sdata.get("user_email") or "").strip().lower()
-        if u and s_user and s_user != u:
-            continue
         sess_list.append({
             "session_id": sid,
             "project_id": s_proj or (sid[5:] if sid.startswith("proj_") else None),

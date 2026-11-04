@@ -319,10 +319,10 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
             boxSizing: 'border-box',
           }}>
             <p style={{
-              fontFamily: "'Newsreader', 'Playfair Display', Georgia, serif",
-              fontStyle: 'italic',
-              fontSize: '21px',
-              lineHeight: 1.45,
+              fontFamily: 'var(--font-sans)',
+              fontSize: '18px',
+              fontWeight: 500,
+              lineHeight: 1.5,
               margin: '0 0 8px 0',
               color: 'rgba(255, 255, 255, 0.95)',
               letterSpacing: '-0.01em',

@@ -11,7 +11,7 @@ export const GeneralTab: React.FC<GeneralTabProps> = ({ onClose }) => {
   const [workDesc, setWorkDesc] = useState('Data Architect / Fabric Engineer');
   const [instructions, setInstructions] = useState('');
   const [theme, setTheme] = useState<'system' | 'light' | 'dark'>('dark');
-  const [font, setFont] = useState('Anthropic Serif (Newsreader)');
+  const [font, setFont] = useState('Anthropic Sans');
 
   const handleThemeChange = (newTheme: 'system' | 'light' | 'dark') => {
     setTheme(newTheme);
