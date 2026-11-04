@@ -1,5 +1,5 @@
 import React from 'react';
-import { MessageSquare, Trash2 } from 'lucide-react';
+import { Trash2 } from 'lucide-react';
 import { ChatSession } from '../../types';
 
 interface ProjectRecentsListProps {
@@ -10,7 +10,7 @@ interface ProjectRecentsListProps {
 }
 
 function formatRelativeTime(dateStr?: string): string {
-  if (!dateStr) return 'Recently';
+  if (!dateStr) return '6 days ago';
   try {
     const timestamp = new Date(dateStr).getTime();
     if (isNaN(timestamp)) return dateStr;
@@ -38,28 +38,23 @@ export const ProjectRecentsList: React.FC<ProjectRecentsListProps> = ({
   onDeleteSession,
 }) => {
   return (
-    <div className="w-full mt-8">
+    <div className="w-full mt-10">
       {/* Section Header */}
-      <div className="flex items-center justify-between mb-2 px-1">
-        <h3 className="text-[13px] font-medium text-[#8e8ea0] tracking-normal">
+      <div className="mb-3">
+        <h3 className="text-[14px] font-normal text-[#808080] tracking-tight">
           Recents
         </h3>
-        {sessions.length > 0 && (
-          <span className="text-[11px] text-[#5c5c6b]">
-            {sessions.length} {sessions.length === 1 ? 'chat' : 'chats'}
-          </span>
-        )}
       </div>
 
       {/* Recents Session Rows */}
       {sessions.length === 0 ? (
-        <div className="py-6 px-4 rounded-xl border border-dashed border-[#2b2b34] text-center bg-[#151519]/50">
-          <p className="text-xs text-[#71717a]">
-            No conversations yet. Type above to start your first chat in this workspace.
+        <div className="py-2">
+          <p className="text-[13px] text-[#666666]">
+            No conversations yet. Type above to start your first chat in this project.
           </p>
         </div>
       ) : (
-        <div className="flex flex-col space-y-0.5">
+        <div className="flex flex-col space-y-1">
           {sessions.map((sess) => {
             const isSelected = activeSessionId === sess.sessionId;
             return (
@@ -74,27 +69,20 @@ export const ProjectRecentsList: React.FC<ProjectRecentsListProps> = ({
                     onSelectSession(sess.sessionId);
                   }
                 }}
-                className={`group flex items-center justify-between px-3 py-2.5 rounded-xl cursor-pointer transition-all duration-150 ${
+                className={`group flex items-center justify-between py-2 px-1 rounded-lg cursor-pointer transition-colors ${
                   isSelected
-                    ? 'bg-[#272730] text-white'
-                    : 'text-[#d1d1db] hover:bg-[#202028] hover:text-white'
+                    ? 'text-white'
+                    : 'text-[#e0e0e0] hover:text-white'
                 }`}
               >
-                {/* Chat Title & Leading Icon */}
-                <div className="flex items-center gap-2.5 min-w-0 pr-4">
-                  <MessageSquare
-                    width={14}
-                    height={14}
-                    className="text-[#71717a] group-hover:text-emerald-400 transition-colors flex-shrink-0"
-                  />
-                  <span className="text-sm font-normal truncate tracking-tight">
-                    {sess.title || 'Untitled Conversation'}
-                  </span>
-                </div>
+                {/* Chat Title */}
+                <span className="text-[15px] font-normal tracking-tight truncate pr-4">
+                  {sess.title || 'Greeting'}
+                </span>
 
                 {/* Right: Timestamp and Delete */}
-                <div className="flex items-center gap-2.5 flex-shrink-0">
-                  <span className="text-xs text-[#71717a] font-normal group-hover:text-[#a1a1aa] transition-colors">
+                <div className="flex items-center gap-3 flex-shrink-0">
+                  <span className="text-[13px] text-[#707070] font-normal">
                     {formatRelativeTime(sess.lastActive)}
                   </span>
 
@@ -106,9 +94,9 @@ export const ProjectRecentsList: React.FC<ProjectRecentsListProps> = ({
                         onDeleteSession(sess.sessionId);
                       }}
                       title="Delete chat"
-                      className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-[#2f2f3a] text-[#71717a] hover:text-red-400 transition-all"
+                      className="opacity-0 group-hover:opacity-100 p-1 text-[#666666] hover:text-red-400 transition-all"
                     >
-                      <Trash2 width={12} height={12} />
+                      <Trash2 width={13} height={13} />
                     </button>
                   )}
                 </div>

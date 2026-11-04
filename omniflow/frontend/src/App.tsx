@@ -751,19 +751,21 @@ export const App: React.FC = () => {
       />
 
       {/* 2. Main Studio Canvas */}
-      <main className="studio-main" id="mainCanvas">
-        <TopBar
-          viewTitle={getViewTitle()}
-          isSidebarCollapsed={isSidebarCollapsed}
-          onToggleSidebar={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-          isWorkbenchOpen={isWorkbenchOpen}
-          onToggleWorkbench={() => setIsWorkbenchOpen(!isWorkbenchOpen)}
-          onNewSession={handleNewSession}
-          onRefreshWorkspace={() => fetchFabricStatus().then(setStatus)}
-          status={status}
-          onOpenFabricConnection={() => setIsFabricConnectionModalOpen(true)}
-          onOpenVoiceMode={() => setIsVoiceModeActive((prev) => !prev)}
-        />
+      <main className={`studio-main ${activeView === 'project' ? '!bg-[#1e1e1e]' : ''}`} id="mainCanvas">
+        {activeView !== 'project' && (
+          <TopBar
+            viewTitle={getViewTitle()}
+            isSidebarCollapsed={isSidebarCollapsed}
+            onToggleSidebar={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+            isWorkbenchOpen={isWorkbenchOpen}
+            onToggleWorkbench={() => setIsWorkbenchOpen(!isWorkbenchOpen)}
+            onNewSession={handleNewSession}
+            onRefreshWorkspace={() => fetchFabricStatus().then(setStatus)}
+            status={status}
+            onOpenFabricConnection={() => setIsFabricConnectionModalOpen(true)}
+            onOpenVoiceMode={() => setIsVoiceModeActive((prev) => !prev)}
+          />
+        )}
 
         {/* View Routing */}
         {activeView === 'projects' && (
@@ -794,6 +796,8 @@ export const App: React.FC = () => {
             }
             sessions={projectSessions}
             activeSessionId={sessionId}
+            isSidebarCollapsed={isSidebarCollapsed}
+            onToggleSidebar={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
             onSelectSession={(sid) => {
               handleSelectSession(sid);
             }}

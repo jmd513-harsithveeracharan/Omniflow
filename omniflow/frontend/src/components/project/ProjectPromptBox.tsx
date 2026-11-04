@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Plus, ChevronDown, Mic, MicOff, ArrowUp, Sparkles } from 'lucide-react';
+import { Plus, ChevronDown, Mic, MicOff, ArrowUp, AudioWaveform } from 'lucide-react';
 
 interface ProjectPromptBoxProps {
   projectName: string;
@@ -8,11 +8,11 @@ interface ProjectPromptBoxProps {
 }
 
 const AVAILABLE_MODELS = [
-  { id: 'Sonnet 3.5 Medium', name: 'Sonnet 3.5 Medium', provider: 'Anthropic' },
-  { id: 'Claude 3.7 Sonnet', name: 'Claude 3.7 Sonnet', provider: 'Anthropic' },
-  { id: 'Tenali AI Medium', name: 'Tenali AI Medium', provider: 'Tenali' },
-  { id: 'Gemini 3.6 Flash', name: 'Gemini 3.6 Flash', provider: 'Google' },
-  { id: 'GPT-4o Omniflow', name: 'GPT-4o Omniflow', provider: 'OpenAI' },
+  { id: 'Sonnet 3.5 Medium', name: 'Sonnet 3.5', tier: 'Medium' },
+  { id: 'Claude 3.7 Sonnet', name: 'Claude 3.7', tier: 'Thinking' },
+  { id: 'Tenali AI Medium', name: 'Tenali AI', tier: 'Medium' },
+  { id: 'Gemini 3.6 Flash', name: 'Gemini 3.6', tier: 'Flash' },
+  { id: 'GPT-4o Omniflow', name: 'GPT-4o', tier: 'Omni' },
 ];
 
 export const ProjectPromptBox: React.FC<ProjectPromptBoxProps> = ({
@@ -28,15 +28,13 @@ export const ProjectPromptBox: React.FC<ProjectPromptBoxProps> = ({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const modelMenuRef = useRef<HTMLDivElement>(null);
 
-  // Auto-resize textarea as text grows
   useEffect(() => {
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
-      textareaRef.current.style.height = `${Math.min(Math.max(textareaRef.current.scrollHeight, 72), 240)}px`;
+      textareaRef.current.style.height = `${Math.min(Math.max(textareaRef.current.scrollHeight, 64), 220)}px`;
     }
   }, [prompt]);
 
-  // Close model menu when clicking outside
   useEffect(() => {
     const handleOutsideClick = (e: MouseEvent) => {
       if (modelMenuRef.current && !modelMenuRef.current.contains(e.target as Node)) {
@@ -53,7 +51,7 @@ export const ProjectPromptBox: React.FC<ProjectPromptBoxProps> = ({
     onSubmit(trimmed, selectedModel, activeMode);
     setPrompt('');
     if (textareaRef.current) {
-      textareaRef.current.style.height = '72px';
+      textareaRef.current.style.height = '64px';
     }
   };
 
@@ -64,10 +62,12 @@ export const ProjectPromptBox: React.FC<ProjectPromptBoxProps> = ({
     }
   };
 
+  const activeModelObj = AVAILABLE_MODELS.find((m) => m.id === selectedModel) || AVAILABLE_MODELS[0];
+
   return (
-    <div className="w-full rounded-2xl bg-[#1e1e24]/90 border border-[#303038] hover:border-[#3e3e48] transition-all duration-200 shadow-xl overflow-hidden focus-within:border-[#4f4f5a] focus-within:ring-1 focus-within:ring-[#5c5c6b]/30">
-      {/* Textarea Input */}
-      <div className="p-4 pt-4 pb-2">
+    <div className="w-full rounded-2xl bg-[#2b2b2b] border border-[#383838] hover:border-[#444444] transition-all duration-200 shadow-lg overflow-hidden flex flex-col justify-between">
+      {/* Textarea Input without separator lines */}
+      <div className="p-4 pt-4 pb-1">
         <textarea
           ref={textareaRef}
           value={prompt}
@@ -77,60 +77,63 @@ export const ProjectPromptBox: React.FC<ProjectPromptBoxProps> = ({
           aria-label={`Prompt for ${projectName}`}
           rows={2}
           disabled={disabled}
-          className="w-full bg-transparent resize-none text-[15px] leading-relaxed text-[#ececf1] placeholder-[#71717a] outline-none border-none focus:ring-0 selection:bg-emerald-500/30"
-          style={{ minHeight: '64px', maxHeight: '240px' }}
+          className="w-full bg-transparent resize-none text-[15px] leading-relaxed text-[#f0f0f0] placeholder-[#707070] outline-none border-none focus:ring-0 selection:bg-neutral-600/40"
+          style={{ minHeight: '60px', maxHeight: '220px' }}
         />
       </div>
 
-      {/* Dock Controls Footer */}
-      <div className="flex items-center justify-between px-3.5 py-2.5 bg-[#18181d]/80 border-t border-[#2a2a32]">
-        {/* Left: Mode Switchers (+ Chat / Cowork) */}
+      {/* Seamless Dock Controls Footer (No top border line!) */}
+      <div className="flex items-center justify-between px-3.5 pb-3 pt-1">
+        {/* Left: + icon followed by Chat & Cowork pills */}
         <div className="flex items-center gap-1.5">
           <button
             type="button"
+            className="p-1 text-[#8a8a8a] hover:text-[#d1d1db] transition-colors"
+            title="Add attachment"
+          >
+            <Plus width={17} height={17} strokeWidth={1.8} />
+          </button>
+
+          <button
+            type="button"
             onClick={() => setActiveMode('chat')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+            className={`px-3 py-1 rounded-lg text-xs font-normal transition-all ${
               activeMode === 'chat'
-                ? 'bg-[#2b2b34] text-white shadow-sm'
-                : 'text-[#8e8ea0] hover:text-[#d1d1db] hover:bg-[#23232b]'
+                ? 'bg-[#3b3b3b] text-white shadow-sm'
+                : 'text-[#8a8a8a] hover:text-[#e0e0e0]'
             }`}
           >
-            <Plus width={13} height={13} className="text-[#a1a1aa]" />
-            <span>Chat</span>
+            Chat
           </button>
 
           <button
             type="button"
             onClick={() => setActiveMode('cowork')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+            className={`px-3 py-1 rounded-lg text-xs font-normal transition-all ${
               activeMode === 'cowork'
-                ? 'bg-[#2b2b34] text-white shadow-sm'
-                : 'text-[#8e8ea0] hover:text-[#d1d1db] hover:bg-[#23232b]'
+                ? 'bg-[#3b3b3b] text-white shadow-sm'
+                : 'text-[#8a8a8a] hover:text-[#e0e0e0]'
             }`}
           >
-            <Sparkles width={12} height={12} className="text-emerald-400" />
-            <span>Cowork</span>
+            Cowork
           </button>
         </div>
 
-        {/* Right: Model Selector, Voice, and Submit */}
-        <div className="flex items-center gap-2">
+        {/* Right: Model Name, Voice Icon, Audio / Submit */}
+        <div className="flex items-center gap-2.5">
           {/* Model Selector Dropdown */}
           <div className="relative" ref={modelMenuRef}>
             <button
               type="button"
               onClick={() => setIsModelMenuOpen((prev) => !prev)}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-[#b4b4c2] hover:text-white hover:bg-[#262630] transition-colors"
+              className="flex items-center gap-1.5 text-xs font-normal text-[#8a8a8a] hover:text-[#d0d0d0] transition-colors"
             >
-              <span>{selectedModel}</span>
-              <ChevronDown width={12} height={12} className="text-[#71717a]" />
+              <span>{activeModelObj.name} <span className="text-[#666666]">{activeModelObj.tier}</span></span>
+              <ChevronDown width={12} height={12} className="text-[#666666]" />
             </button>
 
             {isModelMenuOpen && (
-              <div className="absolute right-0 bottom-full mb-1.5 w-52 py-1 bg-[#1c1c22] border border-[#32323c] rounded-xl shadow-2xl z-50 animate-in fade-in-50 zoom-in-95">
-                <div className="px-3 py-1.5 text-[11px] font-semibold tracking-wider uppercase text-[#71717a]">
-                  Execution Model
-                </div>
+              <div className="absolute right-0 bottom-full mb-2 w-48 py-1 bg-[#242424] border border-[#383838] rounded-xl shadow-2xl z-50 animate-in fade-in-50 zoom-in-95">
                 {AVAILABLE_MODELS.map((m) => (
                   <button
                     key={m.id}
@@ -139,14 +142,14 @@ export const ProjectPromptBox: React.FC<ProjectPromptBoxProps> = ({
                       setSelectedModel(m.id);
                       setIsModelMenuOpen(false);
                     }}
-                    className={`w-full flex items-center justify-between px-3 py-1.5 text-xs text-left transition-colors ${
+                    className={`w-full flex items-center justify-between px-3 py-2 text-xs text-left transition-colors ${
                       selectedModel === m.id
-                        ? 'bg-emerald-500/15 text-emerald-300 font-medium'
-                        : 'text-[#d1d1db] hover:bg-[#262630]'
+                        ? 'bg-[#333333] text-white font-medium'
+                        : 'text-[#a0a0a0] hover:bg-[#2c2c2c] hover:text-white'
                     }`}
                   >
                     <span>{m.name}</span>
-                    <span className="text-[10px] text-[#71717a]">{m.provider}</span>
+                    <span className="text-[10px] text-[#666666]">{m.tier}</span>
                   </button>
                 ))}
               </div>
@@ -158,27 +161,33 @@ export const ProjectPromptBox: React.FC<ProjectPromptBoxProps> = ({
             type="button"
             onClick={() => setIsRecording((prev) => !prev)}
             title={isRecording ? 'Listening...' : 'Voice mode'}
-            className={`p-1.5 rounded-lg text-[#8e8ea0] hover:text-[#ececf1] hover:bg-[#262630] transition-colors ${
-              isRecording ? 'text-red-400 bg-red-500/15 animate-pulse' : ''
+            className={`p-1 text-[#8a8a8a] hover:text-white transition-colors ${
+              isRecording ? 'text-red-400 animate-pulse' : ''
             }`}
           >
-            {isRecording ? <MicOff width={15} height={15} /> : <Mic width={15} height={15} />}
+            {isRecording ? <MicOff width={16} height={16} /> : <Mic width={16} height={16} strokeWidth={1.8} />}
           </button>
 
-          {/* Submit Arrow Button */}
-          <button
-            type="button"
-            onClick={handleSubmit}
-            disabled={!prompt.trim() || disabled}
-            aria-label="Send prompt"
-            className={`p-1.5 rounded-lg transition-all ${
-              prompt.trim() && !disabled
-                ? 'bg-white text-black hover:bg-[#ececf1] shadow-md'
-                : 'bg-[#2b2b34] text-[#5c5c6b] cursor-not-allowed opacity-60'
-            }`}
-          >
-            <ArrowUp width={15} height={15} strokeWidth={2.5} />
-          </button>
+          {/* Audio Waveform / Submit Button */}
+          {prompt.trim() ? (
+            <button
+              type="button"
+              onClick={handleSubmit}
+              disabled={disabled}
+              aria-label="Send prompt"
+              className="p-1 text-[#e0e0e0] hover:text-white transition-colors"
+            >
+              <ArrowUp width={17} height={17} strokeWidth={2.2} />
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="p-1 text-[#8a8a8a] hover:text-white transition-colors"
+              title="Voice waveform"
+            >
+              <AudioWaveform width={16} height={16} strokeWidth={1.8} />
+            </button>
+          )}
         </div>
       </div>
     </div>

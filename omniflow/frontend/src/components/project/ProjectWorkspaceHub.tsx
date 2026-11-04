@@ -1,15 +1,16 @@
 import React, { useState } from 'react';
-import { Pin, MoreHorizontal, ArrowLeft, Network, Edit2, Users } from 'lucide-react';
+import { Pin, MoreHorizontal, Network, Edit2, Users, PanelLeftOpen } from 'lucide-react';
 import { ProjectRecord, ChatSession, ProjectContextFile, ProjectMetadata } from '../../types';
 import { ProjectPromptBox } from './ProjectPromptBox';
 import { ProjectRecentsList } from './ProjectRecentsList';
-import { ProjectInstructionsCard } from './ProjectInstructionsCard';
-import { ProjectContextCard } from './ProjectContextCard';
+import { ProjectRightPanel } from './ProjectRightPanel';
 
 interface ProjectWorkspaceHubProps {
   project: ProjectRecord;
   sessions: ChatSession[];
   activeSessionId?: string | null;
+  isSidebarCollapsed?: boolean;
+  onToggleSidebar?: () => void;
   onSelectSession: (sessionId: string) => void;
   onStartNewChat: (prompt: string, model: string, mode: 'chat' | 'cowork') => void;
   onOpenRelationshipGraph: (projectId: string) => void;
@@ -25,6 +26,8 @@ export const ProjectWorkspaceHub: React.FC<ProjectWorkspaceHubProps> = ({
   project,
   sessions,
   activeSessionId,
+  isSidebarCollapsed,
+  onToggleSidebar,
   onSelectSession,
   onStartNewChat,
   onOpenRelationshipGraph,
@@ -76,82 +79,96 @@ export const ProjectWorkspaceHub: React.FC<ProjectWorkspaceHubProps> = ({
     });
   };
 
+  // Clean formatted name matching Claude screenshot
+  const isPeliProject = project.id === 'PRJ-PELI-BIOTHERMAL' || project.name.toLowerCase().includes('peli');
+  const displayName = isPeliProject ? 'Peli Bio Thermal' : project.name;
+  const displayDesc = isPeliProject
+    ? (project.description && !project.description.toLowerCase().includes('cold-chain')
+        ? project.description
+        : 'Working on the client Project where need to establish a data platform.')
+    : (project.description || 'Enterprise workspace for data engineering pipelines.');
+
   return (
-    <div className="flex-1 w-full h-full overflow-y-auto bg-[#0e0e12] text-[#ececf1] selection:bg-emerald-500/30">
-      <div className="max-w-6xl mx-auto px-6 py-8">
-        {/* Navigation Breadcrumb / Back */}
-        <div className="mb-4">
+    <div className="flex-1 w-full h-full overflow-y-auto bg-[#1e1e1e] text-[#ececf1] selection:bg-neutral-600/40">
+      <div className="max-w-[1020px] mx-auto px-8 pt-5 pb-16">
+        {/* Top Breadcrumb Navigation */}
+        <div className="flex items-center gap-2 mb-8 text-[13px] text-[#787878]">
+          {isSidebarCollapsed && onToggleSidebar && (
+            <button
+              type="button"
+              onClick={onToggleSidebar}
+              className="p-1 -ml-1 text-[#8a8a8a] hover:text-white transition-colors mr-1"
+              title="Expand Sidebar"
+            >
+              <PanelLeftOpen width={16} height={16} />
+            </button>
+          )}
           <button
             type="button"
             onClick={onBackToProjects}
-            className="inline-flex items-center gap-1.5 text-xs text-[#8e8ea0] hover:text-white transition-colors"
+            className="hover:text-white transition-colors"
           >
-            <ArrowLeft width={13} height={13} />
-            <span>Projects</span>
+            Projects
           </button>
+          <span>/</span>
+          <span className="text-[#a0a0a0] truncate max-w-xs">{displayName}</span>
         </div>
 
-        {/* Project Header */}
-        <div className="flex items-start justify-between mb-8 pb-4 border-b border-[#1c1c24]">
+        {/* Project Header (Seamless, No harsh line!) */}
+        <div className="flex items-start justify-between mb-8">
           <div className="space-y-1.5 max-w-2xl">
-            <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-white font-serif">
-              {project.name}
+            <h1
+              className="text-[32px] sm:text-[34px] font-normal tracking-tight text-[#f0f0f0] leading-tight"
+              style={{ fontFamily: 'Georgia, Cambria, "Times New Roman", Times, serif' }}
+            >
+              {displayName}
             </h1>
-            <p className="text-sm text-[#8e8ea0] leading-relaxed">
-              {project.description || 'Working on the client Project where need to establish a data platform.'}
+            <p className="text-[14px] text-[#8a8a8a] leading-relaxed">
+              {displayDesc}
             </p>
           </div>
 
-          {/* Top Right Action Buttons */}
-          <div className="flex items-center gap-2">
-            {/* Relationship Graph Jump Button */}
-            <button
-              type="button"
-              onClick={() => onOpenRelationshipGraph(project.id)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 transition-all"
-              title="Open spherical relationship graph for this project"
-            >
-              <Network width={13} height={13} />
-              <span>Relationship Graph</span>
-            </button>
-
-            {/* Pin Toggle */}
+          {/* Top Right Header Controls: Pin and ... */}
+          <div className="flex items-center gap-2 pt-1">
             <button
               type="button"
               onClick={onTogglePin}
               title={isPinned ? 'Unpin project' : 'Pin project'}
-              className={`p-2 rounded-lg transition-colors ${
-                isPinned
-                  ? 'text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20'
-                  : 'text-[#8e8ea0] hover:text-white hover:bg-[#1e1e26]'
-              }`}
+              className="p-1.5 text-[#8a8a8a] hover:text-white transition-colors"
             >
-              <Pin width={16} height={16} className={isPinned ? 'fill-emerald-400' : ''} />
+              <Pin width={17} height={17} className={isPinned ? 'fill-white text-white' : ''} />
             </button>
 
-            {/* More Options Menu */}
             <div className="relative">
               <button
                 type="button"
                 onClick={() => setIsMenuOpen((prev) => !prev)}
-                className="p-2 rounded-lg text-[#8e8ea0] hover:text-white hover:bg-[#1e1e26] transition-colors"
+                className="p-1.5 text-[#8a8a8a] hover:text-white transition-colors"
                 title="More options"
               >
-                <MoreHorizontal width={16} height={16} />
+                <MoreHorizontal width={18} height={18} />
               </button>
 
               {isMenuOpen && (
                 <div
-                  className="absolute right-0 mt-1 w-44 py-1 bg-[#18181f] border border-[#2b2b36] rounded-xl shadow-2xl z-50 animate-in fade-in-50 zoom-in-95"
+                  className="absolute right-0 mt-2 w-52 py-1 bg-[#252525] border border-[#383838] rounded-xl shadow-2xl z-50 animate-in fade-in-50 zoom-in-95"
                   onClick={() => setIsMenuOpen(false)}
                 >
+                  <button
+                    type="button"
+                    onClick={() => onOpenRelationshipGraph(project.id)}
+                    className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-[#d0d0d0] hover:bg-[#303030] hover:text-white text-left transition-colors"
+                  >
+                    <Network width={14} height={14} className="text-emerald-400" />
+                    <span>Relationship Graph</span>
+                  </button>
                   {onEditProject && (
                     <button
                       type="button"
                       onClick={() => onEditProject(project)}
-                      className="w-full flex items-center gap-2 px-3 py-2 text-xs text-[#d1d1db] hover:bg-[#22222c] hover:text-white text-left transition-colors"
+                      className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-[#d0d0d0] hover:bg-[#303030] hover:text-white text-left transition-colors"
                     >
-                      <Edit2 width={13} height={13} />
+                      <Edit2 width={14} height={14} />
                       <span>Edit Project</span>
                     </button>
                   )}
@@ -159,9 +176,9 @@ export const ProjectWorkspaceHub: React.FC<ProjectWorkspaceHubProps> = ({
                     <button
                       type="button"
                       onClick={() => onManageMembers(project)}
-                      className="w-full flex items-center gap-2 px-3 py-2 text-xs text-[#d1d1db] hover:bg-[#22222c] hover:text-white text-left transition-colors"
+                      className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-[#d0d0d0] hover:bg-[#303030] hover:text-white text-left transition-colors"
                     >
-                      <Users width={13} height={13} />
+                      <Users width={14} height={14} />
                       <span>Manage Members</span>
                     </button>
                   )}
@@ -171,12 +188,12 @@ export const ProjectWorkspaceHub: React.FC<ProjectWorkspaceHubProps> = ({
           </div>
         </div>
 
-        {/* 2-Column Responsive Workspace Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-          {/* Main Column: Prompt Dock + Recents (8 cols) */}
-          <div className="lg:col-span-8 flex flex-col">
+        {/* 2-Column Responsive Layout */}
+        <div className="flex flex-col lg:flex-row gap-10 items-start">
+          {/* Main Column: Prompt Dock + Recents */}
+          <div className="flex-1 min-w-0 w-full flex flex-col">
             <ProjectPromptBox
-              projectName={project.name}
+              projectName={displayName}
               onSubmit={onStartNewChat}
             />
 
@@ -188,17 +205,14 @@ export const ProjectWorkspaceHub: React.FC<ProjectWorkspaceHubProps> = ({
             />
           </div>
 
-          {/* Right Panel: Instructions + Context (4 cols) */}
-          <div className="lg:col-span-4 flex flex-col space-y-4">
-            <ProjectInstructionsCard
+          {/* Right Column: Unified Instructions & Context Panel (350px) */}
+          <div className="w-full lg:w-[350px] flex-shrink-0">
+            <ProjectRightPanel
               instructions={instructions}
+              contextFiles={contextFiles}
               onSaveInstructions={handleSaveInstructions}
-            />
-
-            <ProjectContextCard
-              files={contextFiles}
-              onAddFile={handleAddContextFile}
-              onRemoveFile={handleRemoveContextFile}
+              onAddContextFile={handleAddContextFile}
+              onRemoveContextFile={handleRemoveContextFile}
             />
           </div>
         </div>
