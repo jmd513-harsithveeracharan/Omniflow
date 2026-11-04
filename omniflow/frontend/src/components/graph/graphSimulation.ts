@@ -3,6 +3,7 @@ import {
   forceManyBody,
   forceLink,
   forceCollide,
+  forceCenter,
   Simulation,
   SimulationNodeDatum,
   SimulationLinkDatum,
@@ -26,22 +27,53 @@ export interface D3SimLink extends SimulationLinkDatum<D3SimNode> {
 }
 
 /**
- * Custom D3 Force: Soft Circular Boundary Enclosure
- * Pulls any node that drifts outside the circular radius back into the sphere.
+ * Custom D3 Force: Spherical Harmonic Galaxy Envelope (Obsidian-Style)
+ * 1. Planetary Gravitational Well: Gently draws all nodes towards (0, 0) with Hookean tension (F = -k * d)
+ *    to prevent the graph from elongating or stretching into irregular shapes.
+ * 2. Spherical Boundary Surface Tension: Creates a smooth spherical boundary at `radius`. As nodes
+ *    approach or exceed `0.86 * radius`, an escalating inward restitution force keeps the silhouette
+ *    circular and round.
+ * 3. Perimeter Corona Orbit: Gently encourages low-degree singletons and peripheral nodes to distribute
+ *    evenly along the spherical rim (0.88 - 0.96 * radius), giving the exact celestial constellation
+ *    silhouette seen in Obsidian graphs.
  */
-export function forceCircularBoundary(radius: number, pullStrength = 0.28) {
+export function forceSphericalGalaxy(radius: number) {
   let nodes: D3SimNode[] = [];
 
   function force(alpha: number) {
-    const k = pullStrength * alpha;
+    const kCentering = 0.052 * alpha;
+    const kBoundary = 22 * alpha;
+    const innerRim = radius * 0.86;
+    const rimSpan = radius * 0.14;
+
     for (let i = 0; i < nodes.length; i++) {
       const n = nodes[i];
       if (n.x === undefined || n.y === undefined) continue;
       const d = Math.hypot(n.x, n.y);
-      if (d > radius && d > 0) {
-        const excess = d - radius;
-        n.vx = (n.vx || 0) - (n.x / d) * excess * k;
-        n.vy = (n.vy || 0) - (n.y / d) * excess * k;
+      if (d === 0) continue;
+
+      const nx = n.x / d;
+      const ny = n.y / d;
+
+      // 1. Inward Radial Gravitational Pull (Hooke's Law / Central Mass)
+      n.vx = (n.vx || 0) - n.x * kCentering;
+      n.vy = (n.vy || 0) - n.y * kCentering;
+
+      // 2. Spherical Surface Boundary (Soft quadratic restitution)
+      if (d > innerRim) {
+        const excess = d - innerRim;
+        const push = (excess / rimSpan) * kBoundary;
+        n.vx = (n.vx || 0) - nx * push;
+        n.vy = (n.vy || 0) - ny * push;
+      }
+
+      // 3. Outer Corona Guiding Force for Singletons & Peripheral Leaf Nodes
+      if (n.degree <= 1 && n.type !== 'column') {
+        const targetD = radius * 0.90;
+        const diff = d - targetD;
+        const coronaPull = diff * 0.06 * alpha;
+        n.vx = (n.vx || 0) - nx * coronaPull;
+        n.vy = (n.vy || 0) - ny * coronaPull;
       }
     }
   }
@@ -53,28 +85,12 @@ export function forceCircularBoundary(radius: number, pullStrength = 0.28) {
   return force;
 }
 
-/**
- * Custom D3 Force: Radial Gravitational Well
- * Pulls clusters gently toward (0, 0) to balance Coulomb repulsion.
- */
-export function forceRadialGravity(gravity = 0.045) {
-  let nodes: D3SimNode[] = [];
+export function forceCircularBoundary(radius: number) {
+  return forceSphericalGalaxy(radius);
+}
 
-  function force(alpha: number) {
-    const k = gravity * alpha;
-    for (let i = 0; i < nodes.length; i++) {
-      const n = nodes[i];
-      if (n.x === undefined || n.y === undefined) continue;
-      n.vx = (n.vx || 0) - n.x * k;
-      n.vy = (n.vy || 0) - n.y * k;
-    }
-  }
-
-  force.initialize = (initNodes: D3SimNode[]) => {
-    nodes = initNodes;
-  };
-
-  return force;
+export function forceRadialGravity() {
+  return () => {};
 }
 
 /**
@@ -199,40 +215,40 @@ export function createSnowflakeSimulation(
     }
   }
 
-  // Configure D3 Force Layout with Anti-Clutter Physics
+  // Configure D3 Force Layout with Obsidian-Style Spherical Galaxy Physics
   const simulation = forceSimulation<D3SimNode>(simNodes)
-    // 1. Multi-Body Repulsion
+    // 0. Anchor Center of Gravity at Origin
+    .force('center', forceCenter(0, 0))
+    // 1. Multi-Body Coulomb Repulsion
     .force(
       'charge',
       forceManyBody<D3SimNode>()
-        .strength((d) => (d.isHub ? -340 : -26))
-        .distanceMax(Math.max(450, boundaryRadius * 1.2))
+        .strength((d) => (d.isHub ? -380 : -22))
+        .distanceMax(Math.max(480, boundaryRadius * 1.3))
     )
-    // 2. Elastic Spring Links: 44px maintains tight flower bouquet without cramping names
+    // 2. Elastic Spring Links: Compact 38px column bouquet, 135px cluster separation
     .force(
       'link',
       forceLink<D3SimNode, D3SimLink>(simLinks)
-        .distance((l) => (l.relationship === 'CONTAINS' ? 44 : 125))
-        .strength((l) => (l.relationship === 'CONTAINS' ? 0.94 : 0.25))
+        .distance((l) => (l.relationship === 'CONTAINS' ? 38 : 135))
+        .strength((l) => (l.relationship === 'CONTAINS' ? 0.95 : 0.18))
     )
-    // 3. Collision Barrier: Active on ALL nodes (including columns) to prevent overlapping text
+    // 3. Collision Barrier: Active on ALL nodes to prevent label overlap
     .force(
       'collide',
       forceCollide<D3SimNode>()
         .radius((d) => d.collisionRadius)
-        .strength(0.88)
+        .strength(0.92)
         .iterations(3)
     )
-    // 4. Inward Radial Gravity
-    .force('gravity', forceRadialGravity(0.045))
-    // 5. Circular Boundary Enclosure
-    .force('circular_boundary', forceCircularBoundary(boundaryRadius, 0.32))
-    .alpha(0.28)
-    .alphaDecay(0.04)
-    .velocityDecay(0.42);
+    // 4. Custom Spherical Harmonic Galaxy Envelope (Obsidian-Style)
+    .force('spherical', forceSphericalGalaxy(boundaryRadius))
+    .alpha(0.35)
+    .alphaDecay(0.035)
+    .velocityDecay(0.40);
 
-  // Synchronous warmup (50 ticks) so initial coordinates are settled and bounding box is stable
-  for (let i = 0; i < 50; i++) {
+  // Synchronous warmup (60 ticks) so initial coordinates are settled into the spherical shape
+  for (let i = 0; i < 60; i++) {
     simulation.tick();
   }
 
