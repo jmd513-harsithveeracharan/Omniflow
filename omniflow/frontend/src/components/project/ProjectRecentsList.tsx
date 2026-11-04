@@ -41,7 +41,7 @@ export const ProjectRecentsList: React.FC<ProjectRecentsListProps> = ({
     <div className="w-full mt-10">
       {/* Section Header */}
       <div className="mb-3">
-        <h3 className="text-[14px] font-normal text-[#808080] tracking-tight">
+        <h3 className="text-[14px] font-normal text-[#8e918f] tracking-tight">
           Recents
         </h3>
       </div>
@@ -49,7 +49,7 @@ export const ProjectRecentsList: React.FC<ProjectRecentsListProps> = ({
       {/* Recents Session Rows */}
       {sessions.length === 0 ? (
         <div className="py-2">
-          <p className="text-[13px] text-[#666666]">
+          <p className="text-[13px] text-[#8e918f]">
             No conversations yet. Type above to start your first chat in this project.
           </p>
         </div>
@@ -69,10 +69,10 @@ export const ProjectRecentsList: React.FC<ProjectRecentsListProps> = ({
                     onSelectSession(sess.sessionId);
                   }
                 }}
-                className={`group flex items-center justify-between py-2 px-1 rounded-lg cursor-pointer transition-colors ${
+                className={`group flex items-center justify-between py-2 px-2.5 rounded-xl cursor-pointer transition-colors ${
                   isSelected
-                    ? 'text-white'
-                    : 'text-[#e0e0e0] hover:text-white'
+                    ? 'bg-[#1a1a1c] text-[#f0f0f2]'
+                    : 'text-[#c4c7c5] hover:bg-[#1a1a1c]/70 hover:text-[#f0f0f2]'
                 }`}
               >
                 {/* Chat Title */}
@@ -82,7 +82,7 @@ export const ProjectRecentsList: React.FC<ProjectRecentsListProps> = ({
 
                 {/* Right: Timestamp and Delete */}
                 <div className="flex items-center gap-3 flex-shrink-0">
-                  <span className="text-[13px] text-[#707070] font-normal">
+                  <span className="text-[13px] text-[#8e918f] font-normal">
                     {formatRelativeTime(sess.lastActive)}
                   </span>
 
@@ -94,7 +94,7 @@ export const ProjectRecentsList: React.FC<ProjectRecentsListProps> = ({
                         onDeleteSession(sess.sessionId);
                       }}
                       title="Delete chat"
-                      className="opacity-0 group-hover:opacity-100 p-1 text-[#666666] hover:text-red-400 transition-all"
+                      className="opacity-0 group-hover:opacity-100 p-1 text-[#8e918f] hover:text-red-400 transition-all"
                     >
                       <Trash2 width={13} height={13} />
                     </button>

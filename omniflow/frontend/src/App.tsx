@@ -751,7 +751,7 @@ export const App: React.FC = () => {
       />
 
       {/* 2. Main Studio Canvas */}
-      <main className={`studio-main ${activeView === 'project' ? '!bg-[#1e1e1e]' : ''}`} id="mainCanvas">
+      <main className={`studio-main ${activeView === 'project' ? '!bg-[#131314]' : ''}`} id="mainCanvas">
         {activeView !== 'project' && (
           <TopBar
             viewTitle={getViewTitle()}

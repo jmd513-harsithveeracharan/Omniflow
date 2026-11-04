@@ -89,15 +89,15 @@ export const ProjectWorkspaceHub: React.FC<ProjectWorkspaceHubProps> = ({
     : (project.description || 'Enterprise workspace for data engineering pipelines.');
 
   return (
-    <div className="flex-1 w-full h-full overflow-y-auto bg-[#1e1e1e] text-[#ececf1] selection:bg-neutral-600/40">
+    <div className="flex-1 w-full h-full overflow-y-auto bg-[#131314] text-[#f0f0f2] selection:bg-emerald-500/30">
       <div className="max-w-[1020px] mx-auto px-8 pt-5 pb-16">
         {/* Top Breadcrumb Navigation */}
-        <div className="flex items-center gap-2 mb-8 text-[13px] text-[#787878]">
+        <div className="flex items-center gap-2 mb-8 text-[13px] text-[#8e918f]">
           {isSidebarCollapsed && onToggleSidebar && (
             <button
               type="button"
               onClick={onToggleSidebar}
-              className="p-1 -ml-1 text-[#8a8a8a] hover:text-white transition-colors mr-1"
+              className="p-1 -ml-1 text-[#8e918f] hover:text-[#f0f0f2] transition-colors mr-1"
               title="Expand Sidebar"
             >
               <PanelLeftOpen width={16} height={16} />
@@ -106,24 +106,24 @@ export const ProjectWorkspaceHub: React.FC<ProjectWorkspaceHubProps> = ({
           <button
             type="button"
             onClick={onBackToProjects}
-            className="hover:text-white transition-colors"
+            className="hover:text-[#f0f0f2] transition-colors"
           >
             Projects
           </button>
           <span>/</span>
-          <span className="text-[#a0a0a0] truncate max-w-xs">{displayName}</span>
+          <span className="text-[#c4c7c5] truncate max-w-xs">{displayName}</span>
         </div>
 
         {/* Project Header (Seamless, No harsh line!) */}
         <div className="flex items-start justify-between mb-8">
           <div className="space-y-1.5 max-w-2xl">
             <h1
-              className="text-[32px] sm:text-[34px] font-normal tracking-tight text-[#f0f0f0] leading-tight"
+              className="text-[32px] sm:text-[34px] font-normal tracking-tight text-[#f0f0f2] leading-tight"
               style={{ fontFamily: 'Georgia, Cambria, "Times New Roman", Times, serif' }}
             >
               {displayName}
             </h1>
-            <p className="text-[14px] text-[#8a8a8a] leading-relaxed">
+            <p className="text-[14px] text-[#8e918f] leading-relaxed">
               {displayDesc}
             </p>
           </div>
@@ -134,16 +134,16 @@ export const ProjectWorkspaceHub: React.FC<ProjectWorkspaceHubProps> = ({
               type="button"
               onClick={onTogglePin}
               title={isPinned ? 'Unpin project' : 'Pin project'}
-              className="p-1.5 text-[#8a8a8a] hover:text-white transition-colors"
+              className="p-1.5 text-[#8e918f] hover:text-[#f0f0f2] transition-colors"
             >
-              <Pin width={17} height={17} className={isPinned ? 'fill-white text-white' : ''} />
+              <Pin width={17} height={17} className={isPinned ? 'fill-emerald-400 text-emerald-400' : ''} />
             </button>
 
             <div className="relative">
               <button
                 type="button"
                 onClick={() => setIsMenuOpen((prev) => !prev)}
-                className="p-1.5 text-[#8a8a8a] hover:text-white transition-colors"
+                className="p-1.5 text-[#8e918f] hover:text-[#f0f0f2] transition-colors"
                 title="More options"
               >
                 <MoreHorizontal width={18} height={18} />
@@ -151,13 +151,13 @@ export const ProjectWorkspaceHub: React.FC<ProjectWorkspaceHubProps> = ({
 
               {isMenuOpen && (
                 <div
-                  className="absolute right-0 mt-2 w-52 py-1 bg-[#252525] border border-[#383838] rounded-xl shadow-2xl z-50 animate-in fade-in-50 zoom-in-95"
+                  className="absolute right-0 mt-2 w-52 py-1 bg-[#1a1a1c] border border-[#2a2b30] rounded-xl shadow-2xl z-50 animate-in fade-in-50 zoom-in-95"
                   onClick={() => setIsMenuOpen(false)}
                 >
                   <button
                     type="button"
                     onClick={() => onOpenRelationshipGraph(project.id)}
-                    className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-[#d0d0d0] hover:bg-[#303030] hover:text-white text-left transition-colors"
+                    className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-[#c4c7c5] hover:bg-[#222225] hover:text-white text-left transition-colors"
                   >
                     <Network width={14} height={14} className="text-emerald-400" />
                     <span>Relationship Graph</span>
@@ -166,7 +166,7 @@ export const ProjectWorkspaceHub: React.FC<ProjectWorkspaceHubProps> = ({
                     <button
                       type="button"
                       onClick={() => onEditProject(project)}
-                      className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-[#d0d0d0] hover:bg-[#303030] hover:text-white text-left transition-colors"
+                      className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-[#c4c7c5] hover:bg-[#222225] hover:text-white text-left transition-colors"
                     >
                       <Edit2 width={14} height={14} />
                       <span>Edit Project</span>
@@ -176,7 +176,7 @@ export const ProjectWorkspaceHub: React.FC<ProjectWorkspaceHubProps> = ({
                     <button
                       type="button"
                       onClick={() => onManageMembers(project)}
-                      className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-[#d0d0d0] hover:bg-[#303030] hover:text-white text-left transition-colors"
+                      className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-[#c4c7c5] hover:bg-[#222225] hover:text-white text-left transition-colors"
                     >
                       <Users width={14} height={14} />
                       <span>Manage Members</span>

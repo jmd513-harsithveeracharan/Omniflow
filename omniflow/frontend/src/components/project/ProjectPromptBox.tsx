@@ -65,7 +65,7 @@ export const ProjectPromptBox: React.FC<ProjectPromptBoxProps> = ({
   const activeModelObj = AVAILABLE_MODELS.find((m) => m.id === selectedModel) || AVAILABLE_MODELS[0];
 
   return (
-    <div className="w-full rounded-2xl bg-[#2b2b2b] border border-[#383838] hover:border-[#444444] transition-all duration-200 shadow-lg overflow-hidden flex flex-col justify-between">
+    <div className="w-full rounded-2xl bg-[#1a1a1c] border border-[#2a2b30] hover:border-[#34353a] transition-all duration-200 shadow-xl overflow-hidden flex flex-col justify-between">
       {/* Textarea Input without separator lines */}
       <div className="p-4 pt-4 pb-1">
         <textarea
@@ -77,7 +77,7 @@ export const ProjectPromptBox: React.FC<ProjectPromptBoxProps> = ({
           aria-label={`Prompt for ${projectName}`}
           rows={2}
           disabled={disabled}
-          className="w-full bg-transparent resize-none text-[15px] leading-relaxed text-[#f0f0f0] placeholder-[#707070] outline-none border-none focus:ring-0 selection:bg-neutral-600/40"
+          className="w-full bg-transparent resize-none text-[15px] leading-relaxed text-[#f0f0f2] placeholder-[#71717a] outline-none border-none focus:ring-0 selection:bg-emerald-500/30"
           style={{ minHeight: '60px', maxHeight: '220px' }}
         />
       </div>
@@ -88,7 +88,7 @@ export const ProjectPromptBox: React.FC<ProjectPromptBoxProps> = ({
         <div className="flex items-center gap-1.5">
           <button
             type="button"
-            className="p-1 text-[#8a8a8a] hover:text-[#d1d1db] transition-colors"
+            className="p-1 text-[#8e918f] hover:text-[#f0f0f2] transition-colors"
             title="Add attachment"
           >
             <Plus width={17} height={17} strokeWidth={1.8} />
@@ -99,8 +99,8 @@ export const ProjectPromptBox: React.FC<ProjectPromptBoxProps> = ({
             onClick={() => setActiveMode('chat')}
             className={`px-3 py-1 rounded-lg text-xs font-normal transition-all ${
               activeMode === 'chat'
-                ? 'bg-[#3b3b3b] text-white shadow-sm'
-                : 'text-[#8a8a8a] hover:text-[#e0e0e0]'
+                ? 'bg-[#28282c] text-[#f0f0f2] shadow-sm'
+                : 'text-[#8e918f] hover:text-[#f0f0f2]'
             }`}
           >
             Chat
@@ -111,8 +111,8 @@ export const ProjectPromptBox: React.FC<ProjectPromptBoxProps> = ({
             onClick={() => setActiveMode('cowork')}
             className={`px-3 py-1 rounded-lg text-xs font-normal transition-all ${
               activeMode === 'cowork'
-                ? 'bg-[#3b3b3b] text-white shadow-sm'
-                : 'text-[#8a8a8a] hover:text-[#e0e0e0]'
+                ? 'bg-[#28282c] text-[#f0f0f2] shadow-sm'
+                : 'text-[#8e918f] hover:text-[#f0f0f2]'
             }`}
           >
             Cowork
@@ -126,14 +126,14 @@ export const ProjectPromptBox: React.FC<ProjectPromptBoxProps> = ({
             <button
               type="button"
               onClick={() => setIsModelMenuOpen((prev) => !prev)}
-              className="flex items-center gap-1.5 text-xs font-normal text-[#8a8a8a] hover:text-[#d0d0d0] transition-colors"
+              className="flex items-center gap-1.5 text-xs font-normal text-[#8e918f] hover:text-[#f0f0f2] transition-colors"
             >
-              <span>{activeModelObj.name} <span className="text-[#666666]">{activeModelObj.tier}</span></span>
-              <ChevronDown width={12} height={12} className="text-[#666666]" />
+              <span>{activeModelObj.name} <span className="text-[#5f6368]">{activeModelObj.tier}</span></span>
+              <ChevronDown width={12} height={12} className="text-[#5f6368]" />
             </button>
 
             {isModelMenuOpen && (
-              <div className="absolute right-0 bottom-full mb-2 w-48 py-1 bg-[#242424] border border-[#383838] rounded-xl shadow-2xl z-50 animate-in fade-in-50 zoom-in-95">
+              <div className="absolute right-0 bottom-full mb-2 w-48 py-1 bg-[#1a1a1c] border border-[#2a2b30] rounded-xl shadow-2xl z-50 animate-in fade-in-50 zoom-in-95">
                 {AVAILABLE_MODELS.map((m) => (
                   <button
                     key={m.id}
@@ -144,12 +144,12 @@ export const ProjectPromptBox: React.FC<ProjectPromptBoxProps> = ({
                     }}
                     className={`w-full flex items-center justify-between px-3 py-2 text-xs text-left transition-colors ${
                       selectedModel === m.id
-                        ? 'bg-[#333333] text-white font-medium'
-                        : 'text-[#a0a0a0] hover:bg-[#2c2c2c] hover:text-white'
+                        ? 'bg-[#222225] text-emerald-400 font-medium'
+                        : 'text-[#c4c7c5] hover:bg-[#222225] hover:text-white'
                     }`}
                   >
                     <span>{m.name}</span>
-                    <span className="text-[10px] text-[#666666]">{m.tier}</span>
+                    <span className="text-[10px] text-[#5f6368]">{m.tier}</span>
                   </button>
                 ))}
               </div>
@@ -161,7 +161,7 @@ export const ProjectPromptBox: React.FC<ProjectPromptBoxProps> = ({
             type="button"
             onClick={() => setIsRecording((prev) => !prev)}
             title={isRecording ? 'Listening...' : 'Voice mode'}
-            className={`p-1 text-[#8a8a8a] hover:text-white transition-colors ${
+            className={`p-1 text-[#8e918f] hover:text-[#f0f0f2] transition-colors ${
               isRecording ? 'text-red-400 animate-pulse' : ''
             }`}
           >
@@ -175,14 +175,14 @@ export const ProjectPromptBox: React.FC<ProjectPromptBoxProps> = ({
               onClick={handleSubmit}
               disabled={disabled}
               aria-label="Send prompt"
-              className="p-1 text-[#e0e0e0] hover:text-white transition-colors"
+              className="p-1 text-[#f0f0f2] hover:text-white transition-colors"
             >
               <ArrowUp width={17} height={17} strokeWidth={2.2} />
             </button>
           ) : (
             <button
               type="button"
-              className="p-1 text-[#8a8a8a] hover:text-white transition-colors"
+              className="p-1 text-[#8e918f] hover:text-[#f0f0f2] transition-colors"
               title="Voice waveform"
             >
               <AudioWaveform width={16} height={16} strokeWidth={1.8} />
