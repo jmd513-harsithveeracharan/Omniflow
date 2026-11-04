@@ -20,6 +20,7 @@ import { ProjectsView } from './components/ProjectsView';
 import { WorkspaceExplorerView } from './components/WorkspaceExplorerView';
 import { IngestionStudioView } from './components/IngestionStudioView';
 import { GraphMeshView } from './components/graph/GraphMeshView';
+import { ProjectWorkspaceHub } from './components/project/ProjectWorkspaceHub';
 import {
   fetchFabricStatus,
   streamChatTurn,
@@ -62,6 +63,7 @@ export const App: React.FC = () => {
   });
   const [isLoadingSession, setIsLoadingSession] = useState<boolean>(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [projectSessions, setProjectSessions] = useState<ChatSession[]>([]);
   const [isStreaming, setIsStreaming] = useState<boolean>(false);
   const [activeCredentialRequest, setActiveCredentialRequest] = useState<CredentialRequestData | null>(null);
 
@@ -237,29 +239,36 @@ export const App: React.FC = () => {
   const handleSelectSession = async (sid: string) => {
     if (isStreaming) return;
     if (sid === sessionId && messages.length > 0) return;
-    const knownSession = sessions.find((s) => s.sessionId === sid);
+    const isProjSession = sid.startsWith('proj_');
+    const knownSession = sessions.find((s) => s.sessionId === sid) || projectSessions.find((s) => s.sessionId === sid);
     if (knownSession && knownSession.messageCount === 0) {
-      setActiveProjectId(null);
+      if (!isProjSession) {
+        setActiveProjectId(null);
+        try { localStorage.removeItem('omniflow_active_project_id'); } catch {}
+      }
       setCurrentPlan(null);
       setActiveView('chat');
       setSessionId(sid);
       setMessages([]);
       setIsLoadingSession(false);
       try {
-        localStorage.removeItem('omniflow_active_project_id');
         localStorage.setItem('omniflow_active_session_id', sid);
+        localStorage.setItem('omniflow_active_view', 'chat');
       } catch {}
       return;
     }
     try {
       setIsLoadingSession(true);
-      setActiveProjectId(null);
+      if (!isProjSession) {
+        setActiveProjectId(null);
+        try { localStorage.removeItem('omniflow_active_project_id'); } catch {}
+      }
       setCurrentPlan(null);
       setActiveView('chat');
       setSessionId(sid);
       try {
-        localStorage.removeItem('omniflow_active_project_id');
         localStorage.setItem('omniflow_active_session_id', sid);
+        localStorage.setItem('omniflow_active_view', 'chat');
       } catch {}
       const detail = await fetchSessionDetail(sid);
       if (detail && Array.isArray(detail.messages)) {
@@ -313,24 +322,26 @@ export const App: React.FC = () => {
   };
 
   // Projects Handlers
-  const handleSelectProject = async (projectId: string, shouldSwitchToChat: boolean = true) => {
-    if (projectId === activeProjectId && sessionId === ('proj_' + projectId) && messages.length > 0) {
-      if (shouldSwitchToChat) {
-        setActiveView('chat');
-        try { localStorage.setItem('omniflow_active_view', 'chat'); } catch {}
-      }
-      return;
-    }
+  const handleSelectProject = async (projectId: string, shouldSwitchToView: boolean = true) => {
     setActiveProjectId(projectId);
     try {
       localStorage.setItem('omniflow_active_project_id', projectId);
-      localStorage.setItem('omniflow_active_session_id', `proj_${projectId}`);
     } catch {}
 
+    // Load sessions belonging to this project
+    try {
+      const pSessions = await fetchSessions(currentUser?.email, projectId);
+      setProjectSessions(pSessions);
+    } catch (e) {
+      console.warn('Failed to fetch project sessions', e);
+    }
+
+    if (shouldSwitchToView) {
+      setActiveView('project');
+      try { localStorage.setItem('omniflow_active_view', 'project'); } catch {}
+    }
 
     try {
-      setIsLoadingSession(true);
-      if (shouldSwitchToChat) setActiveView('chat');
       const detail = await fetchProjectDetail(projectId);
       if (detail) {
         setCurrentPlan(detail.plan || null);
@@ -357,9 +368,6 @@ export const App: React.FC = () => {
       }
     } catch (e) {
       console.error('Failed to load project detail', e);
-      if (shouldSwitchToChat) setActiveView('chat');
-    } finally {
-      setIsLoadingSession(false);
     }
   };
 
@@ -671,6 +679,10 @@ export const App: React.FC = () => {
         return 'Relationship Graph';
       case 'projects':
         return 'Projects';
+      case 'project': {
+        const currentProj = projects.find((p) => p.id === activeProjectId);
+        return currentProj ? currentProj.name : 'Project Workspace';
+      }
       case 'skills':
         return 'Skills & Grounding Engine';
       case 'workspaces':
@@ -767,6 +779,65 @@ export const App: React.FC = () => {
             currentUser={currentUser}
             projects={projects}
             isLoading={isLoadingProjects}
+          />
+        )}
+
+        {activeView === 'project' && activeProjectId && (
+          <ProjectWorkspaceHub
+            project={
+              projects.find((p) => p.id === activeProjectId) || {
+                id: activeProjectId,
+                name: activeProjectId,
+                description: 'Active Enterprise Medallion Workspace',
+                metadata: {},
+              }
+            }
+            sessions={projectSessions}
+            activeSessionId={sessionId}
+            onSelectSession={(sid) => {
+              handleSelectSession(sid);
+            }}
+            onStartNewChat={(prompt, model) => {
+              const newSid = `proj_${activeProjectId}_${Math.random().toString(36).substring(2, 9)}`;
+              setSessionId(newSid);
+              setMessages([]);
+              setActiveView('chat');
+              try {
+                localStorage.setItem('omniflow_active_session_id', newSid);
+                localStorage.setItem('omniflow_active_view', 'chat');
+              } catch {}
+              handleSendMessage(prompt, model, undefined, 'project');
+            }}
+            onOpenRelationshipGraph={(pId) => {
+              setActiveProjectId(pId);
+              setActiveView('mesh');
+              try {
+                localStorage.setItem('omniflow_active_view', 'mesh');
+              } catch {}
+            }}
+            onBackToProjects={() => {
+              setActiveView('projects');
+              try {
+                localStorage.setItem('omniflow_active_view', 'projects');
+              } catch {}
+            }}
+            onUpdateProject={async (updated) => {
+              setProjects((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
+              await updateProject(updated.id, {
+                name: updated.name,
+                description: updated.description,
+                metadata: updated.metadata,
+              });
+            }}
+            onTogglePin={() => {
+              const p = projects.find((x) => x.id === activeProjectId);
+              if (p) handleTogglePinProject(p.id, p.is_pinned || 0);
+            }}
+            onEditProject={handleEditProject}
+            onDeleteSession={async (sid) => {
+              await handleDeleteSession(sid);
+              setProjectSessions((prev) => prev.filter((s) => s.sessionId !== sid));
+            }}
           />
         )}
 

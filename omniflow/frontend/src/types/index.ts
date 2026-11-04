@@ -68,6 +68,7 @@ export interface ChatMessage {
 
 export interface ChatSession {
   sessionId: string;
+  projectId?: string;
   workspaceId: string;
   workspaceName?: string;
   workspace_name?: string;
@@ -241,6 +242,25 @@ export interface ProjectMember {
   joined_at?: string;
 }
 
+export interface ProjectContextFile {
+  id: string;
+  name: string;
+  type: 'json' | 'sql' | 'markdown' | 'pdf' | 'doc' | string;
+  size: number;
+  content?: string;
+  is_intake_spec?: boolean;
+  template_filename?: string;
+  uploaded_at: string;
+}
+
+export interface IntakeTemplate {
+  filename: string;
+  project_name: string;
+  project_code: string;
+  domain: string;
+  data: Record<string, unknown>;
+}
+
 export interface ProjectMetadata {
   fabricFolder?: string;
   localPath?: string;
@@ -249,6 +269,9 @@ export interface ProjectMetadata {
   targetWorkspace?: string;
   workspaces?: string[];
   sharedContext?: boolean;
+  instructions?: string;
+  context_files?: ProjectContextFile[];
+  intake_filename?: string;
 }
 
 export interface ProjectRecord {

@@ -42,19 +42,35 @@ export async function fetchFabricStatus(): Promise<FabricStatus> {
   }
 }
 
-export async function fetchSessions(userEmail?: string): Promise<ChatSession[]> {
-  const url = userEmail ? `${API_BASE}/sessions?user_email=${encodeURIComponent(userEmail)}` : `${API_BASE}/sessions`;
+export async function fetchSessions(userEmail?: string, projectId?: string): Promise<ChatSession[]> {
+  const params = new URLSearchParams();
+  if (userEmail) params.append('user_email', userEmail);
+  if (projectId) params.append('project_id', projectId);
+  const qs = params.toString();
+  const url = qs ? `${API_BASE}/sessions?${qs}` : `${API_BASE}/sessions`;
   const res = await fetch(url);
   if (!res.ok) throw new Error(`Failed to fetch sessions: ${res.statusText}`);
   const data = await res.json();
   return (data.sessions || []).map((s: Record<string, unknown>) => ({
     sessionId: String(s.session_id || ''),
+    projectId: s.project_id ? String(s.project_id) : undefined,
     workspaceId: String(s.workspace_id || ''),
     title: String(s.title || 'New Conversation'),
     messageCount: Number(s.message_count || 0),
     runCount: Number(s.run_count || 0),
     lastActive: String(s.last_active || ''),
   }));
+}
+
+export async function fetchIntakeTemplates(): Promise<import('../types').IntakeTemplate[]> {
+  try {
+    const res = await fetch(`${API_BASE}/intake/templates`);
+    if (!res.ok) return [];
+    return await res.json();
+  } catch (err) {
+    console.warn('Failed to fetch intake templates:', err);
+    return [];
+  }
 }
 
 export async function fetchSessionDetail(

@@ -114,6 +114,7 @@ SESSIONS: dict[str, dict[str, Any]] = load_sessions_from_disk()
 class ChatRequest(BaseModel):
     message: str = Field(..., description="Prompt or intake JSON spec")
     session_id: str | None = Field(default=None, description="Session ID")
+    project_id: str | None = Field(default=None, description="Project ID")
     model: str | None = Field(default="Gemini 3.6 Flash")
     effort: str | None = Field(default="medium")
     mode: str | None = Field(default="project")
@@ -210,10 +211,29 @@ def fetch_projects_cached(force_refresh: bool = False) -> list[dict[str, Any]]:
                             }
                         ]
                     }
+                    if (pid == "PRJ-PELI-BIOTHERMAL" or pid == "PRJ-COMMERCIAL-REV") and "context_files" not in meta:
+                        meta["context_files"] = [
+                            {
+                                "id": "ctx_peli_intake",
+                                "name": "project_intake.json",
+                                "type": "json",
+                                "size": 10479,
+                                "is_intake_spec": True,
+                                "template_filename": "project_intake.json",
+                                "uploaded_at": "6 days ago",
+                            }
+                        ]
+                        if not meta.get("instructions"):
+                            meta["instructions"] = "Add instructions to tailor Omniflow's responses"
+                    
+                    proj_desc = r[2] or ""
+                    if pid == "PRJ-PELI-BIOTHERMAL" and not proj_desc:
+                        proj_desc = "Working on the client Project where need to establish a data platform."
+
                     projects.append({
                         "id": pid,
                         "name": r[1],
-                        "description": r[2] or "",
+                        "description": proj_desc,
                         "status": r[3],
                         "is_pinned": old_p.get("is_pinned", 0),
                         "is_archived": old_p.get("is_archived", 0),
@@ -259,18 +279,56 @@ FABRIC_ITEMS_CACHE_TIME: float = 0.0
 
 
 @app.get("/api/sessions")
-async def list_sessions(user_email: str | None = None) -> dict[str, Any]:
+async def list_sessions(user_email: str | None = None, project_id: str | None = None) -> dict[str, Any]:
     sess_list = []
     u = user_email.strip().lower() if user_email else None
+
+    # Auto-seed initial greeting session for Peli BioThermal if none exists
+    if project_id and project_id in ["PRJ-PELI-BIOTHERMAL", "PRJ-COMMERCIAL-REV"]:
+        peli_sess_id = f"proj_{project_id}"
+        if peli_sess_id not in SESSIONS:
+            six_days_ago = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(time.time() - 6 * 86400))
+            SESSIONS[peli_sess_id] = {
+                "session_id": peli_sess_id,
+                "project_id": project_id,
+                "title": "Greeting",
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": "Initialize Peli BioThermal data platform workspace."
+                    },
+                    {
+                        "role": "assistant",
+                        "content": "### 📁 Project: Peli BioThermal Cold-Chain Platform\n\n**Status**: `Active` • **Workspace**: `PBT_DATA_AGENT`\n\nContext intake specifications and Medallion architecture guidelines loaded. Ready to synthesize raw batch ingestion pipelines, Delta Lake upsert notebooks, and Power BI semantic models."
+                    }
+                ],
+                "user_email": u or "bheesetti.harsith@pelibiothermal.com",
+                "updated_at": six_days_ago,
+            }
+            save_sessions_to_disk()
+
     for sid, sdata in SESSIONS.items():
-        # Exclude internal project chats from general conversations list
-        if sid.startswith("proj_"):
-            continue
+        s_proj = sdata.get("project_id") or ""
+        if project_id:
+            # Match sessions belonging to this project
+            matches = (
+                s_proj == project_id
+                or sid == f"proj_{project_id}"
+                or sid.startswith(f"proj_{project_id}_")
+            )
+            if not matches:
+                continue
+        else:
+            # Exclude internal project chats from general conversations list
+            if sid.startswith("proj_") or s_proj:
+                continue
+
         s_user = (sdata.get("user_email") or "").strip().lower()
         if u and s_user and s_user != u:
             continue
         sess_list.append({
             "session_id": sid,
+            "project_id": s_proj or (sid[5:] if sid.startswith("proj_") else None),
             "title": sdata.get("title", "New Conversation"),
             "message_count": len(sdata.get("messages", [])),
             "run_count": 1,
@@ -282,10 +340,15 @@ async def list_sessions(user_email: str | None = None) -> dict[str, Any]:
 
 @app.post("/api/sessions/new")
 async def create_new_session(payload: dict[str, Any] | None = None) -> dict[str, Any]:
-    sid = f"sess_{uuid.uuid4().hex[:9]}"
+    proj_id = (payload or {}).get("project_id", "").strip()
+    if proj_id:
+        sid = f"proj_{proj_id}_{uuid.uuid4().hex[:6]}"
+    else:
+        sid = f"sess_{uuid.uuid4().hex[:9]}"
     user_email = (payload or {}).get("user_email", "").strip()
     SESSIONS[sid] = {
         "session_id": sid,
+        "project_id": proj_id or None,
         "title": "New Conversation",
         "messages": [],
         "user_email": user_email,
@@ -1055,15 +1118,24 @@ async def handle_chat_stream(req: ChatRequest) -> StreamingResponse:
     clean_msg_title = re.sub(r"[#*_`\n]", " ", req.message).strip()
     clean_msg_title = re.sub(r"\s+", " ", clean_msg_title)[:42] or "New Conversation"
 
+    proj_id = req.project_id
+    if not proj_id and sid.startswith("proj_"):
+        parts = sid.split("_")
+        if len(parts) >= 2:
+            proj_id = parts[1]
+
     if sid not in SESSIONS:
         SESSIONS[sid] = {
             "session_id": sid,
+            "project_id": proj_id,
             "title": clean_msg_title,
             "messages": [],
             "user_email": (req.user_email or "").strip(),
             "updated_at": time.strftime("%Y-%m-%dT%H:%M:%SZ"),
         }
     else:
+        if proj_id:
+            SESSIONS[sid]["project_id"] = proj_id
         if req.user_email and not SESSIONS[sid].get("user_email"):
             SESSIONS[sid]["user_email"] = req.user_email.strip()
         if SESSIONS[sid].get("title") in ["New Conversation", "Medallion Architecture Session", ""]:
