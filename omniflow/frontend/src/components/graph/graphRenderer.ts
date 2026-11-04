@@ -12,6 +12,7 @@ export interface RenderGraphOptions {
   simLinks: D3SimLink[];
   selectedNode: GraphMeshNode | null;
   hoveredNode?: GraphMeshNode | null;
+  activeFocalNode?: GraphMeshNode | null;
   hoveredEdgeId: string | null;
   selectedLayer?: string;
   selectedLayers?: string[] | string;
@@ -30,6 +31,7 @@ export function renderGraphMesh(opts: RenderGraphOptions): void {
     simLinks,
     selectedNode,
     hoveredNode = null,
+    activeFocalNode,
     hoveredEdgeId,
     searchQuery,
     zoomLevel,
@@ -76,12 +78,17 @@ export function renderGraphMesh(opts: RenderGraphOptions): void {
     }
   }
 
-  const activeId = selectedNode?.id || hoveredNode?.id || null;
+  const activeNode = activeFocalNode !== undefined
+    ? activeFocalNode
+    : (selectedNode || hoveredNode || null);
+  const activeId = activeNode?.id || null;
   const connectedNodeSet = new Set<string>();
   const connectedEdgeSet = new Set<string>();
 
   // Smooth focus interpolation factor (0.0 = neutral galaxy, 1.0 = fully focused)
-  const t = focusProgress !== undefined ? focusProgress : (activeId ? 1.0 : 0.0);
+  // Smoothstep easing for organic expansion & reverse contraction
+  const rawT = focusProgress !== undefined ? focusProgress : (activeId ? 1.0 : 0.0);
+  const t = Math.max(0.0, Math.min(1.0, rawT * rawT * (3 - 2 * rawT)));
 
   if (activeId && !hasSearch) {
     connectedNodeSet.add(activeId);
@@ -267,7 +274,7 @@ export function renderGraphMesh(opts: RenderGraphOptions): void {
       ctx.shadowBlur = 8;
       ctx.stroke();
       ctx.restore();
-    } else if (isCurrentHovered && t > 0.04) {
+    } else if ((isCurrentHovered || (n.id === activeId && !selectedNode)) && t > 0.02) {
       // Dynamic "Ooze Out" Halo: ring smoothly expands outward as focus blooms
       ctx.save();
       const ringExpand = 1.0 + t * 2.2;

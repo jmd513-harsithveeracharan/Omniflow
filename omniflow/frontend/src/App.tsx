@@ -77,7 +77,13 @@ export const App: React.FC = () => {
   const [isLoadingProjects, setIsLoadingProjects] = useState<boolean>(() => {
     return !localStorage.getItem('omniflow_cached_projects');
   });
-  const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
+  const [activeProjectId, setActiveProjectId] = useState<string | null>(() => {
+    try {
+      return localStorage.getItem('omniflow_active_project_id') || null;
+    } catch {
+      return null;
+    }
+  });
   const [editingProject, setEditingProject] = useState<ProjectRecord | null>(null);
 
   // User Auth & RBAC State
@@ -159,7 +165,7 @@ export const App: React.FC = () => {
       } catch {}
       if (projs && projs.length > 0) {
         if (shouldAutoSelect && !activeProjectId) {
-          const defaultProj = projs.find((p) => p.name.toLowerCase().includes('delivery')) || projs[0];
+          const defaultProj = projs[0];
           handleSelectProject(defaultProj.id, false);
         }
       } else {
@@ -788,7 +794,6 @@ export const App: React.FC = () => {
         {activeView === 'mesh' && (
           <div className="flex-1 w-full h-full relative overflow-hidden bg-[#090d16]" style={{ height: 'calc(100vh - 56px)' }}>
             <GraphMeshView
-              plan={currentPlan}
               projectId={activeProjectId || (projects.length > 0 ? projects[0].id : 'PRJ-PELI-BIOTHERMAL')}
               projects={projects.map((p) => ({ id: p.id, name: p.name }))}
               onSelectProject={(newPid) => {

@@ -231,5 +231,10 @@ export function createSnowflakeSimulation(
     .alphaDecay(0.04)
     .velocityDecay(0.42);
 
+  // Synchronous warmup (50 ticks) so initial coordinates are settled and bounding box is stable
+  for (let i = 0; i < 50; i++) {
+    simulation.tick();
+  }
+
   return { simulation, simNodes, simLinks };
 }

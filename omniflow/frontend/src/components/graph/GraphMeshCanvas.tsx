@@ -55,6 +55,7 @@ export const GraphMeshCanvas: React.FC<GraphMeshCanvasProps> = ({
 
   // Smooth "Ooze Out" Focus Animation (0.0 to 1.0)
   const focusTransitionRef = useRef<number>(0.0);
+  const focalNodeRef = useRef<GraphMeshNode | null>(null);
   const lastRenderTimeRef = useRef<number>(performance.now());
 
   const zoomLevelRef = useRef(zoomLevel);
@@ -79,35 +80,60 @@ export const GraphMeshCanvas: React.FC<GraphMeshCanvasProps> = ({
     let maxX = -Infinity;
     let minY = Infinity;
     let maxY = -Infinity;
+    let sumX = 0;
+    let sumY = 0;
+
     for (const n of activeNodes) {
-      if (n.x! < minX) minX = n.x!;
-      if (n.x! > maxX) maxX = n.x!;
-      if (n.y! < minY) minY = n.y!;
-      if (n.y! > maxY) maxY = n.y!;
+      const nx = n.x!;
+      const ny = n.y!;
+      if (nx < minX) minX = nx;
+      if (nx > maxX) maxX = nx;
+      if (ny < minY) minY = ny;
+      if (ny > maxY) maxY = ny;
+      sumX += nx;
+      sumY += ny;
     }
+
+    const boundCenterX = (minX + maxX) / 2;
+    const boundCenterY = (minY + maxY) / 2;
+    const avgX = sumX / activeNodes.length;
+    const avgY = sumY / activeNodes.length;
+
+    // Harmonized visual center: 60% center of mass + 40% bounding center
+    const centerX = avgX * 0.6 + boundCenterX * 0.4;
+    const centerY = avgY * 0.6 + boundCenterY * 0.4;
 
     const graphWidth = Math.max(120, maxX - minX);
     const graphHeight = Math.max(120, maxY - minY);
-    const centerX = (minX + maxX) / 2;
-    const centerY = (minY + maxY) / 2;
 
     const cw = canvas.clientWidth || 1000;
     const ch = canvas.clientHeight || 700;
 
-    const zoomX = (cw - 220) / graphWidth;
-    const zoomY = (ch - 160) / graphHeight;
-    const fitZoom = Math.max(0.35, Math.min(1.35, Math.min(zoomX, zoomY)));
+    const zoomX = (cw - 180) / graphWidth;
+    const zoomY = (ch - 140) / graphHeight;
+    const fitZoom = Math.max(0.40, Math.min(1.25, Math.min(zoomX, zoomY)));
 
     onPanChange({ x: -centerX * fitZoom, y: -centerY * fitZoom });
     onZoomChange(fitZoom);
   };
 
-  // Re-center when autoCenterTrigger changes
+  // Auto-center on nodes load and trigger changes
   useEffect(() => {
     if (autoCenterTrigger !== undefined) {
       autoCenter();
     }
   }, [autoCenterTrigger]);
+
+  useEffect(() => {
+    if (nodes.length > 0) {
+      const t1 = setTimeout(autoCenter, 50);
+      const t2 = setTimeout(autoCenter, 300);
+      return () => {
+        clearTimeout(t1);
+        clearTimeout(t2);
+      };
+    }
+  }, [nodes]);
 
   // Auto-focus matched nodes when search query changes
   useEffect(() => {
@@ -194,15 +220,17 @@ export const GraphMeshCanvas: React.FC<GraphMeshCanvasProps> = ({
 
       // Active focal item (either explicitly selected or hovered)
       const hasActive = Boolean(selectedNode || hoveredNode);
-      const targetFocus = hasActive ? 1.0 : 0.0;
 
-      // Smooth exponential easing for the "ooze out" bloom
-      // Blooming in: ~250ms organic expansion; Easing out: ~280ms smooth fade back to baseline
-      const speed = targetFocus > focusTransitionRef.current ? 5.8 : 6.8;
-      focusTransitionRef.current += (targetFocus - focusTransitionRef.current) * (1 - Math.exp(-speed * dt));
-
-      if (Math.abs(focusTransitionRef.current - targetFocus) < 0.003) {
-        focusTransitionRef.current = targetFocus;
+      if (hasActive) {
+        focalNodeRef.current = selectedNode || hoveredNode;
+        // Smooth forward bloom over ~280ms
+        focusTransitionRef.current = Math.min(1.0, focusTransitionRef.current + dt * 3.6);
+      } else {
+        // Crisp reverse contraction over ~200ms (never takes 1-2 seconds!)
+        focusTransitionRef.current = Math.max(0.0, focusTransitionRef.current - dt * 5.0);
+        if (focusTransitionRef.current === 0.0) {
+          focalNodeRef.current = null;
+        }
       }
 
       const dpr = window.devicePixelRatio || 1;
@@ -223,6 +251,7 @@ export const GraphMeshCanvas: React.FC<GraphMeshCanvasProps> = ({
         simLinks: simLinksRef.current,
         selectedNode,
         hoveredNode,
+        activeFocalNode: focalNodeRef.current,
         hoveredEdgeId,
         selectedLayer,
         selectedLayers,
@@ -313,38 +342,50 @@ export const GraphMeshCanvas: React.FC<GraphMeshCanvasProps> = ({
     const mx = (clientX - rect.left - canvas.clientWidth / 2 - panOffset.x) / zoomLevel;
     const my = (clientY - rect.top - canvas.clientHeight / 2 - panOffset.y) / zoomLevel;
 
-    // Detect hovered node with Hover Intent Debounce (120ms) to eliminate cursor sweep jitter
+    // Detect hovered node with Hover Intent Debounce (~90ms dwell) to eliminate sweep jitter
     const foundHovered = simNodesRef.current.find(
-      (n) => n.x !== undefined && n.y !== undefined && Math.hypot(n.x - mx, n.y - my) <= n.radius + 6
+      (n) => n.x !== undefined && n.y !== undefined && Math.hypot(n.x - mx, n.y - my) <= n.radius + 5
     ) || null;
 
     const foundId = foundHovered?.id || null;
+    const activeHoverId = hoveredNode?.id || null;
 
-    if (foundId === currentHoveredIdRef.current) {
+    if (foundId === activeHoverId) {
       if (hoverTimeoutRef.current && pendingCandidateRef.current?.id !== foundId) {
         window.clearTimeout(hoverTimeoutRef.current);
         hoverTimeoutRef.current = null;
         pendingCandidateRef.current = null;
       }
-    } else if (foundId !== pendingCandidateRef.current?.id) {
-      if (hoverTimeoutRef.current) {
+    } else if (foundHovered) {
+      // User hovered over a new node: require ~90ms dwell to trigger focus bloom
+      if (hoverTimeoutRef.current && pendingCandidateRef.current?.id !== foundId) {
         window.clearTimeout(hoverTimeoutRef.current);
         hoverTimeoutRef.current = null;
       }
       pendingCandidateRef.current = foundHovered;
-
-      const dwellMs = foundHovered ? 60 : 70;
-
-      hoverTimeoutRef.current = window.setTimeout(() => {
-        currentHoveredIdRef.current = foundId;
-        setHoveredNode(foundHovered);
-        if (!foundHovered) {
-          setHoveredEdgeId(null);
-          onHoverHighlightedEdge(null, null);
-        }
+      if (!hoverTimeoutRef.current) {
+        hoverTimeoutRef.current = window.setTimeout(() => {
+          currentHoveredIdRef.current = foundId;
+          setHoveredNode(foundHovered);
+          hoverTimeoutRef.current = null;
+          pendingCandidateRef.current = null;
+        }, 90);
+      }
+    } else {
+      // User moved off into empty space: immediately release hover so reverse animation runs at once!
+      if (hoverTimeoutRef.current) {
+        window.clearTimeout(hoverTimeoutRef.current);
         hoverTimeoutRef.current = null;
-        pendingCandidateRef.current = null;
-      }, dwellMs);
+      }
+      pendingCandidateRef.current = null;
+      currentHoveredIdRef.current = null;
+      if (hoveredNode) {
+        setHoveredNode(null);
+      }
+      if (hoveredEdgeId) {
+        setHoveredEdgeId(null);
+        onHoverHighlightedEdge(null, null);
+      }
     }
 
     const focalNode = selectedNode || hoveredNode;

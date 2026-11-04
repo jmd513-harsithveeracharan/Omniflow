@@ -60,7 +60,7 @@ export const GraphMeshView: React.FC<GraphMeshViewProps> = ({
         // Automatically center the graph after data arrives
         setTimeout(() => {
           setAutoCenterTrigger((prev) => prev + 1);
-        }, 150);
+        }, 80);
       })
       .catch((err) => {
         setError(err.message || 'Failed to load Relationship Graph.');
@@ -72,14 +72,17 @@ export const GraphMeshView: React.FC<GraphMeshViewProps> = ({
 
   useEffect(() => {
     loadMesh(selectedProjectId);
-  }, [plan, selectedProjectId]);
+  }, [selectedProjectId]);
 
   const handleSelectProject = (newPid: string) => {
+    if (newPid === selectedProjectId) return;
     setSelectedProjectId(newPid);
     setSelectedNode(null);
     setHoveredHighlightedEdge(null);
+    try {
+      localStorage.setItem('omniflow_active_project_id', newPid);
+    } catch {}
     if (onSelectProject) onSelectProject(newPid);
-    loadMesh(newPid);
   };
 
   const handleHoverHighlightedEdge = (edge: GraphMeshEdge | null, pos: { x: number; y: number } | null) => {
