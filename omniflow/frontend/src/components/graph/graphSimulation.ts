@@ -67,6 +67,14 @@ export function forceSphericalGalaxy(radius: number) {
         n.vy = (n.vy || 0) - ny * push;
       }
 
+      // Hard celestial horizon: strictly confines all nodes to the spherical disc
+      if (d > radius) {
+        n.x = nx * radius;
+        n.y = ny * radius;
+        n.vx = (n.vx || 0) * 0.4;
+        n.vy = (n.vy || 0) * 0.4;
+      }
+
       // 3. Outer Corona Guiding Force for Singletons & Peripheral Leaf Nodes
       if (n.degree <= 1 && n.type !== 'column') {
         const targetD = radius * 0.90;
@@ -119,47 +127,86 @@ export function createSnowflakeSimulation(
     }
   }
 
-  // Assign smooth angular arcs per layer so hubs never overlap initially
-  const layerArcs: Record<string, { startAngle: number; endAngle: number; distRatio: number }> = {
-    source: { startAngle: -Math.PI * 0.85, endAngle: -Math.PI * 0.65, distRatio: 0.82 },
-    bronze: { startAngle: -Math.PI * 0.6, endAngle: -Math.PI * 0.15, distRatio: 0.58 },
-    silver: { startAngle: -Math.PI * 0.1, endAngle: Math.PI * 0.5, distRatio: 0.42 },
-    gold: { startAngle: Math.PI * 0.55, endAngle: Math.PI * 0.78, distRatio: 0.65 },
-    bi: { startAngle: Math.PI * 0.82, endAngle: Math.PI * 1.05, distRatio: 0.85 },
-    warehouse: { startAngle: 0, endAngle: Math.PI * 0.35, distRatio: 0.45 },
-    shared: { startAngle: -Math.PI * 0.9, endAngle: -Math.PI * 0.75, distRatio: 0.7 },
+  // Helper to extract base entity name from table ID/label for 360-degree domain clustering
+  const extractEntityBase = (n: GraphMeshNode) => {
+    const raw = (n.label || n.id).toLowerCase();
+    return raw
+      .replace(/^(source:\s*|source_|lh_|wh_|sm_|nb_|pl_|tbl_|raw_|silver_|gold_|curated_|curate_)/g, '')
+      .replace(/(_bronze|_silver|_gold|_landing|_curated|_stage|_lake|_model)$/g, '')
+      .trim();
   };
 
-  const hubsByLayer = new Map<string, GraphMeshNode[]>();
-  for (const hub of hubList) {
-    const list = hubsByLayer.get(hub.layer) || [];
-    list.push(hub);
-    hubsByLayer.set(hub.layer, list);
+  // 1. Separate hubs into Central Core (Gold/Warehouses/Sinks) vs Domain Entities (Bronze/Silver/Sources)
+  const isCentralCore = (n: GraphMeshNode) => {
+    const l = n.layer.toLowerCase();
+    const id = n.id.toLowerCase();
+    return (
+      l === 'gold' ||
+      l === 'warehouse' ||
+      id.includes('fact_') ||
+      id.includes('star_schema') ||
+      id.includes('orchestrator')
+    );
+  };
+
+  const centralHubs: GraphMeshNode[] = [];
+  const domainHubs: GraphMeshNode[] = [];
+
+  for (const n of hubList) {
+    if (isCentralCore(n)) {
+      centralHubs.push(n);
+    } else {
+      domainHubs.push(n);
+    }
   }
 
+  // 2. Group domain hubs into coherent business entity clusters across layers
+  const domainMap = new Map<string, GraphMeshNode[]>();
+  for (const hub of domainHubs) {
+    const base = extractEntityBase(hub) || hub.id;
+    const group = domainMap.get(base) || [];
+    group.push(hub);
+    domainMap.set(base, group);
+  }
+
+  const domainKeys = Array.from(domainMap.keys());
+  const numDomains = Math.max(1, domainKeys.length);
   const posMap = new Map<string, { x: number; y: number }>();
-  hubsByLayer.forEach((layerHubs, layer) => {
-    const arc = layerArcs[layer] || {
-      startAngle: -Math.PI,
-      endAngle: Math.PI,
-      distRatio: 0.5,
-    };
-    const count = layerHubs.length;
-    layerHubs.forEach((hub, idx) => {
-      const angle =
-        count <= 1
-          ? (arc.startAngle + arc.endAngle) / 2
-          : arc.startAngle + (idx / (count - 1)) * (arc.endAngle - arc.startAngle);
-      const stagger = idx % 2 === 0 ? 0.92 : 1.08;
-      const hubDist = boundaryRadius * arc.distRatio * stagger;
-      const hx = Math.cos(angle) * hubDist;
-      const hy = Math.sin(angle) * hubDist;
+
+  // 3. Space domains evenly in a full 360-degree circle around the center
+  domainKeys.forEach((key, dIdx) => {
+    const group = domainMap.get(key) || [];
+    const domainAngle = (dIdx / numDomains) * Math.PI * 2 - Math.PI / 2;
+
+    group.forEach((hub, idx) => {
+      const l = hub.layer.toLowerCase();
+      let distRatio = 0.58;
+      let angleOffset = 0;
+
+      if (l === 'source') {
+        distRatio = 0.88;
+        angleOffset = 0;
+      } else if (l === 'bronze') {
+        distRatio = 0.70;
+        angleOffset = -0.09 * (idx + 1);
+      } else if (l === 'silver') {
+        distRatio = 0.48;
+        angleOffset = 0.09 * (idx + 1);
+      } else if (l === 'bi') {
+        distRatio = 0.84;
+        angleOffset = 0.14;
+      }
+
+      const angle = domainAngle + angleOffset;
+      const hx = Math.cos(angle) * boundaryRadius * distRatio;
+      const hy = Math.sin(angle) * boundaryRadius * distRatio;
       posMap.set(hub.id, { x: hx, y: hy });
 
+      // Circular flower spoke arrangement for columns
       const spokes = spokeMap.get(hub.id) || [];
       spokes.forEach((spoke, sIdx) => {
         const spokeAngle = (sIdx / Math.max(1, spokes.length)) * Math.PI * 2;
-        const rSpoke = 34 + (sIdx % 2) * 12;
+        const rSpoke = 32 + (sIdx % 2) * 8;
         posMap.set(spoke.id, {
           x: hx + Math.cos(spokeAngle) * rSpoke,
           y: hy + Math.sin(spokeAngle) * rSpoke,
@@ -168,12 +215,32 @@ export function createSnowflakeSimulation(
     });
   });
 
-  // Peripheral singletons
+  // 4. Central Hubs placed right in the inner circular core
+  const numCentral = Math.max(1, centralHubs.length);
+  centralHubs.forEach((hub, cIdx) => {
+    const angle = (cIdx / numCentral) * Math.PI * 2;
+    const dist = numCentral === 1 ? 0 : boundaryRadius * 0.22;
+    const cx = Math.cos(angle) * dist;
+    const cy = Math.sin(angle) * dist;
+    posMap.set(hub.id, { x: cx, y: cy });
+
+    const spokes = spokeMap.get(hub.id) || [];
+    spokes.forEach((spoke, sIdx) => {
+      const spokeAngle = (sIdx / Math.max(1, spokes.length)) * Math.PI * 2;
+      const rSpoke = 32 + (sIdx % 2) * 8;
+      posMap.set(spoke.id, {
+        x: cx + Math.cos(spokeAngle) * rSpoke,
+        y: cy + Math.sin(spokeAngle) * rSpoke,
+      });
+    });
+  });
+
+  // 5. Peripheral Singletons & Leaf Nodes: form the circular outer starfield rim at 0.88 - 0.94 * R
   let singletonIdx = 0;
   nodes.forEach((n) => {
     if (!posMap.has(n.id)) {
       const angle = (singletonIdx++ / Math.max(1, total)) * Math.PI * 2;
-      const r = boundaryRadius * (0.85 + 0.1 * Math.sin(singletonIdx));
+      const r = boundaryRadius * (0.88 + 0.06 * Math.sin(singletonIdx * 2.5));
       posMap.set(n.id, { x: Math.cos(angle) * r, y: Math.sin(angle) * r });
     }
   });
