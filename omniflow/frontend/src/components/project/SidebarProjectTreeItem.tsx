@@ -179,7 +179,7 @@ export const SidebarProjectTreeItem: React.FC<SidebarProjectTreeItemProps> = ({
         </div>
 
         {/* Project Name (Soft off-white, smooth edge blur hiding right before the 3 dots) */}
-        <span className="flex-1 min-w-0 text-[14px] font-medium tracking-tight text-[#e4e4e7] pr-7 sidebar-fade-truncate">
+        <span className="flex-1 min-w-0 text-[14px] font-medium tracking-tight text-[#e4e4e7] pr-2 sidebar-fade-truncate">
           {displayName}
         </span>
 
@@ -220,26 +220,27 @@ export const SidebarProjectTreeItem: React.FC<SidebarProjectTreeItemProps> = ({
                 onMouseLeave={handleMouseLeave}
                 role="button"
                 tabIndex={0}
-                className={`group/chat relative flex items-center justify-between px-2.5 py-1.5 rounded-lg text-[14px] cursor-pointer transition-colors ${
+                className={`group/chat relative flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-[14px] cursor-pointer transition-colors ${
                   isChatActive
                     ? 'bg-[#28282c] text-[#e4e4e7] font-medium shadow-sm'
                     : 'text-[#e4e4e7] hover:bg-[#1a1a1e]'
                 }`}
               >
-                <div className="flex items-center gap-2.5 min-w-0 flex-1 pl-4 pr-7">
-                  {/* Bullet Dot: Solid white when active, hollow ring when inactive */}
+                {/* Bullet Dot: w-5 h-5 container perfectly matches the project icon position & center */}
+                <div className="w-5 h-5 flex items-center justify-center flex-shrink-0">
                   <span
-                    className={`w-2 h-2 rounded-full flex-shrink-0 transition-colors ${
+                    className={`w-2 h-2 rounded-full transition-colors ${
                       isChatActive
                         ? 'bg-[#e4e4e7]'
                         : 'border border-[#71717a] group-hover/chat:border-[#a1a1aa]'
                     }`}
                   />
-                  {/* Chat Title: Identical 14px size, soft off-white, smooth blur before 3 dots */}
-                  <span className="min-w-0 flex-1 text-[14px] text-[#e4e4e7] sidebar-fade-truncate">
-                    {chatTitle}
-                  </span>
                 </div>
+
+                {/* Chat Title: Identical 14px size, soft off-white, extends flush to right boundary */}
+                <span className="flex-1 min-w-0 text-[14px] text-[#e4e4e7] pr-2 sidebar-fade-truncate">
+                  {chatTitle}
+                </span>
 
                 {/* Chat Horizontal 3-Dots Action Button with Gradient Blur / Haze Backdrop */}
                 {onDeleteSession && (
