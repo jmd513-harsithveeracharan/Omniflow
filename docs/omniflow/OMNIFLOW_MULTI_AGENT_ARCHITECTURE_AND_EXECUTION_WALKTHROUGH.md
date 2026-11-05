@@ -441,7 +441,7 @@ Generated Artifacts on Disk:
 ### Step 8: Cloud Deployment Gate
 - **File**: `omniflow/tools/fabric_deployer.py` (`verify_fabric_workspace_connection()`)
 - **Action**: Executes live Microsoft Fabric REST API connectivity check using the active Azure CLI token (`az account get-access-token --resource https://api.fabric.microsoft.com`).
-- **Result**: `LIVE_FABRIC_CONNECTED` (14 workspaces discovered, target `PBT_DATA_AGENT` confirmed).
+- **Result**: `LIVE_FABRIC_CONNECTED` (live workspaces discovered, target Fabric workspace confirmed).
 - **Database Write**: Updates `runs` table row to `status="completed"`.
 
 ---

@@ -270,7 +270,7 @@ async def get_fabric_status() -> dict[str, Any]:
     is_pelican = "pelican" in tenant_name.lower() or "pelibiothermal" in user_email.lower()
     if is_pelican:
         ws_id = account.get("default_workspace_id") or os.getenv("ALLOWED_WORKSPACE_ID", "")
-        ws_name = os.getenv("ALLOWED_WORKSPACE_NAME") or account.get("default_workspace_name") or "PBT_DATA_AGENT"
+        ws_name = os.getenv("ALLOWED_WORKSPACE_NAME") or account.get("default_workspace_name") or "Fabric Workspace"
     else:
         ws_id = ""
         ws_name = ""

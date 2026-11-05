@@ -34,7 +34,7 @@
       ]
     },
     "platform_summary": {
-      "target_workspace": "PBT_DATA_AGENT",
+      "target_workspace": "Fabric Workspace",
       "primary_engine": "Microsoft Fabric Spark & T-SQL Synapse",
       "storage_format": "Delta Lake (Parquet with V-Order & Compaction)"
     }

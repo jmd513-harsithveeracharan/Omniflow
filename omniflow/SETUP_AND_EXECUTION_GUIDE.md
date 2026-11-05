@@ -90,7 +90,7 @@ NEON_DATABASE_URL=postgresql://neondb_owner:npg_o2FUwbtRgqA8@ep-summer-field-b50
 # 2. Microsoft Fabric Target Workspace (Dynamic Multi-User Support)
 # Paste your target Fabric Workspace ID and Display Name:
 ALLOWED_WORKSPACE_ID=db7344c1-ecd9-44d6-849f-f2de49484f9f
-ALLOWED_WORKSPACE_NAME=PBT_DATA_AGENT
+# ALLOWED_WORKSPACE_NAME= (Dynamically resolved from Fabric REST API)
 
 # 3. Azure OpenAI / LLM Credentials (For multi-agent planning & code generation)
 AZURE_OPENAI_ENDPOINT=https://your-openai-resource.openai.azure.com/
