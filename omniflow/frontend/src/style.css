@@ -826,6 +826,17 @@ nav.sidebar-nav {
     transform: rotate(-90deg);
 }
 
+/* Smooth edge haze / blur fadeout without '...' 3 dots */
+.sidebar-fade-truncate {
+    display: inline-block;
+    max-width: 100%;
+    overflow: hidden !important;
+    white-space: nowrap !important;
+    text-overflow: clip !important;
+    mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent 100%);
+    -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent 100%);
+}
+
 /* Chat list scroll area - fills 100% available vertical space flush to right sidebar edge */
 .chats-scroll-list {
     display: flex;

@@ -15,6 +15,7 @@ import {
   Edit3,
   Trash2,
   Pin,
+  PinOff,
   Archive,
 } from 'lucide-react';
 import { ChatSession, ProjectRecord, UserProfile } from '../types';
@@ -96,6 +97,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
   const [isProjectsOpen, setIsProjectsOpen] = useState(true);
   const [isProjectsExpanded, setIsProjectsExpanded] = useState(false);
+  const [isPinnedOpen, setIsPinnedOpen] = useState(true);
 
   // Project Item Options Menu
   const [projectMenuId, setProjectMenuId] = useState<string | null>(null);
@@ -135,20 +137,26 @@ export const Sidebar: React.FC<SidebarProps> = ({
     };
   }, []);
 
-  // Filter & Sort Projects: non-archived, pinned first, then updated_at
+  // Filter & Sort Projects: non-archived into Pinned and Unpinned
   const activeProjectsList = projects.filter((p) => !p.is_archived);
-  const sortedProjects = [...activeProjectsList].sort((a, b) => {
-    const pinA = a.is_pinned ? 1 : 0;
-    const pinB = b.is_pinned ? 1 : 0;
-    if (pinA !== pinB) return pinB - pinA;
-    const dateA = new Date(a.updated_at || a.created_at || 0).getTime();
-    const dateB = new Date(b.updated_at || b.created_at || 0).getTime();
-    return dateB - dateA;
-  });
+  const pinnedProjects = activeProjectsList
+    .filter((p) => Boolean(p.is_pinned))
+    .sort((a, b) => {
+      const dateA = new Date(a.updated_at || a.created_at || 0).getTime();
+      const dateB = new Date(b.updated_at || b.created_at || 0).getTime();
+      return dateB - dateA;
+    });
+  const unpinnedProjects = activeProjectsList
+    .filter((p) => !p.is_pinned)
+    .sort((a, b) => {
+      const dateA = new Date(a.updated_at || a.created_at || 0).getTime();
+      const dateB = new Date(b.updated_at || b.created_at || 0).getTime();
+      return dateB - dateA;
+    });
 
   const limit = 20;
-  const visibleProjects = isProjectsExpanded ? sortedProjects : sortedProjects.slice(0, limit);
-  const hasMoreProjects = sortedProjects.length > limit;
+  const visibleProjects = isProjectsExpanded ? unpinnedProjects : unpinnedProjects.slice(0, limit);
+  const hasMoreProjects = unpinnedProjects.length > limit;
 
   const handleOpenProjectMenu = (e: React.MouseEvent, pid: string) => {
     e.stopPropagation();
@@ -301,6 +309,57 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <span>Customize</span>
         </button>
 
+        {/* Pinned Projects Section */}
+        {pinnedProjects.length > 0 && (
+          <div className="sidebar-section sidebar-pinned-section mb-1">
+            <div className="sidebar-section-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div
+                className="sidebar-section-title-wrap"
+                onClick={() => setIsPinnedOpen(!isPinnedOpen)}
+              >
+                <span className="sidebar-section-title">Pinned</span>
+                <span className="sidebar-chevron-inline">
+                  <ChevronDown
+                    width={11}
+                    height={11}
+                    style={{ transform: isPinnedOpen ? 'rotate(0deg)' : 'rotate(-90deg)' }}
+                  />
+                </span>
+              </div>
+            </div>
+            {isPinnedOpen && (
+              <div className="sidebar-projects-list">
+                {pinnedProjects.map((p) => {
+                  const projectChats = sessions.filter(
+                    (s) => s.projectId === p.id || s.sessionId.startsWith(`proj_${p.id}`)
+                  );
+                  return (
+                    <SidebarProjectTreeItem
+                      key={`pinned-${p.id}`}
+                      project={p}
+                      isActiveProject={activeProjectId === p.id}
+                      activeSessionId={activeSessionId}
+                      chats={projectChats}
+                      isMenuOpen={projectMenuId === p.id}
+                      onSelectProject={(pid) => {
+                        if (onSelectProject) {
+                          onSelectProject(pid);
+                        } else {
+                          onSelectView('projects');
+                        }
+                      }}
+                      onSelectSession={onSelectSession}
+                      onDeleteSession={onDeleteSession}
+                      onOpenProjectMenu={handleOpenProjectMenu}
+                      onStartProjectChat={onStartProjectChat}
+                    />
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Projects Accordion Section */}
         <div className="sidebar-section sidebar-projects-section">
           <div className="sidebar-section-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -336,7 +395,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   <div className="skeleton-line" style={{ height: '28px', borderRadius: '6px' }} />
                   <div className="skeleton-line" style={{ height: '28px', borderRadius: '6px' }} />
                 </div>
-              ) : sortedProjects.length === 0 ? (
+              ) : activeProjectsList.length === 0 ? (
                 <div style={{ padding: '6px 8px', fontSize: '12px', color: '#94a3b8' }}>
                   No projects yet
                 </div>
@@ -377,7 +436,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       <span>
                         {isProjectsExpanded
                           ? 'Show less'
-                          : `Show ${sortedProjects.length - limit} more`}
+                          : `Show ${unpinnedProjects.length - limit} more`}
                       </span>
                     </button>
                   )}
@@ -389,7 +448,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           {/* Floating Context Menu Popup for Project via Portal (Matching Chat Menu Design) */}
           {projectMenuId && projectMenuPos && typeof document !== 'undefined' && createPortal(
             (() => {
-              const targetProject = sortedProjects.find((p) => p.id === projectMenuId);
+              const targetProject = projects.find((p) => p.id === projectMenuId);
               if (!targetProject) return null;
               const isPinned = Boolean(targetProject.is_pinned);
               return (
@@ -420,8 +479,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       onTogglePinProject?.(targetProject.id, targetProject.is_pinned || 0);
                     }}
                   >
-                    <Pin width={14} height={14} style={isPinned ? { color: '#10b981' } : undefined} />
-                    <span className="menu-label">{isPinned ? 'Unpin' : 'Pin to top'}</span>
+                    {isPinned ? (
+                      <PinOff width={14} height={14} className="text-white" />
+                    ) : (
+                      <Pin width={14} height={14} className="text-[#8e918f]" />
+                    )}
+                    <span className="menu-label">{isPinned ? 'Unpin' : 'Pin'}</span>
                   </div>
 
                   <div
