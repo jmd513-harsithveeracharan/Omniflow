@@ -809,8 +809,8 @@ nav.sidebar-nav {
 }
 
 .sidebar-section-title {
-    font-size: 14.5px;
-    font-weight: 600;
+    font-size: 14px;
+    font-weight: 500;
     color: #f0f0f2;
     letter-spacing: 0.01em;
 }
@@ -833,8 +833,8 @@ nav.sidebar-nav {
     overflow: hidden !important;
     white-space: nowrap !important;
     text-overflow: clip !important;
-    mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent 100%);
-    -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent 100%);
+    mask-image: linear-gradient(to right, #000 calc(100% - 14px), transparent 100%);
+    -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 14px), transparent 100%);
 }
 
 /* Chat list scroll area - fills 100% available vertical space flush to right sidebar edge */

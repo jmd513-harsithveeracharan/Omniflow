@@ -1,7 +1,5 @@
 import React, { useState } from 'react';
 import {
-  ChevronDown,
-  ChevronRight,
   Pin,
   MoreVertical,
   Trash2,
@@ -34,32 +32,25 @@ export const SidebarProjectTreeItem: React.FC<SidebarProjectTreeItemProps> = ({
   onDeleteSession,
   onOpenProjectMenu,
 }) => {
-  // Auto-expand if this is the active project, or user manually toggles
+  // Auto-expand if active project, or user clicks project
   const [isExpanded, setIsExpanded] = useState<boolean>(isActiveProject);
 
   const isPinned = Boolean(project.is_pinned);
   const displayName = project.name;
   const hasChats = chats.length > 0;
 
-  const handleToggleExpand = (e: React.MouseEvent) => {
-    e.stopPropagation();
+  const handleProjectClick = () => {
+    onSelectProject(project.id);
     if (hasChats) {
       setIsExpanded((prev) => !prev);
     }
   };
 
-  const handleProjectClick = () => {
-    onSelectProject(project.id);
-    if (hasChats) {
-      setIsExpanded(true);
-    }
-  };
-
   return (
     <div className="flex flex-col mb-1 select-none">
-      {/* Project Header Row */}
+      {/* Project Header Row - No chevron arrow, perfectly aligned folder icons */}
       <div
-        className={`group relative flex items-center gap-2 px-2 py-1.5 rounded-lg cursor-pointer transition-colors ${
+        className={`group relative flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg cursor-pointer transition-colors ${
           isActiveProject
             ? 'bg-[#28282c] text-white font-medium shadow-sm'
             : 'text-[#c4c7c5] hover:bg-[#1f1f23] hover:text-white'
@@ -67,30 +58,12 @@ export const SidebarProjectTreeItem: React.FC<SidebarProjectTreeItemProps> = ({
         onClick={handleProjectClick}
         title={displayName}
       >
-        {/* Expand / Collapse Chevron (Only shown when project has chats) */}
-        {hasChats ? (
-          <button
-            type="button"
-            onClick={handleToggleExpand}
-            className="p-0.5 text-[#8e918f] hover:text-white transition-colors rounded flex-shrink-0"
-            title={isExpanded ? 'Collapse project chats' : 'Expand project chats'}
-          >
-            {isExpanded ? (
-              <ChevronDown width={13} height={13} />
-            ) : (
-              <ChevronRight width={13} height={13} />
-            )}
-          </button>
-        ) : (
-          <span className="w-4 h-4 flex-shrink-0" />
-        )}
-
-        {/* Project Folder / Pin Icon */}
+        {/* Project Folder / Pin Icon - Always flush aligned across all projects */}
         <span className="flex-shrink-0">
           {isPinned ? (
             <Pin
-              width={14}
-              height={14}
+              width={15}
+              height={15}
               className={isActiveProject ? 'text-white fill-white' : 'text-[#8e918f]'}
             />
           ) : isExpanded && hasChats ? (
@@ -108,25 +81,25 @@ export const SidebarProjectTreeItem: React.FC<SidebarProjectTreeItemProps> = ({
           )}
         </span>
 
-        {/* Project Name (with smooth edge fadeout, zero '...' 3 dots) */}
-        <span className="flex-1 min-w-0 text-[14px] font-medium tracking-tight sidebar-fade-truncate">
+        {/* Project Name (takes full space right until the end, edge-faded without '...' dots) */}
+        <span className="flex-1 min-w-0 text-[14px] font-medium tracking-tight pr-5 sidebar-fade-truncate">
           {displayName}
         </span>
 
-        {/* Project More Options */}
+        {/* Project More Options (Hover action overlay at right edge) */}
         <button
           type="button"
           onClick={(e) => onOpenProjectMenu(e, project.id)}
           title="More options"
-          className="opacity-0 group-hover:opacity-100 p-1 text-[#8e918f] hover:text-white hover:bg-[#2e2f35] rounded transition-all flex-shrink-0"
+          className="absolute right-1.5 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 p-1 text-[#8e918f] hover:text-white hover:bg-[#34343a] rounded transition-all"
         >
           <MoreVertical width={13} height={13} />
         </button>
       </div>
 
-      {/* Collapsible Sub-Tree: Project Chats (No vertical line, no 'Start first chat' placeholder) */}
+      {/* Collapsible Sub-Tree: Project Chats (No vertical line, no empty placeholder) */}
       {isExpanded && hasChats && (
-        <div className="flex flex-col ml-4 pl-1 my-1 space-y-0.5">
+        <div className="flex flex-col ml-3 pl-2.5 my-1 space-y-0.5">
           {chats.map((chat) => {
             const isChatActive = activeSessionId === chat.sessionId;
             return (
@@ -145,16 +118,16 @@ export const SidebarProjectTreeItem: React.FC<SidebarProjectTreeItemProps> = ({
                 }`}
                 title={chat.title || 'Conversation'}
               >
-                <div className="flex items-center gap-2.5 min-w-0 flex-1 pr-1">
-                  {/* Chat Bullet Ring: Hollow circle matching modern design */}
+                <div className="flex items-center gap-2.5 min-w-0 flex-1 pr-5">
+                  {/* Chat Bullet Ring: Solid filled white (no glow) when active, hollow ring when inactive */}
                   <span
                     className={`w-2 h-2 rounded-full flex-shrink-0 transition-colors ${
                       isChatActive
-                        ? 'border-[1.5px] border-white bg-white/30 shadow-[0_0_6px_rgba(255,255,255,0.4)]'
+                        ? 'bg-white'
                         : 'border border-[#71717a] group-hover/chat:border-[#a1a1aa]'
                     }`}
                   />
-                  {/* Chat Title with smooth edge blur/fadeout without '...' 3 dots */}
+                  {/* Chat Title with smooth edge blur/fadeout right until the end without '...' 3 dots */}
                   <span className="min-w-0 flex-1 text-[13px] sidebar-fade-truncate">
                     {chat.title || 'Conversation'}
                   </span>
@@ -168,7 +141,7 @@ export const SidebarProjectTreeItem: React.FC<SidebarProjectTreeItemProps> = ({
                       onDeleteSession(chat.sessionId);
                     }}
                     title="Delete chat"
-                    className="opacity-0 group-hover/chat:opacity-100 p-0.5 text-[#71717a] hover:text-red-400 transition-opacity flex-shrink-0"
+                    className="absolute right-1.5 top-1/2 -translate-y-1/2 opacity-0 group-hover/chat:opacity-100 p-0.5 text-[#71717a] hover:text-red-400 transition-opacity"
                   >
                     <Trash2 width={12} height={12} />
                   </button>
