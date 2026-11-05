@@ -23,9 +23,9 @@ interface SidebarProjectTreeItemProps {
   onStartProjectChat?: (projectId: string) => void;
 }
 
-// Crisp, bold horizontal 3-dots icon matching the screenshot
+// Crisp, bold horizontal 3-dots icon matching the screenshot design
 const HorizontalDotsIcon: React.FC = () => (
-  <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor" className="text-white">
+  <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor" className="text-[#e4e4e7] hover:text-white transition-colors">
     <circle cx="3" cy="8" r="1.6" />
     <circle cx="8" cy="8" r="1.6" />
     <circle cx="13" cy="8" r="1.6" />
@@ -43,14 +43,25 @@ export const SidebarProjectTreeItem: React.FC<SidebarProjectTreeItemProps> = ({
   onDeleteSession,
   onOpenProjectMenu,
 }) => {
-  const [isExpanded, setIsExpanded] = useState<boolean>(isActiveProject);
+  // Highlight only the project if it is active AND no child chat is active
+  const hasActiveChat = Boolean(activeSessionId && chats.some((c) => c.sessionId === activeSessionId));
+  const isProjectHighlighted = isActiveProject && !hasActiveChat;
+
+  const [isExpanded, setIsExpanded] = useState<boolean>(isActiveProject || hasActiveChat);
+
+  // Automatically keep expanded when navigating into a project or its chats
+  useEffect(() => {
+    if (isActiveProject || hasActiveChat) {
+      setIsExpanded(true);
+    }
+  }, [isActiveProject, hasActiveChat]);
 
   // Chat Context Menu State
   const [chatMenuId, setChatMenuId] = useState<string | null>(null);
   const [chatMenuPos, setChatMenuPos] = useState<{ top: number; left: number } | null>(null);
   const chatMenuRef = useRef<HTMLDivElement>(null);
 
-  // Floating Full Name Tooltip State
+  // Floating Full Name Tooltip State with intentional 700ms hover delay
   const [tooltipData, setTooltipData] = useState<{ text: string; top: number; left: number } | null>(null);
   const tooltipTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -81,7 +92,7 @@ export const SidebarProjectTreeItem: React.FC<SidebarProjectTreeItemProps> = ({
         top: rect.top + rect.height / 2,
         left: Math.min(window.innerWidth - 300, rect.right + 10),
       });
-    }, 240);
+    }, 700);
   };
 
   const handleMouseLeave = () => {
@@ -93,6 +104,7 @@ export const SidebarProjectTreeItem: React.FC<SidebarProjectTreeItemProps> = ({
   };
 
   const handleProjectClick = () => {
+    handleMouseLeave();
     onSelectProject(project.id);
     if (hasChats) {
       setIsExpanded((prev) => !prev);
@@ -116,21 +128,21 @@ export const SidebarProjectTreeItem: React.FC<SidebarProjectTreeItemProps> = ({
   };
 
   return (
-    <div className="flex flex-col mb-1 select-none">
+    <div className="flex flex-col mb-0.5 select-none w-full">
       {/* Project Header Row */}
       <div
         className={`group/row relative flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg cursor-pointer transition-colors ${
-          isActiveProject
-            ? 'bg-[#28282c] text-white font-medium shadow-sm'
-            : 'text-white hover:bg-[#1f1f23]'
+          isProjectHighlighted
+            ? 'bg-[#28282c] text-[#e4e4e7] font-medium shadow-sm'
+            : 'text-[#e4e4e7] hover:bg-[#1f1f23]'
         } ${isMenuOpen ? 'bg-[#1f1f23]' : ''}`}
         onClick={handleProjectClick}
         onMouseEnter={(e) => handleMouseEnter(e, displayName)}
         onMouseLeave={handleMouseLeave}
       >
-        {/* Project Icon / Hover Arrow Swap */}
+        {/* Project Icon / Hover Arrow Swap (Arrow only shows when hovering directly over the icon) */}
         <div
-          className="relative w-5 h-5 flex items-center justify-center flex-shrink-0"
+          className="group/icon relative w-5 h-5 flex items-center justify-center flex-shrink-0 cursor-pointer"
           onClick={(e) => {
             if (hasChats) {
               e.stopPropagation();
@@ -140,23 +152,23 @@ export const SidebarProjectTreeItem: React.FC<SidebarProjectTreeItemProps> = ({
           title={hasChats ? (isExpanded ? 'Collapse chats' : 'Expand chats') : undefined}
         >
           {/* Default Project Icon: Package (closed) or PackageOpen (expanded), or Pin */}
-          <span className={`${hasChats ? 'group-hover/row:hidden' : ''} flex items-center justify-center`}>
+          <span className={`${hasChats ? 'group-hover/icon:hidden' : ''} flex items-center justify-center`}>
             {isPinned ? (
               <Pin
                 width={14}
                 height={14}
-                className={isActiveProject ? 'text-white fill-white' : 'text-white'}
+                className={isProjectHighlighted ? 'text-white fill-[#e4e4e7]' : 'text-[#cbd5e1]'}
               />
             ) : isExpanded && hasChats ? (
-              <PackageOpen width={15} height={15} className="text-white" />
+              <PackageOpen width={15} height={15} className="text-[#cbd5e1]" />
             ) : (
-              <Package width={15} height={15} className="text-white" />
+              <Package width={15} height={15} className="text-[#cbd5e1]" />
             )}
           </span>
 
-          {/* Hover Arrow: Swaps in place of the Project Icon on hover */}
+          {/* Hover Arrow: Swaps in place ONLY when hovering directly on the Project Icon */}
           {hasChats && (
-            <span className="hidden group-hover/row:flex w-5 h-5 rounded items-center justify-center bg-[#28282c] text-white hover:bg-[#38383e] transition-colors">
+            <span className="hidden group-hover/icon:flex w-5 h-5 rounded items-center justify-center bg-[#28282c] text-[#e4e4e7] hover:bg-[#38383e] hover:text-white transition-colors">
               {isExpanded ? (
                 <ChevronDown width={12} height={12} strokeWidth={2.5} />
               ) : (
@@ -166,25 +178,33 @@ export const SidebarProjectTreeItem: React.FC<SidebarProjectTreeItemProps> = ({
           )}
         </div>
 
-        {/* Project Name (Crisp white, smooth edge blur hiding right before the 3 dots) */}
-        <span className="flex-1 min-w-0 text-[14px] font-medium tracking-tight text-white pr-7 sidebar-fade-truncate">
+        {/* Project Name (Soft off-white, smooth edge blur hiding right before the 3 dots) */}
+        <span className="flex-1 min-w-0 text-[14px] font-medium tracking-tight text-[#e4e4e7] pr-7 sidebar-fade-truncate">
           {displayName}
         </span>
 
-        {/* Horizontal 3-Dots Action Button (Appears on hover at the right edge) */}
-        <button
-          type="button"
-          onClick={(e) => onOpenProjectMenu(e, project.id)}
-          title="More options"
-          className="absolute right-1.5 top-1/2 -translate-y-1/2 opacity-0 group-hover/row:opacity-100 p-1 text-white hover:bg-[#34343a] rounded transition-all"
+        {/* Horizontal 3-Dots Action Button with Gradient Blur / Haze Backdrop */}
+        <div
+          className={`absolute right-0 top-0 bottom-0 flex items-center pl-6 pr-1.5 rounded-r-lg opacity-0 group-hover/row:opacity-100 transition-opacity pointer-events-none ${
+            isProjectHighlighted
+              ? 'bg-gradient-to-r from-transparent via-[#28282c] to-[#28282c]'
+              : 'bg-gradient-to-r from-transparent via-[#161618] to-[#161618] group-hover/row:via-[#1f1f23] group-hover/row:to-[#1f1f23]'
+          }`}
         >
-          <HorizontalDotsIcon />
-        </button>
+          <button
+            type="button"
+            onClick={(e) => onOpenProjectMenu(e, project.id)}
+            title="More options"
+            className="pointer-events-auto p-1 text-[#e4e4e7] hover:text-white hover:bg-[#34343a] rounded transition-all"
+          >
+            <HorizontalDotsIcon />
+          </button>
+        </div>
       </div>
 
-      {/* Collapsible Sub-Tree: Project Chats */}
+      {/* Collapsible Sub-Tree: Project Chats (Spans 100% full width to match project row boundary) */}
       {isExpanded && hasChats && (
-        <div className="flex flex-col ml-3 pl-2.5 my-1 space-y-0.5">
+        <div className="flex flex-col my-0.5 space-y-0.5 w-full">
           {chats.map((chat) => {
             const isChatActive = activeSessionId === chat.sessionId;
             const chatTitle = chat.title || 'Conversation';
@@ -193,43 +213,52 @@ export const SidebarProjectTreeItem: React.FC<SidebarProjectTreeItemProps> = ({
                 key={chat.sessionId}
                 onClick={(e) => {
                   e.stopPropagation();
+                  handleMouseLeave();
                   if (onSelectSession) onSelectSession(chat.sessionId);
                 }}
                 onMouseEnter={(e) => handleMouseEnter(e, chatTitle)}
                 onMouseLeave={handleMouseLeave}
                 role="button"
                 tabIndex={0}
-                className={`group/chat relative flex items-center justify-between px-2.5 py-1.5 rounded-md text-[13px] cursor-pointer transition-colors ${
+                className={`group/chat relative flex items-center justify-between px-2.5 py-1.5 rounded-lg text-[14px] cursor-pointer transition-colors ${
                   isChatActive
-                    ? 'bg-[#28282c] text-white font-medium shadow-sm'
-                    : 'text-white hover:bg-[#1a1a1e]'
+                    ? 'bg-[#28282c] text-[#e4e4e7] font-medium shadow-sm'
+                    : 'text-[#e4e4e7] hover:bg-[#1a1a1e]'
                 }`}
               >
-                <div className="flex items-center gap-2.5 min-w-0 flex-1 pr-7">
+                <div className="flex items-center gap-2.5 min-w-0 flex-1 pl-4 pr-7">
                   {/* Bullet Dot: Solid white when active, hollow ring when inactive */}
                   <span
                     className={`w-2 h-2 rounded-full flex-shrink-0 transition-colors ${
                       isChatActive
-                        ? 'bg-white'
+                        ? 'bg-[#e4e4e7]'
                         : 'border border-[#71717a] group-hover/chat:border-[#a1a1aa]'
                     }`}
                   />
-                  {/* Chat Title: Crisp white with smooth blur before the 3 dots */}
-                  <span className="min-w-0 flex-1 text-[13px] text-white sidebar-fade-truncate">
+                  {/* Chat Title: Identical 14px size, soft off-white, smooth blur before 3 dots */}
+                  <span className="min-w-0 flex-1 text-[14px] text-[#e4e4e7] sidebar-fade-truncate">
                     {chatTitle}
                   </span>
                 </div>
 
-                {/* Chat Horizontal 3-Dots Action Button */}
+                {/* Chat Horizontal 3-Dots Action Button with Gradient Blur / Haze Backdrop */}
                 {onDeleteSession && (
-                  <button
-                    type="button"
-                    onClick={(e) => handleOpenChatMenu(e, chat.sessionId)}
-                    title="Chat options"
-                    className="absolute right-1.5 top-1/2 -translate-y-1/2 opacity-0 group-hover/chat:opacity-100 p-1 text-white hover:bg-[#34343a] rounded transition-all"
+                  <div
+                    className={`absolute right-0 top-0 bottom-0 flex items-center pl-6 pr-1.5 rounded-r-lg opacity-0 group-hover/chat:opacity-100 transition-opacity pointer-events-none ${
+                      isChatActive
+                        ? 'bg-gradient-to-r from-transparent via-[#28282c] to-[#28282c]'
+                        : 'bg-gradient-to-r from-transparent via-[#161618] to-[#161618] group-hover/chat:via-[#1a1a1e] group-hover/chat:to-[#1a1a1e]'
+                    }`}
                   >
-                    <HorizontalDotsIcon />
-                  </button>
+                    <button
+                      type="button"
+                      onClick={(e) => handleOpenChatMenu(e, chat.sessionId)}
+                      title="Chat options"
+                      className="pointer-events-auto p-1 text-[#e4e4e7] hover:text-white hover:bg-[#34343a] rounded transition-all"
+                    >
+                      <HorizontalDotsIcon />
+                    </button>
+                  </div>
                 )}
               </div>
             );
@@ -237,10 +266,10 @@ export const SidebarProjectTreeItem: React.FC<SidebarProjectTreeItemProps> = ({
         </div>
       )}
 
-      {/* Floating Hover Tooltip: Matches Image 2 Design */}
+      {/* Floating Hover Tooltip: Matches screenshot design */}
       {tooltipData && typeof document !== 'undefined' && createPortal(
         <div
-          className="fixed pointer-events-none z-[999999] px-3 py-2 rounded-lg bg-[#18181b] border border-[#2e2f35] text-white text-[12.5px] leading-snug shadow-2xl max-w-[280px] break-words"
+          className="fixed pointer-events-none z-[999999] px-3 py-2 rounded-lg bg-[#18181b] border border-[#2e2f35] text-[#f4f4f5] text-[12.5px] leading-snug shadow-2xl max-w-[280px] break-words"
           style={{
             top: `${tooltipData.top}px`,
             left: `${tooltipData.left}px`,

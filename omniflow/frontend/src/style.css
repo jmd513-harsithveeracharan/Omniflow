@@ -106,7 +106,7 @@
 :root {
     /* Deep Premium Dark Theme */
     --bg-base: #131314;              /* Deep rich dark background for main canvas & chat */
-    --bg-sidebar: #0e0e10;           /* Sleek deep obsidian sidebar */
+    --bg-sidebar: #161618;           /* Slightly lighter refined dark sidebar */
     --bg-surface: #1a1a1c;           /* Cards, input docks, dropdowns */
     --bg-surface-raised: #222225;    /* Nested containers, button cards, chips */
     --bg-surface-active: #28282c;    /* Active menu items, pressed pills */
@@ -287,7 +287,7 @@ body.is-resizing {
 /* Base Transition for Studio Sidebar */
 .studio-sidebar {
     width: var(--sidebar-w, 260px);
-    background: var(--bg-sidebar, #131314);
+    background: var(--bg-sidebar, #161618);
     display: flex;
     flex-direction: column;
     height: 100%;

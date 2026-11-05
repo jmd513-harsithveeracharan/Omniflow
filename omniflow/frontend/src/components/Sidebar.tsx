@@ -249,7 +249,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {/* Nav Items */}
       <nav className="sidebar-nav">
         <button
-          className={`nav-item ${activeView === 'projects' || activeView === 'project' ? 'active' : ''}`}
+          className={`nav-item ${activeView === 'projects' ? 'active' : ''}`}
           onClick={() => onSelectView('projects')}
         >
           <span className="nav-item-icon">
