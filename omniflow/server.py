@@ -1999,4 +1999,11 @@ if __name__ == "__main__":
     import uvicorn
     port = int(os.getenv("PORT", "8090"))
     print(f"\n[OmniFlow] Launching Fabric Studio on http://127.0.0.1:{port}\n")
-    uvicorn.run("omniflow.server:app", host="127.0.0.1", port=port, reload=True)
+    uvicorn.run(
+        "omniflow.server:app",
+        host="127.0.0.1",
+        port=port,
+        reload=True,
+        reload_dirs=[BASE_DIR],
+        reload_excludes=["sessions_store.json", "*.json", "*.tmp", "frontend/*", "*.log"],
+    )

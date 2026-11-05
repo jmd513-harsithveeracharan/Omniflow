@@ -530,8 +530,22 @@ export const App: React.FC = () => {
       thoughtElapsed: '0.0',
     };
     setMessages((prev) => {
-      const filtered = prev.filter(
-        (m, i) => !(m.role === 'assistant' && !m.content.trim() && i === prev.length - 1)
+      let base = [...prev];
+      if (base.length >= 2) {
+        const lastMsg = base[base.length - 1];
+        const prevMsg = base[base.length - 2];
+        const isLastError =
+          lastMsg.role === 'assistant' &&
+          (lastMsg.content.includes('Error communicating with agent') ||
+            lastMsg.content.includes('Network connection interrupted') ||
+            lastMsg.content.includes('Error in input stream') ||
+            lastMsg.content.startsWith('⚠'));
+        if (isLastError && prevMsg.role === 'user' && prevMsg.content.trim() === text.trim()) {
+          base = base.slice(0, -2);
+        }
+      }
+      const filtered = base.filter(
+        (m, i) => !(m.role === 'assistant' && !m.content.trim() && i === base.length - 1)
       );
       return [...filtered, userMsg, placeholderAssistantMsg];
     });
@@ -595,7 +609,17 @@ export const App: React.FC = () => {
         const elapsedSec = ((Date.now() - startTime) / 1000).toFixed(1);
         setMessages((prev) => {
           const last = prev[prev.length - 1];
-          const errMsg = `⚠️ Error communicating with agent: ${err}`;
+          let cleanErr = err;
+          if (
+            cleanErr.includes('Error in input stream') ||
+            cleanErr.includes('Failed to fetch') ||
+            cleanErr.includes('Load failed') ||
+            cleanErr.includes('network') ||
+            cleanErr.includes('interrupted')
+          ) {
+            cleanErr = 'Network connection interrupted while communicating with the AI model. Please try sending again.';
+          }
+          const errMsg = cleanErr.startsWith('⚠') ? cleanErr : `⚠️ ${cleanErr}`;
           if (last && last.role === 'assistant') {
             const closedSteps = (last.thoughtSteps || []).map((s) =>
               s.status === 'in_progress' ? { ...s, status: 'failed' as const } : s
