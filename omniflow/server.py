@@ -72,7 +72,9 @@ app.add_middleware(
 )
 
 app.include_router(auth_router)
+app.include_router(auth_router, prefix="/api")
 app.include_router(git_router)
+app.include_router(git_router, prefix="/api")
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DIST_DIR = os.path.join(BASE_DIR, "frontend", "dist")
@@ -206,7 +208,7 @@ def fetch_projects_cached(force_refresh: bool = False) -> list[dict[str, Any]]:
                     def_folder = os.path.join(BASE_DIR, "generated_artifacts", pid)
                     has_folder = os.path.isdir(def_folder)
                     old_p = existing_map.get(pid, {})
-                    creator = r[5] or old_p.get("created_by") or "bheesetti.harsith@fabric.ai"
+                    creator = r[5] or old_p.get("created_by") or "Bheesetti.Harsith@Pelibiothermal.com"
                     owner_name = creator.split("@")[0].replace(".", " ").title() if "@" in creator else creator
                     meta = old_p.get("metadata") or {
                         "members": [

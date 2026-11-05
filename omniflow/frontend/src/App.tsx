@@ -11,6 +11,7 @@ import { ConnectorModal } from './components/ConnectorModal';
 import { GovernanceModal } from './components/GovernanceModal';
 import { SettingsModal } from './components/SettingsModal';
 import { FabricConnectionModal } from './components/modals/FabricConnectionModal';
+import { AccountSwitcherModal } from './components/auth/AccountSwitcherModal';
 import { ProjectEditModal } from './components/ProjectEditModal';
 import { AuthModal } from './components/auth/AuthModal';
 import { LoginPage } from './components/auth/LoginPage';
@@ -137,6 +138,7 @@ export const App: React.FC = () => {
   const [isGovernanceModalOpen, setIsGovernanceModalOpen] = useState<boolean>(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState<boolean>(false);
   const [isFabricConnectionModalOpen, setIsFabricConnectionModalOpen] = useState<boolean>(false);
+  const [isAccountModalOpen, setIsAccountModalOpen] = useState<boolean>(false);
   const [isVoiceModeActive, setIsVoiceModeActive] = useState<boolean>(false);
   const [currentPlan, setCurrentPlan] = useState<IngestionPlan | null>(null);
 
@@ -837,7 +839,7 @@ export const App: React.FC = () => {
             onNewSession={handleNewSession}
             onRefreshWorkspace={() => fetchFabricStatus().then(setStatus)}
             status={status}
-            onOpenFabricConnection={() => setIsFabricConnectionModalOpen(true)}
+            onOpenFabricConnection={() => setIsAccountModalOpen(true)}
             onOpenVoiceMode={() => setIsVoiceModeActive((prev) => !prev)}
           />
         )}
@@ -1075,6 +1077,12 @@ export const App: React.FC = () => {
         onClose={() => setIsFabricConnectionModalOpen(false)}
         status={status}
         onRefreshStatus={() => fetchFabricStatus().then(setStatus)}
+      />
+
+      <AccountSwitcherModal
+        isOpen={isAccountModalOpen}
+        onClose={() => setIsAccountModalOpen(false)}
+        onAccountSwitched={() => fetchFabricStatus().then(setStatus)}
       />
 
       <AuthModal

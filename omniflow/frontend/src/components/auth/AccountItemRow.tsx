@@ -1,5 +1,5 @@
 import React from 'react';
-import { Check, Loader2 } from 'lucide-react';
+import { Check, Loader2, Building2 } from 'lucide-react';
 import { FabricAccountProfile } from '../../types';
 
 interface AccountItemRowProps {
@@ -13,106 +13,72 @@ export const AccountItemRow: React.FC<AccountItemRowProps> = ({
   isSwitching,
   onSwitch,
 }) => {
+  const initial = (account.name || account.email || 'U')[0].toUpperCase();
+  const isActive = Boolean(account.is_active);
+
   return (
     <div
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        padding: '10px 12px',
-        borderRadius: '10px',
-        background: account.is_active ? 'rgba(16, 185, 129, 0.08)' : 'rgba(255, 255, 255, 0.03)',
-        border: account.is_active ? '1px solid rgba(16, 185, 129, 0.3)' : '1px solid rgba(255, 255, 255, 0.08)',
-      }}
+      className={`flex items-center justify-between p-3.5 rounded-xl transition-all ${
+        isActive
+          ? 'bg-[#202024] border border-white/20 shadow-sm'
+          : 'bg-[#18181b] border border-white/[0.08] hover:border-white/15 hover:bg-[#1c1c20]'
+      }`}
     >
-      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
-        <div
-          style={{
-            width: '32px',
-            height: '32px',
-            borderRadius: '50%',
-            background: account.is_active ? '#10b981' : '#3f3f46',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: '#ffffff',
-            fontWeight: 600,
-            fontSize: '12px',
-            flexShrink: 0,
-          }}
-        >
-          {account.name[0] || 'U'}
+      <div className="flex items-center gap-3 min-w-0">
+        {/* Sleek Neutral Slate Avatar */}
+        <div className="w-9 h-9 rounded-full bg-[#27272a] border border-white/10 text-[#f4f4f5] font-semibold text-[13px] flex items-center justify-center flex-shrink-0">
+          {initial}
         </div>
-        <div style={{ minWidth: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'nowrap' }}>
-            <span
-              style={{
-                fontSize: '13px',
-                fontWeight: 600,
-                color: '#f4f4f5',
-                whiteSpace: 'nowrap',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-              }}
-            >
+
+        <div className="min-w-0 flex flex-col gap-0.5">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-[13.5px] font-medium text-[#f4f4f5] truncate">
               {account.name}
             </span>
-            <span
-              style={{
-                fontSize: '10.5px',
-                fontWeight: 600,
-                padding: '2px 7px',
-                borderRadius: '4px',
-                background: account.is_active ? 'rgba(16, 185, 129, 0.15)' : 'rgba(255, 255, 255, 0.08)',
-                color: account.is_active ? '#34d399' : '#a1a1aa',
-                whiteSpace: 'nowrap',
-                flexShrink: 0,
-              }}
-            >
-              {account.account_type}
+            <span className="text-[10.5px] font-medium px-2 py-0.5 rounded bg-white/[0.06] text-[#a1a1aa] border border-white/[0.06] whitespace-nowrap">
+              {account.account_type || 'Azure CLI'}
             </span>
           </div>
-          <div
-            style={{
-              fontSize: '11.5px',
-              color: '#71717a',
-              whiteSpace: 'nowrap',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-            }}
-          >
+
+          <div className="text-[12px] text-[#8e918f] truncate">
             {account.email}
           </div>
+
+          {account.tenant_name && (
+            <div className="flex items-center gap-1.5 text-[11px] text-[#71717a] truncate mt-0.5">
+              <Building2 size={11} className="flex-shrink-0 text-[#8e918f]" />
+              <span className="truncate">{account.tenant_name}</span>
+            </div>
+          )}
         </div>
       </div>
 
-      <div style={{ flexShrink: 0, marginLeft: '12px' }}>
-        {account.is_active ? (
-          <span
-            style={{
-              fontSize: '11px',
-              fontWeight: 600,
-              color: '#10b981',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '4px',
-            }}
-          >
-            <Check width={13} height={13} /> Active
+      {/* Action / State */}
+      <div className="flex-shrink-0 ml-3">
+        {isActive ? (
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 text-[11.5px] font-medium border border-emerald-500/20">
+            <Check size={12} strokeWidth={2.5} />
+            <span>Active</span>
           </span>
         ) : (
           <button
             type="button"
             disabled={isSwitching}
             onClick={() => onSwitch(account)}
-            className="projects-modal-btn-cancel"
-            style={{ padding: '5px 12px', fontSize: '12px' }}
+            className="px-3.5 py-1.5 rounded-lg text-[12px] font-medium bg-[#27272a] hover:bg-[#34343a] text-[#f4f4f5] border border-white/10 hover:border-white/20 transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+            title={`Switch active session to ${account.name}`}
           >
-            {isSwitching ? <Loader2 width={12} height={12} className="spin" /> : 'Switch'}
+            {isSwitching ? (
+              <>
+                <Loader2 size={12} className="animate-spin text-white" />
+                <span>Switching...</span>
+              </>
+            ) : (
+              <span>Switch</span>
+            )}
           </button>
         )}
       </div>
     </div>
   );
 };
-

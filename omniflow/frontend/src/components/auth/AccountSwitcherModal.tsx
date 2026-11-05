@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Laptop, KeyRound, RefreshCw } from 'lucide-react';
+import { X, Globe, KeyRound, RefreshCw, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { FabricAccountProfile } from '../../types';
 import {
   fetchFabricAccounts,
@@ -56,6 +56,17 @@ export const AccountSwitcherModal: React.FC<AccountSwitcherModalProps> = ({
     }
   }, [isOpen]);
 
+  // Escape key handler
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isOpen) {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
   // Polling loop for device code
   useEffect(() => {
     if (!deviceCode || !isPollingDeviceCode) return;
@@ -108,7 +119,7 @@ export const AccountSwitcherModal: React.FC<AccountSwitcherModalProps> = ({
   const handleBrowserLogin = async () => {
     try {
       setIsLoading(true);
-      setStatusMsg({ text: 'Launching Microsoft sign-in window...', type: 'info' });
+      setStatusMsg({ text: 'Launching Microsoft browser sign-in...', type: 'info' });
       const res = await triggerBrowserLogin(tenantInput.trim() || undefined);
       if (res.success) {
         setStatusMsg({ text: res.message, type: 'success' });
@@ -146,68 +157,50 @@ export const AccountSwitcherModal: React.FC<AccountSwitcherModalProps> = ({
 
   return createPortal(
     <div
-      className="modal-backdrop open active"
+      className="fixed inset-0 z-[100050] flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-fadeIn"
       onClick={onClose}
-      style={{
-        display: 'flex',
-        position: 'fixed',
-        inset: 0,
-        zIndex: 100050,
-        background: 'rgba(0, 0, 0, 0.75)',
-        backdropFilter: 'blur(8px)',
-        WebkitBackdropFilter: 'blur(8px)',
-        alignItems: 'center',
-        justifyContent: 'center',
-      }}
     >
       <div
-        className="modal-content"
-        style={{
-          width: '540px',
-          maxWidth: '95vw',
-          background: '#18181b',
-          borderRadius: '16px',
-          padding: '24px 26px',
-          border: '1px solid rgba(255, 255, 255, 0.12)',
-          boxShadow: '0 24px 60px rgba(0, 0, 0, 0.8)',
-          position: 'relative',
-          zIndex: 100051,
-        }}
+        className="w-full max-w-[560px] bg-[#141416] border border-white/10 rounded-[18px] p-6 shadow-2xl relative z-[100051] flex flex-col gap-5 text-sans select-none"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '18px' }}>
+        {/* Header (Matching Customize Dialog Style) */}
+        <div className="flex items-start justify-between">
           <div>
-            <h3 style={{ fontSize: '17px', fontWeight: 600, color: '#f4f4f5', margin: 0 }}>
+            <h3 className="text-[17px] font-semibold text-[#f4f4f5] tracking-tight">
               Fabric Accounts & Tenancy
             </h3>
-            <p style={{ fontSize: '12px', color: '#a1a1aa', margin: '3px 0 0 0' }}>
+            <p className="text-[12.5px] text-[#8e918f] mt-1 leading-normal">
               Switch active workspace session or connect an organization account
             </p>
           </div>
           <button
             type="button"
             onClick={onClose}
-            style={{ background: 'transparent', border: 'none', color: '#71717a', cursor: 'pointer', padding: '4px' }}
+            className="p-1.5 rounded-lg text-[#71717a] hover:text-[#f4f4f5] hover:bg-white/5 transition-colors cursor-pointer"
+            title="Close dialog (Esc)"
           >
-            <X width={18} height={18} />
+            <X size={18} />
           </button>
         </div>
 
         {/* Feedback Message */}
         {statusMsg && (
           <div
-            style={{
-              padding: '8px 12px',
-              borderRadius: '8px',
-              fontSize: '12.5px',
-              marginBottom: '14px',
-              background: statusMsg.type === 'success' ? 'rgba(16, 185, 129, 0.15)' : statusMsg.type === 'error' ? 'rgba(239, 68, 68, 0.15)' : 'rgba(59, 130, 246, 0.15)',
-              border: statusMsg.type === 'success' ? '1px solid #10b981' : statusMsg.type === 'error' ? '1px solid #ef4444' : '1px solid #3b82f6',
-              color: statusMsg.type === 'success' ? '#34d399' : statusMsg.type === 'error' ? '#fca5a5' : '#93c5fd',
-            }}
+            className={`flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-[12.5px] transition-all ${
+              statusMsg.type === 'success'
+                ? 'bg-emerald-500/10 text-emerald-300 border border-emerald-500/20'
+                : statusMsg.type === 'error'
+                ? 'bg-red-500/10 text-red-300 border border-red-500/20'
+                : 'bg-blue-500/10 text-blue-300 border border-blue-500/20'
+            }`}
           >
-            {statusMsg.text}
+            {statusMsg.type === 'success' ? (
+              <CheckCircle2 size={15} className="flex-shrink-0 text-emerald-400" />
+            ) : (
+              <AlertCircle size={15} className="flex-shrink-0" />
+            )}
+            <span>{statusMsg.text}</span>
           </div>
         )}
 
@@ -219,25 +212,26 @@ export const AccountSwitcherModal: React.FC<AccountSwitcherModalProps> = ({
           />
         )}
 
-        {/* Account List */}
-        <div style={{ marginBottom: '18px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-            <label style={{ fontSize: '11px', fontWeight: 700, color: '#a1a1aa', letterSpacing: '0.04em' }}>
-              AUTHENTICATED ACCOUNTS ({accounts.length})
-            </label>
+        {/* Authenticated Accounts List */}
+        <div>
+          <div className="flex items-center justify-between mb-2 px-0.5">
+            <span className="text-[11px] font-semibold text-[#71717a] tracking-wider uppercase">
+              Authenticated Accounts ({accounts.length})
+            </span>
             <button
               type="button"
               onClick={loadAccounts}
-              style={{ background: 'transparent', border: 'none', color: '#71717a', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center' }}
-              title="Refresh accounts"
+              disabled={isLoading}
+              className="text-[#71717a] hover:text-[#f4f4f5] p-1 rounded transition-colors cursor-pointer disabled:opacity-50"
+              title="Refresh account sessions"
             >
-              <RefreshCw width={12} height={12} />
+              <RefreshCw size={13} className={isLoading ? 'animate-spin' : ''} />
             </button>
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '200px', overflowY: 'auto' }}>
+          <div className="flex flex-col gap-2 max-h-[220px] overflow-y-auto pr-0.5">
             {accounts.length === 0 ? (
-              <div style={{ padding: '14px', fontSize: '12px', color: '#71717a', textAlign: 'center', border: '1px dashed rgba(255,255,255,0.1)', borderRadius: '8px' }}>
+              <div className="p-4 text-[12.5px] text-[#71717a] text-center border border-dashed border-white/10 rounded-xl">
                 No Fabric accounts saved. Sign in below to connect.
               </div>
             ) : (
@@ -253,39 +247,39 @@ export const AccountSwitcherModal: React.FC<AccountSwitcherModalProps> = ({
           </div>
         </div>
 
-        {/* Sign In to Another Account */}
-        <div style={{ borderTop: '1px solid rgba(255, 255, 255, 0.08)', paddingTop: '16px' }}>
-          <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: '#a1a1aa', marginBottom: '6px', letterSpacing: '0.04em' }}>
-            ORGANIZATION DOMAIN OR TENANT (OPTIONAL)
-          </label>
-          <input
-            type="text"
-            value={tenantInput}
-            onChange={(e) => setTenantInput(e.target.value)}
-            placeholder="e.g. yourcompany.com or tenant ID (prevents Windows SSO defaulting)"
-            className="projects-modal-input"
-            style={{ fontSize: '12.5px', padding: '8px 10px', marginBottom: '10px' }}
-          />
+        {/* Sign In to Another Account Section */}
+        <div className="pt-4 border-t border-white/[0.08] flex flex-col gap-3">
+          <div>
+            <label className="block text-[11px] font-semibold text-[#71717a] tracking-wider uppercase mb-1.5 px-0.5">
+              Organization Domain or Tenant ID (Optional)
+            </label>
+            <input
+              type="text"
+              value={tenantInput}
+              onChange={(e) => setTenantInput(e.target.value)}
+              placeholder="e.g. yourcompany.com or tenant ID (prevents Windows SSO defaulting)"
+              className="w-full bg-[#18181b] border border-white/10 focus:border-white/25 rounded-xl px-3.5 py-2 text-[12.5px] text-[#f4f4f5] placeholder-[#71717a] outline-none transition-colors"
+            />
+          </div>
 
-          <div style={{ display: 'flex', gap: '10px' }}>
+          {/* Action Buttons: Clean Slate Buttons Matching Customize Modal */}
+          <div className="flex items-center gap-3">
             <button
               type="button"
               disabled={isLoading || isPollingDeviceCode}
               onClick={handleBrowserLogin}
-              className="projects-btn-new-primary"
-              style={{ flex: 1, padding: '9px 12px', fontSize: '12.5px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+              className="flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-[13px] font-medium bg-[#27272a] hover:bg-[#323236] text-[#f4f4f5] border border-white/10 hover:border-white/20 transition-all cursor-pointer disabled:opacity-50 shadow-sm"
             >
-              <Laptop width={14} height={14} />
+              <Globe size={15} className="text-[#a1a1aa]" />
               <span>Browser Sign-in</span>
             </button>
             <button
               type="button"
               disabled={isLoading || isPollingDeviceCode}
               onClick={handleStartDeviceCode}
-              className="projects-modal-btn-cancel"
-              style={{ flex: 1, padding: '9px 12px', fontSize: '12.5px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+              className="flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-[13px] font-medium bg-[#1e1e22] hover:bg-[#27272a] text-[#d4d4d8] border border-white/10 hover:border-white/20 transition-all cursor-pointer disabled:opacity-50"
             >
-              <KeyRound width={14} height={14} />
+              <KeyRound size={15} className="text-[#a1a1aa]" />
               <span>Device Code Sign-in</span>
             </button>
           </div>
