@@ -219,7 +219,11 @@ export const App: React.FC = () => {
       const initialSid = generateNewSessionId();
       setSessionId(initialSid);
       setMessages([]);
-      setActiveView('chat');
+      if (activeProjectId) {
+        setActiveView('project');
+      } else {
+        setActiveView('projects');
+      }
     }
   }, [currentUser?.email]);
 
@@ -319,8 +323,13 @@ export const App: React.FC = () => {
     try {
       await deleteSession(sid);
       setSessions((prev) => prev.filter((s) => s.sessionId !== sid));
+      setProjectSessions((prev) => prev.filter((s) => s.sessionId !== sid));
       if (sessionId === sid) {
-        handleNewSession();
+        if (activeProjectId) {
+          setActiveView('project');
+        } else {
+          setActiveView('projects');
+        }
       }
     } catch (e) {
       console.error('Failed to delete session', e);
@@ -746,7 +755,7 @@ export const App: React.FC = () => {
             return currentSess.title;
           }
         }
-        return 'New Chat';
+        return 'Project Workspace';
       }
     }
   };
@@ -777,6 +786,9 @@ export const App: React.FC = () => {
         isLoadingProjects={isLoadingProjects}
         activeProjectId={activeProjectId}
         onSelectProject={(pId) => {
+          handleSelectProject(pId, true);
+        }}
+        onStartProjectChat={(pId) => {
           handleSelectProject(pId, true);
         }}
         onTogglePinProject={handleTogglePinProject}

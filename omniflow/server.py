@@ -288,12 +288,17 @@ FABRIC_ITEMS_CACHE_TIME: float = 0.0
 
 
 @app.get("/api/sessions")
-async def list_sessions(user_email: str | None = None, project_id: str | None = None) -> dict[str, Any]:
+async def list_sessions(user_email: str | None = None, project_id: str | None = None, include_all: bool = True) -> dict[str, Any]:
     sess_list = []
     u = user_email.strip().lower() if user_email else None
 
     for sid, sdata in SESSIONS.items():
         s_proj = sdata.get("project_id") or ""
+        if not s_proj and sid.startswith("proj_"):
+            parts = sid.split("_")
+            if len(parts) >= 2:
+                s_proj = parts[1]
+
         if project_id:
             # Match sessions belonging to this project
             matches = (
@@ -303,7 +308,7 @@ async def list_sessions(user_email: str | None = None, project_id: str | None = 
             )
             if not matches:
                 continue
-        else:
+        elif not include_all:
             # Exclude internal project chats from general conversations list
             if sid.startswith("proj_") or s_proj:
                 continue
@@ -314,7 +319,7 @@ async def list_sessions(user_email: str | None = None, project_id: str | None = 
         s_user = (sdata.get("user_email") or "").strip().lower()
         sess_list.append({
             "session_id": sid,
-            "project_id": s_proj or (sid[5:] if sid.startswith("proj_") else None),
+            "project_id": s_proj or None,
             "title": sdata.get("title", "New Conversation"),
             "message_count": len(sdata.get("messages", [])),
             "run_count": 1,
@@ -1613,12 +1618,44 @@ async def handle_chat_stream(req: ChatRequest) -> StreamingResponse:
             active_plan = SESSIONS[sid].get("active_plan") or {}
             p_name = active_plan.get("sourceName")
             p_code = active_plan.get("project_code")
-            if not p_name and sid.startswith("proj_"):
-                active_pid = sid[5:]
-                p_rec = next((p for p in fetch_projects_cached() if p["id"] == active_pid), None)
-                if p_rec:
-                    p_name = p_rec["name"]
-                    p_code = p_rec["id"]
+            active_pid = proj_id
+            if not active_pid and sid.startswith("proj_"):
+                parts = sid.split("_")
+                if len(parts) >= 2:
+                    active_pid = parts[1]
+
+            p_rec = next((p for p in fetch_projects_cached() if p["id"] == active_pid), None)
+            if not p_rec and active_pid:
+                repo = PostgresRepository()
+                try:
+                    with repo._connect() as conn:
+                        with conn.cursor() as cur:
+                            cur.execute(
+                                "SELECT project_id, project_name, description, metadata FROM projects WHERE project_id = %s OR project_code = %s LIMIT 1;",
+                                (active_pid, active_pid),
+                            )
+                            row = cur.fetchone()
+                            if row:
+                                p_rec = {
+                                    "id": str(row[0]),
+                                    "name": row[1],
+                                    "description": row[2] or "",
+                                    "metadata": row[3] if isinstance(row[3], dict) else {},
+                                }
+                except Exception:
+                    pass
+
+            if p_rec:
+                p_name = p_rec.get("name") or p_name
+                p_code = p_rec.get("id") or p_code
+                p_meta = p_rec.get("metadata", {}) or {}
+                p_instructions = p_meta.get("instructions", "")
+                p_context_files = p_meta.get("context_files", [])
+            else:
+                p_meta = {}
+                p_instructions = ""
+                p_context_files = []
+
             p_name = p_name or "Fabric Data Engineering"
             p_code = p_code or "FABRIC-STUDIO"
             p_root = active_plan.get("root_folder") or f"{p_code}_Platform"
@@ -1771,6 +1808,41 @@ async def handle_chat_stream(req: ChatRequest) -> StreamingResponse:
                 f"- For conceptual or conversational explanations (e.g. 'what is data engineering'), provide crisp, engaging, structured answers (2-3 concise paragraphs or key highlights). Do NOT output unprompted 2,000-word walls of text.\n"
                 f"- Include a concise summary and next execution steps."
             )
+
+            # Hydrate Shared Project Knowledge Base & Custom Instructions into Model Context
+            if p_instructions and p_instructions.strip() and p_instructions != "Add instructions to tailor Omniflow's responses":
+                sys_prompt += f"\n\n### 📋 Project Custom Instructions:\n{p_instructions.strip()}\n"
+
+            if p_context_files:
+                sys_prompt += f"\n\n### 📚 Project Knowledge Base Context Files:\n"
+                for cfile in p_context_files:
+                    c_name = cfile.get("name", "Document")
+                    c_desc = cfile.get("description", "")
+                    c_content = cfile.get("content", "")
+                    if c_content:
+                        sys_prompt += f"- **{c_name}**: {c_desc}\n```\n{c_content[:2000]}\n```\n"
+                    else:
+                        sys_prompt += f"- **{c_name}**: {c_desc}\n"
+
+            # Check if project intake template exists on disk (e.g. PRJ-PELI-BIOTHERMAL.json)
+            intake_fname = f"{p_code}.json"
+            intake_path = os.path.join(INTAKE_DIR, intake_fname)
+            if not os.path.exists(intake_path) and "PELI" in p_code:
+                intake_path = os.path.join(INTAKE_DIR, "PRJ-PELI-BIOTHERMAL.json")
+            if os.path.exists(intake_path):
+                try:
+                    with open(intake_path, "r", encoding="utf-8") as f:
+                        intake_spec = json.load(f)
+                        p_sum = intake_spec.get("project_context", {}).get("project_summary", {})
+                        sol_sum = intake_spec.get("project_context", {}).get("solution_summary", {})
+                        sys_prompt += (
+                            f"\n\n### 📦 Project Intake Architecture Specifications:\n"
+                            f"- Business Domain: {p_sum.get('business_domain', 'Enterprise')}\n"
+                            f"- Architecture Blueprint: {sol_sum.get('target_architecture', 'Medallion Lakehouse')}\n"
+                            f"- SLA Target: {p_sum.get('sla_target_minutes', 5)} min latency, RPO: {p_sum.get('target_rpo_minutes', 1)} min\n"
+                        )
+                except Exception:
+                    pass
 
             if active_conn_id:
                 if is_notebook_pathway:

@@ -21,7 +21,7 @@ interface TopBarProps {
 }
 
 export const TopBar: React.FC<TopBarProps> = ({
-  viewTitle = 'New Chat',
+  viewTitle = 'Workspace',
   isSidebarCollapsed,
   onToggleSidebar,
   isWorkbenchOpen,
