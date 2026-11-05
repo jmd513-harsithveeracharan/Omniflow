@@ -1,8 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import {
-  Package,
-  PackageOpen,
+  Layers,
+  Layers2,
   Pin,
   ChevronDown,
   ChevronRight,
@@ -151,7 +151,7 @@ export const SidebarProjectTreeItem: React.FC<SidebarProjectTreeItemProps> = ({
           }}
           title={hasChats ? (isExpanded ? 'Collapse chats' : 'Expand chats') : undefined}
         >
-          {/* Default Project Icon: Package (closed) or PackageOpen (expanded), or Pin */}
+          {/* Default Project Icon: Layers2 (collapsed) or Layers (expanded), or Pin */}
           <span className={`${hasChats ? 'group-hover/icon:hidden' : ''} flex items-center justify-center`}>
             {isPinned ? (
               <Pin
@@ -160,9 +160,9 @@ export const SidebarProjectTreeItem: React.FC<SidebarProjectTreeItemProps> = ({
                 className={isProjectHighlighted ? 'text-white fill-[#e4e4e7]' : 'text-[#cbd5e1]'}
               />
             ) : isExpanded && hasChats ? (
-              <PackageOpen width={15} height={15} className="text-[#cbd5e1]" />
+              <Layers width={15} height={15} strokeWidth={1.8} className={isProjectHighlighted ? 'text-white' : 'text-[#cbd5e1]'} />
             ) : (
-              <Package width={15} height={15} className="text-[#cbd5e1]" />
+              <Layers2 width={15} height={15} strokeWidth={1.8} className={isProjectHighlighted ? 'text-white' : 'text-[#cbd5e1]'} />
             )}
           </span>
 
