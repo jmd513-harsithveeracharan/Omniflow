@@ -105,7 +105,7 @@ export const FabricConnectionModal: React.FC<FabricConnectionModalProps> = ({
                 </span>
               </div>
               <div style={{ fontSize: '11px', color: '#71717a' }}>
-                Workspace: {status?.workspaceId || 'PBT_DATA_AGENT'}
+                Workspace: {status?.workspaceName || status?.workspaceId || 'Active Workspace'}
               </div>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>

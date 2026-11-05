@@ -417,8 +417,8 @@ _ACTIVE_FABRIC_ACCOUNT: dict[str, Any] = {
     "tenant_name": "PELICAN PRODUCTS INC",
     "is_active": True,
     "account_type": "Azure CLI / Enterprise SSO",
-    "default_workspace_id": os.getenv("ALLOWED_WORKSPACE_ID", "db7344c1-ecd9-44d6-849f-f2de49484f9f"),
-    "default_workspace_name": os.getenv("ALLOWED_WORKSPACE_NAME", "PBT_DATA_AGENT"),
+    "default_workspace_id": os.getenv("ALLOWED_WORKSPACE_ID", ""),
+    "default_workspace_name": os.getenv("ALLOWED_WORKSPACE_NAME", "PELICAN PRODUCTS INC"),
 }
 
 
@@ -463,8 +463,8 @@ def _get_azure_cli_account() -> dict[str, Any]:
                 "subscription_id": sub_id,
                 "is_active": True,
                 "account_type": "Azure CLI SSO",
-                "default_workspace_id": os.getenv("ALLOWED_WORKSPACE_ID", "db7344c1-ecd9-44d6-849f-f2de49484f9f"),
-                "default_workspace_name": os.getenv("ALLOWED_WORKSPACE_NAME", "PBT_DATA_AGENT"),
+                "default_workspace_id": os.getenv("ALLOWED_WORKSPACE_ID", ""),
+                "default_workspace_name": os.getenv("ALLOWED_WORKSPACE_NAME", tenant_display or "Fabric Workspace"),
             }
             return _ACTIVE_FABRIC_ACCOUNT
         except Exception as e:
@@ -506,8 +506,8 @@ def get_fabric_accounts() -> list[dict[str, Any]]:
                     "subscription_id": sub_id,
                     "is_active": is_active,
                     "account_type": account_type,
-                    "default_workspace_id": os.getenv("ALLOWED_WORKSPACE_ID", "db7344c1-ecd9-44d6-849f-f2de49484f9f"),
-                    "default_workspace_name": os.getenv("ALLOWED_WORKSPACE_NAME", "PBT_DATA_AGENT"),
+                    "default_workspace_id": os.getenv("ALLOWED_WORKSPACE_ID", ""),
+                    "default_workspace_name": os.getenv("ALLOWED_WORKSPACE_NAME", tenant_name or "Fabric Workspace"),
                 })
             if accounts:
                 accounts.sort(key=lambda x: not x["is_active"])
@@ -590,6 +590,12 @@ def switch_fabric_account(req: SwitchAccountRequest) -> dict[str, Any]:
         rc, _, err = _run_az_cmd(["account", "set", "--subscription", sub_id], timeout=30)
         account = _get_azure_cli_account()
         if rc == 0:
+            try:
+                import omniflow.server as srv
+                srv.FABRIC_STATUS_CACHE = None
+                srv._workspaces_list_cache["data"] = None
+            except Exception:
+                pass
             return {
                 "success": True,
                 "message": f"Switched active Fabric session to {account.get('name', 'selected account')} ({account.get('tenant_name')})",

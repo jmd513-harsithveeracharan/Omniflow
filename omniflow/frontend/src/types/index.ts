@@ -126,6 +126,9 @@ export interface FabricStatus {
   userIdentity?: string;
   authMethod?: string;
   tenantId?: string;
+  tenantName?: string;
+  accountName?: string;
+  accountType?: string;
   expiresInMinutes?: number;
 }
 

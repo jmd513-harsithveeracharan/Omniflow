@@ -62,11 +62,11 @@ export const TopBar: React.FC<TopBarProps> = ({
             type="button"
             className="topbar-account-chip flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#18181b] hover:bg-[#222226] border border-white/10 hover:border-white/20 text-[12px] text-[#cbd5e1] hover:text-white transition-all cursor-pointer mr-1"
             onClick={onOpenFabricConnection}
-            title={`Active Fabric Tenant: ${status?.tenantId || 'PELICAN PRODUCTS INC'}. Click to switch account`}
+            title={`Active Fabric: ${status?.workspaceName || status?.tenantName || 'Fabric Session'}. Click to switch account`}
           >
             <PlatformCube platformId="fabric" size={13} />
-            <span className="font-medium max-w-[130px] truncate text-[12px] text-[#e4e4e7]">
-              {status?.workspaceName || 'PBT_DATA_AGENT'}
+            <span className="font-medium max-w-[150px] truncate text-[12px] text-[#e4e4e7]">
+              {status?.workspaceName || status?.tenantName || 'Fabric Workspace'}
             </span>
             <ChevronDown size={11} className="text-[#71717a]" />
           </button>

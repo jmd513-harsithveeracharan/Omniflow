@@ -9,12 +9,12 @@ interface ProjectWorkspacesPickerProps {
 }
 
 const DEFAULT_ENTERPRISE_WORKSPACES: FabricWorkspaceSummary[] = [
-  { id: 'ws_pbt_agent', displayName: 'PBT_DATA_AGENT', description: 'Primary active data engineering workspace', type: 'Workspace', isActive: true },
+  { id: 'ws_fabric_primary', displayName: 'Fabric_Workspace_Primary', description: 'Primary active data engineering workspace', type: 'Workspace', isActive: true },
   { id: 'ws_pharmacold', displayName: 'PharmaCold_Logistics_Medallion', description: 'IoT streaming telemetry & ERP shipments', type: 'Workspace' },
-  { id: 'ws_prod_warehouse', displayName: 'Paxafe_Production_Warehouse', description: 'Delta Lake bronze/silver/gold storage', type: 'Workspace' },
+  { id: 'ws_prod_warehouse', displayName: 'Production_Warehouse', description: 'Delta Lake bronze/silver/gold storage', type: 'Workspace' },
   { id: 'ws_directlake', displayName: 'DirectLake_PowerBI_Gold', description: 'Direct Lake semantic models & reporting', type: 'Workspace' },
   { id: 'ws_iot_stream', displayName: 'IoT_Telemetry_Streaming', description: 'Eventstream & real-time analytics hub', type: 'Workspace' },
-  { id: 'ws_cdc_ingest', displayName: 'Enterprise_CDC_Ingest', description: 'Data Factory CDC pipelines & SAP feeds', type: 'Workspace' },
+  { id: 'ws_cdc_ingest', displayName: 'Enterprise_CDC_Ingest', description: 'Data Factory CDC pipelines & feeds', type: 'Workspace' },
 ];
 
 export const ProjectWorkspacesPicker: React.FC<ProjectWorkspacesPickerProps> = ({

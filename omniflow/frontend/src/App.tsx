@@ -883,7 +883,7 @@ export const App: React.FC = () => {
               const optimisticSession: ChatSession = {
                 sessionId: newSid,
                 projectId: activeProjectId,
-                workspaceId: status?.workspaceId || 'PBT_DATA_AGENT',
+                workspaceId: status?.workspaceId || status?.workspaceName || 'Fabric Workspace',
                 title: prompt.trim().slice(0, 42) || 'New Conversation',
                 messageCount: 1,
                 runCount: 1,
@@ -941,7 +941,7 @@ export const App: React.FC = () => {
 
         {activeView === 'workspaces' && (
           <WorkspaceExplorerView
-            workspaceName={status?.workspaceId || 'PBT_DATA_AGENT'}
+            workspaceName={status?.workspaceName || status?.workspaceId || 'Fabric Workspace'}
             onInspectItem={handleInspectWorkspaceItem}
             onDeleteItem={handleDeleteWorkspaceItem}
           />

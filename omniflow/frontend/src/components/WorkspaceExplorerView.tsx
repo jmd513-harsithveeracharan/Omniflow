@@ -17,7 +17,7 @@ interface WorkspaceExplorerViewProps {
 }
 
 export const WorkspaceExplorerView: React.FC<WorkspaceExplorerViewProps> = ({
-  workspaceName = 'PBT_DATA_AGENT',
+  workspaceName = 'Fabric Workspace',
   onInspectItem,
   onDeleteItem,
 }) => {

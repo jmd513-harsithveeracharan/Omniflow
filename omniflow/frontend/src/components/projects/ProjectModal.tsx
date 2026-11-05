@@ -27,7 +27,7 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
 }) => {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
-  const [selectedWorkspaces, setSelectedWorkspaces] = useState<string[]>(['PBT_DATA_AGENT']);
+  const [selectedWorkspaces, setSelectedWorkspaces] = useState<string[]>([]);
   const [sharedContext, setSharedContext] = useState(true);
   const [members, setMembers] = useState<ProjectMember[]>([]);
   const [isSaving, setIsSaving] = useState(false);
@@ -54,13 +54,13 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
       setName(project.name);
       setDescription(project.description || '');
       const meta = project.metadata || {};
-      setSelectedWorkspaces(meta.workspaces || ['PBT_DATA_AGENT']);
+      setSelectedWorkspaces(meta.workspaces || []);
       setSharedContext(meta.sharedContext !== false);
       setMembers(meta.members && meta.members.length > 0 ? meta.members : [ownerMember]);
     } else {
       setName('');
       setDescription('');
-      setSelectedWorkspaces(['PBT_DATA_AGENT']);
+      setSelectedWorkspaces([]);
       setSharedContext(true);
       setMembers([ownerMember]);
     }
@@ -94,8 +94,8 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
         ...(project?.metadata || {}),
         badge: 'Fabric Project',
         fabricFolder: project?.metadata?.fabricFolder || `AI_Test_Folder/${slug || 'project'}`,
-        workspaces: selectedWorkspaces.length > 0 ? selectedWorkspaces : ['PBT_DATA_AGENT'],
-        targetWorkspace: selectedWorkspaces[0] || 'PBT_DATA_AGENT',
+        workspaces: selectedWorkspaces,
+        targetWorkspace: selectedWorkspaces[0] || 'Fabric Workspace',
         sharedContext,
         members,
       };

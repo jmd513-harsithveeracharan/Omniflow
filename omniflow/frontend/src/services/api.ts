@@ -35,6 +35,9 @@ export async function fetchFabricStatus(): Promise<FabricStatus> {
       userIdentity: data.user_identity || '',
       authMethod: data.auth_method || '',
       tenantId: data.tenant_id || '',
+      tenantName: data.tenant_name || '',
+      accountName: data.account_name || '',
+      accountType: data.account_type || '',
       expiresInMinutes: data.expires_in_minutes || 0,
     };
   } finally {
@@ -502,14 +505,14 @@ export async function fetchFabricWorkspaces(): Promise<{
     }));
     return {
       activeWorkspaceId: String(data.active_workspace_id || ''),
-      activeWorkspaceName: String(data.active_workspace_name || 'PBT_DATA_AGENT'),
+      activeWorkspaceName: String(data.active_workspace_name || data.active_workspace_id || 'Fabric Workspace'),
       workspaces: list,
     };
   } catch (err) {
     console.warn('Failed to fetch workspace list from Fabric API, using fallback defaults', err);
     return {
-      activeWorkspaceId: 'ws_pbt_agent',
-      activeWorkspaceName: 'PBT_DATA_AGENT',
+      activeWorkspaceId: '',
+      activeWorkspaceName: 'Fabric Workspace',
       workspaces: [],
     };
   }

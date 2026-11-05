@@ -169,18 +169,8 @@ DIRECTORY_USERS: list[dict[str, Any]] = [
 # High-performance In-Memory Caches for Sub-Millisecond Page Loads
 PROJECTS_CACHE: list[dict[str, Any]] = []
 PROJECTS_CACHE_TIME: float = 0.0
-FABRIC_STATUS_CACHE: dict[str, Any] | None = {
-    "authenticated": True,
-    "workspace_id": os.getenv("ALLOWED_WORKSPACE_ID", "db7344c1-ecd9-44d6-849f-f2de49484f9f"),
-    "workspace_name": os.getenv("ALLOWED_WORKSPACE_NAME", "PBT_DATA_AGENT"),
-    "target_folder": "Workspace Root (Zero Container)",
-    "workspaces_count": 1,
-    "user_identity": os.getenv("FABRIC_USER_IDENTITY", "Fabric Workspace Identity"),
-    "auth_method": "Azure CLI",
-    "tenant_id": os.getenv("AZURE_TENANT_ID", "94b62ba4-8d71-4507-9dc9-9734a149f836"),
-    "expires_in_minutes": 60,
-}
-FABRIC_STATUS_CACHE_TIME: float = time.time()
+FABRIC_STATUS_CACHE: dict[str, Any] | None = None
+FABRIC_STATUS_CACHE_TIME: float = 0.0
 
 
 @app.on_event("startup")
@@ -266,22 +256,58 @@ def fetch_projects_cached(force_refresh: bool = False) -> list[dict[str, Any]]:
 @app.get("/api/fabric/status")
 async def get_fabric_status() -> dict[str, Any]:
     global FABRIC_STATUS_CACHE, FABRIC_STATUS_CACHE_TIME
-    if FABRIC_STATUS_CACHE:
+    now = time.time()
+    if FABRIC_STATUS_CACHE and (now - FABRIC_STATUS_CACHE_TIME) < 10.0:
         return FABRIC_STATUS_CACHE
 
-    fabric_status_fallback = {
+    from omniflow.auth import _get_azure_cli_account
+    account = _get_azure_cli_account()
+
+    tenant_name = account.get("tenant_name") or os.getenv("AZURE_TENANT_NAME", "Fabric Enterprise")
+    user_email = account.get("email") or os.getenv("FABRIC_USER_IDENTITY", "")
+    tenant_id = account.get("tenant_id") or os.getenv("AZURE_TENANT_ID", "")
+
+    is_pelican = "pelican" in tenant_name.lower() or "pelibiothermal" in user_email.lower()
+    if is_pelican:
+        ws_id = account.get("default_workspace_id") or os.getenv("ALLOWED_WORKSPACE_ID", "")
+        ws_name = os.getenv("ALLOWED_WORKSPACE_NAME") or account.get("default_workspace_name") or "PBT_DATA_AGENT"
+    else:
+        ws_id = ""
+        ws_name = ""
+
+    # Try dynamically resolving workspace from Fabric REST API if not set
+    if not ws_name:
+        try:
+            from app.fabric_client import list_workspaces as fc_list_workspaces
+            live_ws = fc_list_workspaces()
+            if live_ws:
+                found = next((w for w in live_ws if w.get("id") == ws_id), None)
+                if not found:
+                    found = next((w for w in live_ws if w.get("type") != "Personal"), live_ws[0])
+                if found:
+                    ws_id = found.get("id", ws_id)
+                    ws_name = found.get("displayName") or found.get("name") or "Fabric Workspace"
+        except Exception:
+            pass
+
+    if not ws_name:
+        ws_name = tenant_name or "Fabric Workspace"
+
+    FABRIC_STATUS_CACHE = {
         "authenticated": True,
-        "workspace_id": os.getenv("ALLOWED_WORKSPACE_ID", "db7344c1-ecd9-44d6-849f-f2de49484f9f"),
-        "workspace_name": os.getenv("ALLOWED_WORKSPACE_NAME", "PBT_DATA_AGENT"),
+        "workspace_id": ws_id,
+        "workspace_name": ws_name,
         "target_folder": "Workspace Root (Zero Container)",
         "workspaces_count": 1,
-        "user_identity": os.getenv("FABRIC_USER_IDENTITY", "Fabric Workspace Identity"),
-        "auth_method": "Azure CLI",
-        "tenant_id": os.getenv("AZURE_TENANT_ID", "94b62ba4-8d71-4507-9dc9-9734a149f836"),
+        "user_identity": user_email or account.get("name", "Fabric User"),
+        "auth_method": "Azure CLI SSO",
+        "tenant_id": tenant_id,
+        "tenant_name": tenant_name,
+        "account_name": account.get("name", ""),
+        "account_type": account.get("account_type", "Azure CLI"),
         "expires_in_minutes": 60,
     }
-    FABRIC_STATUS_CACHE = fabric_status_fallback
-    FABRIC_STATUS_CACHE_TIME = time.time()
+    FABRIC_STATUS_CACHE_TIME = now
     return FABRIC_STATUS_CACHE
 
 
@@ -744,14 +770,20 @@ async def list_fabric_workspaces(refresh: bool = False) -> dict[str, Any]:
     if not refresh and _workspaces_list_cache["data"] and _workspaces_list_cache["expires_at"] > now:
         return _workspaces_list_cache["data"]
 
-    default_ws_id = os.getenv("ALLOWED_WORKSPACE_ID", "db7344c1-ecd9-44d6-849f-f2de49484f9f")
-    default_ws_name = os.getenv("ALLOWED_WORKSPACE_NAME", "PBT_DATA_AGENT")
+    default_ws_id = os.getenv("ALLOWED_WORKSPACE_ID", "")
+    default_ws_name = os.getenv("ALLOWED_WORKSPACE_NAME", "")
     workspaces: list[dict[str, Any]] = []
 
     try:
         from app.fabric_client import list_workspaces as fc_list_workspaces
         live_ws = fc_list_workspaces()
         if live_ws:
+            if not default_ws_id:
+                first_active = next((w for w in live_ws if w.get("type") != "Personal"), live_ws[0])
+                default_ws_id = first_active.get("id", "")
+                if not default_ws_name:
+                    default_ws_name = first_active.get("displayName") or first_active.get("name") or "Fabric Workspace"
+
             for w in live_ws:
                 workspaces.append({
                     "id": w.get("id"),
@@ -764,7 +796,7 @@ async def list_fabric_workspaces(refresh: bool = False) -> dict[str, Any]:
                 })
             result = {
                 "active_workspace_id": default_ws_id,
-                "active_workspace_name": default_ws_name,
+                "active_workspace_name": default_ws_name or "Fabric Workspace",
                 "workspaces": workspaces,
             }
             _workspaces_list_cache["data"] = result
@@ -1361,7 +1393,7 @@ async def handle_chat_stream(req: ChatRequest) -> StreamingResponse:
             raw_type = atomic_match.group(1).lower().strip()
             item_name = atomic_match.group(2).strip()
             ws_id = os.getenv("ALLOWED_WORKSPACE_ID") or ""
-            ws_name = os.getenv("ALLOWED_WORKSPACE_NAME", "PBT_DATA_AGENT")
+            ws_name = os.getenv("ALLOWED_WORKSPACE_NAME") or "Fabric Workspace"
 
             type_map = {
                 "folder": ("Folder", "📁"),
@@ -1481,10 +1513,11 @@ async def handle_chat_stream(req: ChatRequest) -> StreamingResponse:
                 for d in dep_items
             ])
 
+            ws_display = os.getenv("ALLOWED_WORKSPACE_NAME") or "Fabric Workspace"
             deploy_summary = (
                 f"### 🚀 Microsoft Fabric Architecture Deployed Successfully\n\n"
                 f"- **Deployment Run ID**: `{run_id}`\n"
-                f"- **Target Workspace**: Microsoft Fabric (`PBT_DATA_AGENT`)\n"
+                f"- **Target Workspace**: Microsoft Fabric (`{ws_display}`)\n"
                 f"- **Root Project Folder**: `{root_f}`\n\n"
                 f"#### 📁 Deployed Items across Medallion Hierarchy:\n"
                 f"{item_bullets}\n\n"
@@ -1560,13 +1593,14 @@ async def handle_chat_stream(req: ChatRequest) -> StreamingResponse:
                 project_name=proj_name,
                 prompt_text=req.message,
             )
+            ws_display = os.getenv("ALLOWED_WORKSPACE_NAME") or "Fabric Workspace"
             try:
                 res = orch.run_pipeline(req=plan_req, intake_data_override=intake_override, resume=is_resume, deploy=False)
                 summary_text = (
                     f"### 📦 Microsoft Fabric Architecture Synthesized\n\n"
                     f"- **Project**: `{proj_name}` (`{proj_code}`)\n"
                     f"- **Quality Audit**: `100% Passed` (AST syntax verified, SHA-256 PII masking applied)\n"
-                    f"- **Target Workspace**: Microsoft Fabric (`PBT_DATA_AGENT`)\n\n"
+                    f"- **Target Workspace**: Microsoft Fabric (`{ws_display}`)\n\n"
                     f"#### 📁 Target Folders & Assets:\n"
                     f"- 📁 **{root_f}/{sub_f.get('raw', '01 Raw')}** ➔ `Lakehouse`: `lh_{clean_dom}_bronze`, `Pipeline`: `pl_{clean_dom}_bronze_ingest`\n"
                     f"- 📁 **{root_f}/{sub_f.get('stage', '02 Stage')}** ➔ `Notebook`: `nb_{clean_dom}_curate` (Delta Deduplication & PII Hashing)\n"
@@ -1795,7 +1829,7 @@ async def handle_chat_stream(req: ChatRequest) -> StreamingResponse:
 
             sys_prompt = (
                 f"You are Tenali AI (OmniFlow GPT-6 Luna), the autonomous enterprise Microsoft Fabric data engineering agent.\n"
-                f"Target Workspace: {os.getenv('ALLOWED_WORKSPACE_NAME', 'PBT_DATA_AGENT')}\n"
+                f"Target Workspace: {os.getenv('ALLOWED_WORKSPACE_NAME', 'Fabric Workspace')}\n"
                 f"Active Project: {p_name} ({p_code})\n"
                 f"Active Tables & Lineage: {active_plan.get('tables', [])}\n"
                 f"Recent Fabric Items: {', '.join(db_ctx)}\n\n"

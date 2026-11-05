@@ -72,7 +72,7 @@ export const CONNECTORS: ConnectorSummary[] = [
     category: 'Business Intelligence',
     description: 'Direct Lake semantic models, report definitions, and workspace sync',
     fields: [
-      { name: 'workspace_id', label: 'Workspace ID / Name', type: 'string', required: true, default: 'PBT_DATA_AGENT' },
+      { name: 'workspace_id', label: 'Workspace ID / Name', type: 'string', required: true, default: '' },
       { name: 'dataset_name', label: 'Dataset Name', type: 'string', required: true, default: 'Corporate_KPIs' },
     ],
   },

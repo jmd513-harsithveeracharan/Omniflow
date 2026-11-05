@@ -43,7 +43,7 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
       ? workspaces.length === 1
         ? workspaces[0]
         : `${workspaces[0]} +${workspaces.length - 1}`
-      : 'PBT_DATA_AGENT';
+      : 'Fabric Workspace';
   const members = meta.members || [];
 
   return (

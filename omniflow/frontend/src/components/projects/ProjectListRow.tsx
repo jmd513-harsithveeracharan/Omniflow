@@ -43,7 +43,7 @@ export const ProjectListRow: React.FC<ProjectListRowProps> = ({
       ? workspaces.length === 1
         ? workspaces[0]
         : `${workspaces[0]} +${workspaces.length - 1}`
-      : 'PBT_DATA_AGENT';
+      : 'Fabric Workspace';
   const members = meta.members || [];
 
   return (
