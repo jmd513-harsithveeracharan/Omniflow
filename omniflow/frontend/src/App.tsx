@@ -223,6 +223,15 @@ export const App: React.FC = () => {
     }
   }, [currentUser?.email]);
 
+  // Re-fetch project sessions whenever active view is project or active project changes
+  useEffect(() => {
+    if (activeView === 'project' && activeProjectId) {
+      fetchSessions(currentUser?.email, activeProjectId)
+        .then(setProjectSessions)
+        .catch((e) => console.warn('Failed to refresh project sessions', e));
+    }
+  }, [activeView, activeProjectId, currentUser?.email]);
+
   const handleNewSession = () => {
     if (isStreaming) return;
     setActiveProjectId(null);
@@ -240,13 +249,26 @@ export const App: React.FC = () => {
 
   const handleSelectSession = async (sid: string) => {
     if (isStreaming) return;
-    if (sid === sessionId && messages.length > 0) return;
+    if (sid === sessionId) {
+      if (activeView !== 'chat') {
+        setActiveView('chat');
+        try {
+          localStorage.setItem('omniflow_active_view', 'chat');
+        } catch {}
+      }
+      return;
+    }
     const isProjSession = sid.startsWith('proj_');
     const knownSession = sessions.find((s) => s.sessionId === sid) || projectSessions.find((s) => s.sessionId === sid);
+    const targetProjId = knownSession?.projectId || (isProjSession ? sid.split('_')[1] : null);
+
     if (knownSession && knownSession.messageCount === 0) {
       if (!isProjSession) {
         setActiveProjectId(null);
         try { localStorage.removeItem('omniflow_active_project_id'); } catch {}
+      } else if (targetProjId) {
+        setActiveProjectId(targetProjId);
+        try { localStorage.setItem('omniflow_active_project_id', targetProjId); } catch {}
       }
       setCurrentPlan(null);
       setActiveView('chat');
@@ -264,6 +286,9 @@ export const App: React.FC = () => {
       if (!isProjSession) {
         setActiveProjectId(null);
         try { localStorage.removeItem('omniflow_active_project_id'); } catch {}
+      } else if (targetProjId) {
+        setActiveProjectId(targetProjId);
+        try { localStorage.setItem('omniflow_active_project_id', targetProjId); } catch {}
       }
       setCurrentPlan(null);
       setActiveView('chat');
@@ -571,6 +596,12 @@ export const App: React.FC = () => {
           return [...prev, { role: 'assistant', content: errMsg }];
         });
         setIsStreaming(false);
+        loadSessions();
+        if (activeProjectId) {
+          fetchSessions(currentUser?.email, activeProjectId)
+            .then(setProjectSessions)
+            .catch((e) => console.warn('Failed to refresh project sessions on error', e));
+        }
       },
       model,
       effort,

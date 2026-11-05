@@ -86,12 +86,21 @@ INTAKE_DIR = os.path.join(BASE_DIR, "intake")
 SESSION_STORE_PATH = os.path.join(BASE_DIR, "sessions_store.json")
 
 
+def get_utc_iso() -> str:
+    """Returns current UTC timestamp in ISO 8601 format with Z suffix."""
+    return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+
+
 def load_sessions_from_disk() -> dict[str, dict[str, Any]]:
     if os.path.exists(SESSION_STORE_PATH):
         try:
             with open(SESSION_STORE_PATH, "r", encoding="utf-8") as f:
                 data = json.load(f)
                 if isinstance(data, dict):
+                    # Sanitize any legacy sessions with placeholder "Greeting" title
+                    for sid, sdata in data.items():
+                        if sdata.get("title") == "Greeting":
+                            sdata["title"] = "Data Engineering & Peli BioThermal"
                     return data
         except Exception as e:
             print(f"[SessionsStore] Read error: {e}")
@@ -283,30 +292,6 @@ async def list_sessions(user_email: str | None = None, project_id: str | None = 
     sess_list = []
     u = user_email.strip().lower() if user_email else None
 
-    # Auto-seed initial greeting session for Peli BioThermal if none exists
-    if project_id and project_id in ["PRJ-PELI-BIOTHERMAL", "PRJ-COMMERCIAL-REV"]:
-        peli_sess_id = f"proj_{project_id}"
-        if peli_sess_id not in SESSIONS:
-            six_days_ago = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(time.time() - 6 * 86400))
-            SESSIONS[peli_sess_id] = {
-                "session_id": peli_sess_id,
-                "project_id": project_id,
-                "title": "Greeting",
-                "messages": [
-                    {
-                        "role": "user",
-                        "content": "Initialize Peli BioThermal data platform workspace."
-                    },
-                    {
-                        "role": "assistant",
-                        "content": "### 📁 Project: Peli BioThermal Cold-Chain Platform\n\n**Status**: `Active` • **Workspace**: `PBT_DATA_AGENT`\n\nContext intake specifications and Medallion architecture guidelines loaded. Ready to synthesize raw batch ingestion pipelines, Delta Lake upsert notebooks, and Power BI semantic models."
-                    }
-                ],
-                "user_email": u or "bheesetti.harsith@pelibiothermal.com",
-                "updated_at": six_days_ago,
-            }
-            save_sessions_to_disk()
-
     for sid, sdata in SESSIONS.items():
         s_proj = sdata.get("project_id") or ""
         if project_id:
@@ -334,7 +319,7 @@ async def list_sessions(user_email: str | None = None, project_id: str | None = 
             "message_count": len(sdata.get("messages", [])),
             "run_count": 1,
             "user_email": s_user,
-            "last_active": sdata.get("updated_at") or time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            "last_active": sdata.get("updated_at") or get_utc_iso(),
         })
     sess_list.sort(key=lambda s: s.get("last_active") or "", reverse=True)
     return {"sessions": sess_list}
@@ -406,7 +391,7 @@ async def move_session_to_project_endpoint(session_id: str, payload: dict[str, A
             "messages": sess.get("messages", []),
             "active_plan": sess.get("active_plan"),
             "user_email": sess.get("user_email", ""),
-            "updated_at": time.strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "updated_at": get_utc_iso(),
         }
     SESSIONS.pop(session_id, None)
     save_sessions_to_disk()
@@ -478,7 +463,7 @@ async def create_project_endpoint(req: ProjectRequest) -> dict[str, Any]:
         "local_path": lpath,
         "created_by": created_by,
         "metadata": meta,
-        "created_at": time.strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "created_at": get_utc_iso(),
     }
     # Update cache immediately
     PROJECTS_CACHE.insert(0, new_project)
@@ -1134,16 +1119,21 @@ async def handle_chat_stream(req: ChatRequest) -> StreamingResponse:
             "title": clean_msg_title,
             "messages": [],
             "user_email": (req.user_email or "").strip(),
-            "updated_at": time.strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "updated_at": get_utc_iso(),
         }
     else:
         if proj_id:
             SESSIONS[sid]["project_id"] = proj_id
         if req.user_email and not SESSIONS[sid].get("user_email"):
             SESSIONS[sid]["user_email"] = req.user_email.strip()
-        if SESSIONS[sid].get("title") in ["New Conversation", "Medallion Architecture Session", ""]:
+        current_title = SESSIONS[sid].get("title", "")
+        is_generic_title = (
+            current_title in ["New Conversation", "Medallion Architecture Session", "Greeting", "Conversation", ""]
+            or len(current_title.strip()) <= 3
+        )
+        if is_generic_title and len(clean_msg_title.strip()) > 3:
             SESSIONS[sid]["title"] = clean_msg_title
-        SESSIONS[sid]["updated_at"] = time.strftime("%Y-%m-%dT%H:%M:%SZ")
+        SESSIONS[sid]["updated_at"] = get_utc_iso()
     
     SESSIONS[sid]["messages"].append({"role": "user", "content": req.message})
     save_sessions_to_disk()
@@ -1824,12 +1814,21 @@ async def handle_chat_stream(req: ChatRequest) -> StreamingResponse:
             yield f"data: {json.dumps({'type': 'thought_step', 'step': {'id': 't2_stream', 'title': 'Tenali AI: Generating stream response...', 'status': 'in_progress', 'target': 'Tenali AI'}})}\n\n"
             await asyncio.sleep(0)
 
+            # Contextual multi-turn history: preserve prior turns for conversational continuity
+            llm_messages: list[dict[str, str]] = [{"role": "system", "content": sys_prompt}]
+            prior_history = SESSIONS[sid].get("messages", [])
+            for m in prior_history[-8:]:
+                m_role = m.get("role", "user")
+                m_content = m.get("content", "")
+                if m_content:
+                    llm_messages.append({"role": m_role, "content": m_content})
+
             reply_chunks: list[str] = []
             first_chunk_emitted = False
             t_llm_start = time.time()
             try:
                 async for chunk in chat_stream_async(
-                    [{"role": "system", "content": sys_prompt}, {"role": "user", "content": req.message}],
+                    llm_messages,
                     effort=effective_effort,
                 ):
                     if not first_chunk_emitted:
@@ -1843,7 +1842,7 @@ async def handle_chat_stream(req: ChatRequest) -> StreamingResponse:
                 print(f"[OmniFlow Stream Notice] Streaming fallback triggered: {stream_err}")
                 try:
                     fallback_reply = chat(
-                        [{"role": "system", "content": sys_prompt}, {"role": "user", "content": req.message}],
+                        llm_messages,
                         effort=effective_effort,
                     )
                     reply_chunks = [fallback_reply]

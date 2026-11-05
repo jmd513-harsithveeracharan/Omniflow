@@ -17,7 +17,8 @@ function formatRelativeTime(dateStr?: string): string {
     if (isNaN(timestamp)) {
       return dateStr;
     }
-    const diffMs = Math.max(0, Date.now() - timestamp);
+    const diffMs = Date.now() - timestamp;
+    if (diffMs <= 0) return 'Just now';
     const diffSec = Math.floor(diffMs / 1000);
     const diffMin = Math.floor(diffSec / 60);
     const diffHour = Math.floor(diffMin / 60);
@@ -93,7 +94,7 @@ export const ProjectRecentsList: React.FC<ProjectRecentsListProps> = ({
               >
                 {/* Chat Title */}
                 <span className="text-[15px] font-normal tracking-tight truncate pr-4">
-                  {sess.title || 'Greeting'}
+                  {sess.title || 'Conversation'}
                 </span>
 
                 {/* Right: Timestamp and Delete */}
