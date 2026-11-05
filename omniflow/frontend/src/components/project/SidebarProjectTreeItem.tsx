@@ -107,7 +107,7 @@ export const SidebarProjectTreeItem: React.FC<SidebarProjectTreeItemProps> = ({
     handleMouseLeave();
     onSelectProject(project.id);
     if (hasChats) {
-      setIsExpanded((prev) => !prev);
+      setIsExpanded(true);
     }
   };
 
@@ -202,9 +202,9 @@ export const SidebarProjectTreeItem: React.FC<SidebarProjectTreeItemProps> = ({
         </div>
       </div>
 
-      {/* Collapsible Sub-Tree: Project Chats (Spans 100% full width to match project row boundary) */}
+      {/* Collapsible Sub-Tree: Project Chats (Indented with pl-3.5 to feel like an inner section) */}
       {isExpanded && hasChats && (
-        <div className="flex flex-col my-0.5 space-y-0.5 w-full">
+        <div className="flex flex-col my-0.5 space-y-0.5 w-full pl-3.5">
           {chats.map((chat) => {
             const isChatActive = activeSessionId === chat.sessionId;
             const chatTitle = chat.title || 'Conversation';

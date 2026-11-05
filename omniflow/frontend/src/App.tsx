@@ -360,7 +360,9 @@ export const App: React.FC = () => {
   // Projects Handlers
   const handleSelectProject = async (projectId: string, shouldSwitchToView: boolean = true) => {
     setActiveProjectId(projectId);
+    setSessionId('');
     try {
+      localStorage.removeItem('omniflow_active_session_id');
       localStorage.setItem('omniflow_active_project_id', projectId);
     } catch {}
 
@@ -868,7 +870,7 @@ export const App: React.FC = () => {
               }
             }
             sessions={projectSessions}
-            activeSessionId={sessionId}
+            activeSessionId={null}
             isSidebarCollapsed={isSidebarCollapsed}
             onToggleSidebar={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
             onSelectSession={(sid) => {

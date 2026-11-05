@@ -338,7 +338,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       key={`pinned-${p.id}`}
                       project={p}
                       isActiveProject={activeProjectId === p.id}
-                      activeSessionId={activeSessionId}
+                      activeSessionId={activeView === 'chat' ? activeSessionId : undefined}
                       chats={projectChats}
                       isMenuOpen={projectMenuId === p.id}
                       onSelectProject={(pid) => {
@@ -410,7 +410,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         key={p.id}
                         project={p}
                         isActiveProject={activeProjectId === p.id}
-                        activeSessionId={activeSessionId}
+                        activeSessionId={activeView === 'chat' ? activeSessionId : undefined}
                         chats={projectChats}
                         isMenuOpen={projectMenuId === p.id}
                         onSelectProject={(pid) => {
