@@ -369,7 +369,17 @@ export async function streamChatTurn(
     if (err instanceof DOMException && err.name === 'AbortError') {
       return;
     }
-    onError(err instanceof Error ? err.message : String(err));
+    const msg = err instanceof Error ? err.message : String(err);
+    if (
+      msg.includes('Error in input stream') ||
+      msg.includes('network') ||
+      msg.includes('Failed to fetch') ||
+      msg.includes('Load failed')
+    ) {
+      onError('Network connection interrupted while communicating with the AI model. Please try sending again.');
+    } else {
+      onError(msg);
+    }
   }
 }
 

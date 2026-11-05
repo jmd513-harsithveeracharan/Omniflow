@@ -42,6 +42,7 @@ def _get_client():
             azure_endpoint=endpoint,
             api_key=api_key,
             api_version=api_version,
+            timeout=60.0,
         )
         return _SYNC_CLIENT
     elif api_key:
@@ -81,6 +82,7 @@ def _get_async_client():
             azure_endpoint=endpoint,
             api_key=api_key,
             api_version=api_version,
+            timeout=60.0,
             http_client=_ASYNC_HTTP_CLIENT,
         )
         return _ASYNC_CLIENT

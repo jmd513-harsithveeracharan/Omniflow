@@ -334,8 +334,9 @@ async def list_sessions(user_email: str | None = None, project_id: str | None = 
             "message_count": len(sdata.get("messages", [])),
             "run_count": 1,
             "user_email": s_user,
-            "last_active": sdata.get("updated_at", ""),
+            "last_active": sdata.get("updated_at") or time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         })
+    sess_list.sort(key=lambda s: s.get("last_active") or "", reverse=True)
     return {"sessions": sess_list}
 
 
@@ -347,13 +348,14 @@ async def create_new_session(payload: dict[str, Any] | None = None) -> dict[str,
     else:
         sid = f"sess_{uuid.uuid4().hex[:9]}"
     user_email = (payload or {}).get("user_email", "").strip()
+    now_iso = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
     SESSIONS[sid] = {
         "session_id": sid,
         "project_id": proj_id or None,
         "title": "New Conversation",
         "messages": [],
         "user_email": user_email,
-        "updated_at": "",
+        "updated_at": now_iso,
     }
     save_sessions_to_disk()
     return {"session_id": sid}
@@ -1243,12 +1245,18 @@ async def handle_chat_stream(req: ChatRequest) -> StreamingResponse:
                     await asyncio.sleep(0)  # Flushes token over TCP immediately
             except Exception as stream_err:
                 print(f"[OmniFlow Mode1 Notice] Stream fallback: {stream_err}")
-                fallback_reply = chat(
-                    llm_payload,
-                    effort=effective_effort,
-                )
-                reply_chunks = [fallback_reply]
-                yield f"data: {json.dumps({'type': 'chunk', 'text': fallback_reply})}\n\n"
+                try:
+                    fallback_reply = chat(
+                        llm_payload,
+                        effort=effective_effort,
+                    )
+                    reply_chunks = [fallback_reply]
+                    yield f"data: {json.dumps({'type': 'chunk', 'text': fallback_reply})}\n\n"
+                except Exception as fallback_err:
+                    print(f"[OmniFlow Mode1 Notice] Fallback chat failed: {fallback_err}")
+                    fallback_reply = "I'm temporarily experiencing connectivity issues with the upstream AI model. Please check your connection or retry your prompt."
+                    reply_chunks = [fallback_reply]
+                    yield f"data: {json.dumps({'type': 'chunk', 'text': fallback_reply})}\n\n"
 
             reply = "".join(reply_chunks)
             SESSIONS[sid]["messages"].append({"role": "assistant", "content": reply})
@@ -1833,12 +1841,18 @@ async def handle_chat_stream(req: ChatRequest) -> StreamingResponse:
                     await asyncio.sleep(0)  # Immediately flushes chunk over TCP socket
             except Exception as stream_err:
                 print(f"[OmniFlow Stream Notice] Streaming fallback triggered: {stream_err}")
-                fallback_reply = chat(
-                    [{"role": "system", "content": sys_prompt}, {"role": "user", "content": req.message}],
-                    effort=effective_effort,
-                )
-                reply_chunks = [fallback_reply]
-                yield f"data: {json.dumps({'type': 'chunk', 'text': fallback_reply})}\n\n"
+                try:
+                    fallback_reply = chat(
+                        [{"role": "system", "content": sys_prompt}, {"role": "user", "content": req.message}],
+                        effort=effective_effort,
+                    )
+                    reply_chunks = [fallback_reply]
+                    yield f"data: {json.dumps({'type': 'chunk', 'text': fallback_reply})}\n\n"
+                except Exception as fallback_err:
+                    print(f"[OmniFlow Stream Notice] Synchronous fallback also failed: {fallback_err}")
+                    fallback_reply = "I'm temporarily experiencing connectivity issues with the upstream AI model. Please check your connection or retry your prompt."
+                    reply_chunks = [fallback_reply]
+                    yield f"data: {json.dumps({'type': 'chunk', 'text': fallback_reply})}\n\n"
 
             reply = "".join(reply_chunks)
             if active_conn_id and chosen_tables:

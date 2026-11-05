@@ -10,22 +10,27 @@ interface ProjectRecentsListProps {
 }
 
 function formatRelativeTime(dateStr?: string): string {
-  if (!dateStr) return '6 days ago';
+  if (!dateStr) return 'Just now';
   try {
+    if (dateStr.toLowerCase().includes('now')) return 'Just now';
     const timestamp = new Date(dateStr).getTime();
-    if (isNaN(timestamp)) return dateStr;
-    const diffMs = Date.now() - timestamp;
+    if (isNaN(timestamp)) {
+      return dateStr;
+    }
+    const diffMs = Math.max(0, Date.now() - timestamp);
     const diffSec = Math.floor(diffMs / 1000);
     const diffMin = Math.floor(diffSec / 60);
     const diffHour = Math.floor(diffMin / 60);
     const diffDay = Math.floor(diffHour / 24);
 
-    if (diffDay > 30) return `${Math.floor(diffDay / 30)}mo ago`;
-    if (diffDay > 1) return `${diffDay} days ago`;
+    if (diffMin < 1) return 'Just now';
+    if (diffMin === 1) return '1m ago';
+    if (diffHour < 1) return `${diffMin}m ago`;
+    if (diffHour === 1) return '1h ago';
+    if (diffDay < 1) return `${diffHour}h ago`;
     if (diffDay === 1) return 'Yesterday';
-    if (diffHour >= 1) return `${diffHour}h ago`;
-    if (diffMin >= 1) return `${diffMin}m ago`;
-    return 'Just now';
+    if (diffDay < 30) return `${diffDay}d ago`;
+    return `${Math.floor(diffDay / 30)}mo ago`;
   } catch {
     return dateStr;
   }
@@ -37,6 +42,17 @@ export const ProjectRecentsList: React.FC<ProjectRecentsListProps> = ({
   onSelectSession,
   onDeleteSession,
 }) => {
+  // Sort sessions: newest (most recent lastActive timestamp) first
+  const sortedSessions = [...sessions].sort((a, b) => {
+    const getTimestamp = (s: ChatSession): number => {
+      if (!s.lastActive) return 0;
+      if (s.lastActive.toLowerCase().includes('now')) return Date.now();
+      const t = new Date(s.lastActive).getTime();
+      return isNaN(t) ? 0 : t;
+    };
+    return getTimestamp(b) - getTimestamp(a);
+  });
+
   return (
     <div className="w-full mt-10">
       {/* Section Header */}
@@ -47,7 +63,7 @@ export const ProjectRecentsList: React.FC<ProjectRecentsListProps> = ({
       </div>
 
       {/* Recents Session Rows */}
-      {sessions.length === 0 ? (
+      {sortedSessions.length === 0 ? (
         <div className="py-2">
           <p className="text-[13px] text-[#8e918f]">
             No conversations yet. Type above to start your first chat in this project.
@@ -55,7 +71,7 @@ export const ProjectRecentsList: React.FC<ProjectRecentsListProps> = ({
         </div>
       ) : (
         <div className="flex flex-col space-y-1">
-          {sessions.map((sess) => {
+          {sortedSessions.map((sess) => {
             const isSelected = activeSessionId === sess.sessionId;
             return (
               <div

@@ -816,7 +816,7 @@ export const App: React.FC = () => {
                 title: prompt.trim().slice(0, 42) || 'New Conversation',
                 messageCount: 1,
                 runCount: 1,
-                lastActive: 'Just now',
+                lastActive: new Date().toISOString(),
               };
               setProjectSessions((prev) => [optimisticSession, ...prev.filter((s) => s.sessionId !== newSid)]);
               setSessionId(newSid);
