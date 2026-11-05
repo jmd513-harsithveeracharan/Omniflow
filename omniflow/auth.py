@@ -7,6 +7,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
+import logging
 import os
 import secrets
 import subprocess
@@ -19,6 +20,8 @@ from pydantic import BaseModel, Field
 import psycopg2
 from psycopg2.extras import RealDictCursor
 from dotenv import load_dotenv
+
+logger = logging.getLogger("omniflow.auth")
 
 load_dotenv("omniflow/.env")
 load_dotenv()
@@ -419,7 +422,7 @@ _ACTIVE_FABRIC_ACCOUNT: dict[str, Any] = {
 }
 
 
-def _run_az_cmd(args: list[str], timeout: int = 15) -> tuple[int, str, str]:
+def _run_az_cmd(args: list[str], timeout: int = 30) -> tuple[int, str, str]:
     """Helper to execute az commands portably across Windows (az.cmd) and Linux/macOS."""
     is_windows = os.name == "nt"
     cmd_name = "az.cmd" if is_windows else "az"
@@ -433,6 +436,9 @@ def _run_az_cmd(args: list[str], timeout: int = 15) -> tuple[int, str, str]:
             shell=is_windows,
         )
         return proc.returncode, proc.stdout, proc.stderr
+    except subprocess.TimeoutExpired:
+        logger.warning(f"Timeout ({timeout}s) executing az command: {' '.join(full_cmd)}")
+        return 1, "", f"Operation timed out after {timeout} seconds"
     except Exception as e:
         logger.warning(f"Error executing az command {' '.join(full_cmd)}: {e}")
         return 1, "", str(e)
@@ -483,6 +489,14 @@ def get_fabric_accounts() -> list[dict[str, Any]]:
                 tenant_id = a.get("tenantId") or a.get("homeTenantId") or os.getenv("AZURE_TENANT_ID", "")
                 tenant_name = a.get("tenantDisplayName") or a.get("name") or "Corporate Tenant"
                 is_active = bool(a.get("isDefault", False))
+                raw_type = a.get("name", "Azure CLI")
+                if "pelican" in raw_type.lower():
+                    account_type = "Pelican Enterprise"
+                elif "student" in raw_type.lower():
+                    account_type = "Azure for Students"
+                else:
+                    account_type = raw_type.split(":")[0].strip()[:24]
+
                 accounts.append({
                     "id": sub_id,
                     "name": name,
@@ -491,7 +505,7 @@ def get_fabric_accounts() -> list[dict[str, Any]]:
                     "tenant_name": tenant_name,
                     "subscription_id": sub_id,
                     "is_active": is_active,
-                    "account_type": a.get("name", "Azure CLI"),
+                    "account_type": account_type,
                     "default_workspace_id": os.getenv("ALLOWED_WORKSPACE_ID", "db7344c1-ecd9-44d6-849f-f2de49484f9f"),
                     "default_workspace_name": os.getenv("ALLOWED_WORKSPACE_NAME", "PBT_DATA_AGENT"),
                 })
@@ -572,20 +586,28 @@ def poll_fabric_device_code(req: DeviceCodePollRequest) -> dict[str, Any]:
 def switch_fabric_account(req: SwitchAccountRequest) -> dict[str, Any]:
     global _ACTIVE_FABRIC_ACCOUNT
     sub_id = req.account_id
-    rc, _, err = _run_az_cmd(["account", "set", "--subscription", sub_id], timeout=10)
-    account = _get_azure_cli_account()
-    if rc == 0:
-        return {
-            "success": True,
-            "message": f"Switched active Fabric session to {account.get('name', 'selected account')} ({account.get('tenant_name')})",
-            "account": account,
-        }
-    else:
-        logger.warning(f"az account set failed: {err}")
+    try:
+        rc, _, err = _run_az_cmd(["account", "set", "--subscription", sub_id], timeout=30)
+        account = _get_azure_cli_account()
+        if rc == 0:
+            return {
+                "success": True,
+                "message": f"Switched active Fabric session to {account.get('name', 'selected account')} ({account.get('tenant_name')})",
+                "account": account,
+            }
+        else:
+            logger.warning(f"az account set failed: {err}")
+            return {
+                "success": False,
+                "message": f"Failed to switch account: {err or 'Subscription not accessible'}",
+                "account": account,
+            }
+    except Exception as exc:
+        logger.exception(f"Unexpected error switching fabric account: {exc}")
         return {
             "success": False,
-            "message": f"Failed to switch account: {err}",
-            "account": account,
+            "message": f"Switch failed: {str(exc)}",
+            "account": _ACTIVE_FABRIC_ACCOUNT,
         }
 
 

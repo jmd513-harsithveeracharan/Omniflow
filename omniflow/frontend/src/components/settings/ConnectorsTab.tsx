@@ -53,23 +53,15 @@ export const ConnectorsTab: React.FC<ConnectorsTabProps> = ({
               </span>
               <span className="popular-card-name">MS Fabric</span>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <button type="button" className="btn-pill-connected" onClick={onOpenFabricModal} title="Manage Microsoft Fabric Connection">
-                <span className="status-dot-green" />
-                <span>Connected</span>
-              </button>
-              {onOpenAccountModal && (
-                <button
-                  type="button"
-                  className="btn-pill-connect"
-                  onClick={onOpenAccountModal}
-                  title="Switch or connect Fabric identity"
-                  style={{ fontSize: '10.5px', padding: '3px 7px' }}
-                >
-                  Accounts
-                </button>
-              )}
-            </div>
+            <button
+              type="button"
+              className="btn-pill-connected"
+              onClick={onOpenAccountModal || onOpenFabricModal}
+              title="Manage Microsoft Fabric Connection & Accounts"
+            >
+              <span className="status-dot-green" />
+              <span>Connected</span>
+            </button>
           </div>
 
           <div className="popular-card">

@@ -56,7 +56,6 @@ export const AccountSwitcherModal: React.FC<AccountSwitcherModalProps> = ({
     }
   }, [isOpen]);
 
-  // Escape key handler
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && isOpen) {
@@ -67,7 +66,6 @@ export const AccountSwitcherModal: React.FC<AccountSwitcherModalProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
 
-  // Polling loop for device code
   useEffect(() => {
     if (!deviceCode || !isPollingDeviceCode) return;
 
@@ -77,7 +75,7 @@ export const AccountSwitcherModal: React.FC<AccountSwitcherModalProps> = ({
         if (res.status === 'authenticated') {
           setIsPollingDeviceCode(false);
           setDeviceCode(null);
-          setStatusMsg({ text: `Successfully connected: ${res.user_identity || 'Authenticated'}`, type: 'success' });
+          setStatusMsg({ text: `Connected: ${res.user_identity || 'Authenticated'}`, type: 'success' });
           await loadAccounts();
           onAccountSwitched();
         } else if (res.status === 'declined' || res.status === 'expired' || res.status === 'error') {
@@ -101,7 +99,7 @@ export const AccountSwitcherModal: React.FC<AccountSwitcherModalProps> = ({
       setStatusMsg(null);
       const res = await switchFabricAccount(account.id, account.tenant_id);
       if (res.success) {
-        setStatusMsg({ text: `Switched session to ${account.name}`, type: 'success' });
+        setStatusMsg({ text: `Switched active session to ${account.name}`, type: 'success' });
         await loadAccounts();
         onAccountSwitched();
       } else if (res.requires_login) {
@@ -157,37 +155,37 @@ export const AccountSwitcherModal: React.FC<AccountSwitcherModalProps> = ({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[100050] flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-fadeIn"
+      className="fixed inset-0 z-[100050] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fadeIn"
       onClick={onClose}
     >
       <div
-        className="w-full max-w-[560px] bg-[#141416] border border-white/10 rounded-[18px] p-6 shadow-2xl relative z-[100051] flex flex-col gap-5 text-sans select-none"
+        className="w-full max-w-[490px] bg-[#121214] border border-white/10 rounded-[18px] p-6 shadow-2xl relative z-[100051] flex flex-col gap-5 text-sans select-none"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header (Matching Customize Dialog Style) */}
+        {/* Header */}
         <div className="flex items-start justify-between">
           <div>
-            <h3 className="text-[17px] font-semibold text-[#f4f4f5] tracking-tight">
+            <h3 className="text-[16px] font-semibold text-[#f4f4f5] tracking-tight">
               Fabric Accounts & Tenancy
             </h3>
-            <p className="text-[12.5px] text-[#8e918f] mt-1 leading-normal">
+            <p className="text-[12px] text-[#8e918f] mt-0.5 leading-normal">
               Switch active workspace session or connect an organization account
             </p>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 rounded-lg text-[#71717a] hover:text-[#f4f4f5] hover:bg-white/5 transition-colors cursor-pointer"
+            className="p-1 rounded-lg text-[#71717a] hover:text-[#f4f4f5] hover:bg-white/5 transition-colors cursor-pointer"
             title="Close dialog (Esc)"
           >
-            <X size={18} />
+            <X size={17} />
           </button>
         </div>
 
         {/* Feedback Message */}
         {statusMsg && (
           <div
-            className={`flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-[12.5px] transition-all ${
+            className={`flex items-center gap-2 px-3 py-2 rounded-lg text-[12px] transition-all ${
               statusMsg.type === 'success'
                 ? 'bg-emerald-500/10 text-emerald-300 border border-emerald-500/20'
                 : statusMsg.type === 'error'
@@ -196,11 +194,11 @@ export const AccountSwitcherModal: React.FC<AccountSwitcherModalProps> = ({
             }`}
           >
             {statusMsg.type === 'success' ? (
-              <CheckCircle2 size={15} className="flex-shrink-0 text-emerald-400" />
+              <CheckCircle2 size={14} className="flex-shrink-0 text-emerald-400" />
             ) : (
-              <AlertCircle size={15} className="flex-shrink-0" />
+              <AlertCircle size={14} className="flex-shrink-0" />
             )}
-            <span>{statusMsg.text}</span>
+            <span className="truncate">{statusMsg.text}</span>
           </div>
         )}
 
@@ -215,7 +213,7 @@ export const AccountSwitcherModal: React.FC<AccountSwitcherModalProps> = ({
         {/* Authenticated Accounts List */}
         <div>
           <div className="flex items-center justify-between mb-2 px-0.5">
-            <span className="text-[11px] font-semibold text-[#71717a] tracking-wider uppercase">
+            <span className="text-[10.5px] font-semibold text-[#71717a] tracking-wider uppercase">
               Authenticated Accounts ({accounts.length})
             </span>
             <button
@@ -225,13 +223,13 @@ export const AccountSwitcherModal: React.FC<AccountSwitcherModalProps> = ({
               className="text-[#71717a] hover:text-[#f4f4f5] p-1 rounded transition-colors cursor-pointer disabled:opacity-50"
               title="Refresh account sessions"
             >
-              <RefreshCw size={13} className={isLoading ? 'animate-spin' : ''} />
+              <RefreshCw size={12} className={isLoading ? 'animate-spin' : ''} />
             </button>
           </div>
 
-          <div className="flex flex-col gap-2 max-h-[220px] overflow-y-auto pr-0.5">
+          <div className="flex flex-col gap-2 max-h-[230px] overflow-y-auto pr-0.5">
             {accounts.length === 0 ? (
-              <div className="p-4 text-[12.5px] text-[#71717a] text-center border border-dashed border-white/10 rounded-xl">
+              <div className="p-4 text-[12px] text-[#71717a] text-center border border-dashed border-white/10 rounded-xl">
                 No Fabric accounts saved. Sign in below to connect.
               </div>
             ) : (
@@ -247,39 +245,39 @@ export const AccountSwitcherModal: React.FC<AccountSwitcherModalProps> = ({
           </div>
         </div>
 
-        {/* Sign In to Another Account Section */}
-        <div className="pt-4 border-t border-white/[0.08] flex flex-col gap-3">
+        {/* Connect New Account Section */}
+        <div className="pt-3.5 border-t border-white/[0.08] flex flex-col gap-2.5">
           <div>
-            <label className="block text-[11px] font-semibold text-[#71717a] tracking-wider uppercase mb-1.5 px-0.5">
+            <label className="block text-[10.5px] font-semibold text-[#71717a] tracking-wider uppercase mb-1 px-0.5">
               Organization Domain or Tenant ID (Optional)
             </label>
             <input
               type="text"
               value={tenantInput}
               onChange={(e) => setTenantInput(e.target.value)}
-              placeholder="e.g. yourcompany.com or tenant ID (prevents Windows SSO defaulting)"
-              className="w-full bg-[#18181b] border border-white/10 focus:border-white/25 rounded-xl px-3.5 py-2 text-[12.5px] text-[#f4f4f5] placeholder-[#71717a] outline-none transition-colors"
+              placeholder="e.g. yourcompany.com or tenant ID (prevents SSO default)"
+              className="w-full bg-[#161619] border border-white/10 focus:border-white/20 rounded-xl px-3 py-1.5 text-[12px] text-[#f4f4f5] placeholder-[#52525b] outline-none transition-colors"
             />
           </div>
 
-          {/* Action Buttons: Clean Slate Buttons Matching Customize Modal */}
-          <div className="flex items-center gap-3">
+          {/* Action Buttons */}
+          <div className="flex items-center gap-2.5">
             <button
               type="button"
               disabled={isLoading || isPollingDeviceCode}
               onClick={handleBrowserLogin}
-              className="flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-[13px] font-medium bg-[#27272a] hover:bg-[#323236] text-[#f4f4f5] border border-white/10 hover:border-white/20 transition-all cursor-pointer disabled:opacity-50 shadow-sm"
+              className="flex-1 flex items-center justify-center gap-2 py-2 px-3.5 rounded-xl text-[12.5px] font-medium bg-[#1e1e22] hover:bg-[#27272c] text-[#f4f4f5] border border-white/10 hover:border-white/20 transition-all cursor-pointer disabled:opacity-50 shadow-sm"
             >
-              <Globe size={15} className="text-[#a1a1aa]" />
+              <Globe size={14} className="text-[#a1a1aa]" />
               <span>Browser Sign-in</span>
             </button>
             <button
               type="button"
               disabled={isLoading || isPollingDeviceCode}
               onClick={handleStartDeviceCode}
-              className="flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-[13px] font-medium bg-[#1e1e22] hover:bg-[#27272a] text-[#d4d4d8] border border-white/10 hover:border-white/20 transition-all cursor-pointer disabled:opacity-50"
+              className="flex-1 flex items-center justify-center gap-2 py-2 px-3.5 rounded-xl text-[12.5px] font-medium bg-[#18181b] hover:bg-[#202024] text-[#d4d4d8] border border-white/10 hover:border-white/20 transition-all cursor-pointer disabled:opacity-50"
             >
-              <KeyRound size={15} className="text-[#a1a1aa]" />
+              <KeyRound size={14} className="text-[#a1a1aa]" />
               <span>Device Code Sign-in</span>
             </button>
           </div>

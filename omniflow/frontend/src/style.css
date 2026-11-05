@@ -8816,7 +8816,7 @@ ul.chat-md-list {
 
 .connectors-table-header {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 130px 105px;
+    grid-template-columns: minmax(0, 1fr) 130px 175px;
     padding: 6px 8px;
     font-size: 11.5px;
     font-weight: 600;
@@ -8835,7 +8835,7 @@ ul.chat-md-list {
 
 .connector-row {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 130px 105px;
+    grid-template-columns: minmax(0, 1fr) 130px 175px;
     align-items: center;
     padding: 9px 8px;
     border-bottom: 1px solid rgba(255, 255, 255, 0.05);
