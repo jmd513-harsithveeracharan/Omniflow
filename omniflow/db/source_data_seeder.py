@@ -104,7 +104,7 @@ def seed_live_source_crm(db_uri: str = "") -> dict[str, int]:
                   ('Marcus', 'Vance', 'm.vance@cryotech-logistics.de', '+49-89-555-4321', 'CryoTech Logistics GmbH', 'Leopoldstrasse 45', 'Munich', 'Germany'),
                   ('Elena', 'Rostova', 'elena.rostova@nordicbio.se', '+46-8-555-8899', 'Nordic Bio Labs', 'Kungsgatan 12', 'Stockholm', 'Sweden'),
                   ('Devon', 'Miles', 'devon.miles@apexpharma.co.uk', '+44-20-555-7733', 'Apex Pharma UK', '221B Baker Street', 'London', 'UK'),
-                  ('Harsith', 'Bheesetti', 'harsith.bheesetti@pelibiothermal.com', '+1-763-555-9011', 'Peli BioThermal Global', '10050 89th Ave N', 'Maple Grove', 'USA'),
+                  ('Alexander', 'Wright', 'alex.wright@coldchain-global.com', '+1-763-555-9011', 'ColdChain Global Logistics', '10050 89th Ave N', 'Maple Grove', 'USA'),
                   ('Claire', 'Dubois', 'c.dubois@sanofi-supply.fr', '+33-1-555-3412', 'Sanofi Supply Chain', 'Boulevard Haussmann 88', 'Paris', 'France'),
                   ('Kenji', 'Sato', 'k.sato@nippon-coldchain.jp', '+81-3-555-6677', 'Nippon Cold Chain KK', 'Marunouchi 1-1', 'Tokyo', 'Japan'),
                   ('Liam', 'OConnor', 'liam@dublinbiologics.ie', '+353-1-555-9922', 'Dublin Biologics Ltd', 'Grand Canal Dock 4', 'Dublin', 'Ireland');

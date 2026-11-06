@@ -40,7 +40,7 @@ export const ServicePrincipalTab: React.FC<ServicePrincipalTabProps> = ({
     <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
       <input
         type="text"
-        placeholder="Tenant ID (e.g. 94b62ba4-...)"
+        placeholder="Tenant ID (e.g. 00000000-0000-...)"
         value={tenantId}
         onChange={(e) => setTenantId(e.target.value)}
         style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', padding: '8px 10px', color: '#fff', fontSize: '12.5px' }}

@@ -33,7 +33,7 @@ def main() -> None:
                 project_code="PRJ-AUTONOMOUS-DATA-ENG",
                 project_name="Autonomous Microsoft Fabric Data Platform",
                 prompt_text=arg_str,
-                requested_by="harsith.bheesetti@pelibiothermal.com",
+                requested_by=os.getenv("FABRIC_USER_IDENTITY", "user@fabric.internal"),
                 reset_synthesized_tools=not resume,
             )
 
