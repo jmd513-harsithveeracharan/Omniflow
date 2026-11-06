@@ -207,7 +207,7 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
             <input
               type="text"
               required
-              placeholder="e.g. Paxafe-PBT, Enterprise Medallion Platform"
+              placeholder="e.g. Enterprise Medallion Platform, Supply Chain Analytics"
               value={name}
               onChange={(e) => setName(e.target.value)}
               className="projects-modal-input"

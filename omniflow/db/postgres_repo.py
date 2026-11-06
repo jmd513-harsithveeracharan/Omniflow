@@ -31,7 +31,6 @@ class PostgresRepository:
                 "Please set NEON_DATABASE_URL or DATABASE_URL in your .env or omniflow/.env file."
             )
         return psycopg2.connect(self.db_uri, connect_timeout=8)
-        return psycopg2.connect(self.db_uri, connect_timeout=8)
 
     def bootstrap_registry(self, reset_synthesized_tools: bool = True) -> dict[str, int]:
         """Ensures only the 5 core agents exist, seeds engineering_standards & base tools,

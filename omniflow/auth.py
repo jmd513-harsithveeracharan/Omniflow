@@ -409,16 +409,42 @@ class DeviceCodePollRequest(BaseModel):
     device_code: str
 
 
+from typing import Any, Callable, Optional
+
+_cache_invalidation_hooks: list[Callable[[], None]] = []
+
+
+def register_cache_invalidation_hook(hook: Callable[[], None]) -> None:
+    """Register a callback to invalidate higher-level caches when Fabric auth changes."""
+    if hook not in _cache_invalidation_hooks:
+        _cache_invalidation_hooks.append(hook)
+
+
+def invalidate_all_auth_caches() -> None:
+    """Invalidates app.auth token cache and all registered server-level caches."""
+    try:
+        import app.auth as app_auth
+        app_auth.clear_token_cache()
+    except Exception as e:
+        logger.warning(f"Failed to clear app.auth token cache: {e}")
+
+    for hook in _cache_invalidation_hooks:
+        try:
+            hook()
+        except Exception as e:
+            logger.warning(f"Failed to execute cache invalidation hook: {e}")
+
+
 _ACTIVE_FABRIC_ACCOUNT: dict[str, Any] = {
-    "id": "fb730ff8-3f18-4cf8-a13b-5558407772c1",
-    "name": "Bheesetti Harsith",
-    "email": "Bheesetti.Harsith@Pelibiothermal.com",
-    "tenant_id": os.getenv("AZURE_TENANT_ID", "94b62ba4-8d71-4507-9dc9-9734a149f836"),
-    "tenant_name": "PELICAN PRODUCTS INC",
+    "id": os.getenv("AZURE_SUBSCRIPTION_ID", ""),
+    "name": "Fabric Engineer",
+    "email": os.getenv("FABRIC_USER_IDENTITY", "user@fabric.internal"),
+    "tenant_id": os.getenv("AZURE_TENANT_ID", ""),
+    "tenant_name": os.getenv("AZURE_TENANT_NAME", "Fabric Enterprise"),
     "is_active": True,
-    "account_type": "Azure CLI / Enterprise SSO",
+    "account_type": "Azure CLI SSO",
     "default_workspace_id": os.getenv("ALLOWED_WORKSPACE_ID", ""),
-    "default_workspace_name": os.getenv("ALLOWED_WORKSPACE_NAME", "PELICAN PRODUCTS INC"),
+    "default_workspace_name": os.getenv("ALLOWED_WORKSPACE_NAME", "Fabric Workspace"),
 }
 
 
@@ -450,13 +476,13 @@ def _get_azure_cli_account() -> dict[str, Any]:
     if rc == 0 and out.strip():
         try:
             data = json.loads(out)
-            user_name = data.get("user", {}).get("name", "Bheesetti.Harsith@Pelibiothermal.com")
-            tenant_id = data.get("tenantId") or data.get("homeTenantId") or os.getenv("AZURE_TENANT_ID", "94b62ba4-8d71-4507-9dc9-9734a149f836")
-            sub_id = data.get("id", "fb730ff8-3f18-4cf8-a13b-5558407772c1")
-            tenant_display = data.get("tenantDisplayName") or data.get("name", "PELICAN PRODUCTS INC")
+            user_name = data.get("user", {}).get("name", "user@fabric.internal")
+            tenant_id = data.get("tenantId") or data.get("homeTenantId") or os.getenv("AZURE_TENANT_ID", "")
+            sub_id = data.get("id", "")
+            tenant_display = data.get("tenantDisplayName") or data.get("name", "Fabric Tenant")
             _ACTIVE_FABRIC_ACCOUNT = {
                 "id": sub_id,
-                "name": user_name.split("@")[0].replace(".", " ").title(),
+                "name": user_name.split("@")[0].replace(".", " ").title() if "@" in user_name else user_name,
                 "email": user_name,
                 "tenant_id": tenant_id,
                 "tenant_name": tenant_display,
@@ -578,7 +604,7 @@ def poll_fabric_device_code(req: DeviceCodePollRequest) -> dict[str, Any]:
     account = _get_azure_cli_account()
     return {
         "status": "authenticated",
-        "user_identity": account.get("email", "Bheesetti.Harsith@Pelibiothermal.com"),
+        "user_identity": account.get("email", "user@fabric.internal"),
     }
 
 
@@ -590,19 +616,7 @@ def switch_fabric_account(req: SwitchAccountRequest) -> dict[str, Any]:
         rc, _, err = _run_az_cmd(["account", "set", "--subscription", sub_id], timeout=30)
         account = _get_azure_cli_account()
         if rc == 0:
-            try:
-                import app.auth as app_auth
-                app_auth.clear_token_cache()
-            except Exception as e:
-                logger.warning(f"Failed to clear app.auth token cache: {e}")
-            try:
-                import omniflow.server as srv
-                srv.FABRIC_STATUS_CACHE = None
-                srv._workspaces_list_cache["data"] = None
-                srv._workspaces_list_cache["expires_at"] = 0.0
-                srv._workspace_items_cache.clear()
-            except Exception as e:
-                logger.warning(f"Failed to clear server caches: {e}")
+            invalidate_all_auth_caches()
             return {
                 "success": True,
                 "message": f"Switched active Fabric session to {account.get('name', 'selected account')} ({account.get('tenant_name')})",

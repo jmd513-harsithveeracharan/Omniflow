@@ -94,12 +94,12 @@ def _extract_project_table_columns(proj_folder: str) -> dict[str, list[dict[str,
 def build_mesh_from_project(project_id: str | None) -> nx.DiGraph:
     """Compiles a scoped NetworkX Relationship Graph for a specific project."""
     if not project_id or project_id in ("all", "galaxy", "default"):
-        clean_pid = "PRJ-PELI-BIOTHERMAL"
+        clean_pid = "PRJ-DEFAULT"
     else:
         clean_pid = project_id.strip()
 
-    # Dedicated production-grade builder for Peli BioThermal Cold-Chain Platform
-    if "PELI" in clean_pid.upper() or "BIOTHERMAL" in clean_pid.upper():
+    # Dedicated builder for Peli BioThermal if specifically requested by project code
+    if clean_pid and ("PELI" in clean_pid.upper() or "BIOTHERMAL" in clean_pid.upper()):
         from omniflow.graph_peli_builder import build_peli_biothermal_graph
         return build_peli_biothermal_graph()
 

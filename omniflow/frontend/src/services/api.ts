@@ -467,10 +467,8 @@ export async function updateProject(
 }
 
 export async function deleteProject(id: string): Promise<boolean> {
-  const res = await fetch(`${API_BASE}/projects/delete`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ id }),
+  const res = await fetch(`${API_BASE}/projects/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
   });
   if (!res.ok) throw new Error(`Failed to delete project: ${res.statusText}`);
   const data = await res.json();

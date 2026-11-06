@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { ComponentPropsWithoutRef } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Database, FileCode, GitBranch, AlertCircle, Info, Sparkles, AlertTriangle } from 'lucide-react';
@@ -19,11 +19,11 @@ const renderWithLineBreaks = (node: React.ReactNode): React.ReactNode => {
       </React.Fragment>
     ));
   }
-  if (React.isValidElement(node)) {
-    const children = (node.props as any)?.children;
+  if (React.isValidElement<{ children?: React.ReactNode }>(node)) {
+    const children = node.props.children;
     if (children) {
       return React.cloneElement(node, {
-        ...(node.props as any),
+        ...node.props,
         children: renderWithLineBreaks(children),
       });
     }
@@ -101,8 +101,8 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content }) =
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{
-          pre: ({ children }: any) => <>{children}</>,
-          code({ inline, className, children, ...props }: any) {
+          pre: ({ children }: ComponentPropsWithoutRef<'pre'>) => <>{children}</>,
+          code({ inline, className, children, ...props }: ComponentPropsWithoutRef<'code'> & { inline?: boolean }) {
             const match = /language-(\w+)/.exec(className || '');
             const codeString = String(children || '').replace(/\n$/, '');
             const isInline = inline ?? (!match && !String(children || '').includes('\n'));
@@ -133,11 +133,13 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content }) =
               </code>
             );
           },
-          blockquote({ children }: any) {
-            const extractText = (c: any): string => {
+          blockquote({ children }: ComponentPropsWithoutRef<'blockquote'>) {
+            const extractText = (c: React.ReactNode): string => {
               if (typeof c === 'string') return c;
               if (Array.isArray(c)) return c.map(extractText).join(' ');
-              if (c?.props?.children) return extractText(c.props.children);
+              if (React.isValidElement<{ children?: React.ReactNode }>(c) && c.props.children) {
+                return extractText(c.props.children);
+              }
               return '';
             };
             const textContent = extractText(children).trim();
@@ -162,23 +164,23 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content }) =
 
             return <blockquote className="chat-md-blockquote">{children}</blockquote>;
           },
-          table({ children }: any) {
+          table({ children }: ComponentPropsWithoutRef<'table'>) {
             return (
               <div className="chat-md-table-wrapper">
                 <table className="chat-md-table">{children}</table>
               </div>
             );
           },
-          td: ({ children, ...props }: any) => <td {...props}>{renderWithLineBreaks(children)}</td>,
-          th: ({ children, ...props }: any) => <th {...props}>{renderWithLineBreaks(children)}</th>,
-          a({ href, children }: any) {
+          td: ({ children, ...props }: ComponentPropsWithoutRef<'td'>) => <td {...props}>{renderWithLineBreaks(children)}</td>,
+          th: ({ children, ...props }: ComponentPropsWithoutRef<'th'>) => <th {...props}>{renderWithLineBreaks(children)}</th>,
+          a({ href, children }: ComponentPropsWithoutRef<'a'>) {
             return (
               <a href={href} target="_blank" rel="noreferrer" className="chat-md-link">
                 {children}
               </a>
             );
           },
-          li({ children, ...props }: any) {
+          li({ children, ...props }: ComponentPropsWithoutRef<'li'>) {
             const str = typeof children === 'string' ? children : (Array.isArray(children) && typeof children[0] === 'string' ? children[0] : '');
             if (str) {
               const fb = renderFabricItemBadge(str);
@@ -186,22 +188,22 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content }) =
             }
             return <li className="chat-md-list-item" {...props}>{renderWithLineBreaks(children)}</li>;
           },
-          p({ children, ...props }: any) {
+          p({ children, ...props }: ComponentPropsWithoutRef<'p'>) {
             if (typeof children === 'string') {
               const fb = renderFabricItemBadge(children);
               if (fb) return <>{fb}</>;
             }
             return <p className="chat-md-paragraph" {...props}>{renderWithLineBreaks(children)}</p>;
           },
-          h1: ({ children }: any) => <h1 className="chat-md-h1">{children}</h1>,
-          h2: ({ children }: any) => <h2 className="chat-md-h2">{children}</h2>,
-          h3: ({ children }: any) => <h3 className="chat-md-h3">{children}</h3>,
-          h4: ({ children }: any) => <h4 className="chat-md-h4">{children}</h4>,
-          h5: ({ children }: any) => <h5 className="chat-md-h5">{children}</h5>,
-          h6: ({ children }: any) => <h6 className="chat-md-h6">{children}</h6>,
+          h1: ({ children }: ComponentPropsWithoutRef<'h1'>) => <h1 className="chat-md-h1">{children}</h1>,
+          h2: ({ children }: ComponentPropsWithoutRef<'h2'>) => <h2 className="chat-md-h2">{children}</h2>,
+          h3: ({ children }: ComponentPropsWithoutRef<'h3'>) => <h3 className="chat-md-h3">{children}</h3>,
+          h4: ({ children }: ComponentPropsWithoutRef<'h4'>) => <h4 className="chat-md-h4">{children}</h4>,
+          h5: ({ children }: ComponentPropsWithoutRef<'h5'>) => <h5 className="chat-md-h5">{children}</h5>,
+          h6: ({ children }: ComponentPropsWithoutRef<'h6'>) => <h6 className="chat-md-h6">{children}</h6>,
           hr: () => <hr className="chat-md-hr" />,
-          ul: ({ children }: any) => <ul className="chat-md-bullet-list">{children}</ul>,
-          ol: ({ children }: any) => <ol className="chat-md-ordered-list">{children}</ol>,
+          ul: ({ children }: ComponentPropsWithoutRef<'ul'>) => <ul className="chat-md-bullet-list">{children}</ul>,
+          ol: ({ children }: ComponentPropsWithoutRef<'ol'>) => <ol className="chat-md-ordered-list">{children}</ol>,
         }}
       >
         {content}

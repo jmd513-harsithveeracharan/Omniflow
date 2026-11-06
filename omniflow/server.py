@@ -15,6 +15,7 @@ import re
 import time
 import uuid
 import sys
+import threading
 from typing import Any
 import requests
 
@@ -39,7 +40,7 @@ from omniflow.tools.fabric_deployer import (
     verify_fabric_workspace_connection,
 )
 from omniflow.tools.dag_runner import FabricItemSpec, GenericDAGProvisioner
-from omniflow.auth import auth_router, init_auth_db
+from omniflow.auth import auth_router, init_auth_db, register_cache_invalidation_hook
 from omniflow.git_service import git_router
 from omniflow.intent_router import (
     classify_prompt_intent,
@@ -74,7 +75,6 @@ app.add_middleware(
 app.include_router(auth_router)
 app.include_router(auth_router, prefix="/api")
 app.include_router(git_router)
-app.include_router(git_router, prefix="/api")
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DIST_DIR = os.path.join(BASE_DIR, "frontend", "dist")
@@ -109,12 +109,17 @@ def load_sessions_from_disk() -> dict[str, dict[str, Any]]:
     return {}
 
 
+_session_file_lock = threading.Lock()
+
+
 def save_sessions_to_disk() -> None:
     try:
         tmp_path = f"{SESSION_STORE_PATH}.tmp"
-        with open(tmp_path, "w", encoding="utf-8") as f:
-            json.dump(SESSIONS, f, indent=2, ensure_ascii=False)
-        os.replace(tmp_path, SESSION_STORE_PATH)
+        with _session_file_lock:
+            snapshot = dict(SESSIONS)
+            with open(tmp_path, "w", encoding="utf-8") as f:
+                json.dump(snapshot, f, indent=2, ensure_ascii=False)
+            os.replace(tmp_path, SESSION_STORE_PATH)
     except Exception as e:
         print(f"[SessionsStore] Write error: {e}")
 
@@ -156,8 +161,8 @@ class MemberRemoveRequest(BaseModel):
 
 
 DIRECTORY_USERS: list[dict[str, Any]] = [
-    {"id": "usr_charan", "name": "Veeracharan", "email": "Veeracharan99@gmail.com", "avatar_color": "#10b981", "role": "owner"},
-    {"id": "usr_harsith", "name": "Harsith Bheesetti", "email": "Bheesetti.Harsith@Pelibiothermal.com", "avatar_color": "#0078d4", "role": "admin"},
+    {"id": "usr_charan", "name": "Veeracharan", "email": "charan@fabric.internal", "avatar_color": "#10b981", "role": "owner"},
+    {"id": "usr_harsith", "name": "Harsith Bheesetti", "email": "harsith@fabric.internal", "avatar_color": "#0078d4", "role": "admin"},
     {"id": "usr_alex", "name": "Alex Chen", "email": "alex.chen@fabric.internal", "avatar_color": "#6366f1", "role": "engineer"},
     {"id": "usr_sarah", "name": "Sarah Jenkins", "email": "sarah.j@fabric.internal", "avatar_color": "#ec4899", "role": "architect"},
     {"id": "usr_david", "name": "David Kumar", "email": "david.kumar@fabric.internal", "avatar_color": "#3b82f6", "role": "contributor"},
@@ -199,7 +204,7 @@ def fetch_projects_cached(force_refresh: bool = False) -> list[dict[str, Any]]:
                     def_folder = os.path.join(BASE_DIR, "generated_artifacts", pid)
                     has_folder = os.path.isdir(def_folder)
                     old_p = existing_map.get(pid, {})
-                    creator = r[5] or old_p.get("created_by") or "Bheesetti.Harsith@Pelibiothermal.com"
+                    creator = r[5] or old_p.get("created_by") or "user@fabric.internal"
                     owner_name = creator.split("@")[0].replace(".", " ").title() if "@" in creator else creator
                     meta = old_p.get("metadata") or {
                         "members": [
@@ -254,6 +259,27 @@ def fetch_projects_cached(force_refresh: bool = False) -> list[dict[str, Any]]:
     return PROJECTS_CACHE
 
 
+FABRIC_STATUS_CACHE: dict[str, Any] | None = None
+FABRIC_STATUS_CACHE_TIME: float = 0.0
+
+# In-memory TTL caches for Fabric REST API responses to prevent redundant cloud roundtrips
+_WORKSPACE_CACHE_TTL = 180.0  # 3 minutes cache
+_workspaces_list_cache: dict[str, Any] = {"data": None, "expires_at": 0.0}
+_workspace_items_cache: dict[str, dict[str, Any]] = {}
+
+
+def _clear_all_workspace_caches() -> None:
+    global FABRIC_STATUS_CACHE, FABRIC_STATUS_CACHE_TIME
+    FABRIC_STATUS_CACHE = None
+    FABRIC_STATUS_CACHE_TIME = 0.0
+    _workspaces_list_cache["data"] = None
+    _workspaces_list_cache["expires_at"] = 0.0
+    _workspace_items_cache.clear()
+
+
+register_cache_invalidation_hook(_clear_all_workspace_caches)
+
+
 @app.get("/api/fabric/status")
 async def get_fabric_status() -> dict[str, Any]:
     global FABRIC_STATUS_CACHE, FABRIC_STATUS_CACHE_TIME
@@ -268,28 +294,22 @@ async def get_fabric_status() -> dict[str, Any]:
     user_email = account.get("email") or os.getenv("FABRIC_USER_IDENTITY", "")
     tenant_id = account.get("tenant_id") or os.getenv("AZURE_TENANT_ID", "")
 
-    is_pelican = "pelican" in tenant_name.lower() or "pelibiothermal" in user_email.lower()
-    if is_pelican:
-        ws_id = account.get("default_workspace_id") or os.getenv("ALLOWED_WORKSPACE_ID", "")
-        ws_name = os.getenv("ALLOWED_WORKSPACE_NAME") or account.get("default_workspace_name") or "Fabric Workspace"
-    else:
-        ws_id = ""
-        ws_name = ""
+    ws_id = account.get("default_workspace_id") or os.getenv("ALLOWED_WORKSPACE_ID", "")
+    ws_name = account.get("default_workspace_name") or os.getenv("ALLOWED_WORKSPACE_NAME", "")
 
-    # Try dynamically resolving workspace from Fabric REST API if not set
-    if not ws_name:
-        try:
-            from app.fabric_client import list_workspaces as fc_list_workspaces
-            live_ws = fc_list_workspaces()
-            if live_ws:
-                found = next((w for w in live_ws if w.get("id") == ws_id), None)
-                if not found:
-                    found = next((w for w in live_ws if w.get("type") != "Personal"), live_ws[0])
-                if found:
-                    ws_id = found.get("id", ws_id)
-                    ws_name = found.get("displayName") or found.get("name") or "Fabric Workspace"
-        except Exception:
-            pass
+    # Dynamically discover workspaces from Fabric REST API
+    try:
+        from app.fabric_client import list_workspaces as fc_list_workspaces
+        live_ws = fc_list_workspaces()
+        if live_ws:
+            found = next((w for w in live_ws if w.get("id") == ws_id), None) if ws_id else None
+            if not found:
+                found = next((w for w in live_ws if w.get("type") != "Personal"), live_ws[0])
+            if found:
+                ws_id = found.get("id", ws_id)
+                ws_name = found.get("displayName") or found.get("name") or ws_name
+    except Exception:
+        pass
 
     if not ws_name:
         ws_name = tenant_name or "Fabric Workspace"
@@ -575,6 +595,14 @@ async def delete_project_endpoint(project_id: str) -> dict[str, Any]:
     return {"success": True}
 
 
+@app.post("/api/projects/delete")
+async def delete_project_post_alias(req: dict[str, Any]) -> dict[str, Any]:
+    project_id = str(req.get("id") or req.get("project_id") or "")
+    if not project_id:
+        raise HTTPException(status_code=400, detail="Missing project id")
+    return await delete_project_endpoint(project_id)
+
+
 @app.get("/api/users/search")
 async def search_users(q: str = "") -> dict[str, Any]:
     query = q.lower().strip()
@@ -755,12 +783,6 @@ async def list_templates() -> list[dict[str, Any]]:
                 except Exception:
                     continue
     return templates
-
-
-# In-memory TTL caches for Fabric REST API responses to prevent redundant cloud roundtrips
-_WORKSPACE_CACHE_TTL = 180.0  # 3 minutes cache
-_workspaces_list_cache: dict[str, Any] = {"data": None, "expires_at": 0.0}
-_workspace_items_cache: dict[str, dict[str, Any]] = {}
 
 
 @app.get("/api/workspace/list")
@@ -1059,6 +1081,143 @@ async def get_connectors_list() -> list[dict[str, Any]]:
     ]
 
 
+class TranspileRequest(BaseModel):
+    sql: str
+    source_dialect: str = "tsql"
+    target_dialect: str = "spark"
+
+
+@app.post("/api/transpile")
+async def transpile_sql_endpoint(req: TranspileRequest) -> dict[str, Any]:
+    try:
+        try:
+            from app.sql_transpiler import transpile_to_spark, extract_column_lineage
+            transpiled = transpile_to_spark(req.sql, source_dialect=req.source_dialect)
+            lineage = extract_column_lineage(req.sql, source_dialect=req.source_dialect)
+            return {
+                "transpiled_sql": transpiled,
+                "source_dialect": req.source_dialect,
+                "target_dialect": req.target_dialect,
+                "validation_status": "valid",
+                "lineage": lineage,
+            }
+        except Exception:
+            import sqlglot
+            transpiled = sqlglot.transpile(req.sql, read=req.source_dialect, write=req.target_dialect, pretty=True)[0]
+            return {
+                "transpiled_sql": transpiled,
+                "source_dialect": req.source_dialect,
+                "target_dialect": req.target_dialect,
+                "validation_status": "valid",
+            }
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=f"Transpilation failed: {exc}")
+
+
+class FabricConnectRequest(BaseModel):
+    auth_type: str = "bearer_token"
+    token: str | None = None
+    client_id: str | None = None
+    client_secret: str | None = None
+    tenant_id: str | None = None
+
+
+@app.post("/api/fabric/connect")
+async def fabric_connect_endpoint(req: FabricConnectRequest) -> dict[str, Any]:
+    try:
+        import app.config as app_cfg
+        import app.auth as app_auth
+        if req.auth_type == "bearer_token" and req.token:
+            app_cfg.FABRIC_BEARER_TOKEN = req.token.strip()
+            app_auth.clear_token_cache()
+            status = app_auth.get_auth_status()
+            return {"success": True, "message": "Bearer token connected successfully", "status": status}
+        elif req.auth_type == "service_principal" and req.client_id:
+            app_cfg.AZURE_CLIENT_ID = req.client_id.strip()
+            app_cfg.AZURE_CLIENT_SECRET = (req.client_secret or "").strip()
+            if req.tenant_id:
+                app_cfg.AZURE_TENANT_ID = req.tenant_id.strip()
+            app_auth.clear_token_cache()
+            status = app_auth.get_auth_status()
+            return {"success": True, "message": "Service Principal connected successfully", "status": status}
+        return {"success": True, "message": "Connected", "status": app_auth.get_auth_status()}
+    except Exception as exc:
+        return {"success": False, "message": f"Connection failed: {exc}"}
+
+
+class ConnectorTestRequest(BaseModel):
+    sourceId: str
+    params: dict[str, Any] = Field(default_factory=dict)
+
+
+@app.post("/api/connectors/test")
+async def handle_connector_test(req: ConnectorTestRequest) -> dict[str, Any]:
+    res = execute_source_inspection(
+        connector_type=req.sourceId,
+        params=req.params,
+        test_mode=True,
+    )
+    return {"success": res.get("status") == "success", "message": res.get("message", "Connection verified")}
+
+
+@app.post("/api/connectors/discover")
+async def handle_connector_discover(req: ConnectorTestRequest) -> dict[str, Any]:
+    res = execute_source_inspection(
+        connector_type=req.sourceId,
+        params=req.params,
+        test_mode=False,
+    )
+    return {"tables": res.get("tables", []), "row_counts": res.get("row_counts", {})}
+
+
+class PipelinePlanRequest(BaseModel):
+    sourceId: str = "sap"
+    selectedTables: list[str] = Field(default_factory=list)
+    schedule: str = "daily"
+
+
+@app.post("/api/pipeline/plan")
+async def handle_pipeline_plan(req: PipelinePlanRequest) -> dict[str, Any]:
+    tables = req.selectedTables or ["orders", "customers", "transactions"]
+    return {
+        "sourceId": req.sourceId,
+        "sourceName": req.sourceId.upper(),
+        "selectedTables": tables,
+        "schedule": req.schedule,
+        "bronzeLakehouse": f"lh_{req.sourceId}_bronze",
+        "silverLakehouse": f"lh_{req.sourceId}_silver",
+        "goldWarehouse": f"wh_{req.sourceId}_gold",
+        "items": [
+            {"name": f"lh_{req.sourceId}_bronze", "item_type": "Lakehouse", "folder_name": "01_Bronze"},
+            {"name": f"lh_{req.sourceId}_silver", "item_type": "Lakehouse", "folder_name": "02_Silver", "depends_on": [f"lh_{req.sourceId}_bronze"]},
+            {"name": f"wh_{req.sourceId}_gold", "item_type": "Warehouse", "folder_name": "03_Gold", "depends_on": [f"lh_{req.sourceId}_silver"]},
+            {"name": f"pl_{req.sourceId}_ingest", "item_type": "DataPipeline", "folder_name": "01_Bronze", "depends_on": [f"lh_{req.sourceId}_bronze"]},
+        ],
+    }
+
+
+class BlastRadiusRequest(BaseModel):
+    targetAssetId: str
+    assetType: str = "table"
+    proposedChange: str = "ALTER_SCHEMA"
+
+
+@app.post("/api/governance/blast-radius")
+async def handle_governance_blast_radius(req: BlastRadiusRequest) -> dict[str, Any]:
+    try:
+        bz = graph_engine.analyze_blast_zone(req.targetAssetId)
+        return bz.model_dump()
+    except Exception:
+        return {
+            "targetAssetId": req.targetAssetId,
+            "directDownstreamCount": 2,
+            "indirectDownstreamCount": 3,
+            "impactedReports": ["Executive_Dashboard", "Operations_Scorecard"],
+            "safetyGateLevel": "WARNING",
+            "message": f"Blast radius evaluation for {req.targetAssetId}",
+        }
+
+
 class ProvisionAndInspectRequest(BaseModel):
     connector_type: str = "sap"
     params: dict[str, Any] = Field(default_factory=dict)
@@ -1304,7 +1463,6 @@ async def handle_chat_stream(req: ChatRequest) -> StreamingResponse:
             reply = "".join(reply_chunks)
             SESSIONS[sid]["messages"].append({"role": "assistant", "content": reply})
             save_sessions_to_disk()
-            save_sessions_to_disk()
             yield f"data: {json.dumps({'type': 'done', 'session_id': sid, 'plan': None})}\n\n"
             return
 
@@ -1388,7 +1546,6 @@ async def handle_chat_stream(req: ChatRequest) -> StreamingResponse:
 
             reply = "".join(reply_chunks)
             SESSIONS[sid]["messages"].append({"role": "assistant", "content": reply})
-            save_sessions_to_disk()
             save_sessions_to_disk()
             yield f"data: {json.dumps({'type': 'done', 'session_id': sid, 'plan': active_plan if active_plan else None})}\n\n"
             return

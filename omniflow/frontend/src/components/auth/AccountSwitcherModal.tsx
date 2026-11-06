@@ -94,30 +94,31 @@ export const AccountSwitcherModal: React.FC<AccountSwitcherModalProps> = ({
   if (!isOpen) return null;
 
   const handleSwitch = async (account: FabricAccountProfile) => {
+    const previousAccounts = [...accounts];
     try {
       setSwitchingId(account.id);
-      setStatusMsg(null);
+      setStatusMsg({ text: `Switching active session to ${account.name}...`, type: 'info' });
+      // Instant 0ms optimistic UI feedback
+      setAccounts((prev) =>
+        prev.map((a) => ({
+          ...a,
+          is_active: a.id === account.id,
+        }))
+      );
       const res = await switchFabricAccount(account.id, account.tenant_id);
       if (res.success) {
         setStatusMsg({ text: `Switched active session to ${account.name}`, type: 'success' });
-        // Instant 0ms optimistic UI feedback
-        setAccounts((prev) =>
-          prev.map((a) => ({
-            ...a,
-            is_active: a.id === account.id,
-          }))
-        );
-        setSwitchingId(null);
         onAccountSwitched();
         window.dispatchEvent(new CustomEvent('fabric-account-switched', { detail: account }));
-        // Background reconcile with Azure CLI without blocking the card status UI
-        loadAccounts().catch(() => {});
       } else if (res.requires_login) {
+        setAccounts(previousAccounts);
         setStatusMsg({ text: `Session expired for ${account.name}. Please sign in again.`, type: 'info' });
       } else {
+        setAccounts(previousAccounts);
         setStatusMsg({ text: res.message || 'Failed to switch account', type: 'error' });
       }
     } catch (err) {
+      setAccounts(previousAccounts);
       setStatusMsg({ text: err instanceof Error ? err.message : 'Error switching account', type: 'error' });
     } finally {
       setSwitchingId(null);
