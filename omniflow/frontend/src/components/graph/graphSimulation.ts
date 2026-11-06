@@ -314,8 +314,9 @@ export function createSnowflakeSimulation(
     .alphaDecay(0.035)
     .velocityDecay(0.40);
 
-  // Synchronous warmup (60 ticks) so initial coordinates are settled into the spherical shape
-  for (let i = 0; i < 60; i++) {
+  // Adaptive synchronous warmup (20-35 ticks based on graph density)
+  const warmupTicks = simNodes.length > 200 ? 20 : 30;
+  for (let i = 0; i < warmupTicks; i++) {
     simulation.tick();
   }
 

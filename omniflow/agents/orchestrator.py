@@ -169,7 +169,7 @@ class MultiAgentOrchestrator:
                     f"an analytical Kimball Star Schema in Gold (wh_{domain_key}_gold) with Direct Lake Power BI semantic model, "
                     f"automated Data Quality reconciliation suite, and NetworkX lineage tracking."
                 ),
-                requested_by=intake_data.get("request_context", {}).get("user_id", "harsith.bheesetti@pelibiothermal.com"),
+                requested_by=intake_data.get("request_context", {}).get("user_id") or os.getenv("FABRIC_USER_IDENTITY", "user@fabric.internal"),
                 reset_synthesized_tools=reset_tools,
             )
 

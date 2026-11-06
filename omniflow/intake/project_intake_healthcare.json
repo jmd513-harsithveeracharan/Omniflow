@@ -4,7 +4,7 @@
   "request_context": {
     "run_id": null,
     "project_id": null,
-    "user_id": "harsith.bheesetti@pelibiothermal.com",
+    "user_id": "user@fabric.internal",
     "request_type": "new_end_to_end_data_engineering_solution",
     "user_request": "Architect, provision, and deploy a HIPAA-compliant Microsoft Fabric Medallion data platform for Healthcare Clinical Encounters and Insurance Claims. Enforce Bronze raw ingestion, Silver Delta Lake curation with strict null-safe SHA-256 masking on patient PHI/PII (SSN, MRN, phone, address), Gold Kimball dimensional star schema warehouse for clinical outcomes and claim denial analytics, Direct Lake Power BI semantic modeling, and Great Expectations automated reconciliation testing.",
     "priority": "high",

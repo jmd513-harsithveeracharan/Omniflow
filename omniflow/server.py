@@ -261,6 +261,7 @@ def fetch_projects_cached(force_refresh: bool = False) -> list[dict[str, Any]]:
 
 FABRIC_STATUS_CACHE: dict[str, Any] | None = None
 FABRIC_STATUS_CACHE_TIME: float = 0.0
+FABRIC_STATUS_CACHE_TTL = 180.0  # 3 minutes cache
 
 # In-memory TTL caches for Fabric REST API responses to prevent redundant cloud roundtrips
 _WORKSPACE_CACHE_TTL = 180.0  # 3 minutes cache
@@ -284,11 +285,11 @@ register_cache_invalidation_hook(_clear_all_workspace_caches)
 async def get_fabric_status() -> dict[str, Any]:
     global FABRIC_STATUS_CACHE, FABRIC_STATUS_CACHE_TIME
     now = time.time()
-    if FABRIC_STATUS_CACHE and (now - FABRIC_STATUS_CACHE_TIME) < 10.0:
+    if FABRIC_STATUS_CACHE and (now - FABRIC_STATUS_CACHE_TIME) < FABRIC_STATUS_CACHE_TTL:
         return FABRIC_STATUS_CACHE
 
     from omniflow.auth import _get_azure_cli_account
-    account = _get_azure_cli_account()
+    account = await asyncio.to_thread(_get_azure_cli_account)
 
     tenant_name = account.get("tenant_name") or os.getenv("AZURE_TENANT_NAME", "Fabric Enterprise")
     user_email = account.get("email") or os.getenv("FABRIC_USER_IDENTITY", "")
@@ -297,10 +298,10 @@ async def get_fabric_status() -> dict[str, Any]:
     ws_id = account.get("default_workspace_id") or os.getenv("ALLOWED_WORKSPACE_ID", "")
     ws_name = account.get("default_workspace_name") or os.getenv("ALLOWED_WORKSPACE_NAME", "")
 
-    # Dynamically discover workspaces from Fabric REST API
+    # Dynamically discover workspaces from Fabric REST API non-blockingly
     try:
         from app.fabric_client import list_workspaces as fc_list_workspaces
-        live_ws = fc_list_workspaces()
+        live_ws = await asyncio.to_thread(fc_list_workspaces)
         if live_ws:
             found = next((w for w in live_ws if w.get("id") == ws_id), None) if ws_id else None
             if not found:
@@ -821,18 +822,20 @@ async def list_fabric_workspaces(refresh: bool = False) -> dict[str, Any]:
                 "active_workspace_id": default_ws_id,
                 "active_workspace_name": default_ws_name or "Fabric Workspace",
                 "workspaces": workspaces,
+                "is_fallback": False,
             }
             _workspaces_list_cache["data"] = result
             _workspaces_list_cache["expires_at"] = now + _WORKSPACE_CACHE_TTL
             return result
     except Exception as e:
         print(f"[Fabric Workspaces Warning]: {e}")
+        error_msg = str(e)
 
     # Fallback to single configured workspace if API is unreachable
     workspaces.append({
         "id": default_ws_id,
-        "displayName": default_ws_name,
-        "description": "Primary configured workspace",
+        "displayName": default_ws_name or "Fabric Workspace",
+        "description": "Primary configured workspace (Offline Fallback)",
         "type": "Workspace",
         "capacityId": "",
         "capacityRegion": "",
@@ -840,8 +843,10 @@ async def list_fabric_workspaces(refresh: bool = False) -> dict[str, Any]:
     })
     return {
         "active_workspace_id": default_ws_id,
-        "active_workspace_name": default_ws_name,
+        "active_workspace_name": default_ws_name or "Fabric Workspace",
         "workspaces": workspaces,
+        "is_fallback": True,
+        "error": error_msg,
     }
 
 

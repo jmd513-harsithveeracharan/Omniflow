@@ -45,7 +45,7 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
       : {
           id: 'usr_me',
           name: 'Project Owner (You)',
-          email: 'owner@fabric.ai',
+          email: 'owner@fabric.internal',
           role: 'owner',
           avatarBg: '#10b981',
         };
