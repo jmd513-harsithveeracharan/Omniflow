@@ -2043,6 +2043,104 @@ nav.sidebar-nav {
     color: var(--text-muted);
 }
 
+/* ═══════════════ PROMPT DOCK IMAGE ATTACHMENTS ═══════════════ */
+.dock-image-preview-tray {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 4px 10px 4px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    margin-bottom: 8px;
+    flex-wrap: wrap;
+}
+
+.dock-image-thumb-box {
+    position: relative;
+    width: 52px;
+    height: 52px;
+    border-radius: 8px;
+    overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    background: #09090b;
+    flex-shrink: 0;
+}
+
+.dock-image-thumb-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.dock-image-thumb-remove {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.75);
+    color: #f43f5e;
+    border: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background 0.15s ease, transform 0.1s ease;
+}
+
+.dock-image-thumb-remove:hover {
+    background: #e11d48;
+    color: #fff;
+    transform: scale(1.1);
+}
+
+.dock-image-tray-hint {
+    font-size: 11px;
+    color: #a1a1aa;
+    font-weight: 500;
+}
+
+.dock-attachment-badge {
+    background: #10b981;
+    color: #ffffff;
+    font-size: 10px;
+    font-weight: 700;
+    border-radius: 10px;
+    padding: 1px 5px;
+    line-height: 1;
+    margin-left: 2px;
+}
+
+.dock-tool-pill.has-attachments {
+    border-color: #10b981;
+    color: #10b981;
+    background: rgba(16, 185, 129, 0.1);
+}
+
+/* Chat timeline image attachment display */
+.chat-bubble-images {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 8px;
+}
+
+.chat-bubble-image-thumb {
+    max-width: 240px;
+    max-height: 180px;
+    object-fit: cover;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    cursor: pointer;
+    transition: transform 0.15s ease, border-color 0.15s ease;
+}
+
+.chat-bubble-image-thumb:hover {
+    transform: scale(1.02);
+    border-color: #38bdf8;
+}
+
 .dock-controls-row {
     display: flex;
     align-items: center;

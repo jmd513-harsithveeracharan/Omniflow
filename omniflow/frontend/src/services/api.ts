@@ -309,7 +309,8 @@ export async function streamChatTurn(
   signal?: AbortSignal,
   userEmail?: string,
   onCredentialRequest?: (data: import('../types').CredentialRequestData) => void,
-  projectId?: string
+  projectId?: string,
+  images?: string[]
 ): Promise<void> {
   try {
     const res = await fetch(`${API_BASE}/chat/stream`, {
@@ -325,6 +326,7 @@ export async function streamChatTurn(
         is_voice: Boolean(isVoice),
         user_email: userEmail || undefined,
         project_id: projectId || undefined,
+        images: images && images.length > 0 ? images : undefined,
       }),
       signal,
     });
@@ -486,13 +488,13 @@ export async function fetchProjectDetail(id: string): Promise<{
   return await res.json();
 }
 
-export async function fetchFabricWorkspaces(): Promise<{
+export async function fetchFabricWorkspaces(refresh: boolean = false): Promise<{
   activeWorkspaceId: string;
   activeWorkspaceName: string;
   workspaces: import('../types').FabricWorkspaceSummary[];
 }> {
   try {
-    const res = await fetch(`${API_BASE}/workspace/list`);
+    const res = await fetch(`${API_BASE}/workspace/list${refresh ? '?refresh=true' : ''}`);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
     const list = (data.workspaces || []).map((w: Record<string, unknown>) => ({

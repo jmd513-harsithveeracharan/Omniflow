@@ -26,28 +26,35 @@ export const ProjectWorkspacesPicker: React.FC<ProjectWorkspacesPickerProps> = (
 
   useEffect(() => {
     let isMounted = true;
-    const load = async () => {
+    const load = async (forceRefresh = false) => {
       try {
         setIsLoading(true);
-        const res = await fetchFabricWorkspaces();
-        if (isMounted && res.workspaces && res.workspaces.length > 0) {
-          // Merge API workspaces with defaults if not already present
-          const existingNames = new Set(res.workspaces.map((w) => w.displayName.toLowerCase()));
-          const combined = [
-            ...res.workspaces,
-            ...DEFAULT_ENTERPRISE_WORKSPACES.filter((d) => !existingNames.has(d.displayName.toLowerCase())),
-          ];
-          setWorkspaces(combined);
+        const res = await fetchFabricWorkspaces(forceRefresh);
+        if (isMounted) {
+          if (res.workspaces && res.workspaces.length > 0) {
+            setWorkspaces(res.workspaces);
+          } else {
+            setWorkspaces(DEFAULT_ENTERPRISE_WORKSPACES);
+          }
         }
       } catch (err) {
         console.warn('Using default enterprise workspaces', err);
+        if (isMounted) setWorkspaces(DEFAULT_ENTERPRISE_WORKSPACES);
       } finally {
         if (isMounted) setIsLoading(false);
       }
     };
-    load();
+
+    load(true);
+
+    const handleAccountSwitched = () => {
+      load(true);
+    };
+
+    window.addEventListener('fabric-account-switched', handleAccountSwitched);
     return () => {
       isMounted = false;
+      window.removeEventListener('fabric-account-switched', handleAccountSwitched);
     };
   }, []);
 

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Loader2, Globe, Layers, X, Mic, MicOff, Volume2, Headphones } from 'lucide-react';
+import { Loader2, Globe, Layers, X, Mic, MicOff, Volume2, Headphones, ImagePlus } from 'lucide-react';
 import { FloatingVoiceOrb, VoiceModeState } from './voice/FloatingVoiceOrb';
 import {
   unlockSpeechEngine,
@@ -10,7 +10,7 @@ import {
 import { normalizeDataEngineeringTerms } from './voice/termNormalizer';
 
 interface PromptDockProps {
-  onSendMessage: (text: string, model?: string, effort?: string, mode?: 'auto' | 'general' | 'project') => void;
+  onSendMessage: (text: string, model?: string, effort?: string, mode?: 'auto' | 'general' | 'project', images?: string[]) => void;
   isStreaming: boolean;
   activeProjectId?: string | null;
   isVoiceModeActive?: boolean;
@@ -57,6 +57,42 @@ export const PromptDock: React.FC<PromptDockProps> = ({
   const [activeSubmenu, setActiveSubmenu] = useState<'none' | 'effort' | 'models'>('none');
   const [isTuningOpen, setIsTuningOpen] = useState(false);
   const [temperature, setTemperature] = useState(0.2);
+
+  // Image attachments (Multimodal)
+  const [attachedImages, setAttachedImages] = useState<string[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFiles = (files: FileList | File[]) => {
+    const valid = Array.from(files).filter((f) => f.type.startsWith('image/'));
+    valid.forEach((file) => {
+      if (file.size > 15 * 1024 * 1024) return;
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const res = e.target?.result as string;
+        if (res) {
+          setAttachedImages((prev) => [...prev, res]);
+        }
+      };
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const handlePaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    if (e.clipboardData && e.clipboardData.items) {
+      const items = Array.from(e.clipboardData.items).filter((it) => it.type.startsWith('image/'));
+      if (items.length > 0) {
+        const files: File[] = [];
+        for (const item of items) {
+          const file = item.getAsFile();
+          if (file) files.push(file);
+        }
+        if (files.length > 0) {
+          e.preventDefault();
+          handleFiles(files);
+        }
+      }
+    }
+  };
 
   // Dedicated speech-to-text dictation state (Microphone only)
   const [isDictating, setIsDictating] = useState<boolean>(false);
@@ -227,9 +263,16 @@ export const PromptDock: React.FC<PromptDockProps> = ({
       setIsDictating(false);
     }
     const val = (typeof textOverride === 'string' ? textOverride : '') || input;
-    if (!val.trim() || isStreaming) return;
-    onSendMessage(val.trim(), selectedModel, selectedEffort.toLowerCase(), chatMode);
+    if ((!val.trim() && attachedImages.length === 0) || isStreaming) return;
+    onSendMessage(
+      val.trim() || 'Analyze the attached image/diagram',
+      selectedModel,
+      selectedEffort.toLowerCase(),
+      chatMode,
+      attachedImages
+    );
     setInput('');
+    setAttachedImages([]);
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
     }
@@ -272,12 +315,36 @@ export const PromptDock: React.FC<PromptDockProps> = ({
       <div className="google-prompt-dock">
         {/* Text Input Wrapper */}
         <div className="dock-textarea-wrapper">
+          {attachedImages.length > 0 && (
+            <div className="dock-image-preview-tray">
+              {attachedImages.map((imgUrl, idx) => (
+                <div key={idx} className="dock-image-thumb-box">
+                  <img src={imgUrl} alt={`Upload ${idx + 1}`} className="dock-image-thumb-img" />
+                  <button
+                    type="button"
+                    className="dock-image-thumb-remove"
+                    title="Remove image"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setAttachedImages((prev) => prev.filter((_, i) => i !== idx));
+                    }}
+                  >
+                    <X size={11} />
+                  </button>
+                </div>
+              ))}
+              <span className="dock-image-tray-hint">
+                {attachedImages.length} image{attachedImages.length > 1 ? 's' : ''} attached
+              </span>
+            </div>
+          )}
           <textarea
             ref={textareaRef}
             id="chatInput"
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
+            onPaste={handlePaste}
             placeholder={
               isVoiceModeActive
                 ? isVoiceMuted
@@ -373,6 +440,38 @@ export const PromptDock: React.FC<PromptDockProps> = ({
                       </>
                     )}
                   </div>
+                </button>
+
+                {/* Hidden File Input for Image Upload */}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp,image/gif,image/bmp"
+                  multiple
+                  style={{ display: 'none' }}
+                  onChange={(e) => {
+                    if (e.target.files) {
+                      handleFiles(e.target.files);
+                      e.target.value = '';
+                    }
+                  }}
+                />
+
+                {/* Attach Image Tool Pill */}
+                <button
+                  type="button"
+                  className={`dock-tool-pill ${attachedImages.length > 0 ? 'active' : ''}`}
+                  id="btnDockAttachImage"
+                  onClick={() => fileInputRef.current?.click()}
+                  title="Attach image or diagram (or paste with Ctrl+V)"
+                >
+                  <ImagePlus size={13} strokeWidth={1.8} />
+                  <span>Image</span>
+                  {attachedImages.length > 0 && (
+                    <span className="dock-attachment-badge">
+                      {attachedImages.length}
+                    </span>
+                  )}
                 </button>
               </div>
 
@@ -596,11 +695,11 @@ export const PromptDock: React.FC<PromptDockProps> = ({
                     </button>
 
                     {/* Send Button or Live Audio Waveform (Interactive Voice Mode) */}
-                    {input.trim().length > 0 || isStreaming ? (
+                    {input.trim().length > 0 || attachedImages.length > 0 || isStreaming ? (
                       <button
                         type="button"
                         onClick={() => handleSubmit()}
-                        disabled={!input.trim() || isStreaming}
+                        disabled={(!input.trim() && attachedImages.length === 0) || isStreaming}
                         className="dock-icon-btn btn-chat-send"
                         id="btnChatSend"
                         title="Send Prompt (Enter)"

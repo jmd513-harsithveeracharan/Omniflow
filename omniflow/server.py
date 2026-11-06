@@ -132,6 +132,7 @@ class ChatRequest(BaseModel):
     stream: bool = Field(default=True)
     is_voice: bool = Field(default=False)
     user_email: str | None = Field(default=None, description="User email for session scoping")
+    images: list[str] | None = Field(default=None, description="Base64 data URLs for multimodal image analysis")
 
 
 class ProjectRequest(BaseModel):
@@ -778,11 +779,11 @@ async def list_fabric_workspaces(refresh: bool = False) -> dict[str, Any]:
         from app.fabric_client import list_workspaces as fc_list_workspaces
         live_ws = fc_list_workspaces()
         if live_ws:
-            if not default_ws_id:
+            ws_found = next((w for w in live_ws if w.get("id") == default_ws_id), None)
+            if not default_ws_id or not ws_found:
                 first_active = next((w for w in live_ws if w.get("type") != "Personal"), live_ws[0])
                 default_ws_id = first_active.get("id", "")
-                if not default_ws_name:
-                    default_ws_name = first_active.get("displayName") or first_active.get("name") or "Fabric Workspace"
+                default_ws_name = first_active.get("displayName") or first_active.get("name") or "Fabric Workspace"
 
             for w in live_ws:
                 workspaces.append({
@@ -1139,6 +1140,18 @@ async def handle_pipeline_deploy(req: DeployPlanRequest) -> dict[str, Any]:
     }
 
 
+def _format_chat_message(m: dict[str, Any]) -> dict[str, Any]:
+    role = m.get("role", "user")
+    content = m.get("content", "")
+    images = m.get("images", [])
+    if role == "user" and images:
+        parts: list[dict[str, Any]] = [{"type": "text", "text": str(content)}]
+        for img in images:
+            parts.append({"type": "image_url", "image_url": {"url": img}})
+        return {"role": role, "content": parts}
+    return {"role": role, "content": content}
+
+
 @app.post("/api/chat/stream")
 async def handle_chat_stream(req: ChatRequest) -> StreamingResponse:
     sid = req.session_id or f"sess_{uuid.uuid4().hex[:9]}"
@@ -1174,7 +1187,10 @@ async def handle_chat_stream(req: ChatRequest) -> StreamingResponse:
             SESSIONS[sid]["title"] = clean_msg_title
         SESSIONS[sid]["updated_at"] = get_utc_iso()
     
-    SESSIONS[sid]["messages"].append({"role": "user", "content": req.message})
+    user_msg_entry: dict[str, Any] = {"role": "user", "content": req.message}
+    if req.images:
+        user_msg_entry["images"] = req.images
+    SESSIONS[sid]["messages"].append(user_msg_entry)
     save_sessions_to_disk()
 
     # Detect if message contains intake JSON or architectural instructions
@@ -1252,15 +1268,13 @@ async def handle_chat_stream(req: ChatRequest) -> StreamingResponse:
             effective_effort = "low" if req.is_voice or not req.effort or req.effort.lower() in ["medium", "auto"] else req.effort
             sys_prompt = build_general_chat_prompt(effort=effective_effort, is_voice=req.is_voice)
             
-            # Multi-turn conversational history hydration
+            # Multi-turn conversational history hydration with multimodal formatting
             raw_history = SESSIONS[sid].get("messages", [])
             recent_history = [
-                {"role": m["role"], "content": m["content"]}
+                _format_chat_message(m)
                 for m in raw_history[-10:]
                 if m.get("content") and m.get("role") in ["user", "assistant"]
             ]
-            if not recent_history or recent_history[-1]["content"] != req.message:
-                recent_history.append({"role": "user", "content": req.message})
             llm_payload = [{"role": "system", "content": sys_prompt}] + recent_history
 
             reply_chunks: list[str] = []
@@ -1345,15 +1359,13 @@ async def handle_chat_stream(req: ChatRequest) -> StreamingResponse:
             effective_effort = "low" if req.is_voice or not req.effort or req.effort.lower() in ["medium", "auto"] else req.effort
             sys_prompt = build_project_qa_prompt(proj_ctx, effort=effective_effort, is_voice=req.is_voice)
             
-            # Multi-turn conversational history hydration
+            # Multi-turn conversational history hydration with multimodal formatting
             raw_history = SESSIONS[sid].get("messages", [])
             recent_history = [
-                {"role": m["role"], "content": m["content"]}
+                _format_chat_message(m)
                 for m in raw_history[-10:]
                 if m.get("content") and m.get("role") in ["user", "assistant"]
             ]
-            if not recent_history or recent_history[-1]["content"] != req.message:
-                recent_history.append({"role": "user", "content": req.message})
             llm_payload = [{"role": "system", "content": sys_prompt}] + recent_history
 
             reply_chunks: list[str] = []
@@ -1922,14 +1934,12 @@ async def handle_chat_stream(req: ChatRequest) -> StreamingResponse:
             yield f"data: {json.dumps({'type': 'thought_step', 'step': {'id': 't2_stream', 'title': 'Tenali AI: Generating stream response...', 'status': 'in_progress', 'target': 'Tenali AI'}})}\n\n"
             await asyncio.sleep(0)
 
-            # Contextual multi-turn history: preserve prior turns for conversational continuity
-            llm_messages: list[dict[str, str]] = [{"role": "system", "content": sys_prompt}]
+            # Contextual multi-turn history: preserve prior turns with multimodal support
+            llm_messages: list[dict[str, Any]] = [{"role": "system", "content": sys_prompt}]
             prior_history = SESSIONS[sid].get("messages", [])
             for m in prior_history[-8:]:
-                m_role = m.get("role", "user")
-                m_content = m.get("content", "")
-                if m_content:
-                    llm_messages.append({"role": m_role, "content": m_content})
+                if m.get("content"):
+                    llm_messages.append(_format_chat_message(m))
 
             reply_chunks: list[str] = []
             first_chunk_emitted = False

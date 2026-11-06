@@ -591,11 +591,18 @@ def switch_fabric_account(req: SwitchAccountRequest) -> dict[str, Any]:
         account = _get_azure_cli_account()
         if rc == 0:
             try:
+                import app.auth as app_auth
+                app_auth.clear_token_cache()
+            except Exception as e:
+                logger.warning(f"Failed to clear app.auth token cache: {e}")
+            try:
                 import omniflow.server as srv
                 srv.FABRIC_STATUS_CACHE = None
                 srv._workspaces_list_cache["data"] = None
-            except Exception:
-                pass
+                srv._workspaces_list_cache["expires_at"] = 0.0
+                srv._workspace_items_cache.clear()
+            except Exception as e:
+                logger.warning(f"Failed to clear server caches: {e}")
             return {
                 "success": True,
                 "message": f"Switched active Fabric session to {account.get('name', 'selected account')} ({account.get('tenant_name')})",

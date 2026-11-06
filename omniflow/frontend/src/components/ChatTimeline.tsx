@@ -200,7 +200,21 @@ export const ChatTimeline: React.FC<ChatTimelineProps> = ({
                 data-raw-content={cleanContent}
               >
                 <div className="chat-content-card">
-                  <div className="chat-card-text">{cleanContent}</div>
+                  {m.images && m.images.length > 0 && (
+                    <div className="chat-bubble-images">
+                      {m.images.map((imgUrl, imgIdx) => (
+                        <img
+                          key={imgIdx}
+                          src={imgUrl}
+                          alt={`Attachment ${imgIdx + 1}`}
+                          className="chat-bubble-image-thumb"
+                          onClick={() => window.open(imgUrl, '_blank')}
+                          title="Click to view full image in new tab"
+                        />
+                      ))}
+                    </div>
+                  )}
+                  {cleanContent && <div className="chat-card-text">{cleanContent}</div>}
                 </div>
                 <div className="chat-bubble-actions user-actions">
                   <button

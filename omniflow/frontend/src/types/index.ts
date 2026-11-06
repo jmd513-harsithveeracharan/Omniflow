@@ -59,6 +59,7 @@ export interface ChatMessage {
   id?: number;
   role: RoleType;
   content: string;
+  images?: string[];
   tokenEst?: number;
   createdAt?: string;
   isStreaming?: boolean;

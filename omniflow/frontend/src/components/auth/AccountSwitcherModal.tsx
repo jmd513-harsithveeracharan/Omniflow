@@ -100,8 +100,18 @@ export const AccountSwitcherModal: React.FC<AccountSwitcherModalProps> = ({
       const res = await switchFabricAccount(account.id, account.tenant_id);
       if (res.success) {
         setStatusMsg({ text: `Switched active session to ${account.name}`, type: 'success' });
-        await loadAccounts();
+        // Instant 0ms optimistic UI feedback
+        setAccounts((prev) =>
+          prev.map((a) => ({
+            ...a,
+            is_active: a.id === account.id,
+          }))
+        );
+        setSwitchingId(null);
         onAccountSwitched();
+        window.dispatchEvent(new CustomEvent('fabric-account-switched', { detail: account }));
+        // Background reconcile with Azure CLI without blocking the card status UI
+        loadAccounts().catch(() => {});
       } else if (res.requires_login) {
         setStatusMsg({ text: `Session expired for ${account.name}. Please sign in again.`, type: 'info' });
       } else {

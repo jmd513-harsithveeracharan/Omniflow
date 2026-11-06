@@ -504,9 +504,10 @@ export const App: React.FC = () => {
     text: string,
     model?: string,
     effort?: string,
-    mode?: 'auto' | 'general' | 'project'
+    mode?: 'auto' | 'general' | 'project',
+    images?: string[]
   ) => {
-    if (!text.trim()) return;
+    if (!text.trim() && (!images || images.length === 0)) return;
 
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
@@ -525,7 +526,11 @@ export const App: React.FC = () => {
     abortControllerRef.current = controller;
 
     const startTime = Date.now();
-    const userMsg: ChatMessage = { role: 'user', content: text };
+    const userMsg: ChatMessage = {
+      role: 'user',
+      content: text,
+      images: images && images.length > 0 ? images : undefined,
+    };
     const placeholderAssistantMsg: ChatMessage = {
       role: 'assistant',
       content: '',
@@ -681,7 +686,8 @@ export const App: React.FC = () => {
           setActiveCredentialRequest(credData);
         }
       },
-      activeProjectId || undefined
+      activeProjectId || undefined,
+      images
     );
   };
 
