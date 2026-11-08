@@ -518,9 +518,23 @@ export async function fetchFabricWorkspaces(refresh: boolean = false): Promise<{
   }
 }
 
-export async function fetchFabricAccounts(): Promise<import('../types').FabricAccountProfile[]> {
-  const res = await fetch(`${API_BASE}/auth/accounts`);
+export async function fetchFabricAccounts(refresh = false): Promise<import('../types').FabricAccountProfile[]> {
+  const url = refresh ? `${API_BASE}/auth/accounts?refresh=true` : `${API_BASE}/auth/accounts`;
+  const res = await fetch(url);
   if (!res.ok) throw new Error(`Failed to fetch accounts: ${res.statusText}`);
+  return res.json();
+}
+
+export async function removeFabricAccount(
+  accountId: string,
+  email?: string
+): Promise<{ success: boolean; message: string; accounts: import('../types').FabricAccountProfile[] }> {
+  const res = await fetch(`${API_BASE}/auth/accounts/remove`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ account_id: accountId, email: email || '' }),
+  });
+  if (!res.ok) throw new Error(`Failed to disconnect account: ${res.statusText}`);
   return res.json();
 }
 
