@@ -866,6 +866,13 @@ export const App: React.FC = () => {
             onOpenProject={(id) => {
               handleSelectProject(id);
             }}
+            onOpenRelationshipGraph={(pId) => {
+              setActiveProjectId(pId);
+              setActiveView('mesh');
+              try {
+                localStorage.setItem('omniflow_active_view', 'mesh');
+              } catch {}
+            }}
             onNewChatWithContext={(_name) => {
               setActiveView('chat');
               handleNewSession();
@@ -943,6 +950,7 @@ export const App: React.FC = () => {
               if (p) handleTogglePinProject(p.id, p.is_pinned || 0);
             }}
             onEditProject={handleEditProject}
+            onDeleteProject={handleDeleteProject}
             onDeleteSession={async (sid) => {
               await handleDeleteSession(sid);
               setProjectSessions((prev) => prev.filter((s) => s.sessionId !== sid));
@@ -1064,6 +1072,14 @@ export const App: React.FC = () => {
         project={editingProject}
         onSave={handleSaveEditedProject}
         initialTab={editingProjectTab}
+        onDeleteProject={handleDeleteProject}
+        onOpenRelationshipGraph={(pId) => {
+          setActiveProjectId(pId);
+          setActiveView('mesh');
+          try {
+            localStorage.setItem('omniflow_active_view', 'mesh');
+          } catch {}
+        }}
       />
 
       <SkillInspectorModal

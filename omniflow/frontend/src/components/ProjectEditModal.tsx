@@ -11,6 +11,8 @@ import {
   AlertCircle,
   CheckCircle2,
   Share2,
+  Network,
+  Trash2,
 } from 'lucide-react';
 import { ProjectRecord, ProjectMetadata } from '../types';
 import { ProjectTeamTab } from './project/ProjectTeamTab';
@@ -31,6 +33,8 @@ interface ProjectEditModalProps {
     }
   ) => Promise<void>;
   initialTab?: 'general' | 'workspaces' | 'team' | 'git';
+  onDeleteProject?: (projectId: string) => void;
+  onOpenRelationshipGraph?: (projectId: string) => void;
 }
 
 export const ProjectEditModal: React.FC<ProjectEditModalProps> = ({
@@ -39,6 +43,8 @@ export const ProjectEditModal: React.FC<ProjectEditModalProps> = ({
   project,
   onSave,
   initialTab = 'general',
+  onDeleteProject,
+  onOpenRelationshipGraph,
 }) => {
   const [activeTab, setActiveTab] = useState<'general' | 'workspaces' | 'team' | 'git'>(initialTab);
   const [searchQuery, setSearchQuery] = useState('');
@@ -82,6 +88,29 @@ export const ProjectEditModal: React.FC<ProjectEditModalProps> = ({
   }, [isOpen, onClose]);
 
   if (!isOpen || !project) return null;
+
+  const handleOpenGraph = () => {
+    if (!project) return;
+    onClose();
+    if (onOpenRelationshipGraph) {
+      onOpenRelationshipGraph(project.id);
+    }
+  };
+
+  const handleDelete = () => {
+    if (!project) return;
+    const projName = project.name || project.id;
+    if (
+      window.confirm(
+        `Are you sure you want to delete "${projName}"? This will remove all local mappings and lineage history.`
+      )
+    ) {
+      if (onDeleteProject) {
+        onDeleteProject(project.id);
+      }
+      onClose();
+    }
+  };
 
   const handleFolderPicked = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -186,6 +215,18 @@ export const ProjectEditModal: React.FC<ProjectEditModalProps> = ({
                 </button>
               );
             })}
+
+            {onOpenRelationshipGraph && (
+              <button
+                type="button"
+                className="claude-settings-nav-item"
+                style={{ marginTop: '4px', color: '#7dd3fc' }}
+                onClick={handleOpenGraph}
+              >
+                <Network width={15} height={15} style={{ color: '#38bdf8' }} />
+                <span>Relationship Graph</span>
+              </button>
+            )}
           </div>
 
           <div style={{ marginTop: 'auto', paddingTop: '16px', borderTop: '1px solid rgba(255, 255, 255, 0.07)' }}>
@@ -201,12 +242,44 @@ export const ProjectEditModal: React.FC<ProjectEditModalProps> = ({
         {/* RIGHT CONTENT PANE */}
         <div className="claude-settings-body">
           {/* Header Row */}
-          <div className="pane-header-row">
+          <div className="pane-header-row" style={{ marginBottom: '14px' }}>
             <div>
               <h2 className="pane-title">{currentNav.label}</h2>
-              <p className="pane-desc">{currentNav.desc}</p>
+              <p className="pane-desc" style={{ marginTop: '2px', fontSize: '12px' }}>{currentNav.desc}</p>
             </div>
-            <div className="pane-header-actions">
+            <div className="pane-header-actions" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              {onOpenRelationshipGraph && (
+                <button
+                  type="button"
+                  onClick={handleOpenGraph}
+                  title="View Lineage & Relationship Graph"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '5px 11px',
+                    background: 'rgba(255, 255, 255, 0.05)',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    borderRadius: '7px',
+                    color: '#e4e4e7',
+                    fontSize: '12px',
+                    fontWeight: 500,
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = 'rgba(56, 189, 248, 0.12)';
+                    e.currentTarget.style.borderColor = 'rgba(56, 189, 248, 0.3)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
+                    e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)';
+                  }}
+                >
+                  <Network width={13} height={13} style={{ color: '#38bdf8' }} />
+                  <span>Relationship Graph</span>
+                </button>
+              )}
               <button
                 type="button"
                 className="btn-subtle-icon btn-close-modal-icon"
@@ -221,19 +294,19 @@ export const ProjectEditModal: React.FC<ProjectEditModalProps> = ({
           {error && (
             <div
               style={{
-                padding: '10px 14px',
+                padding: '8px 12px',
                 borderRadius: '8px',
                 background: 'rgba(239, 68, 68, 0.12)',
                 border: '1px solid rgba(239, 68, 68, 0.25)',
                 color: '#f87171',
-                fontSize: '12.5px',
-                marginBottom: '16px',
+                fontSize: '12px',
+                marginBottom: '12px',
                 display: 'flex',
                 alignItems: 'center',
                 gap: '8px',
               }}
             >
-              <AlertCircle width={15} height={15} />
+              <AlertCircle width={14} height={14} />
               <span>{error}</span>
             </div>
           )}
@@ -241,28 +314,28 @@ export const ProjectEditModal: React.FC<ProjectEditModalProps> = ({
           {saveSuccess && (
             <div
               style={{
-                padding: '10px 14px',
+                padding: '8px 12px',
                 borderRadius: '8px',
                 background: 'rgba(56, 189, 248, 0.12)',
                 border: '1px solid rgba(56, 189, 248, 0.25)',
                 color: '#38bdf8',
-                fontSize: '12.5px',
-                marginBottom: '16px',
+                fontSize: '12px',
+                marginBottom: '12px',
                 display: 'flex',
                 alignItems: 'center',
                 gap: '8px',
               }}
             >
-              <CheckCircle2 width={15} height={15} />
+              <CheckCircle2 width={14} height={14} />
               <span>Project settings saved successfully</span>
             </div>
           )}
 
           {/* TAB 1: GENERAL */}
           {activeTab === 'general' && (
-            <div className="settings-tab-pane" style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+            <div className="settings-tab-pane" style={{ display: 'flex', flexDirection: 'column', gap: '11px' }}>
               <div>
-                <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 600, color: '#e4e4e7', marginBottom: '6px' }}>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#e4e4e7', marginBottom: '5px' }}>
                   Project Name <span style={{ color: '#ef4444' }}>*</span>
                 </label>
                 <input
@@ -275,7 +348,7 @@ export const ProjectEditModal: React.FC<ProjectEditModalProps> = ({
                     background: '#18181b',
                     border: '1px solid rgba(255, 255, 255, 0.1)',
                     borderRadius: '8px',
-                    padding: '9px 12px',
+                    padding: '8px 11px',
                     color: '#ffffff',
                     fontSize: '13px',
                     outline: 'none',
@@ -286,22 +359,22 @@ export const ProjectEditModal: React.FC<ProjectEditModalProps> = ({
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 600, color: '#e4e4e7', marginBottom: '6px' }}>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#e4e4e7', marginBottom: '5px' }}>
                   Description
                 </label>
                 <textarea
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   placeholder="Brief summary of data pipeline goals, lakehouses, and analytics scope..."
-                  rows={3}
+                  rows={2}
                   style={{
                     width: '100%',
                     background: '#18181b',
                     border: '1px solid rgba(255, 255, 255, 0.1)',
                     borderRadius: '8px',
-                    padding: '10px 12px',
+                    padding: '7px 11px',
                     color: '#ffffff',
-                    fontSize: '13px',
+                    fontSize: '12.5px',
                     outline: 'none',
                     resize: 'vertical',
                     boxSizing: 'border-box',
@@ -310,22 +383,22 @@ export const ProjectEditModal: React.FC<ProjectEditModalProps> = ({
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 600, color: '#e4e4e7', marginBottom: '6px' }}>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#e4e4e7', marginBottom: '5px' }}>
                   Objectives & Scope
                 </label>
                 <textarea
                   value={objectives}
                   onChange={(e) => setObjectives(e.target.value)}
                   placeholder="Describe upstream data sources, medallion layer transformations, or business KPIs..."
-                  rows={3}
+                  rows={2}
                   style={{
                     width: '100%',
                     background: '#18181b',
                     border: '1px solid rgba(255, 255, 255, 0.1)',
                     borderRadius: '8px',
-                    padding: '10px 12px',
+                    padding: '7px 11px',
                     color: '#ffffff',
-                    fontSize: '13px',
+                    fontSize: '12.5px',
                     outline: 'none',
                     resize: 'vertical',
                     boxSizing: 'border-box',
@@ -336,13 +409,13 @@ export const ProjectEditModal: React.FC<ProjectEditModalProps> = ({
               {/* Shared Multi-turn Context Toggle */}
               <div
                 style={{
-                  background: 'rgba(255, 255, 255, 0.03)',
+                  background: 'rgba(255, 255, 255, 0.025)',
                   border: '1px solid rgba(255, 255, 255, 0.08)',
-                  borderRadius: '10px',
-                  padding: '14px 16px',
+                  borderRadius: '9px',
+                  padding: '9px 12px',
                   display: 'flex',
                   alignItems: 'flex-start',
-                  gap: '12px',
+                  gap: '10px',
                 }}
               >
                 <input
@@ -350,18 +423,71 @@ export const ProjectEditModal: React.FC<ProjectEditModalProps> = ({
                   id="chkSharedContext"
                   checked={sharedContext}
                   onChange={(e) => setSharedContext(e.target.checked)}
-                  style={{ accentColor: '#38bdf8', width: '16px', height: '16px', marginTop: '2px', cursor: 'pointer' }}
+                  style={{ accentColor: '#38bdf8', width: '15px', height: '15px', marginTop: '2px', cursor: 'pointer' }}
                 />
-                <label htmlFor="chkSharedContext" style={{ cursor: 'pointer' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', fontWeight: 600, color: '#f4f4f5' }}>
+                <label htmlFor="chkSharedContext" style={{ cursor: 'pointer', flex: 1 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12.5px', fontWeight: 600, color: '#f4f4f5' }}>
                     <Share2 width={13} height={13} style={{ color: '#38bdf8' }} />
                     <span>Share multi-turn chat history & agent blast-radius lineage</span>
                   </div>
-                  <p style={{ margin: '4px 0 0 0', fontSize: '11.5px', color: '#a1a1aa', lineHeight: 1.45 }}>
+                  <p style={{ margin: '2px 0 0 0', fontSize: '11px', color: '#a1a1aa', lineHeight: 1.4 }}>
                     When enabled, team members can view session history, explore the shared lineage graph, and inspect downstream impact analysis across project workspaces.
                   </p>
                 </label>
               </div>
+
+              {/* Danger Zone: Delete Project */}
+              {onDeleteProject && (
+                <div
+                  style={{
+                    background: 'rgba(239, 68, 68, 0.03)',
+                    border: '1px solid rgba(239, 68, 68, 0.18)',
+                    borderRadius: '9px',
+                    padding: '9px 12px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: '12px',
+                    marginTop: '2px',
+                  }}
+                >
+                  <div>
+                    <div style={{ fontSize: '12.5px', fontWeight: 600, color: '#f87171', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                      <Trash2 width={13} height={13} />
+                      <span>Delete project</span>
+                    </div>
+                    <p style={{ margin: '2px 0 0 0', fontSize: '11px', color: '#a1a1aa' }}>
+                      Permanently remove this project and dissociate local workspace bindings.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleDelete}
+                    style={{
+                      padding: '5px 12px',
+                      borderRadius: '6px',
+                      background: 'rgba(239, 68, 68, 0.12)',
+                      border: '1px solid rgba(239, 68, 68, 0.28)',
+                      color: '#ef4444',
+                      fontSize: '12px',
+                      fontWeight: 500,
+                      cursor: 'pointer',
+                      whiteSpace: 'nowrap',
+                      transition: 'all 0.15s ease',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = '#ef4444';
+                      e.currentTarget.style.color = '#ffffff';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = 'rgba(239, 68, 68, 0.12)';
+                      e.currentTarget.style.color = '#ef4444';
+                    }}
+                  >
+                    Delete project
+                  </button>
+                </div>
+              )}
             </div>
           )}
 
@@ -387,17 +513,17 @@ export const ProjectEditModal: React.FC<ProjectEditModalProps> = ({
 
           {/* TAB 4: STORAGE & GIT */}
           {activeTab === 'git' && (
-            <div className="settings-tab-pane" style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+            <div className="settings-tab-pane" style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
               {/* Local Hard Disk Storage Location */}
               <div
                 style={{
                   background: 'rgba(255, 255, 255, 0.03)',
                   border: '1px solid rgba(255, 255, 255, 0.08)',
                   borderRadius: '10px',
-                  padding: '16px',
+                  padding: '14px',
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
                   <label
                     style={{
                       display: 'flex',
@@ -499,7 +625,7 @@ export const ProjectEditModal: React.FC<ProjectEditModalProps> = ({
           <div
             style={{
               marginTop: 'auto',
-              paddingTop: '20px',
+              paddingTop: '14px',
               borderTop: '1px solid rgba(255, 255, 255, 0.08)',
               display: 'flex',
               alignItems: 'center',
@@ -511,7 +637,7 @@ export const ProjectEditModal: React.FC<ProjectEditModalProps> = ({
               type="button"
               onClick={onClose}
               style={{
-                padding: '7px 15px',
+                padding: '6px 14px',
                 borderRadius: '8px',
                 border: '1px solid rgba(255, 255, 255, 0.12)',
                 background: 'transparent',
@@ -529,7 +655,7 @@ export const ProjectEditModal: React.FC<ProjectEditModalProps> = ({
               onClick={() => handleSaveAll()}
               disabled={isSaving}
               style={{
-                padding: '7px 18px',
+                padding: '6px 16px',
                 borderRadius: '8px',
                 border: 'none',
                 background: '#ffffff',

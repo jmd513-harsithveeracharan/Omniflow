@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Pin, MoreHorizontal, Network, Edit3, Users, PanelLeftOpen, FolderTree } from 'lucide-react';
+import { Pin, MoreHorizontal, Network, Edit3, Trash2, PanelLeftOpen, FolderTree } from 'lucide-react';
 import { ProjectRecord, ChatSession, ProjectContextFile, ProjectMetadata } from '../../types';
 import { PromptDock } from '../PromptDock';
 import { ProjectRecentsList } from './ProjectRecentsList';
@@ -18,7 +18,7 @@ interface ProjectWorkspaceHubProps {
   onUpdateProject: (updated: ProjectRecord) => Promise<void>;
   onTogglePin?: () => void;
   onEditProject?: (p: ProjectRecord, initialTab?: 'general' | 'workspaces' | 'team' | 'git') => void;
-  onManageMembers?: (p: ProjectRecord) => void;
+  onDeleteProject?: (projectId: string) => void;
   onDeleteSession?: (sessionId: string) => void;
 }
 
@@ -35,7 +35,7 @@ export const ProjectWorkspaceHub: React.FC<ProjectWorkspaceHubProps> = ({
   onUpdateProject,
   onTogglePin,
   onEditProject,
-  onManageMembers: _onManageMembers,
+  onDeleteProject,
   onDeleteSession,
 }) => {
   const [isMenuOpen, setIsMenuOpen] = useState<boolean>(false);
@@ -151,7 +151,7 @@ export const ProjectWorkspaceHub: React.FC<ProjectWorkspaceHubProps> = ({
               title={isPinned ? 'Unpin project' : 'Pin project'}
               className="p-1.5 text-[#8e918f] hover:text-[#f0f0f2] transition-colors"
             >
-              <Pin width={17} height={17} className={isPinned ? 'fill-emerald-400 text-emerald-400' : ''} />
+              <Pin width={17} height={17} className={isPinned ? 'fill-zinc-300 text-zinc-300' : ''} />
             </button>
 
             <div className="relative" ref={menuContainerRef}>
@@ -195,16 +195,6 @@ export const ProjectWorkspaceHub: React.FC<ProjectWorkspaceHubProps> = ({
                     </div>
                   )}
 
-                  {onEditProject && (
-                    <div
-                      className="chat-menu-item"
-                      onClick={() => onEditProject(project, 'team')}
-                    >
-                      <Users width={13} height={13} style={{ color: '#94a3b8' }} />
-                      <span className="menu-label">Team & members</span>
-                    </div>
-                  )}
-
                   <div className="chat-menu-divider" />
 
                   <div
@@ -214,6 +204,24 @@ export const ProjectWorkspaceHub: React.FC<ProjectWorkspaceHubProps> = ({
                     <FolderTree width={13} height={13} style={{ color: '#94a3b8' }} />
                     <span className="menu-label">View All Projects</span>
                   </div>
+
+                  {onDeleteProject && (
+                    <>
+                      <div className="chat-menu-divider" />
+                      <div
+                        className="chat-menu-item item-danger"
+                        onClick={() => {
+                          const name = project.name || project.id;
+                          if (window.confirm(`Are you sure you want to delete "${name}"? This will remove all local mappings and lineage history.`)) {
+                            onDeleteProject(project.id);
+                          }
+                        }}
+                      >
+                        <Trash2 width={13} height={13} />
+                        <span className="menu-label">Delete project</span>
+                      </div>
+                    </>
+                  )}
                 </div>
               )}
             </div>

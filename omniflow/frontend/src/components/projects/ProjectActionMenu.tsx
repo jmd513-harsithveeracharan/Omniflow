@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { Pin, Edit3, Users, Archive, Trash2 } from 'lucide-react';
+import { Pin, Edit3, Network, Archive, Trash2 } from 'lucide-react';
 import { ProjectRecord } from '../../types';
 
 interface ProjectActionMenuProps {
@@ -9,9 +9,9 @@ interface ProjectActionMenuProps {
   onClose: () => void;
   onTogglePin: (e: React.MouseEvent, p: ProjectRecord) => void;
   onEdit: (p: ProjectRecord, initialTab?: 'general' | 'workspaces' | 'team' | 'git') => void;
-  onManageMembers: (p: ProjectRecord) => void;
   onArchive: (e: React.MouseEvent, id: string) => void;
   onDelete: (e: React.MouseEvent, id: string) => void;
+  onOpenRelationshipGraph?: (projectId: string) => void;
 }
 
 export const ProjectActionMenu: React.FC<ProjectActionMenuProps> = ({
@@ -20,9 +20,9 @@ export const ProjectActionMenu: React.FC<ProjectActionMenuProps> = ({
   onClose,
   onTogglePin,
   onEdit,
-  onManageMembers: _onManageMembers,
   onArchive,
   onDelete,
+  onOpenRelationshipGraph,
 }) => {
   const menuRef = useRef<HTMLDivElement>(null);
   const isPinned = Boolean(project.is_pinned);
@@ -68,9 +68,22 @@ export const ProjectActionMenu: React.FC<ProjectActionMenuProps> = ({
           onClose();
         }}
       >
-        <Pin width={13} height={13} style={isPinned ? { color: '#10b981' } : undefined} />
+        <Pin width={13} height={13} style={isPinned ? { color: '#e4e4e7' } : undefined} />
         <span className="menu-label">{isPinned ? 'Unpin project' : 'Pin to top'}</span>
       </div>
+
+      {onOpenRelationshipGraph && (
+        <div
+          className="chat-menu-item"
+          onClick={() => {
+            onClose();
+            onOpenRelationshipGraph(project.id);
+          }}
+        >
+          <Network width={13} height={13} />
+          <span className="menu-label">Relationship Graph</span>
+        </div>
+      )}
 
       <div
         className="chat-menu-item"
@@ -81,17 +94,6 @@ export const ProjectActionMenu: React.FC<ProjectActionMenuProps> = ({
       >
         <Edit3 width={13} height={13} />
         <span className="menu-label">Edit details</span>
-      </div>
-
-      <div
-        className="chat-menu-item"
-        onClick={() => {
-          onClose();
-          onEdit(project, 'team');
-        }}
-      >
-        <Users width={13} height={13} />
-        <span className="menu-label">Team & members</span>
       </div>
 
       <div

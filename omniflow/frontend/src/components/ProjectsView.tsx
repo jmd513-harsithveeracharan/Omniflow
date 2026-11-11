@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { FolderPlus } from 'lucide-react';
-import { ProjectRecord, ProjectMember, ProjectMetadata } from '../types';
+import { ProjectRecord, ProjectMetadata } from '../types';
 import { fetchProjects, createProject, updateProject, deleteProject } from '../services/api';
 import { ProjectsHeader } from './projects/ProjectsHeader';
 import { ProjectSkeleton } from './projects/ProjectSkeleton';
@@ -8,11 +8,11 @@ import { ProjectCard } from './projects/ProjectCard';
 import { ProjectListRow } from './projects/ProjectListRow';
 import { ProjectActionMenu } from './projects/ProjectActionMenu';
 import { ProjectModal } from './projects/ProjectModal';
-import { ProjectMembersModal } from './projects/ProjectMembersModal';
 import { ProjectEditModal } from './ProjectEditModal';
 
 interface ProjectsViewProps {
   onOpenProject: (projectId: string) => void;
+  onOpenRelationshipGraph?: (projectId: string) => void;
   onNewChatWithContext?: (projectName: string) => void;
   onProjectsChanged?: () => void;
   currentUser?: import('../types').UserProfile | null;
@@ -22,6 +22,7 @@ interface ProjectsViewProps {
 
 export const ProjectsView: React.FC<ProjectsViewProps> = ({
   onOpenProject,
+  onOpenRelationshipGraph,
   onProjectsChanged,
   currentUser,
   projects: initialProjects = [],
@@ -40,8 +41,6 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({
   const [selectedProjectForEdit, setSelectedProjectForEdit] = useState<ProjectRecord | null>(null);
   const [editingProjectRecord, setEditingProjectRecord] = useState<ProjectRecord | null>(null);
   const [editModalTab, setEditModalTab] = useState<'general' | 'workspaces' | 'team' | 'git'>('general');
-  const [isMembersModalOpen, setIsMembersModalOpen] = useState<boolean>(false);
-  const [selectedProjectForMembers, setSelectedProjectForMembers] = useState<ProjectRecord | null>(null);
 
   // Floating Action Menu State
   const [activeMenuProject, setActiveMenuProject] = useState<ProjectRecord | null>(null);
@@ -96,11 +95,6 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({
   ) => {
     setEditingProjectRecord(p);
     setEditModalTab(tab);
-  };
-
-  const handleOpenMembersModal = (p: ProjectRecord) => {
-    setEditingProjectRecord(p);
-    setEditModalTab('team');
   };
 
   const handleOpenActionMenu = (e: React.MouseEvent, p: ProjectRecord) => {
@@ -187,19 +181,6 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({
     } catch (err) {
       console.error('Failed to archive project', err);
     }
-  };
-
-  const handleUpdateMembers = async (projectId: string, members: ProjectMember[]) => {
-    const target = projects.find((p) => p.id === projectId);
-    const meta = { ...(target?.metadata || {}), members };
-    setProjects((prev) =>
-      prev.map((p) => (p.id === projectId ? { ...p, metadata: meta } : p))
-    );
-    await updateProject(projectId, { metadata: meta });
-    if (selectedProjectForMembers?.id === projectId) {
-      setSelectedProjectForMembers((prev) => (prev ? { ...prev, metadata: meta } : null));
-    }
-    onProjectsChanged?.();
   };
 
   // Filter & Sort
@@ -302,9 +283,9 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({
             onClose={() => { setActiveMenuProject(null); setMenuPos(null); }}
             onTogglePin={handleTogglePin}
             onEdit={handleOpenEditModal}
-            onManageMembers={handleOpenMembersModal}
             onArchive={handleArchive}
             onDelete={handleDelete}
+            onOpenRelationshipGraph={onOpenRelationshipGraph}
           />
         )}
 
@@ -332,13 +313,12 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({
             setEditingProjectRecord(null);
           }}
           initialTab={editModalTab}
-        />
-
-        <ProjectMembersModal
-          isOpen={isMembersModalOpen}
-          onClose={() => setIsMembersModalOpen(false)}
-          project={selectedProjectForMembers}
-          onUpdateMembers={handleUpdateMembers}
+          onDeleteProject={async (id) => {
+            await deleteProject(id);
+            setProjects((prev) => prev.filter((p) => p.id !== id));
+            setEditingProjectRecord(null);
+          }}
+          onOpenRelationshipGraph={onOpenRelationshipGraph}
         />
       </div>
     </section>

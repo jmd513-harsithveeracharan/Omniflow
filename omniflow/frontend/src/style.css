@@ -8549,8 +8549,8 @@ ul.chat-md-list {
     border-radius: 18px;
     width: 900px;
     max-width: 95vw;
-    height: 680px;
-    max-height: 90vh;
+    height: 520px;
+    max-height: 88vh;
     box-shadow: 0 24px 80px rgba(0, 0, 0, 0.9);
     display: flex;
     overflow: hidden;
@@ -12192,8 +12192,13 @@ pre[class*="language-"] {
 }
 
 .project-card.is-pinned {
-    border-color: rgba(16, 185, 129, 0.35);
-    background: linear-gradient(180deg, rgba(16, 185, 129, 0.04) 0%, rgba(24, 24, 27, 1) 100%);
+    border-color: rgba(255, 255, 255, 0.14);
+    background: #18181b;
+}
+
+.project-card.is-pinned:hover {
+    border-color: rgba(255, 255, 255, 0.22);
+    background: #1f1f23;
 }
 
 .project-card-create {
@@ -12289,7 +12294,7 @@ pre[class*="language-"] {
 }
 
 .project-card-pin-btn.pinned {
-    color: #10b981 !important;
+    color: #e4e4e7 !important;
 }
 
 .project-card-name {
@@ -12382,7 +12387,7 @@ pre[class*="language-"] {
 }
 
 .projects-list-row.is-pinned {
-    background: rgba(16, 185, 129, 0.03);
+    background: rgba(255, 255, 255, 0.03);
 }
 
 .projects-list-info {
