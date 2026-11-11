@@ -275,19 +275,19 @@ export function createSnowflakeSimulation(
         .distance((l) => (l.relationship === 'CONTAINS' ? 38 : 135))
         .strength((l) => (l.relationship === 'CONTAINS' ? 0.95 : 0.18))
     )
-    // 3. Collision Barrier: Active on ALL nodes to prevent label overlap
+    // 3. Collision Barrier: Relaxed strength to prevent high-frequency jitter
     .force(
       'collide',
       forceCollide<D3SimNode>()
         .radius((d) => d.collisionRadius)
-        .strength(0.92)
-        .iterations(3)
+        .strength(0.70)
+        .iterations(1)
     )
     // 4. Custom Spherical Harmonic Galaxy Envelope (Obsidian-Style)
     .force('spherical', forceSphericalGalaxy(boundaryRadius))
     .alpha(0.35)
-    .alphaDecay(0.035)
-    .velocityDecay(0.40);
+    .alphaDecay(0.04)
+    .velocityDecay(0.48);
 
   // Adaptive synchronous warmup (20-35 ticks based on graph density)
   const warmupTicks = simNodes.length > 200 ? 20 : 30;

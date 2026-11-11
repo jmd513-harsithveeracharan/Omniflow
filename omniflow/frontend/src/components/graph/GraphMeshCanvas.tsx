@@ -58,8 +58,36 @@ export const GraphMeshCanvas: React.FC<GraphMeshCanvasProps> = ({
   const focalNodeRef = useRef<GraphMeshNode | null>(null);
   const lastRenderTimeRef = useRef<number>(performance.now());
 
-  const zoomLevelRef = useRef(zoomLevel);
-  zoomLevelRef.current = zoomLevel;
+  // Ultra-fast mutable refs for 60/120 FPS continuous panning & zooming without React state churn
+  const panRef = useRef({ x: panOffset.x, y: panOffset.y });
+  const zoomRef = useRef(zoomLevel);
+  const wheelTimeoutRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    panRef.current = { x: panOffset.x, y: panOffset.y };
+  }, [panOffset.x, panOffset.y]);
+
+  useEffect(() => {
+    zoomRef.current = zoomLevel;
+  }, [zoomLevel]);
+
+  const selectedNodeRef = useRef(selectedNode);
+  selectedNodeRef.current = selectedNode;
+
+  const hoveredNodeRef = useRef(hoveredNode);
+  hoveredNodeRef.current = hoveredNode;
+
+  const hoveredEdgeIdRef = useRef(hoveredEdgeId);
+  hoveredEdgeIdRef.current = hoveredEdgeId;
+
+  const searchQueryRef = useRef(searchQuery);
+  searchQueryRef.current = searchQuery;
+
+  const selectedLayerRef = useRef(selectedLayer);
+  selectedLayerRef.current = selectedLayer;
+
+  const selectedLayersRef = useRef(selectedLayers);
+  selectedLayersRef.current = selectedLayers;
 
   // Cleanup pending hover timer on unmount
   useEffect(() => {
@@ -112,8 +140,11 @@ export const GraphMeshCanvas: React.FC<GraphMeshCanvasProps> = ({
     const zoomX = (cw - 180) / graphWidth;
     const zoomY = (ch - 140) / graphHeight;
     const fitZoom = Math.max(0.40, Math.min(1.25, Math.min(zoomX, zoomY)));
+    const newPan = { x: -centerX * fitZoom, y: -centerY * fitZoom };
 
-    onPanChange({ x: -centerX * fitZoom, y: -centerY * fitZoom });
+    panRef.current = newPan;
+    zoomRef.current = fitZoom;
+    onPanChange(newPan);
     onZoomChange(fitZoom);
   };
 
@@ -148,8 +179,11 @@ export const GraphMeshCanvas: React.FC<GraphMeshCanvasProps> = ({
     if (matches.length > 0 && matches.length <= 4) {
       const avgX = matches.reduce((sum, n) => sum + (n.x || 0), 0) / matches.length;
       const avgY = matches.reduce((sum, n) => sum + (n.y || 0), 0) / matches.length;
-      const targetZoom = Math.max(0.95, Math.min(1.35, zoomLevelRef.current));
-      onPanChange({ x: -avgX * targetZoom, y: -avgY * targetZoom });
+      const targetZoom = Math.max(0.95, Math.min(1.35, zoomRef.current));
+      const newPan = { x: -avgX * targetZoom, y: -avgY * targetZoom };
+      panRef.current = newPan;
+      zoomRef.current = targetZoom;
+      onPanChange(newPan);
       onZoomChange(targetZoom);
     }
   }, [searchQuery]);
@@ -163,14 +197,25 @@ export const GraphMeshCanvas: React.FC<GraphMeshCanvasProps> = ({
       e.preventDefault();
       e.stopPropagation();
 
-      const factor = e.deltaY < 0 ? 1.12 : 0.89;
-      const newZoom = Math.max(0.25, Math.min(3.5, zoomLevelRef.current * factor));
-      onZoomChange(newZoom);
+      const factor = e.deltaY < 0 ? 1.09 : 0.91;
+      const newZoom = Math.max(0.25, Math.min(3.5, zoomRef.current * factor));
+      zoomRef.current = newZoom;
+
+      if (wheelTimeoutRef.current) {
+        window.clearTimeout(wheelTimeoutRef.current);
+      }
+      wheelTimeoutRef.current = window.setTimeout(() => {
+        onZoomChange(zoomRef.current);
+        wheelTimeoutRef.current = null;
+      }, 100);
     };
 
     canvas.addEventListener('wheel', handleWheelEvent, { passive: false });
     return () => {
       canvas.removeEventListener('wheel', handleWheelEvent);
+      if (wheelTimeoutRef.current) {
+        window.clearTimeout(wheelTimeoutRef.current);
+      }
     };
   }, [onZoomChange]);
 
@@ -218,15 +263,14 @@ export const GraphMeshCanvas: React.FC<GraphMeshCanvasProps> = ({
       const dt = Math.min(0.05, (now - lastRenderTimeRef.current) / 1000);
       lastRenderTimeRef.current = now;
 
-      // Active focal item (either explicitly selected or hovered)
-      const hasActive = Boolean(selectedNode || hoveredNode);
+      const curSelected = selectedNodeRef.current;
+      const curHovered = hoveredNodeRef.current;
+      const hasActive = Boolean(curSelected || curHovered);
 
       if (hasActive) {
-        focalNodeRef.current = selectedNode || hoveredNode;
-        // Smooth forward bloom over ~280ms
+        focalNodeRef.current = curSelected || curHovered;
         focusTransitionRef.current = Math.min(1.0, focusTransitionRef.current + dt * 3.6);
       } else {
-        // Crisp reverse contraction over ~200ms (never takes 1-2 seconds!)
         focusTransitionRef.current = Math.max(0.0, focusTransitionRef.current - dt * 5.0);
         if (focusTransitionRef.current === 0.0) {
           focalNodeRef.current = null;
@@ -249,15 +293,15 @@ export const GraphMeshCanvas: React.FC<GraphMeshCanvasProps> = ({
         height: h,
         simNodes: simNodesRef.current,
         simLinks: simLinksRef.current,
-        selectedNode,
-        hoveredNode,
+        selectedNode: curSelected,
+        hoveredNode: curHovered,
         activeFocalNode: focalNodeRef.current,
-        hoveredEdgeId,
-        selectedLayer,
-        selectedLayers,
-        searchQuery,
-        zoomLevel,
-        panOffset,
+        hoveredEdgeId: hoveredEdgeIdRef.current,
+        selectedLayer: selectedLayerRef.current,
+        selectedLayers: selectedLayersRef.current,
+        searchQuery: searchQueryRef.current,
+        zoomLevel: zoomRef.current,
+        panOffset: panRef.current,
         focusProgress: focusTransitionRef.current,
       });
 
@@ -267,14 +311,14 @@ export const GraphMeshCanvas: React.FC<GraphMeshCanvasProps> = ({
 
     animId = requestAnimationFrame(render);
     return () => cancelAnimationFrame(animId);
-  }, [edges, selectedLayer, selectedLayers, searchQuery, selectedNode, hoveredNode, hoveredEdgeId, zoomLevel, panOffset]);
+  }, []);
 
   const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const rect = canvas.getBoundingClientRect();
-    const mx = (e.clientX - rect.left - canvas.clientWidth / 2 - panOffset.x) / zoomLevel;
-    const my = (e.clientY - rect.top - canvas.clientHeight / 2 - panOffset.y) / zoomLevel;
+    const mx = (e.clientX - rect.left - canvas.clientWidth / 2 - panRef.current.x) / zoomRef.current;
+    const my = (e.clientY - rect.top - canvas.clientHeight / 2 - panRef.current.y) / zoomRef.current;
 
     const clicked = simNodesRef.current.find(
       (n) => n.x !== undefined && n.y !== undefined && Math.hypot(n.x - mx, n.y - my) <= n.radius + 6
@@ -290,13 +334,13 @@ export const GraphMeshCanvas: React.FC<GraphMeshCanvasProps> = ({
       setHoveredNode(clicked);
 
       draggedNodeRef.current = clicked;
-      if (simulationRef.current) {
+      if (simulationRef.current && isPhysicsActive) {
         simulationRef.current.alphaTarget(0.12).restart();
       }
       clicked.fx = clicked.x;
       clicked.fy = clicked.y;
 
-      if (selectedNode?.id === clicked.id) {
+      if (selectedNodeRef.current?.id === clicked.id) {
         onSelectNode(null);
         onHoverHighlightedEdge(null, null);
       } else {
@@ -326,21 +370,26 @@ export const GraphMeshCanvas: React.FC<GraphMeshCanvasProps> = ({
     const clientY = e.clientY;
 
     if (draggedNodeRef.current) {
-      draggedNodeRef.current.fx = (clientX - rect.left - canvas.clientWidth / 2 - panOffset.x) / zoomLevel;
-      draggedNodeRef.current.fy = (clientY - rect.top - canvas.clientHeight / 2 - panOffset.y) / zoomLevel;
+      const fx = (clientX - rect.left - canvas.clientWidth / 2 - panRef.current.x) / zoomRef.current;
+      const fy = (clientY - rect.top - canvas.clientHeight / 2 - panRef.current.y) / zoomRef.current;
+      draggedNodeRef.current.fx = fx;
+      draggedNodeRef.current.fy = fy;
+      draggedNodeRef.current.x = fx;
+      draggedNodeRef.current.y = fy;
       return;
     }
 
     if (isDraggingCanvasRef.current) {
       const dx = clientX - lastMousePosRef.current.x;
       const dy = clientY - lastMousePosRef.current.y;
-      onPanChange({ x: panOffset.x + dx, y: panOffset.y + dy });
+      panRef.current.x += dx;
+      panRef.current.y += dy;
       lastMousePosRef.current = { x: clientX, y: clientY };
       return;
     }
 
-    const mx = (clientX - rect.left - canvas.clientWidth / 2 - panOffset.x) / zoomLevel;
-    const my = (clientY - rect.top - canvas.clientHeight / 2 - panOffset.y) / zoomLevel;
+    const mx = (clientX - rect.left - canvas.clientWidth / 2 - panRef.current.x) / zoomRef.current;
+    const my = (clientY - rect.top - canvas.clientHeight / 2 - panRef.current.y) / zoomRef.current;
 
     // Detect hovered node with Hover Intent Debounce (~90ms dwell) to eliminate sweep jitter
     const foundHovered = simNodesRef.current.find(
@@ -379,7 +428,7 @@ export const GraphMeshCanvas: React.FC<GraphMeshCanvasProps> = ({
       }
       pendingCandidateRef.current = null;
       currentHoveredIdRef.current = null;
-      if (hoveredNode) {
+      if (hoveredNodeRef.current) {
         setHoveredNode(null);
       }
       if (hoveredEdgeId) {
@@ -388,9 +437,9 @@ export const GraphMeshCanvas: React.FC<GraphMeshCanvasProps> = ({
       }
     }
 
-    const focalNode = selectedNode || hoveredNode;
+    const focalNode = selectedNodeRef.current || hoveredNode;
     if (focalNode) {
-      const threshold = 7 / zoomLevel;
+      const threshold = 7 / zoomRef.current;
       let foundLink: D3SimLink | null = null;
 
       for (const link of simLinksRef.current) {
@@ -435,7 +484,10 @@ export const GraphMeshCanvas: React.FC<GraphMeshCanvasProps> = ({
         simulationRef.current.alphaTarget(0);
       }
     }
-    isDraggingCanvasRef.current = false;
+    if (isDraggingCanvasRef.current) {
+      isDraggingCanvasRef.current = false;
+      onPanChange({ ...panRef.current });
+    }
   };
 
   return (
