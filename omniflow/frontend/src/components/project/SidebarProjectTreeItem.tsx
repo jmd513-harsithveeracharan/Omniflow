@@ -66,7 +66,11 @@ export const SidebarProjectTreeItem: React.FC<SidebarProjectTreeItemProps> = ({
   const tooltipTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const isPinned = Boolean(project.is_pinned);
-  const displayName = project.name;
+  const rawName = project.name || '';
+  const cleanFallbackName = (project.id || '').startsWith('PRJ-')
+    ? project.id.replace(/^PRJ-/, '').replace(/[-_]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()).trim()
+    : (project.id || '');
+  const displayName = rawName && !rawName.startsWith('PRJ-') ? rawName : (cleanFallbackName || 'Project');
   const hasChats = chats.length > 0;
 
   useEffect(() => {

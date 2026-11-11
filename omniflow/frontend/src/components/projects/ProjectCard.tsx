@@ -45,6 +45,11 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
         : `${workspaces[0]} +${workspaces.length - 1}`
       : 'Fabric Workspace';
   const members = meta.members || [];
+  const rawName = project.name || '';
+  const cleanFallbackName = (project.id || '').startsWith('PRJ-')
+    ? project.id.replace(/^PRJ-/, '').replace(/[-_]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()).trim()
+    : (project.id || '');
+  const displayName = rawName && !rawName.startsWith('PRJ-') ? rawName : (cleanFallbackName || 'Project');
 
   return (
     <div
@@ -79,7 +84,7 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
         </div>
       </div>
 
-      <h3 className="project-card-name">{project.name}</h3>
+      <h3 className="project-card-name">{displayName}</h3>
       <p className="project-card-description">
         {project.description || 'No description provided'}
       </p>

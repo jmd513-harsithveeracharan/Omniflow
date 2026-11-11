@@ -45,6 +45,11 @@ export const ProjectListRow: React.FC<ProjectListRowProps> = ({
         : `${workspaces[0]} +${workspaces.length - 1}`
       : 'Fabric Workspace';
   const members = meta.members || [];
+  const rawName = project.name || '';
+  const cleanFallbackName = (project.id || '').startsWith('PRJ-')
+    ? project.id.replace(/^PRJ-/, '').replace(/[-_]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()).trim()
+    : (project.id || '');
+  const displayName = rawName && !rawName.startsWith('PRJ-') ? rawName : (cleanFallbackName || 'Project');
 
   return (
     <div
@@ -54,7 +59,7 @@ export const ProjectListRow: React.FC<ProjectListRowProps> = ({
       <div className="projects-list-info">
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
           {isPinned && <Pin width={12} height={12} style={{ color: '#10b981', flexShrink: 0 }} />}
-          <span className="projects-list-name">{project.name}</span>
+          <span className="projects-list-name">{displayName}</span>
           <span
             className="project-card-badge"
             style={{ padding: '2px 8px', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px' }}

@@ -189,7 +189,7 @@ async def on_startup():
 def fetch_projects_cached(force_refresh: bool = False) -> list[dict[str, Any]]:
     global PROJECTS_CACHE, PROJECTS_CACHE_TIME
     now = time.time()
-    if not force_refresh and PROJECTS_CACHE and (now - PROJECTS_CACHE_TIME < 300.0):
+    if not force_refresh and PROJECTS_CACHE and (now - PROJECTS_CACHE_TIME < 60.0):
         return PROJECTS_CACHE
 
     projects = []
@@ -198,7 +198,28 @@ def fetch_projects_cached(force_refresh: bool = False) -> list[dict[str, Any]]:
         repo = PostgresRepository()
         with repo._connect() as conn:
             with conn.cursor() as cur:
-                cur.execute("SELECT COALESCE(project_code, project_id::text) as pid, project_name, description, status, created_at, created_by FROM projects ORDER BY created_at DESC LIMIT 50;")
+                # Ensure columns exist in postgres
+                cur.execute("ALTER TABLE projects ADD COLUMN IF NOT EXISTS is_pinned INTEGER DEFAULT 0;")
+                cur.execute("ALTER TABLE projects ADD COLUMN IF NOT EXISTS is_archived INTEGER DEFAULT 0;")
+                cur.execute("ALTER TABLE projects ADD COLUMN IF NOT EXISTS metadata JSONB DEFAULT '{}'::jsonb;")
+                conn.commit()
+
+                cur.execute(
+                    """
+                    SELECT COALESCE(project_code, project_id::text) as pid, 
+                           COALESCE(project_name, project_code, 'Untitled Project') as pname, 
+                           COALESCE(description, '') as pdesc, 
+                           COALESCE(status, 'active') as pstatus, 
+                           created_at, 
+                           created_by,
+                           COALESCE(is_pinned, 0) as is_pinned,
+                           COALESCE(is_archived, 0) as is_archived,
+                           metadata
+                    FROM projects 
+                    WHERE COALESCE(is_archived, 0) = 0
+                    ORDER BY is_pinned DESC, created_at DESC LIMIT 100;
+                    """
+                )
                 for r in cur.fetchall():
                     pid = str(r[0])
                     def_folder = os.path.join(BASE_DIR, "generated_artifacts", pid)
@@ -206,7 +227,17 @@ def fetch_projects_cached(force_refresh: bool = False) -> list[dict[str, Any]]:
                     old_p = existing_map.get(pid, {})
                     creator = r[5] or old_p.get("created_by") or "user@fabric.internal"
                     owner_name = creator.split("@")[0].replace(".", " ").title() if "@" in creator else creator
-                    meta = old_p.get("metadata") or {
+                    
+                    db_meta = r[8]
+                    if isinstance(db_meta, str):
+                        try:
+                            db_meta = json.loads(db_meta)
+                        except Exception:
+                            db_meta = {}
+                    elif not isinstance(db_meta, dict):
+                        db_meta = {}
+
+                    meta = db_meta or old_p.get("metadata") or {
                         "members": [
                             {
                                 "id": f"mem_{pid}",
@@ -218,6 +249,18 @@ def fetch_projects_cached(force_refresh: bool = False) -> list[dict[str, Any]]:
                             }
                         ]
                     }
+                    if "members" not in meta or not meta["members"]:
+                        meta["members"] = [
+                            {
+                                "id": f"mem_{pid}",
+                                "user_id": f"usr_{pid[:8]}",
+                                "name": f"{owner_name} (Owner)",
+                                "email": creator,
+                                "role": "owner",
+                                "avatarBg": "#27272a",
+                            }
+                        ]
+
                     if (pid == "PRJ-PELI-BIOTHERMAL" or pid == "PRJ-COMMERCIAL-REV") and "context_files" not in meta:
                         meta["context_files"] = [
                             {
@@ -237,20 +280,24 @@ def fetch_projects_cached(force_refresh: bool = False) -> list[dict[str, Any]]:
                     if pid == "PRJ-PELI-BIOTHERMAL" and not proj_desc:
                         proj_desc = "Working on the client Project where need to establish a data platform."
 
+                    proj_name = str(r[1] or pid)
+                    if proj_name.startswith("PRJ-") and pid != proj_name:
+                        proj_name = proj_name.replace("PRJ-", "").replace("-", " ").title()
+
                     projects.append({
                         "id": pid,
-                        "name": r[1],
+                        "name": proj_name,
                         "description": proj_desc,
                         "status": r[3],
-                        "is_pinned": old_p.get("is_pinned", 0),
-                        "is_archived": old_p.get("is_archived", 0),
+                        "is_pinned": int(r[6] or 0),
+                        "is_archived": int(r[7] or 0),
                         "local_path": def_folder if has_folder else "",
                         "created_at": str(r[4]) if r[4] else "",
                         "created_by": creator,
                         "metadata": meta,
                     })
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"[Notice] Failed to load projects from Postgres: {e}")
 
     if projects:
         PROJECTS_CACHE = projects
@@ -536,8 +583,9 @@ def resolve_project_workspace(proj_id: Optional[str]) -> tuple[str, str]:
 @app.post("/api/projects/new")
 async def create_project_endpoint(req: ProjectRequest) -> dict[str, Any]:
     global PROJECTS_CACHE
-    pid = req.id or f"PRJ-{uuid.uuid4().hex[:6].upper()}"
-    pname = req.name or "New Project"
+    pname = (req.name or "New Project").strip()
+    slug = re.sub(r'[^A-Z0-9]+', '-', pname.upper()).strip('-')
+    pid = req.id or f"PRJ-{slug[:18] or uuid.uuid4().hex[:6].upper()}"
     desc = req.description or ""
     lpath = req.local_path or os.path.join(BASE_DIR, "generated_artifacts", pid)
     created_by = (req.created_by or "user@fabric.ai").strip()
@@ -550,7 +598,7 @@ async def create_project_endpoint(req: ProjectRequest) -> dict[str, Any]:
             pass
 
     meta = req.metadata or {}
-    if "members" not in meta:
+    if "members" not in meta or not meta["members"]:
         meta["members"] = [
             {
                 "id": f"mem_{uuid.uuid4().hex[:8]}",
@@ -558,7 +606,7 @@ async def create_project_endpoint(req: ProjectRequest) -> dict[str, Any]:
                 "name": created_by.split("@")[0].replace(".", " ").title(),
                 "email": created_by,
                 "role": "owner",
-                "avatarBg": "#10b981",
+                "avatarBg": "#27272a",
             }
         ]
 
@@ -567,28 +615,36 @@ async def create_project_endpoint(req: ProjectRequest) -> dict[str, Any]:
         "name": pname,
         "description": desc,
         "status": "active",
-        "is_pinned": 0,
+        "is_pinned": int(req.is_pinned or 0),
         "is_archived": 0,
         "local_path": lpath,
         "created_by": created_by,
         "metadata": meta,
         "created_at": get_utc_iso(),
     }
-    # Update cache immediately
+    # Update cache immediately at top
+    PROJECTS_CACHE = [p for p in PROJECTS_CACHE if p["id"] != pid]
     PROJECTS_CACHE.insert(0, new_project)
 
-    # Persist to Postgres asynchronously
+    # Persist to Postgres with real UUID
     try:
         repo = PostgresRepository()
         with repo._connect() as conn:
             with conn.cursor() as cur:
+                proj_uuid = str(uuid.uuid4())
                 cur.execute(
-                    "INSERT INTO projects (project_id, project_code, project_name, description, primary_language, target_platform, status, created_by) VALUES (%s, %s, %s, %s, 'PySpark / T-SQL', 'Microsoft Fabric', 'active', %s);",
-                    (pid, pid, pname, desc, created_by),
+                    """
+                    INSERT INTO projects (
+                        project_id, project_code, project_name, description, 
+                        primary_language, target_platform, status, created_by,
+                        is_pinned, is_archived, metadata
+                    ) VALUES (%s, %s, %s, %s, 'PySpark / T-SQL', 'Microsoft Fabric', 'active', %s, %s, %s, %s);
+                    """,
+                    (proj_uuid, pid, pname, desc, created_by, int(req.is_pinned or 0), 0, json.dumps(meta)),
                 )
                 conn.commit()
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"[Error creating project in Postgres]: {e}")
 
     return {"success": True, "project": new_project}
 
@@ -611,26 +667,48 @@ async def update_project_endpoint(req: ProjectRequest) -> dict[str, Any]:
                         except Exception:
                             pass
                 if req.is_pinned is not None:
-                    p["is_pinned"] = req.is_pinned
+                    p["is_pinned"] = int(req.is_pinned)
                 if req.is_archived is not None:
-                    p["is_archived"] = req.is_archived
+                    p["is_archived"] = int(req.is_archived)
                 if req.metadata is not None:
                     p["metadata"] = req.metadata
                 break
 
     # Persist updates to Postgres in background
     try:
-        if req.id and (req.name or req.description):
+        if req.id:
             repo = PostgresRepository()
             with repo._connect() as conn:
                 with conn.cursor() as cur:
-                    cur.execute(
-                        "UPDATE projects SET project_name = COALESCE(%s, project_name), description = COALESCE(%s, description) WHERE project_id = %s;",
-                        (req.name, req.description, req.id),
-                    )
-                    conn.commit()
-    except Exception:
-        pass
+                    updates = []
+                    params = []
+                    if req.name is not None:
+                        updates.append("project_name = %s")
+                        params.append(req.name)
+                    if req.description is not None:
+                        updates.append("description = %s")
+                        params.append(req.description)
+                    if req.is_pinned is not None:
+                        updates.append("is_pinned = %s")
+                        params.append(int(req.is_pinned))
+                    if req.is_archived is not None:
+                        updates.append("is_archived = %s")
+                        params.append(int(req.is_archived))
+                    if req.metadata is not None:
+                        updates.append("metadata = %s")
+                        params.append(json.dumps(req.metadata))
+
+                    if updates:
+                        updates.append("updated_at = NOW()")
+                        set_clause = ", ".join(updates)
+                        params.extend([req.id, req.id])
+                        cur.execute(
+                            f"UPDATE projects SET {set_clause} WHERE project_code = %s OR project_id::text = %s;",
+                            tuple(params),
+                        )
+                        conn.commit()
+    except Exception as e:
+        print(f"[Error updating project in Postgres]: {e}")
 
     return {"success": True}
 
@@ -643,10 +721,13 @@ async def delete_project_endpoint(project_id: str) -> dict[str, Any]:
         repo = PostgresRepository()
         with repo._connect() as conn:
             with conn.cursor() as cur:
-                cur.execute("DELETE FROM projects WHERE project_id = %s;", (project_id,))
+                cur.execute(
+                    "DELETE FROM projects WHERE project_code = %s OR project_id::text = %s;",
+                    (project_id, project_id),
+                )
                 conn.commit()
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"[Error deleting project from Postgres]: {e}")
     return {"success": True}
 
 

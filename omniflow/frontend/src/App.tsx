@@ -882,7 +882,9 @@ export const App: React.FC = () => {
             project={
               projects.find((p) => p.id === activeProjectId) || {
                 id: activeProjectId,
-                name: activeProjectId,
+                name: (activeProjectId.startsWith('PRJ-')
+                  ? activeProjectId.replace(/^PRJ-/, '').replace(/[-_]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()).trim()
+                  : activeProjectId),
                 description: 'Active Enterprise Medallion Workspace',
                 metadata: {},
               }

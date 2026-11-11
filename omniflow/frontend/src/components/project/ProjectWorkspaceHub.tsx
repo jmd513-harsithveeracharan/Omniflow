@@ -91,8 +91,15 @@ export const ProjectWorkspaceHub: React.FC<ProjectWorkspaceHubProps> = ({
   };
 
   // Clean formatted name
-  const isPeliProject = project.id === 'PRJ-PELI-BIOTHERMAL' || project.name.toLowerCase().includes('peli');
-  const displayName = isPeliProject ? 'Peli Bio Thermal' : project.name;
+  const rawName = project.name || '';
+  const isPeliProject = project.id === 'PRJ-PELI-BIOTHERMAL' || rawName.toLowerCase().includes('peli');
+  const cleanFallbackName = (project.id || '').startsWith('PRJ-')
+    ? project.id.replace(/^PRJ-/, '').replace(/[-_]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()).trim()
+    : (project.id || '');
+
+  const displayName = isPeliProject
+    ? 'Peli Bio Thermal'
+    : (rawName && !rawName.startsWith('PRJ-') ? rawName : (cleanFallbackName || 'Project'));
   const displayDesc = isPeliProject
     ? (project.description && !project.description.toLowerCase().includes('cold-chain')
         ? project.description
