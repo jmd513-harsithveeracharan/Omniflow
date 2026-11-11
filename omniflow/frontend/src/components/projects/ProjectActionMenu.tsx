@@ -8,7 +8,7 @@ interface ProjectActionMenuProps {
   position: { top: number; left: number };
   onClose: () => void;
   onTogglePin: (e: React.MouseEvent, p: ProjectRecord) => void;
-  onEdit: (p: ProjectRecord) => void;
+  onEdit: (p: ProjectRecord, initialTab?: 'general' | 'workspaces' | 'team' | 'git') => void;
   onManageMembers: (p: ProjectRecord) => void;
   onArchive: (e: React.MouseEvent, id: string) => void;
   onDelete: (e: React.MouseEvent, id: string) => void;
@@ -20,7 +20,7 @@ export const ProjectActionMenu: React.FC<ProjectActionMenuProps> = ({
   onClose,
   onTogglePin,
   onEdit,
-  onManageMembers,
+  onManageMembers: _onManageMembers,
   onArchive,
   onDelete,
 }) => {
@@ -76,7 +76,7 @@ export const ProjectActionMenu: React.FC<ProjectActionMenuProps> = ({
         className="chat-menu-item"
         onClick={() => {
           onClose();
-          onEdit(project);
+          onEdit(project, 'general');
         }}
       >
         <Edit3 width={13} height={13} />
@@ -87,7 +87,7 @@ export const ProjectActionMenu: React.FC<ProjectActionMenuProps> = ({
         className="chat-menu-item"
         onClick={() => {
           onClose();
-          onManageMembers(project);
+          onEdit(project, 'team');
         }}
       >
         <Users width={13} height={13} />

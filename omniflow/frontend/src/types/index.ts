@@ -269,6 +269,7 @@ export interface ProjectMetadata {
   fabricFolder?: string;
   localPath?: string;
   badge?: string;
+  objectives?: string;
   members?: ProjectMember[];
   targetWorkspace?: string;
   workspaces?: string[];

@@ -214,7 +214,7 @@ def fetch_projects_cached(force_refresh: bool = False) -> list[dict[str, Any]]:
                                 "name": f"{owner_name} (Owner)",
                                 "email": creator,
                                 "role": "owner",
-                                "avatarBg": "#10b981",
+                                "avatarBg": "#27272a",
                             }
                         ]
                     }

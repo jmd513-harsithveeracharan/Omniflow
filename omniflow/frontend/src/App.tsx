@@ -37,7 +37,7 @@ import {
   deleteProject,
   logoutFabric,
 } from './services/api';
-import { FabricStatus, ChatMessage, IngestionPlan, WorkspaceItem, ChatSession, ProjectRecord, UserProfile, CredentialRequestData } from './types';
+import { FabricStatus, ChatMessage, IngestionPlan, WorkspaceItem, ChatSession, ProjectRecord, ProjectMetadata, UserProfile, CredentialRequestData } from './types';
 
 export const App: React.FC = () => {
   const [activeView, setActiveView] = useState<string>(() => {
@@ -89,6 +89,7 @@ export const App: React.FC = () => {
     }
   });
   const [editingProject, setEditingProject] = useState<ProjectRecord | null>(null);
+  const [editingProjectTab, setEditingProjectTab] = useState<'general' | 'workspaces' | 'team' | 'git'>('general');
 
   // User Auth & RBAC State
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(() => {
@@ -456,13 +457,17 @@ export const App: React.FC = () => {
     }
   };
 
-  const handleEditProject = (project: ProjectRecord) => {
+  const handleEditProject = (
+    project: ProjectRecord,
+    initialTab?: 'general' | 'workspaces' | 'team' | 'git'
+  ) => {
     setEditingProject(project);
+    setEditingProjectTab(initialTab || 'general');
   };
 
   const handleSaveEditedProject = async (
     projectId: string,
-    updates: { name: string; description: string; local_path?: string }
+    updates: { name: string; description: string; local_path?: string; metadata?: ProjectMetadata }
   ) => {
     await updateProject(projectId, updates);
     setProjects((prev) =>
@@ -473,6 +478,7 @@ export const App: React.FC = () => {
               name: updates.name,
               description: updates.description,
               local_path: updates.local_path,
+              metadata: updates.metadata ? { ...(p.metadata || {}), ...updates.metadata } : p.metadata,
               updated_at: new Date().toISOString(),
             }
           : p
@@ -1055,6 +1061,7 @@ export const App: React.FC = () => {
         onClose={() => setEditingProject(null)}
         project={editingProject}
         onSave={handleSaveEditedProject}
+        initialTab={editingProjectTab}
       />
 
       <SkillInspectorModal

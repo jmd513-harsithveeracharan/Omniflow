@@ -17,7 +17,7 @@ interface ProjectWorkspaceHubProps {
   onBackToProjects: () => void;
   onUpdateProject: (updated: ProjectRecord) => Promise<void>;
   onTogglePin?: () => void;
-  onEditProject?: (p: ProjectRecord) => void;
+  onEditProject?: (p: ProjectRecord, initialTab?: 'general' | 'workspaces' | 'team' | 'git') => void;
   onManageMembers?: (p: ProjectRecord) => void;
   onDeleteSession?: (sessionId: string) => void;
 }
@@ -35,7 +35,7 @@ export const ProjectWorkspaceHub: React.FC<ProjectWorkspaceHubProps> = ({
   onUpdateProject,
   onTogglePin,
   onEditProject,
-  onManageMembers,
+  onManageMembers: _onManageMembers,
   onDeleteSession,
 }) => {
   const [isMenuOpen, setIsMenuOpen] = useState<boolean>(false);
@@ -159,46 +159,54 @@ export const ProjectWorkspaceHub: React.FC<ProjectWorkspaceHubProps> = ({
 
               {isMenuOpen && (
                 <div
-                  className="absolute right-0 mt-2 w-56 p-1.5 bg-[#1c1c1f]/95 backdrop-blur-xl border border-[#2e2f35] rounded-xl shadow-[0_16px_36px_rgba(0,0,0,0.7)] z-50 animate-in fade-in-50 zoom-in-95"
+                  className="sidebar-chat-menu-popup"
+                  style={{
+                    position: 'absolute',
+                    top: '100%',
+                    right: 0,
+                    marginTop: '8px',
+                    width: '195px',
+                    zIndex: 999999,
+                  }}
                   onClick={() => setIsMenuOpen(false)}
                 >
-                  <button
-                    type="button"
+                  <div
+                    className="chat-menu-item"
                     onClick={() => onOpenRelationshipGraph(project.id)}
-                    className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-[#c4c7c5] hover:bg-[#28282c] hover:text-white rounded-lg text-left transition-colors"
                   >
-                    <Network width={14} height={14} className="text-emerald-400" />
-                    <span>Relationship Graph</span>
-                  </button>
+                    <Network width={13} height={13} style={{ color: '#94a3b8' }} />
+                    <span className="menu-label">Relationship Graph</span>
+                  </div>
+
                   {onEditProject && (
-                    <button
-                      type="button"
-                      onClick={() => onEditProject(project)}
-                      className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-[#c4c7c5] hover:bg-[#28282c] hover:text-white rounded-lg text-left transition-colors"
+                    <div
+                      className="chat-menu-item"
+                      onClick={() => onEditProject(project, 'general')}
                     >
-                      <Edit3 width={14} height={14} className="text-[#a1a1aa]" />
-                      <span>Edit Project</span>
-                    </button>
+                      <Edit3 width={13} height={13} style={{ color: '#94a3b8' }} />
+                      <span className="menu-label">Edit details</span>
+                    </div>
                   )}
-                  {onManageMembers && (
-                    <button
-                      type="button"
-                      onClick={() => onManageMembers(project)}
-                      className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-[#c4c7c5] hover:bg-[#28282c] hover:text-white rounded-lg text-left transition-colors"
+
+                  {onEditProject && (
+                    <div
+                      className="chat-menu-item"
+                      onClick={() => onEditProject(project, 'team')}
                     >
-                      <Users width={14} height={14} className="text-[#a1a1aa]" />
-                      <span>Manage Members</span>
-                    </button>
+                      <Users width={13} height={13} style={{ color: '#94a3b8' }} />
+                      <span className="menu-label">Team & members</span>
+                    </div>
                   )}
-                  <div className="border-t border-[#28282c] my-1" />
-                  <button
-                    type="button"
+
+                  <div className="chat-menu-divider" />
+
+                  <div
+                    className="chat-menu-item"
                     onClick={onBackToProjects}
-                    className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-[#8e918f] hover:bg-[#28282c] hover:text-white rounded-lg text-left transition-colors"
                   >
-                    <FolderTree width={14} height={14} />
-                    <span>View All Projects</span>
-                  </button>
+                    <FolderTree width={13} height={13} style={{ color: '#94a3b8' }} />
+                    <span className="menu-label">View All Projects</span>
+                  </div>
                 </div>
               )}
             </div>

@@ -9,6 +9,7 @@ import { ProjectListRow } from './projects/ProjectListRow';
 import { ProjectActionMenu } from './projects/ProjectActionMenu';
 import { ProjectModal } from './projects/ProjectModal';
 import { ProjectMembersModal } from './projects/ProjectMembersModal';
+import { ProjectEditModal } from './ProjectEditModal';
 
 interface ProjectsViewProps {
   onOpenProject: (projectId: string) => void;
@@ -37,6 +38,8 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({
   // Modals & Menu State
   const [isProjectModalOpen, setIsProjectModalOpen] = useState<boolean>(false);
   const [selectedProjectForEdit, setSelectedProjectForEdit] = useState<ProjectRecord | null>(null);
+  const [editingProjectRecord, setEditingProjectRecord] = useState<ProjectRecord | null>(null);
+  const [editModalTab, setEditModalTab] = useState<'general' | 'workspaces' | 'team' | 'git'>('general');
   const [isMembersModalOpen, setIsMembersModalOpen] = useState<boolean>(false);
   const [selectedProjectForMembers, setSelectedProjectForMembers] = useState<ProjectRecord | null>(null);
 
@@ -87,14 +90,17 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({
     setIsProjectModalOpen(true);
   };
 
-  const handleOpenEditModal = (p: ProjectRecord) => {
-    setSelectedProjectForEdit(p);
-    setIsProjectModalOpen(true);
+  const handleOpenEditModal = (
+    p: ProjectRecord,
+    tab: 'general' | 'workspaces' | 'team' | 'git' = 'general'
+  ) => {
+    setEditingProjectRecord(p);
+    setEditModalTab(tab);
   };
 
   const handleOpenMembersModal = (p: ProjectRecord) => {
-    setSelectedProjectForMembers(p);
-    setIsMembersModalOpen(true);
+    setEditingProjectRecord(p);
+    setEditModalTab('team');
   };
 
   const handleOpenActionMenu = (e: React.MouseEvent, p: ProjectRecord) => {
@@ -309,6 +315,23 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({
           project={selectedProjectForEdit}
           onSave={handleSaveProject}
           currentUser={currentUser}
+        />
+
+        <ProjectEditModal
+          isOpen={editingProjectRecord !== null}
+          onClose={() => setEditingProjectRecord(null)}
+          project={editingProjectRecord}
+          onSave={async (pId, updates) => {
+            await handleSaveProject({
+              id: pId,
+              name: updates.name,
+              description: updates.description,
+              badge: 'Fabric Project',
+              metadata: updates.metadata || { localPath: updates.local_path },
+            });
+            setEditingProjectRecord(null);
+          }}
+          initialTab={editModalTab}
         />
 
         <ProjectMembersModal

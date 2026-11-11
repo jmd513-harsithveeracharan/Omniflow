@@ -155,11 +155,12 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
                 width: '36px',
                 height: '36px',
                 borderRadius: '8px',
-                background: 'rgba(16, 185, 129, 0.15)',
+                background: 'rgba(255, 255, 255, 0.08)',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                color: '#10b981',
+                color: '#f4f4f5',
               }}
             >
               {project ? <FolderGit2 width={20} height={20} /> : <FolderPlus width={20} height={20} />}
@@ -249,7 +250,7 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
               type="checkbox"
               checked={sharedContext}
               onChange={(e) => setSharedContext(e.target.checked)}
-              style={{ accentColor: '#10b981', width: '15px', height: '15px' }}
+              style={{ accentColor: '#38bdf8', width: '15px', height: '15px' }}
             />
             <span style={{ fontSize: '12.5px', color: '#d4d4d8' }}>
               Share multi-turn chat history & agent blast-radius lineage across project members

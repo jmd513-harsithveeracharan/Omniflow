@@ -5811,18 +5811,18 @@ ul.chat-md-list {
 
 .projects-modal-btn-submit {
     padding: 8px 18px;
-    background: #10b981;
+    background: #ffffff;
     border: none;
     border-radius: 8px;
-    color: #052e16;
+    color: #111113;
     font-size: 13px;
-    font-weight: 600;
+    font-weight: 500;
     cursor: pointer;
     transition: background 0.15s ease, opacity 0.15s ease;
 }
 
 .projects-modal-btn-submit:hover:not(:disabled) {
-    background: #34d399;
+    background: #f4f4f5;
 }
 
 .projects-modal-btn-submit:disabled {
@@ -12144,12 +12144,12 @@ pre[class*="language-"] {
 .projects-btn-new-primary {
     display: inline-flex;
     align-items: center;
-    gap: 8px;
-    background: #10b981;
-    color: #000000;
-    font-weight: 600;
+    gap: 7px;
+    background: #ffffff;
+    color: #111113;
+    font-weight: 500;
     font-size: 13px;
-    padding: 7px 16px;
+    padding: 7px 15px;
     border-radius: 8px;
     border: none;
     cursor: pointer;
@@ -12157,9 +12157,9 @@ pre[class*="language-"] {
 }
 
 .projects-btn-new-primary:hover {
-    background: #059669;
-    box-shadow: 0 4px 14px rgba(16, 185, 129, 0.35);
-    transform: translateY(-1px);
+    background: #f4f4f5;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+    transform: translateY(-0.5px);
 }
 
 /* Projects Cards Grid (2 columns on standard, 3 on wide) */
@@ -12206,20 +12206,27 @@ pre[class*="language-"] {
 }
 
 .project-card-create:hover {
-    border-color: #10b981;
-    background: rgba(16, 185, 129, 0.04);
+    border-color: rgba(255, 255, 255, 0.28);
+    background: rgba(255, 255, 255, 0.035);
 }
 
 .project-create-icon-wrap {
-    width: 48px;
-    height: 48px;
+    width: 44px;
+    height: 44px;
     border-radius: 12px;
-    background: rgba(16, 185, 129, 0.12);
-    color: #10b981;
+    background: rgba(255, 255, 255, 0.06);
+    color: #e4e4e7;
+    border: 1px solid rgba(255, 255, 255, 0.1);
     display: flex;
     align-items: center;
     justify-content: center;
     margin-bottom: 12px;
+    transition: all 0.15s ease;
+}
+
+.project-card-create:hover .project-create-icon-wrap {
+    background: rgba(255, 255, 255, 0.1);
+    color: #ffffff;
 }
 
 .project-create-title {

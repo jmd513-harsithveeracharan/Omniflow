@@ -1,5 +1,5 @@
 import React from 'react';
-import { Pin, MoreVertical, Database } from 'lucide-react';
+import { Pin, MoreVertical, Database, User } from 'lucide-react';
 import { ProjectRecord } from '../../types';
 
 interface ProjectListRowProps {
@@ -71,22 +71,49 @@ export const ProjectListRow: React.FC<ProjectListRowProps> = ({
       {members.length > 0 ? (
         <div className="project-members-stack" style={{ marginRight: '16px' }} title={`${members.length} collaborators`}>
           {members.slice(0, 2).map((m, idx) => {
-            const cleanName = m.name.replace(/\s*\(You\)/, '');
-            const initials =
-              cleanName
-                .split(' ')
-                .map((w) => w[0])
-                .slice(0, 2)
-                .join('')
-                .toUpperCase() || 'U';
+            const cleanName = (m.name || '')
+              .replace(/\s*\((You|Owner)\)/gi, '')
+              .trim();
+            const isSystemOrCli =
+              !cleanName ||
+              cleanName.toLowerCase().includes('omniflow_cli') ||
+              cleanName.toLowerCase() === 'system' ||
+              cleanName.toLowerCase() === 'cli' ||
+              cleanName.toLowerCase() === 'user';
+
+            const words = cleanName.split(/[\s._-]+/).filter(Boolean);
+            const letterInitials = words
+              .map((w) => w[0])
+              .filter((char) => /[A-Za-z]/.test(char))
+              .slice(0, 2)
+              .join('')
+              .toUpperCase();
+
+            const showIcon = isSystemOrCli || !letterInitials;
+            const avatarColor =
+              m.avatarBg && m.avatarBg !== '#10b981' && !m.avatarBg.includes('rgb(16, 185, 129)')
+                ? m.avatarBg
+                : '#27272a';
+
             return (
               <span
                 key={m.id || idx}
                 className="project-member-avatar-pill"
-                style={{ background: m.avatarBg || '#10b981' }}
-                title={m.name}
+                style={{
+                  background: avatarColor,
+                  border: '1px solid rgba(255, 255, 255, 0.12)',
+                  color: '#e4e4e7',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+                title={cleanName || 'Team Member'}
               >
-                {initials}
+                {showIcon ? (
+                  <User width={12} height={12} style={{ display: 'block', color: '#d4d4d8' }} />
+                ) : (
+                  letterInitials
+                )}
               </span>
             );
           })}
