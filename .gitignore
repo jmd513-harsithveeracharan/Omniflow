@@ -56,7 +56,9 @@ dist/
 *.tsbuildinfo
 
 # Projects & Generated Outputs
+*.zip
 omniflow.zip
+omniflow-clean.zip
 ~$*
 omniflow/generated_artifacts/
 omniflow/test_run_result.json
