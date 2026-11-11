@@ -78,7 +78,7 @@ def _run_az_cmd(args: list[str], timeout: int = 30) -> tuple[int, str, str]:
 
 def _get_azure_cli_account() -> dict[str, Any]:
     global _ACTIVE_FABRIC_ACCOUNT
-    rc, out, _ = _run_az_cmd(["account", "show", "--output", "json"], timeout=8)
+    rc, out, _ = _run_az_cmd(["account", "show", "--output", "json"], timeout=15)
     if rc == 0 and out.strip():
         try:
             data = json.loads(out)
@@ -130,7 +130,7 @@ def get_fabric_accounts(refresh: bool = False) -> list[dict[str, Any]]:
     if not refresh and _ACCOUNTS_CACHE is not None and (now - _ACCOUNTS_CACHE_TIME) < _ACCOUNTS_CACHE_TTL:
         return _ACCOUNTS_CACHE
 
-    rc, out, _ = _run_az_cmd(["account", "list", "--output", "json"], timeout=10)
+    rc, out, _ = _run_az_cmd(["account", "list", "--output", "json"], timeout=15)
     if rc == 0 and out.strip():
         try:
             az_accounts = json.loads(out)
