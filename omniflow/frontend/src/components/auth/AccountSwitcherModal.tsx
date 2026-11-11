@@ -43,7 +43,9 @@ export const AccountSwitcherModal: React.FC<AccountSwitcherModalProps> = ({
 
   const loadAccounts = async (forceRefresh = false) => {
     try {
-      setIsLoading(true);
+      if (_cachedFabricAccounts.length === 0 || forceRefresh) {
+        setIsLoading(true);
+      }
       const list = await fetchFabricAccounts(forceRefresh);
       _cachedFabricAccounts = list;
       setAccounts(list);
@@ -56,6 +58,10 @@ export const AccountSwitcherModal: React.FC<AccountSwitcherModalProps> = ({
 
   useEffect(() => {
     if (isOpen) {
+      if (_cachedFabricAccounts.length > 0) {
+        setAccounts(_cachedFabricAccounts);
+        setIsLoading(false);
+      }
       loadAccounts(false);
       setStatusMsg(null);
       setDeviceCode(null);

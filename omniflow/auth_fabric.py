@@ -49,17 +49,7 @@ def invalidate_all_auth_caches() -> None:
             logger.warning(f"Failed to execute cache invalidation hook: {e}")
 
 
-_ACTIVE_FABRIC_ACCOUNT: dict[str, Any] = {
-    "id": os.getenv("AZURE_SUBSCRIPTION_ID", ""),
-    "name": "Fabric Engineer",
-    "email": os.getenv("FABRIC_USER_IDENTITY", "user@fabric.internal"),
-    "tenant_id": os.getenv("AZURE_TENANT_ID", ""),
-    "tenant_name": os.getenv("AZURE_TENANT_NAME", "Fabric Enterprise"),
-    "is_active": True,
-    "account_type": "Azure CLI SSO",
-    "default_workspace_id": os.getenv("ALLOWED_WORKSPACE_ID", ""),
-    "default_workspace_name": os.getenv("ALLOWED_WORKSPACE_NAME", "Fabric Workspace"),
-}
+_ACTIVE_FABRIC_ACCOUNT: Optional[dict[str, Any]] = None
 
 
 def _run_az_cmd(args: list[str], timeout: int = 30) -> tuple[int, str, str]:
@@ -76,13 +66,15 @@ def _run_az_cmd(args: list[str], timeout: int = 30) -> tuple[int, str, str]:
         return 1, "", str(e)
 
 
-def _get_azure_cli_account() -> dict[str, Any]:
+def _get_azure_cli_account() -> Optional[dict[str, Any]]:
     global _ACTIVE_FABRIC_ACCOUNT
     rc, out, _ = _run_az_cmd(["account", "show", "--output", "json"], timeout=15)
     if rc == 0 and out.strip():
         try:
             data = json.loads(out)
-            user_name = data.get("user", {}).get("name", "user@fabric.internal")
+            user_name = data.get("user", {}).get("name", "")
+            if not user_name:
+                return None
             tenant_id = data.get("tenantId") or data.get("homeTenantId") or os.getenv("AZURE_TENANT_ID", "")
             sub_id = data.get("id", "")
             tenant_display = data.get("tenantDisplayName") or data.get("name", "Fabric Tenant")
@@ -94,14 +86,14 @@ def _get_azure_cli_account() -> dict[str, Any]:
                 "tenant_name": tenant_display,
                 "subscription_id": sub_id,
                 "is_active": True,
-                "account_type": "Azure CLI SSO",
+                "account_type": data.get("name", "Azure CLI"),
                 "default_workspace_id": os.getenv("ALLOWED_WORKSPACE_ID", ""),
                 "default_workspace_name": os.getenv("ALLOWED_WORKSPACE_NAME", tenant_display or "Fabric Workspace"),
             }
             return _ACTIVE_FABRIC_ACCOUNT
         except Exception as e:
             logger.warning(f"Failed parsing az account show: {e}")
-    return _ACTIVE_FABRIC_ACCOUNT
+    return None
 
 
 class BrowserLoginRequest(BaseModel):
@@ -145,7 +137,7 @@ def get_fabric_accounts(refresh: bool = False) -> list[dict[str, Any]]:
                 tenant_name = a.get("tenantDisplayName") or a.get("name") or "Corporate Tenant"
                 is_active = bool(a.get("isDefault", False))
                 raw_type = a.get("name", "Azure CLI")
-                account_type = raw_type.split(":")[0].strip()[:24]
+                account_type = raw_type.split(":")[0].strip()
 
                 accounts.append({
                     "id": sub_id, "name": name, "email": user_email,
@@ -162,9 +154,14 @@ def get_fabric_accounts(refresh: bool = False) -> list[dict[str, Any]]:
         except Exception as e:
             logger.warning(f"Failed parsing az account list: {e}")
 
-    fallback = [_get_azure_cli_account()]
-    _ACCOUNTS_CACHE, _ACCOUNTS_CACHE_TIME = fallback, time.time()
-    return fallback
+    cli_acc = _get_azure_cli_account()
+    if cli_acc:
+        fallback = [cli_acc]
+        _ACCOUNTS_CACHE, _ACCOUNTS_CACHE_TIME = fallback, time.time()
+        return fallback
+
+    _ACCOUNTS_CACHE = None
+    return []
 
 
 @fabric_auth_router.post("/auth/login/browser")

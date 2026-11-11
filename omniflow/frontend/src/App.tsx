@@ -24,6 +24,7 @@ import { GraphMeshView } from './components/graph/GraphMeshView';
 import { ProjectWorkspaceHub } from './components/project/ProjectWorkspaceHub';
 import {
   fetchFabricStatus,
+  fetchFabricAccounts,
   streamChatTurn,
   fetchSessions,
   fetchSessionDetail,
@@ -186,6 +187,9 @@ export const App: React.FC = () => {
     fetchFabricStatus()
       .then(setStatus)
       .catch(() => setStatus(null));
+
+    fetchFabricAccounts(false)
+      .catch(() => {});
 
     const activeEmail = currentUser?.email;
     loadSessions(activeEmail);
