@@ -512,7 +512,7 @@ async def list_projects(user_email: str | None = None) -> dict[str, Any]:
     for p in projects:
         p_creator = (p.get("created_by") or "").strip().lower()
         # Baseline workspace/system platform projects visible to authenticated workspace users
-        if p_creator in ["", "omniflow_cli", "system", "workspace", "none"]:
+        if p_creator in ["", "omniflow_cli", "system", "workspace", "none", "user@fabric.internal"]:
             scoped.append(p)
             continue
         # Project creator
