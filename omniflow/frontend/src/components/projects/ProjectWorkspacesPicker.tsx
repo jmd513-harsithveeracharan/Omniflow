@@ -8,21 +8,12 @@ interface ProjectWorkspacesPickerProps {
   onChange: (workspaces: string[]) => void;
 }
 
-const DEFAULT_ENTERPRISE_WORKSPACES: FabricWorkspaceSummary[] = [
-  { id: 'ws_fabric_primary', displayName: 'Fabric_Workspace_Primary', description: 'Primary active data engineering workspace', type: 'Workspace', isActive: true },
-  { id: 'ws_pharmacold', displayName: 'PharmaCold_Logistics_Medallion', description: 'IoT streaming telemetry & ERP shipments', type: 'Workspace' },
-  { id: 'ws_prod_warehouse', displayName: 'Production_Warehouse', description: 'Delta Lake bronze/silver/gold storage', type: 'Workspace' },
-  { id: 'ws_directlake', displayName: 'DirectLake_PowerBI_Gold', description: 'Direct Lake semantic models & reporting', type: 'Workspace' },
-  { id: 'ws_iot_stream', displayName: 'IoT_Telemetry_Streaming', description: 'Eventstream & real-time analytics hub', type: 'Workspace' },
-  { id: 'ws_cdc_ingest', displayName: 'Enterprise_CDC_Ingest', description: 'Data Factory CDC pipelines & feeds', type: 'Workspace' },
-];
-
 export const ProjectWorkspacesPicker: React.FC<ProjectWorkspacesPickerProps> = ({
   selectedWorkspaces,
   onChange,
 }) => {
-  const [workspaces, setWorkspaces] = useState<FabricWorkspaceSummary[]>(DEFAULT_ENTERPRISE_WORKSPACES);
-  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [workspaces, setWorkspaces] = useState<FabricWorkspaceSummary[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
 
   useEffect(() => {
     let isMounted = true;
@@ -31,15 +22,12 @@ export const ProjectWorkspacesPicker: React.FC<ProjectWorkspacesPickerProps> = (
         setIsLoading(true);
         const res = await fetchFabricWorkspaces(forceRefresh);
         if (isMounted) {
-          if (res.workspaces && res.workspaces.length > 0) {
-            setWorkspaces(res.workspaces);
-          } else {
-            setWorkspaces(DEFAULT_ENTERPRISE_WORKSPACES);
-          }
+          const list = res.workspaces || [];
+          setWorkspaces(list);
         }
       } catch (err) {
-        console.warn('Using default enterprise workspaces', err);
-        if (isMounted) setWorkspaces(DEFAULT_ENTERPRISE_WORKSPACES);
+        console.warn('Failed to fetch Fabric workspaces', err);
+        if (isMounted) setWorkspaces([]);
       } finally {
         if (isMounted) setIsLoading(false);
       }
@@ -89,7 +77,17 @@ export const ProjectWorkspacesPicker: React.FC<ProjectWorkspacesPickerProps> = (
           padding: '4px',
         }}
       >
-        {workspaces.map((ws) => {
+        {isLoading ? (
+          <div style={{ padding: '24px 16px', textAlign: 'center', color: '#71717a', fontSize: '12px' }}>
+            <Loader2 width={14} height={14} className="spin" style={{ display: 'inline', marginRight: '6px' }} />
+            Loading workspaces from Microsoft Fabric...
+          </div>
+        ) : workspaces.length === 0 ? (
+          <div style={{ padding: '24px 16px', textAlign: 'center', color: '#71717a', fontSize: '12px' }}>
+            No Fabric workspaces found for the active account.
+          </div>
+        ) : (
+          workspaces.map((ws) => {
           const isSelected = selectedWorkspaces.includes(ws.displayName) || selectedWorkspaces.includes(ws.id);
           return (
             <div
@@ -166,7 +164,7 @@ export const ProjectWorkspacesPicker: React.FC<ProjectWorkspacesPickerProps> = (
               )}
             </div>
           );
-        })}
+        }))}
       </div>
     </div>
   );

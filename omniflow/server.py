@@ -797,6 +797,7 @@ async def list_fabric_workspaces(refresh: bool = False) -> dict[str, Any]:
     default_ws_id = os.getenv("ALLOWED_WORKSPACE_ID", "")
     default_ws_name = os.getenv("ALLOWED_WORKSPACE_NAME", "")
     workspaces: list[dict[str, Any]] = []
+    error_msg: str | None = None
 
     try:
         from app.fabric_client import list_workspaces as fc_list_workspaces
@@ -827,23 +828,26 @@ async def list_fabric_workspaces(refresh: bool = False) -> dict[str, Any]:
             _workspaces_list_cache["data"] = result
             _workspaces_list_cache["expires_at"] = now + _WORKSPACE_CACHE_TTL
             return result
+        else:
+            error_msg = "No live workspaces returned from Microsoft Fabric REST API"
     except Exception as e:
         print(f"[Fabric Workspaces Warning]: {e}")
         error_msg = str(e)
 
-    # Fallback to single configured workspace if API is unreachable
-    workspaces.append({
-        "id": default_ws_id,
-        "displayName": default_ws_name or "Fabric Workspace",
-        "description": "Primary configured workspace (Offline Fallback)",
-        "type": "Workspace",
-        "capacityId": "",
-        "capacityRegion": "",
-        "isActive": True,
-    })
+    # Fallback to configured workspace if explicitly set in environment
+    if default_ws_id:
+        workspaces.append({
+            "id": default_ws_id,
+            "displayName": default_ws_name or "Fabric Workspace",
+            "description": "Configured active workspace",
+            "type": "Workspace",
+            "capacityId": "",
+            "capacityRegion": "",
+            "isActive": True,
+        })
     return {
         "active_workspace_id": default_ws_id,
-        "active_workspace_name": default_ws_name or "Fabric Workspace",
+        "active_workspace_name": default_ws_name or "",
         "workspaces": workspaces,
         "is_fallback": True,
         "error": error_msg,
