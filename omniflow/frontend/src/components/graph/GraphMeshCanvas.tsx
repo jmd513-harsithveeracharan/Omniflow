@@ -291,7 +291,7 @@ export const GraphMeshCanvas: React.FC<GraphMeshCanvasProps> = ({
 
       draggedNodeRef.current = clicked;
       if (simulationRef.current) {
-        simulationRef.current.alphaTarget(0.3).restart();
+        simulationRef.current.alphaTarget(0.12).restart();
       }
       clicked.fx = clicked.x;
       clicked.fy = clicked.y;

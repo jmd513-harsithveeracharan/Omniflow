@@ -16,6 +16,7 @@ export interface D3SimNode extends SimulationNodeDatum, GraphMeshNode {
   radius: number;
   collisionRadius: number;
   isHub: boolean;
+  _wrappedLines?: string[];
 }
 
 export interface D3SimLink extends SimulationLinkDatum<D3SimNode> {
@@ -26,17 +27,7 @@ export interface D3SimLink extends SimulationLinkDatum<D3SimNode> {
   description?: string | null;
 }
 
-/**
- * Custom D3 Force: Spherical Harmonic Galaxy Envelope (Obsidian-Style)
- * 1. Planetary Gravitational Well: Gently draws all nodes towards (0, 0) with Hookean tension (F = -k * d)
- *    to prevent the graph from elongating or stretching into irregular shapes.
- * 2. Spherical Boundary Surface Tension: Creates a smooth spherical boundary at `radius`. As nodes
- *    approach or exceed `0.86 * radius`, an escalating inward restitution force keeps the silhouette
- *    circular and round.
- * 3. Perimeter Corona Orbit: Gently encourages low-degree singletons and peripheral nodes to distribute
- *    evenly along the spherical rim (0.88 - 0.96 * radius), giving the exact celestial constellation
- *    silhouette seen in Obsidian graphs.
- */
+/** Custom D3 Force: Spherical Harmonic Galaxy Envelope (Obsidian-Style Constellation) */
 export function forceSphericalGalaxy(radius: number) {
   let nodes: D3SimNode[] = [];
 
@@ -51,23 +42,20 @@ export function forceSphericalGalaxy(radius: number) {
       if (n.x === undefined || n.y === undefined) continue;
       const d = Math.hypot(n.x, n.y);
       if (d === 0) continue;
-
       const nx = n.x / d;
       const ny = n.y / d;
 
-      // 1. Inward Radial Gravitational Pull (Hooke's Law / Central Mass)
+      // Inward Radial Gravitational Pull
       n.vx = (n.vx || 0) - n.x * kCentering;
       n.vy = (n.vy || 0) - n.y * kCentering;
 
-      // 2. Spherical Surface Boundary (Soft quadratic restitution)
+      // Spherical Surface Boundary restitution
       if (d > innerRim) {
         const excess = d - innerRim;
         const push = (excess / rimSpan) * kBoundary;
         n.vx = (n.vx || 0) - nx * push;
         n.vy = (n.vy || 0) - ny * push;
       }
-
-      // Hard celestial horizon: strictly confines all nodes to the spherical disc
       if (d > radius) {
         n.x = nx * radius;
         n.y = ny * radius;
@@ -75,31 +63,22 @@ export function forceSphericalGalaxy(radius: number) {
         n.vy = (n.vy || 0) * 0.4;
       }
 
-      // 3. Outer Corona Guiding Force for Singletons & Peripheral Leaf Nodes
+      // Outer Corona Guiding Force for Singletons & Leaf Nodes
       if (n.degree <= 1 && n.type !== 'column') {
         const targetD = radius * 0.90;
-        const diff = d - targetD;
-        const coronaPull = diff * 0.06 * alpha;
+        const coronaPull = (d - targetD) * 0.06 * alpha;
         n.vx = (n.vx || 0) - nx * coronaPull;
         n.vy = (n.vy || 0) - ny * coronaPull;
       }
     }
   }
 
-  force.initialize = (initNodes: D3SimNode[]) => {
-    nodes = initNodes;
-  };
-
+  force.initialize = (initNodes: D3SimNode[]) => { nodes = initNodes; };
   return force;
 }
 
-export function forceCircularBoundary(radius: number) {
-  return forceSphericalGalaxy(radius);
-}
-
-export function forceRadialGravity() {
-  return () => {};
-}
+export function forceCircularBoundary(radius: number) { return forceSphericalGalaxy(radius); }
+export function forceRadialGravity() { return () => {}; }
 
 /**
  * Seeds and configures a snowflake radial tree simulation with two-tier petal clearance.
@@ -151,16 +130,11 @@ export function createSnowflakeSimulation(
 
   const centralHubs: GraphMeshNode[] = [];
   const domainHubs: GraphMeshNode[] = [];
-
   for (const n of hubList) {
-    if (isCentralCore(n)) {
-      centralHubs.push(n);
-    } else {
-      domainHubs.push(n);
-    }
+    (isCentralCore(n) ? centralHubs : domainHubs).push(n);
   }
 
-  // 2. Group domain hubs into coherent business entity clusters across layers
+  // Group domain hubs into coherent business entity clusters across layers
   const domainMap = new Map<string, GraphMeshNode[]>();
   for (const hub of domainHubs) {
     const base = extractEntityBase(hub) || hub.id;
@@ -261,6 +235,7 @@ export function createSnowflakeSimulation(
       radius: r,
       collisionRadius,
       isHub,
+      _wrappedLines: lines,
       x: initPos.x,
       y: initPos.y,
     };
