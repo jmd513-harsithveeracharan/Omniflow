@@ -479,6 +479,60 @@ async def list_projects(user_email: str | None = None) -> dict[str, Any]:
     return {"projects": scoped}
 
 
+def resolve_project_workspace(proj_id: Optional[str]) -> tuple[str, str]:
+    """
+    Dynamically resolves the active Microsoft Fabric workspace ID and display name
+    for a given project from its metadata, without relying on static .env values.
+    Supports both workspace GUIDs and workspace display names (e.g. 'PBT_DATA_AGENT').
+    """
+    default_ws_id = os.getenv("ALLOWED_WORKSPACE_ID", "")
+    default_ws_name = os.getenv("ALLOWED_WORKSPACE_NAME", "Fabric Workspace")
+
+    if not proj_id:
+        return default_ws_id, default_ws_name
+
+    # 1. Look up project in in-memory cache or DB
+    proj = next((p for p in PROJECTS_CACHE if str(p.get("id")) == str(proj_id)), None)
+    if not proj:
+        try:
+            repo = PostgresRepository()
+            proj = repo.get_project(proj_id)
+        except Exception:
+            pass
+
+    if not proj:
+        return default_ws_id, default_ws_name
+
+    meta = proj.get("metadata") or {}
+    workspaces = meta.get("workspaces", [])
+    target_ws = meta.get("targetWorkspace") or (workspaces[0] if workspaces else None)
+
+    if not target_ws:
+        return default_ws_id, default_ws_name
+
+    target_ws_str = str(target_ws).strip()
+
+    # If already a valid UUID GUID, use directly
+    is_guid = bool(re.match(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", target_ws_str, re.IGNORECASE))
+    if is_guid:
+        return target_ws_str, meta.get("targetWorkspaceName") or target_ws_str
+
+    # Otherwise, it's a workspace name (e.g. "PBT_DATA_AGENT")
+    # Query live Fabric workspaces to resolve its GUID
+    try:
+        from app.fabric_client import list_workspaces as fc_list_workspaces
+        live_ws = fc_list_workspaces()
+        for w in live_ws:
+            disp = (w.get("displayName") or w.get("name") or "").strip()
+            if disp.lower() == target_ws_str.lower():
+                return w.get("id", ""), disp
+    except Exception as e:
+        print(f"[Dynamic Workspace Resolver Notice] Could not query Fabric list_workspaces: {e}")
+
+    # Fallback if unresolvable
+    return target_ws_str, target_ws_str
+
+
 @app.post("/api/projects/new")
 async def create_project_endpoint(req: ProjectRequest) -> dict[str, Any]:
     global PROJECTS_CACHE
@@ -1570,8 +1624,10 @@ async def handle_chat_stream(req: ChatRequest) -> StreamingResponse:
         if atomic_match and not intake_override and not any(k in req.message.lower() for k in ["that ", "with ", "reads from", "dedupe", "join", "procedure", "select"]):
             raw_type = atomic_match.group(1).lower().strip()
             item_name = atomic_match.group(2).strip()
-            ws_id = os.getenv("ALLOWED_WORKSPACE_ID") or ""
-            ws_name = os.getenv("ALLOWED_WORKSPACE_NAME") or "Fabric Workspace"
+            ws_id, ws_name = resolve_project_workspace(proj_id)
+            if not ws_id:
+                ws_id = os.getenv("ALLOWED_WORKSPACE_ID") or ""
+                ws_name = os.getenv("ALLOWED_WORKSPACE_NAME") or "Fabric Workspace"
 
             type_map = {
                 "folder": ("Folder", "📁"),
@@ -1679,7 +1735,8 @@ async def handle_chat_stream(req: ChatRequest) -> StreamingResponse:
                 FabricItemSpec(name=f"nb_{clean_dom}_curate", item_type="Notebook", depends_on=[f"lh_{clean_dom}_bronze"], folder_name=stage_f),
                 FabricItemSpec(name=f"pl_{clean_dom}_bronze_ingest", item_type="DataPipeline", depends_on=[f"lh_{clean_dom}_bronze"], folder_name=raw_f),
             ]
-            provisioner = GenericDAGProvisioner()
+            ws_id, ws_name = resolve_project_workspace(proj_id)
+            provisioner = GenericDAGProvisioner(workspace_id=ws_id)
             dag_res = provisioner.execute_optimistic_provisioning(items_to_deploy, enable_two_pass=True)
             run_id = str(uuid.uuid4())
             dep_items = [
@@ -1691,7 +1748,7 @@ async def handle_chat_stream(req: ChatRequest) -> StreamingResponse:
                 for d in dep_items
             ])
 
-            ws_display = os.getenv("ALLOWED_WORKSPACE_NAME") or "Fabric Workspace"
+            ws_display = ws_name or os.getenv("ALLOWED_WORKSPACE_NAME") or "Fabric Workspace"
             deploy_summary = (
                 f"### 🚀 Microsoft Fabric Architecture Deployed Successfully\n\n"
                 f"- **Deployment Run ID**: `{run_id}`\n"
@@ -1771,7 +1828,8 @@ async def handle_chat_stream(req: ChatRequest) -> StreamingResponse:
                 project_name=proj_name,
                 prompt_text=req.message,
             )
-            ws_display = os.getenv("ALLOWED_WORKSPACE_NAME") or "Fabric Workspace"
+            ws_id, ws_name = resolve_project_workspace(proj_id)
+            ws_display = ws_name or os.getenv("ALLOWED_WORKSPACE_NAME") or "Fabric Workspace"
             try:
                 res = orch.run_pipeline(req=plan_req, intake_data_override=intake_override, resume=is_resume, deploy=False)
                 summary_text = (
