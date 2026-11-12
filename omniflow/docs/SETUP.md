@@ -42,20 +42,28 @@ omniflow/
 │
 ├── config/                     # Environment configuration & LLM adapters
 │   ├── env_loader.py           # Dynamic workspace and tenant parameter loader
-│   ├── llm_adapter.py          # Azure OpenAI / Anthropic streaming and chat callers
-│   └── settings.py             # Global constants, paths, and timeouts
+│   └── llm_adapter.py          # Azure OpenAI / Anthropic streaming and chat callers
 │
 ├── db/                         # Database persistence layers
 │   ├── postgres_repo.py        # Neon PostgreSQL repository for tools, runs, and project context
 │   ├── execution_logger.py     # Persistent agent/tool run and lineage edge logging
 │   └── catalog_seeder.py       # Source table schema metadata resolver
 │
+├── docs/                       # Setup & Execution Guides
+│   ├── SETUP.md                # Platform directory guide & quickstart
+│   └── SETUP_AND_EXECUTION_GUIDE.md # Step-by-step setup & execution walkthrough
+│
 ├── tools/                      # Core engineering & deployment tools
 │   ├── fabric_deployer.py      # Deploys items (Lakehouse, Warehouse, Notebook, Pipeline) via Fabric REST
 │   ├── dag_runner.py           # GenericDAGProvisioner with NetworkX parallel topological waves
 │   ├── fabric_adapter.py       # Folder creation and item listing wrappers
 │   ├── asset_indexer.py        # Workspace asset cataloger and cache indexer
+│   ├── guardrails.py           # AST & security validation guardrails for synthesized code
+│   ├── introspect_source.py    # Schema discovery & metadata inspection helpers
 │   └── skill_loader.py         # Dynamic skill discovery and loader
+│
+├── ui/                         # Terminal execution UI output helpers
+│   └── terminal.py             # Console progress formatting and banners
 │
 ├── intake/                     # Enterprise Project Intake Specifications & Helpers
 │   ├── helpers.py              # Intake JSON extraction, connection hydration & plan builders
