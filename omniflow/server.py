@@ -54,6 +54,11 @@ from omniflow.connectors_interceptor import (
     CONNECTOR_REGISTRY,
     CONNECTIONS_VAULT,
 )
+from omniflow.intake_helpers import (
+    extract_intake_json,
+    merge_connection_into_intake,
+    build_dynamic_plan_object,
+)
 from omniflow.graph_service import GraphEngine
 
 graph_engine = GraphEngine()
@@ -538,12 +543,20 @@ def resolve_project_workspace(proj_id: Optional[str]) -> tuple[str, str]:
     if not proj_id:
         return default_ws_id, default_ws_name
 
-    # 1. Look up project in in-memory cache or DB
-    proj = next((p for p in PROJECTS_CACHE if str(p.get("id")) == str(proj_id)), None)
+    # 1. Look up project in hydrated cache or direct Postgres fallback
+    cached_list = fetch_projects_cached()
+    proj = next((p for p in cached_list if str(p.get("id")) == str(proj_id)), None)
     if not proj:
         try:
             repo = PostgresRepository()
-            proj = repo.get_project(proj_id)
+            with repo._connect() as conn, conn.cursor() as cur:
+                cur.execute(
+                    "SELECT project_code, project_name, metadata FROM projects WHERE project_code = %s OR project_id::text = %s LIMIT 1;",
+                    (str(proj_id), str(proj_id)),
+                )
+                row = cur.fetchone()
+                if row:
+                    proj = {"id": row[0], "name": row[1], "metadata": row[2] if isinstance(row[2], dict) else {}}
         except Exception:
             pass
 
@@ -1375,16 +1388,22 @@ async def get_connector_definitions() -> list[dict[str, Any]]:
 
 @app.post("/api/connectors/provision_and_inspect")
 async def handle_provision_and_inspect(req: ProvisionAndInspectRequest) -> dict[str, Any]:
-    return execute_source_inspection(
-        connector_type=req.connector_type,
-        params=req.params,
-        test_mode=req.test_mode,
-    )
+    try:
+        return execute_source_inspection(
+            connector_type=req.connector_type,
+            params=req.params,
+            test_mode=req.test_mode,
+        )
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=f"Connection inspection failed: {exc}")
 
 
 class DeployPlanRequest(BaseModel):
     plan: dict[str, Any] | None = None
     workspace_id: str | None = None
+    project_id: str | None = None
 
 
 @app.post("/api/pipeline/deploy")
@@ -1421,7 +1440,12 @@ async def handle_pipeline_deploy(req: DeployPlanRequest) -> dict[str, Any]:
             FabricItemSpec(name=f"pl_{clean_d}_bronze_ingest", item_type="DataPipeline", depends_on=[f"lh_{clean_d}_bronze"], folder_name=raw_f),
         ]
 
-    provisioner = GenericDAGProvisioner(workspace_id=req.workspace_id)
+    target_ws_id = req.workspace_id
+    if not target_ws_id:
+        resolved_id, _ = resolve_project_workspace(req.project_id or plan_data.get("project_code"))
+        target_ws_id = resolved_id or None
+
+    provisioner = GenericDAGProvisioner(workspace_id=target_ws_id)
     dag_res = provisioner.execute_optimistic_provisioning(items_to_deploy, enable_two_pass=True)
 
     deployed_items = [
@@ -1496,22 +1520,42 @@ async def handle_chat_stream(req: ChatRequest) -> StreamingResponse:
     SESSIONS[sid]["messages"].append(user_msg_entry)
     save_sessions_to_disk()
 
-    # Detect if message contains intake JSON or architectural instructions
-    intake_override = None
-    is_resume = "--resume" in req.message.lower()
-    json_match = re.search(r"```(?:json)?\s*(\{[\s\S]*?\})\s*```", req.message)
-    if json_match:
-        try:
-            intake_override = json.loads(json_match.group(1))
-        except Exception:
-            intake_override = None
+    # Detect if message contains intake JSON or connector resume instructions
+    intake_override = extract_intake_json(req.message)
+    conn_id_match = re.search(r"connectionId\s*['\"]?(conn_[a-zA-Z0-9_\-]+)['\"]?", req.message)
+    active_conn_id = conn_id_match.group(1) if conn_id_match else None
+    tables_match = re.search(r"selected tables:\s*([^\n]+)", req.message, re.IGNORECASE)
+    chosen_tables = [t.strip() for t in tables_match.group(1).split(",") if t.strip()] if tables_match else []
+    is_resume = ("--resume" in req.message.lower()) or bool(active_conn_id)
 
     async def event_generator():
+        nonlocal intake_override
         yield f"data: {json.dumps({'type': 'init', 'session_id': sid, 'resuming': is_resume})}\n\n"
+
+        # Restore pending Intake JSON when resuming after dynamic credential inspection
+        if is_resume and active_conn_id and not intake_override and SESSIONS[sid].get("pending_intake"):
+            pending_intake = SESSIONS[sid].pop("pending_intake", None)
+            p_rec_res = next((p for p in fetch_projects_cached() if p["id"] == proj_id), None) if proj_id else None
+            p_name_res = (p_rec_res or {}).get("name") or pending_intake.get("project_context", {}).get("project_summary", {}).get("project_name", "Fabric Engineering Platform")
+            p_code_res = proj_id or pending_intake.get("project_context", {}).get("project_summary", {}).get("project_code", "PRJ-OMNIFLOW")
+            _, ws_disp_res = resolve_project_workspace(proj_id or p_code_res)
+            intake_override = merge_connection_into_intake(
+                pending_intake=pending_intake,
+                connection_id=active_conn_id,
+                chosen_tables=chosen_tables,
+                vault=CONNECTIONS_VAULT,
+                proj_name=p_name_res,
+                proj_code=p_code_res,
+                workspace_display=ws_disp_res or os.getenv("ALLOWED_WORKSPACE_NAME") or "Fabric Workspace",
+            )
+            save_sessions_to_disk()
 
         # Check for connector credential requirement (Interception Gate)
         conn_def = detect_connector_need(req.message, SESSIONS[sid])
         if conn_def:
+            if intake_override:
+                SESSIONS[sid]["pending_intake"] = intake_override
+                save_sessions_to_disk()
             yield f"data: {json.dumps({'type': 'thought_step', 'step': {'id': 'conn_interception', 'title': f'Connector Interception: Awaiting Secure Connection to {conn_def.name}', 'status': 'in_progress', 'target': 'Fabric Connection Vault'}})}\n\n"
             await asyncio.sleep(0.1)
 
@@ -1809,16 +1853,28 @@ async def handle_chat_stream(req: ChatRequest) -> StreamingResponse:
             stage_f = f"{root_f}/{sub_f.get('stage', '02 Stage')}"
             silver_f = f"{root_f}/{sub_f.get('silver', '03 Silver')}"
             gold_f = f"{root_f}/{sub_f.get('gold', '04 Gold')}"
-            items_to_deploy = [
-                FabricItemSpec(name=f"lh_{clean_dom}_bronze", item_type="Lakehouse", folder_name=raw_f),
-                FabricItemSpec(name=f"lh_{clean_dom}_silver", item_type="Lakehouse", folder_name=silver_f),
-                FabricItemSpec(name=f"wh_{clean_dom}_gold", item_type="Warehouse", folder_name=gold_f),
-                FabricItemSpec(name=f"nb_{clean_dom}_curate", item_type="Notebook", depends_on=[f"lh_{clean_dom}_bronze"], folder_name=stage_f),
-                FabricItemSpec(name=f"pl_{clean_dom}_bronze_ingest", item_type="DataPipeline", depends_on=[f"lh_{clean_dom}_bronze"], folder_name=raw_f),
-            ]
-            ws_id, ws_name = resolve_project_workspace(proj_id)
+            if active_plan.get("items"):
+                items_to_deploy = [
+                    FabricItemSpec(
+                        name=it.get("name") or it.get("display_name", f"item_{uuid.uuid4().hex[:4]}"),
+                        item_type=it.get("type") or it.get("item_type", "Lakehouse"),
+                        depends_on=it.get("depends_on", []),
+                        folder_name=it.get("folder_name") or root_f,
+                        description=it.get("description", ""),
+                    )
+                    for it in active_plan["items"]
+                ]
+            else:
+                items_to_deploy = [
+                    FabricItemSpec(name=f"lh_{clean_dom}_bronze", item_type="Lakehouse", folder_name=raw_f),
+                    FabricItemSpec(name=f"lh_{clean_dom}_silver", item_type="Lakehouse", folder_name=silver_f),
+                    FabricItemSpec(name=f"wh_{clean_dom}_gold", item_type="Warehouse", folder_name=gold_f),
+                    FabricItemSpec(name=f"nb_{clean_dom}_curate", item_type="Notebook", depends_on=[f"lh_{clean_dom}_bronze"], folder_name=stage_f),
+                    FabricItemSpec(name=f"pl_{clean_dom}_bronze_ingest", item_type="DataPipeline", depends_on=[f"lh_{clean_dom}_bronze"], folder_name=raw_f),
+                ]
+            ws_id, ws_name = resolve_project_workspace(proj_id or proj_code)
             provisioner = GenericDAGProvisioner(workspace_id=ws_id)
-            dag_res = provisioner.execute_optimistic_provisioning(items_to_deploy, enable_two_pass=True)
+            dag_res = await asyncio.to_thread(provisioner.execute_optimistic_provisioning, items_to_deploy, True)
             run_id = str(uuid.uuid4())
             dep_items = [
                 {"item_type": s.item_type, "display_name": s.name, "item_id": s.item_id, "status": s.pass1_status}
@@ -1847,6 +1903,7 @@ async def handle_chat_stream(req: ChatRequest) -> StreamingResponse:
             SESSIONS[sid]["messages"].append({"role": "assistant", "content": deploy_summary})
             save_sessions_to_disk()
             yield f"data: {json.dumps({'type': 'done', 'session_id': sid, 'plan': active_plan})}\n\n"
+            return
 
         # ==============================================================================
         # COGNITIVE HARNESS TIER 3: Full Platform Blueprint (End-to-End Architecture)
@@ -1909,54 +1966,47 @@ async def handle_chat_stream(req: ChatRequest) -> StreamingResponse:
                 project_name=proj_name,
                 prompt_text=req.message,
             )
-            ws_id, ws_name = resolve_project_workspace(proj_id)
+            ws_id, ws_name = resolve_project_workspace(proj_id or proj_code)
             ws_display = ws_name or os.getenv("ALLOWED_WORKSPACE_NAME") or "Fabric Workspace"
+            synth_res: dict[str, Any] | None = None
             try:
-                res = orch.run_pipeline(req=plan_req, intake_data_override=intake_override, resume=is_resume, deploy=False)
-                summary_text = (
-                    f"### 📦 Microsoft Fabric Architecture Synthesized\n\n"
-                    f"- **Project**: `{proj_name}` (`{proj_code}`)\n"
-                    f"- **Quality Audit**: `100% Passed` (AST syntax verified, SHA-256 PII masking applied)\n"
-                    f"- **Target Workspace**: Microsoft Fabric (`{ws_display}`)\n\n"
-                    f"#### 📁 Target Folders & Assets:\n"
-                    f"- 📁 **{root_f}/{sub_f.get('raw', '01 Raw')}** ➔ `Lakehouse`: `lh_{clean_dom}_bronze`, `Pipeline`: `pl_{clean_dom}_bronze_ingest`\n"
-                    f"- 📁 **{root_f}/{sub_f.get('stage', '02 Stage')}** ➔ `Notebook`: `nb_{clean_dom}_curate` (Delta Deduplication & PII Hashing)\n"
-                    f"- 📁 **{root_f}/{sub_f.get('silver', '03 Silver')}** ➔ `Lakehouse`: `lh_{clean_dom}_silver` (Curated Harmonized)\n"
-                    f"- 📁 **{root_f}/{sub_f.get('gold', '04 Gold')}** ➔ `Warehouse`: `wh_{clean_dom}_gold` (Kimball Analytical Warehouse)\n\n"
-                    f"✨ **All code artifacts generated and saved to `omniflow/generated_artifacts/{proj_code}/`!**\n\n"
-                    f"Click **Deploy to Fabric** below or in the right workbench to provision all items into their designated folders in Microsoft Fabric."
+                synth_res = await asyncio.to_thread(
+                    orch.run_pipeline,
+                    req=plan_req,
+                    intake_data_override=intake_override,
+                    resume=is_resume,
+                    deploy=False,
+                )
+                plan_obj, summary_text = build_dynamic_plan_object(
+                    intake=intake_override or {},
+                    res=synth_res,
+                    proj_name=proj_name,
+                    proj_code=proj_code,
+                    clean_dom=clean_dom,
+                    root_f=root_f,
+                    sub_f=sub_f,
+                    ws_display=ws_display,
+                    connection_id=active_conn_id,
                 )
             except Exception as e:
-                summary_text = f"Architecture execution completed with status notice: {e}"
+                plan_obj, _ = build_dynamic_plan_object(
+                    intake=intake_override or {},
+                    res=None,
+                    proj_name=proj_name,
+                    proj_code=proj_code,
+                    clean_dom=clean_dom,
+                    root_f=root_f,
+                    sub_f=sub_f,
+                    ws_display=ws_display,
+                    connection_id=active_conn_id,
+                )
+                summary_text = f"Architecture synthesis prepared with notice: {e}\n\nYou can review the discovered entities in the right workbench and click **Deploy to Fabric**."
 
             # Stream words
             for chunk in summary_text.split(" "):
                 yield f"data: {json.dumps({'type': 'chunk', 'text': chunk + ' '})}\n\n"
                 await asyncio.sleep(0.015)
 
-            plan_obj = {
-                "sourceName": proj_name,
-                "project_code": proj_code,
-                "domain": clean_dom,
-                "schedule": "Hourly Micro-Batch",
-                "root_folder": root_f,
-                "folders": sub_f,
-                "lakehouses": [f"lh_{clean_dom}_bronze", f"lh_{clean_dom}_silver"],
-                "notebooks": [{"name": f"nb_{clean_dom}_curate", "layer": "stage"}],
-                "pipeline": f"pl_{clean_dom}_bronze_ingest",
-                "items": [
-                    {"name": f"lh_{clean_dom}_bronze", "type": "Lakehouse", "folder_name": f"{root_f}/{sub_f.get('raw', '01 Raw')}"},
-                    {"name": f"lh_{clean_dom}_silver", "type": "Lakehouse", "folder_name": f"{root_f}/{sub_f.get('silver', '03 Silver')}"},
-                    {"name": f"wh_{clean_dom}_gold", "type": "Warehouse", "folder_name": f"{root_f}/{sub_f.get('gold', '04 Gold')}"},
-                    {"name": f"nb_{clean_dom}_curate", "type": "Notebook", "depends_on": [f"lh_{clean_dom}_bronze"], "folder_name": f"{root_f}/{sub_f.get('stage', '02 Stage')}"},
-                    {"name": f"pl_{clean_dom}_bronze_ingest", "type": "DataPipeline", "depends_on": [f"lh_{clean_dom}_bronze"], "folder_name": f"{root_f}/{sub_f.get('raw', '01 Raw')}"},
-                ],
-                "tables": [
-                    {"name": f"{clean_dom}_raw_stream", "target": f"{sub_f.get('raw', '01 Raw')} / lh_{clean_dom}_bronze"},
-                    {"name": f"{clean_dom}_curated", "target": f"{sub_f.get('stage', '02 Stage')} / nb_{clean_dom}_curate"},
-                    {"name": f"{clean_dom}_harmonized", "target": f"{sub_f.get('silver', '03 Silver')} / lh_{clean_dom}_silver"},
-                ],
-            }
             SESSIONS[sid]["active_plan"] = plan_obj
             SESSIONS[sid]["messages"].append({"role": "assistant", "content": summary_text})
             save_sessions_to_disk()
@@ -2015,7 +2065,7 @@ async def handle_chat_stream(req: ChatRequest) -> StreamingResponse:
 
             conn_id_match = re.search(r"connectionId\s*['\"]?(conn_[a-zA-Z0-9_\-]+)['\"]?", req.message)
             active_conn_id = conn_id_match.group(1) if conn_id_match else None
-            tables_match = re.search(r"selected tables:\s*([a-zA-Z0-9_,\s]+)", req.message, re.IGNORECASE)
+            tables_match = re.search(r"selected tables:\s*([^\n]+)", req.message, re.IGNORECASE)
             chosen_tables = [t.strip() for t in tables_match.group(1).split(",") if t.strip()] if tables_match else []
 
             # 1. Classify component type and target engine
@@ -2198,12 +2248,26 @@ async def handle_chat_stream(req: ChatRequest) -> StreamingResponse:
                     pass
 
             if active_conn_id:
+                vault_rec = CONNECTIONS_VAULT.get(active_conn_id, {})
+                disc_tables = vault_rec.get("discovered_tables", [])
+                chosen_lower = {c.lower() for c in chosen_tables}
+                matched_meta = [
+                    d for d in disc_tables
+                    if not chosen_lower
+                    or str(d.get("full_name", "")).lower() in chosen_lower
+                    or str(d.get("name", "")).lower() in chosen_lower
+                ]
+                schema_summary = "\n".join(
+                    f"  - {d.get('full_name') or d.get('name')} (PK: {d.get('pk')}, Watermark: {d.get('watermark')}, Cols: {[c.get('name') + ':' + c.get('type', '') for c in d.get('columns', [])[:15]]})"
+                    for d in matched_meta[:35]
+                )
                 if is_notebook_pathway:
                     sys_prompt += (
                         f"\n\nCRITICAL FABRIC NOTEBOOK INGESTION INSTRUCTIONS:\n"
-                        f"- Target System: {CONNECTIONS_VAULT.get(active_conn_id, {}).get('connector_name', 'Custom API Source')}\n"
+                        f"- Target System: {vault_rec.get('connector_name', 'Custom API Source')}\n"
                         f"- Connection ID / Vault Reference: `{active_conn_id}` (verified in Fabric Connection Vault)\n"
                         f"- Selected Tables / Collections: {', '.join(chosen_tables)}\n"
+                        f"- Discovered Schemas:\n{schema_summary or 'Standard relational entities'}\n"
                         f"- Pathway: CUSTOM PYSPARK INGESTION NOTEBOOK (Non-native Fabric API/Driver extraction)\n"
                         f"- 1. Generate the complete, production-grade PySpark Ingestion Notebook:\n"
                         f"     - Use mssparkutils.credentials.getSecret('FabricVault', 'API_KEY') for secret retrieval\n"
@@ -2216,11 +2280,12 @@ async def handle_chat_stream(req: ChatRequest) -> StreamingResponse:
                         f"\n\nCRITICAL FABRIC CONNECTOR INTEGRATION INSTRUCTIONS:\n"
                         f"- Microsoft Fabric Connection ID: `{active_conn_id}` (verified from Fabric Connection Vault)\n"
                         f"- Selected Tables to Ingest: {', '.join(chosen_tables)}\n"
+                        f"- Discovered Schemas:\n{schema_summary or 'Standard relational entities'}\n"
                         f"- Pathway: NATIVE FABRIC DATA PIPELINE COPY ACTIVITY\n"
                         f"- STRICT SECURITY: Never hallucinate or insert passwords, secrets, or tokens in your response.\n"
                         f"- 1. Generate the complete Microsoft Fabric Pipeline definition JSON with Copy activities referencing:\n"
                         f"     \"externalConnections\": {{ \"connectionId\": \"{active_conn_id}\" }}\n"
-                        f"- 2. For each table ({', '.join(chosen_tables)}), generate idempotent PySpark Delta Lake extraction & Delta MERGE code writing to `lh_bronze` and `lh_silver`.\n"
+                        f"- 2. For the selected tables ({', '.join(chosen_tables[:15])}), generate idempotent PySpark Delta Lake extraction & Delta MERGE code writing to `lh_bronze` and `lh_silver`.\n"
                         f"- 3. Structure the output clearly with copyable code blocks and next deployment steps.\n"
                     )
 
@@ -2278,17 +2343,25 @@ async def handle_chat_stream(req: ChatRequest) -> StreamingResponse:
 
             reply = "".join(reply_chunks)
             if active_conn_id and chosen_tables:
+                clean_p_dom = re.sub(r"[^a-zA-Z0-9_]", "_", p_name.lower()).strip("_")[:16] or "enterprise"
                 active_plan = {
                     "sourceName": p_name,
                     "project_code": p_code,
-                    "domain": "enterprise",
+                    "domain": clean_p_dom,
                     "connection_id": active_conn_id,
                     "schedule": "Hourly Triggered",
                     "root_folder": p_root,
                     "folders": {"raw": "01 Raw", "stage": "02 Stage", "silver": "03 Silver", "gold": "04 Gold"},
+                    "items": [
+                        {"name": f"lh_{clean_p_dom}_bronze", "type": "Lakehouse", "folder_name": f"{p_root}/01 Raw"},
+                        {"name": f"lh_{clean_p_dom}_silver", "type": "Lakehouse", "folder_name": f"{p_root}/03 Silver"},
+                        {"name": f"wh_{clean_p_dom}_gold", "type": "Warehouse", "folder_name": f"{p_root}/04 Gold"},
+                        {"name": f"nb_{clean_p_dom}_curate", "type": "Notebook", "depends_on": [f"lh_{clean_p_dom}_bronze"], "folder_name": f"{p_root}/02 Stage"},
+                        {"name": f"pl_{clean_p_dom}_bronze_ingest", "type": "DataPipeline", "depends_on": [f"lh_{clean_p_dom}_bronze"], "folder_name": f"{p_root}/01 Raw"},
+                    ],
                     "tables": [
-                        {"name": f"lh_{tbl.strip().lower()}_bronze", "target": f"01 Raw / {tbl.strip()}"}
-                        for tbl in chosen_tables
+                        {"name": f"brz_{tbl.strip().split('.')[-1].lower()}", "target": f"01 Raw / {tbl.strip()}"}
+                        for tbl in chosen_tables[:60]
                     ],
                 }
                 SESSIONS[sid]["active_plan"] = active_plan

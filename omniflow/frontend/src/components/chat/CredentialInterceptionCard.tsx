@@ -43,9 +43,14 @@ export const CredentialInterceptionCard: React.FC<CredentialInterceptionCardProp
   const [inspectResult, setInspectResult] = useState<ProvisionAndInspectResult | null>(null);
   const [selectedTables, setSelectedTables] = useState<Record<string, boolean>>({});
   const [showCode, setShowCode] = useState<boolean>(false);
+  const [usedDemoPresets, setUsedDemoPresets] = useState<boolean>(false);
+
+  const getTableKey = (t: DiscoveredSourceTable): string =>
+    t.full_name || (t.schema ? `${t.schema}.${t.name}` : t.name);
 
   const handleFillDemo = () => {
     setFormData({ ...data.sample_presets });
+    setUsedDemoPresets(true);
     setInspectError(null);
   };
 
@@ -59,12 +64,12 @@ export const CredentialInterceptionCard: React.FC<CredentialInterceptionCardProp
     setInspectError(null);
 
     try {
-      const res = await provisionAndInspectConnector(data.connector_type, formData, true);
+      const res = await provisionAndInspectConnector(data.connector_type, formData, usedDemoPresets);
       setInspectResult(res);
-      // Pre-select all discovered tables
+      // Pre-select all discovered tables using qualified schema.table key
       const initialSelected: Record<string, boolean> = {};
       res.discovered_tables.forEach((t) => {
-        initialSelected[t.name] = true;
+        initialSelected[getTableKey(t)] = true;
       });
       setSelectedTables(initialSelected);
     } catch (err) {
@@ -74,15 +79,15 @@ export const CredentialInterceptionCard: React.FC<CredentialInterceptionCardProp
     }
   };
 
-  const handleToggleTable = (name: string) => {
-    setSelectedTables((prev) => ({ ...prev, [name]: !prev[name] }));
+  const handleToggleTable = (tableKey: string) => {
+    setSelectedTables((prev) => ({ ...prev, [tableKey]: !prev[tableKey] }));
   };
 
   const handleSelectAll = (select: boolean) => {
     if (!inspectResult) return;
     const next: Record<string, boolean> = {};
     inspectResult.discovered_tables.forEach((t) => {
-      next[t.name] = select;
+      next[getTableKey(t)] = select;
     });
     setSelectedTables(next);
   };
@@ -100,6 +105,14 @@ export const CredentialInterceptionCard: React.FC<CredentialInterceptionCardProp
 
     const pathway = inspectResult.pathway || data.pathway || (data.is_fabric_native === false ? 'pyspark_notebook' : 'native_pipeline');
     onConfirmResume(inspectResult.connection_id, chosen, pathway);
+  };
+
+  const handleImportAllAndResume = () => {
+    if (!inspectResult) return;
+    const allTables = inspectResult.discovered_tables.map((t) => getTableKey(t));
+    if (allTables.length === 0) return;
+    const pathway = inspectResult.pathway || data.pathway || (data.is_fabric_native === false ? 'pyspark_notebook' : 'native_pipeline');
+    onConfirmResume(inspectResult.connection_id, allTables, pathway);
   };
 
   const handleBypassInspection = () => {
@@ -188,9 +201,10 @@ export const CredentialInterceptionCard: React.FC<CredentialInterceptionCardProp
                 {data.required_params.map((param) => {
                   const isPass = param.type === 'password';
                   const showPass = showPasswords[param.key];
+                  const isFullWidth = param.key === 'connection_url' || param.key === 'endpoint_url';
 
                   return (
-                    <div key={param.key} className="space-y-1">
+                    <div key={param.key} className={`space-y-1 ${isFullWidth ? 'md:col-span-2' : ''}`}>
                       <label className="text-[11px] font-medium text-slate-300 flex items-center justify-between">
                         <span>{param.label} {param.required && <span className="text-rose-400">*</span>}</span>
                       </label>
@@ -198,7 +212,10 @@ export const CredentialInterceptionCard: React.FC<CredentialInterceptionCardProp
                         <input
                           type={isPass && !showPass ? 'password' : 'text'}
                           value={formData[param.key] || ''}
-                          onChange={(e) => setFormData({ ...formData, [param.key]: e.target.value })}
+                          onChange={(e) => {
+                            setUsedDemoPresets(false);
+                            setFormData({ ...formData, [param.key]: e.target.value });
+                          }}
                           placeholder={param.placeholder}
                           required={param.required}
                           className="w-full bg-[#111317] border border-[#2d3139] focus:border-[#0078d4] focus:ring-1 focus:ring-[#0078d4] rounded-lg px-3 py-2 text-xs text-white placeholder-slate-500 font-mono transition-all"
@@ -328,14 +345,15 @@ export const CredentialInterceptionCard: React.FC<CredentialInterceptionCardProp
                   </div>
                 </div>
 
-                <div className="space-y-1.5 max-h-52 overflow-y-auto pr-1">
+                <div className="space-y-1.5 max-h-56 overflow-y-auto pr-1">
                   {inspectResult.discovered_tables.map((t: DiscoveredSourceTable) => {
-                    const isChecked = Boolean(selectedTables[t.name]);
+                    const tableKey = getTableKey(t);
+                    const isChecked = Boolean(selectedTables[tableKey]);
 
                     return (
                       <div
-                        key={t.name}
-                        onClick={() => handleToggleTable(t.name)}
+                        key={tableKey}
+                        onClick={() => handleToggleTable(tableKey)}
                         className={`flex items-center justify-between p-2.5 rounded-lg border text-xs cursor-pointer transition-all ${
                           isChecked
                             ? 'bg-[#0078d4]/10 border-[#0078d4]/40 text-white'
@@ -350,11 +368,16 @@ export const CredentialInterceptionCard: React.FC<CredentialInterceptionCardProp
                             className="rounded border-[#2d3139] text-[#0078d4] focus:ring-0 focus:ring-offset-0 cursor-pointer"
                           />
                           <div>
-                            <div className="font-mono font-medium text-slate-200 flex items-center gap-2">
-                              <span>{t.schema}.{t.name}</span>
-                              {t.pk && (
+                            <div className="font-mono font-medium text-slate-200 flex items-center flex-wrap gap-1.5">
+                              <span>{tableKey}</span>
+                              {t.pk && t.pk.length > 0 && (
                                 <span className="text-[10px] px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">
                                   PK: {t.pk.join(', ')}
+                                </span>
+                              )}
+                              {t.watermark && (
+                                <span className="text-[10px] px-1.5 py-0.2 rounded bg-sky-500/15 text-sky-300 border border-sky-500/30">
+                                  WM: {t.watermark}
                                 </span>
                               )}
                             </div>
@@ -364,8 +387,8 @@ export const CredentialInterceptionCard: React.FC<CredentialInterceptionCardProp
                           </div>
                         </div>
 
-                        <div className="text-[11px] text-slate-400 font-mono">
-                          {t.est_rows ? `~${t.est_rows.toLocaleString()} rows` : ''}
+                        <div className="text-[11px] text-slate-400 font-mono shrink-0 ml-2">
+                          {t.est_rows !== undefined ? `${t.est_rows.toLocaleString()} rows` : ''}
                         </div>
                       </div>
                     );
@@ -374,7 +397,7 @@ export const CredentialInterceptionCard: React.FC<CredentialInterceptionCardProp
               </div>
 
               {/* Confirm & Resume Footer */}
-              <div className="flex items-center justify-between pt-3 border-t border-[#2d3139]">
+              <div className="flex items-center justify-between gap-2 pt-3 border-t border-[#2d3139]">
                 <button
                   type="button"
                   onClick={() => setInspectResult(null)}
@@ -383,14 +406,24 @@ export const CredentialInterceptionCard: React.FC<CredentialInterceptionCardProp
                   ← Edit Connection Parameters
                 </button>
 
-                <button
-                  type="button"
-                  onClick={handleConfirmAndResume}
-                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[#0078d4] hover:bg-[#1084d8] text-white text-xs font-semibold shadow-lg shadow-[#0078d4]/20 transition-all"
-                >
-                  <span>Confirm Tables & Synthesize Pipeline</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleImportAllAndResume}
+                    className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-[#20242c] hover:bg-[#2a2f3a] border border-[#323846] text-slate-200 text-xs font-medium transition-all"
+                  >
+                    <span>Import All ({inspectResult.discovered_tables.length})</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleConfirmAndResume}
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[#0078d4] hover:bg-[#1084d8] text-white text-xs font-semibold shadow-lg shadow-[#0078d4]/20 transition-all"
+                  >
+                    <span>Confirm Selected ({Object.values(selectedTables).filter(Boolean).length})</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
               </div>
             </div>
           )}

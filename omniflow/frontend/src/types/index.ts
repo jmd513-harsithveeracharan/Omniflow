@@ -320,10 +320,14 @@ export interface CredentialRequestData {
 export interface DiscoveredSourceTable {
   name: string;
   schema: string;
+  full_name?: string;
   description?: string;
   est_rows?: number;
   pk?: string[];
-  watermark?: string;
+  foreign_keys?: string[];
+  watermark?: string | null;
+  columns?: Array<{ name: string; type: string; nullable?: boolean; is_pk?: boolean; is_pii?: boolean }>;
+  pii_columns?: string[];
 }
 
 export interface ProvisionAndInspectResult {

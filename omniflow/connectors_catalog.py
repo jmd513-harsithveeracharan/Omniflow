@@ -130,11 +130,12 @@ def synthesize_dynamic_connector(source_name: str) -> ConnectorDefinition:
         # Default to database / data store pattern
         category = "Database / Data Store" if not is_native else "Enterprise Source"
         fields = [
-            ConnectorField(key="host", label=f"{clean_name} Server Host / FQDN", type="text", placeholder=f"{slug}-db.corp.internal", default=f"{slug}-db.corp.internal", required=True),
-            ConnectorField(key="port", label="Port", type="number", placeholder="5432", default="5432", required=True),
-            ConnectorField(key="database", label="Database Name / Keyspace", type="text", placeholder=f"{slug}_prod", default=f"{slug}_prod", required=True),
-            ConnectorField(key="username", label="Service User", type="text", placeholder="fabric_svc", default="fabric_svc", required=True),
-            ConnectorField(key="password", label="Password / Secret", type="password", placeholder="••••••••••••", default="", required=True),
+            ConnectorField(key="connection_url", label="Connection URL / URI (Optional — overrides individual fields)", type="text", placeholder=f"{slug}://user:password@host:5432/database", default="", required=False),
+            ConnectorField(key="host", label=f"{clean_name} Server Host / FQDN", type="text", placeholder=f"{slug}-db.corp.internal", default="", required=False),
+            ConnectorField(key="port", label="Port", type="number", placeholder="5432", default="5432", required=False),
+            ConnectorField(key="database", label="Database Name / Keyspace", type="text", placeholder=f"{slug}_prod", default="", required=False),
+            ConnectorField(key="username", label="Service User", type="text", placeholder="fabric_svc", default="", required=False),
+            ConnectorField(key="password", label="Password / Secret", type="password", placeholder="••••••••••••", default="", required=False),
             ConnectorField(key="gateway", label="Fabric Gateway Name (Optional)", type="text", placeholder="Corp-Data-Gateway-01", default="Corp-Data-Gateway-01", required=False),
         ]
         sample_presets = {

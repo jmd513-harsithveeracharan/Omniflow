@@ -27,6 +27,8 @@ from omniflow.connectors_catalog import (
     synthesize_dynamic_connector,
     FABRIC_NATIVE_CONNECTORS,
 )
+from omniflow.connectors_live_inspector import run_live_schema_inspection
+from omniflow.intake_helpers import extract_intake_json
 
 # Secure In-Memory Connection Vault (Keyed by connection_id)
 # Passwords/tokens stay here and are never injected into LLM prompts.
@@ -108,11 +110,12 @@ CONNECTOR_REGISTRY: dict[str, ConnectorDefinition] = {
         pathway_explanation="Native Microsoft Fabric Data Pipeline Copy Activity supported.",
         default_gateway=None,
         required_params=[
-            ConnectorField(key="host", label="Host / Server FQDN", type="text", placeholder="postgres.internal.net or ep-xyz.neon.tech", default="localhost", required=True),
-            ConnectorField(key="port", label="Port", type="number", placeholder="5432", default="5432", required=True),
-            ConnectorField(key="database", label="Database Name", type="text", placeholder="enterprise_dw", default="postgres", required=True),
-            ConnectorField(key="username", label="Username", type="text", placeholder="postgres", default="postgres", required=True),
-            ConnectorField(key="password", label="Password", type="password", placeholder="••••••••••••", default="", required=True),
+            ConnectorField(key="connection_url", label="Connection URL / URI (Optional — overrides host/db fields)", type="text", placeholder="postgresql://user:password@host:5432/dbname?sslmode=require", default="", required=False),
+            ConnectorField(key="host", label="Host / Server FQDN", type="text", placeholder="postgres.internal.net or ep-xyz.neon.tech", default="", required=False),
+            ConnectorField(key="port", label="Port", type="number", placeholder="5432", default="5432", required=False),
+            ConnectorField(key="database", label="Database Name", type="text", placeholder="enterprise_dw", default="", required=False),
+            ConnectorField(key="username", label="Username", type="text", placeholder="postgres", default="", required=False),
+            ConnectorField(key="password", label="Password", type="password", placeholder="••••••••••••", default="", required=False),
         ],
         sample_presets={
             "host": "ep-delicate-lake-a28d.us-east-2.aws.neon.tech",
@@ -185,21 +188,60 @@ CONNECTOR_REGISTRY: dict[str, ConnectorDefinition] = {
 }
 
 
+def _resolve_connector_from_label(label: str) -> ConnectorDefinition | None:
+    """Resolves a structured source system label cleanly against registry or synthesizes dynamically."""
+    low = (label or "").strip().lower()
+    if not low:
+        return None
+    alias_map = {
+        "postgres": ("postgres", "postgresql", "neon", "aurora_postgres"),
+        "snowflake": ("snowflake",),
+        "sap": ("sap", "sap_hana", "sap_ecc", "s/4hana"),
+        "salesforce": ("salesforce", "sfdc"),
+        "dummy_sandbox": ("dummy_sandbox", "sandbox"),
+    }
+    for reg_key, aliases in alias_map.items():
+        if any(a in low for a in aliases):
+            return CONNECTOR_REGISTRY[reg_key]
+    return synthesize_dynamic_connector(label.strip())
+
+
 def detect_connector_need(message: str, session_data: dict[str, Any] | None = None) -> ConnectorDefinition | None:
     """
     TRULY DYNAMIC connector detection:
-    1. If connectionId or resume pipeline is present, returns None.
-    2. Matches known presets or dynamically synthesizes a connector for ANY source name.
+    1. If connectionId, --resume, or resume pipeline is present, returns None.
+    2. Parses Intake JSON `retrieved_context.data_sources` dynamically when present.
+    3. Matches known presets cleanly or synthesizes a connector for arbitrary source names.
     """
     msg_lower = message.lower()
 
-    if "connectionid" in msg_lower or "conn_" in msg_lower or "resume pipeline" in msg_lower:
+    if "connectionid" in msg_lower or "conn_" in msg_lower or "resume pipeline" in msg_lower or "--resume" in msg_lower:
         return None
 
-    # Check for direct keyword matches in presets first
+    intake = extract_intake_json(message)
+    if intake:
+        sources = intake.get("retrieved_context", {}).get("data_sources", [])
+        if isinstance(sources, list):
+            for src in sources:
+                if not isinstance(src, dict):
+                    continue
+                sys_label = str(
+                    src.get("connector_type")
+                    or src.get("system_type")
+                    or src.get("source_type")
+                    or src.get("source_name")
+                    or ""
+                ).strip()
+                resolved = _resolve_connector_from_label(sys_label)
+                if resolved:
+                    return resolved
+
+    # Check for word-boundary matches in presets first
     for key, cdef in CONNECTOR_REGISTRY.items():
-        if key in msg_lower:
+        if re.search(rf"\b{re.escape(key)}\b", msg_lower):
             return cdef
+    if re.search(r"\b(?:postgresql|neon)\b", msg_lower):
+        return CONNECTOR_REGISTRY["postgres"]
 
     # Dynamic extraction of integration target (e.g. "connect to Workday", "ingest from Stripe", "integrate ServiceNow")
     patterns = [
@@ -210,16 +252,13 @@ def detect_connector_need(message: str, session_data: dict[str, Any] | None = No
         m = re.search(pattern, msg_lower)
         if m:
             target_name = m.group(1).strip()
-            # Ignore non-connector words
             if target_name in ["a", "an", "the", "my", "our", "external", "data", "source", "lakehouse", "bronze"]:
                 continue
             slug = target_name.lower().replace("-", "_").replace(" ", "_")
             if slug in CONNECTOR_REGISTRY:
                 return CONNECTOR_REGISTRY[slug]
-            # Synthesize truly dynamic JIT connector!
             return synthesize_dynamic_connector(target_name.capitalize())
 
-    # Generic integration trigger without explicit name -> default to Sandbox or SAP
     if any(k in msg_lower for k in ["external connection", "source connection", "connect to source", "integrate external"]):
         return CONNECTOR_REGISTRY["dummy_sandbox"]
 
@@ -294,16 +333,26 @@ def execute_source_inspection(
     test_mode: bool = True,
 ) -> dict[str, Any]:
     """
-    Performs on-the-fly source inspection and registers connection in vault.
+    Performs live source catalog introspection (when real credentials/URL are supplied)
+    or sandbox fallback inspection, and registers connection metadata in vault.
     """
     if connector_type in CONNECTOR_REGISTRY:
         conn_def = CONNECTOR_REGISTRY[connector_type]
     else:
         conn_def = synthesize_dynamic_connector(connector_type.capitalize())
 
+    live_tables = run_live_schema_inspection(
+        connector_type=conn_def.connector_type,
+        params=params,
+        sample_presets=conn_def.sample_presets,
+        test_mode=test_mode,
+    )
+    discovered_tables = live_tables if live_tables is not None else conn_def.mock_tables
+    inspection_mode = "live_catalog" if live_tables is not None else "sandbox_preset"
+
     conn_uuid = f"conn_{conn_def.connector_type}_{uuid.uuid4().hex[:8]}"
 
-    # Save credentials securely into the in-memory vault
+    # Save credentials & discovered schema metadata securely into the in-memory vault
     CONNECTIONS_VAULT[conn_uuid] = {
         "connection_id": conn_uuid,
         "connector_type": conn_def.connector_type,
@@ -311,11 +360,12 @@ def execute_source_inspection(
         "pathway": conn_def.pathway.value,
         "is_fabric_native": conn_def.is_fabric_native,
         "params": params,
+        "discovered_tables": discovered_tables,
+        "inspection_mode": inspection_mode,
         "created_at": time.time(),
         "status": "verified",
     }
 
-    # Generate Python Inspector code
     is_api = conn_def.category == "SaaS API / Microservice" or "api" in conn_def.connector_type
     py_code = generate_python_inspector_script(conn_def.connector_type, params, is_api=is_api)
 
@@ -329,7 +379,12 @@ def execute_source_inspection(
         "pathway": conn_def.pathway.value,
         "pathway_explanation": conn_def.pathway_explanation,
         "gateway": params.get("gateway") or conn_def.default_gateway or "Fabric Cloud Connector (Direct)",
-        "discovered_tables": conn_def.mock_tables,
+        "inspection_mode": inspection_mode,
+        "discovered_tables": discovered_tables,
         "python_inspector_code": py_code,
-        "message": f"Successfully connected to {conn_def.name} and inspected {len(conn_def.mock_tables)} entities.",
+        "message": (
+            f"Successfully connected live to {conn_def.name} and discovered {len(discovered_tables)} entities."
+            if live_tables is not None
+            else f"Verified sandbox preset for {conn_def.name} and loaded {len(discovered_tables)} sample entities."
+        ),
     }
