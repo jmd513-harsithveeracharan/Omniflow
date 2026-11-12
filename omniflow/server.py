@@ -187,8 +187,46 @@ FABRIC_STATUS_CACHE_TIME: float = 0.0
 @app.on_event("startup")
 async def on_startup():
     import threading
+
+    def _warm_fabric_caches() -> None:
+        try:
+            from omniflow.auth.fabric import get_fabric_accounts, _get_azure_cli_account
+            get_fabric_accounts(refresh=False)
+            _get_azure_cli_account()
+            from app.fabric_client import list_workspaces as fc_list_workspaces
+            live_ws = fc_list_workspaces()
+            if live_ws:
+                default_ws_id = os.getenv("ALLOWED_WORKSPACE_ID", "")
+                default_ws_name = os.getenv("ALLOWED_WORKSPACE_NAME", "")
+                ws_found = next((w for w in live_ws if w.get("id") == default_ws_id), None)
+                if not default_ws_id or not ws_found:
+                    first_active = next((w for w in live_ws if w.get("type") != "Personal"), live_ws[0])
+                    default_ws_id = first_active.get("id", "")
+                    default_ws_name = first_active.get("displayName") or first_active.get("name") or "Fabric Workspace"
+                _workspaces_list_cache["data"] = {
+                    "active_workspace_id": default_ws_id,
+                    "active_workspace_name": default_ws_name or "Fabric Workspace",
+                    "workspaces": [
+                        {
+                            "id": w.get("id"),
+                            "displayName": w.get("displayName") or w.get("name") or "Workspace",
+                            "description": w.get("description") or "",
+                            "type": w.get("type") or "Workspace",
+                            "capacityId": w.get("capacityId") or "",
+                            "capacityRegion": w.get("capacityRegion") or "",
+                            "isActive": (w.get("id") == default_ws_id),
+                        }
+                        for w in live_ws
+                    ],
+                    "is_fallback": False,
+                }
+                _workspaces_list_cache["expires_at"] = time.time() + _WORKSPACE_CACHE_TTL
+        except Exception as e:
+            print(f"[OmniFlow Startup] Fabric account warm notice: {e}")
+
     threading.Thread(target=fetch_projects_cached, args=(True,), daemon=True).start()
     threading.Thread(target=init_auth_db, daemon=True).start()
+    threading.Thread(target=_warm_fabric_caches, daemon=True).start()
 
 
 def fetch_projects_cached(force_refresh: bool = False) -> list[dict[str, Any]]:
@@ -341,7 +379,7 @@ async def get_fabric_status() -> dict[str, Any]:
         return FABRIC_STATUS_CACHE
 
     from omniflow.auth import _get_azure_cli_account
-    account = await asyncio.to_thread(_get_azure_cli_account)
+    account = (await asyncio.to_thread(_get_azure_cli_account)) or {}
 
     tenant_name = account.get("tenant_name") or os.getenv("AZURE_TENANT_NAME", "Fabric Enterprise")
     user_email = account.get("email") or os.getenv("FABRIC_USER_IDENTITY", "")
@@ -349,37 +387,43 @@ async def get_fabric_status() -> dict[str, Any]:
 
     ws_id = account.get("default_workspace_id") or os.getenv("ALLOWED_WORKSPACE_ID", "")
     ws_name = account.get("default_workspace_name") or os.getenv("ALLOWED_WORKSPACE_NAME", "")
+    ws_count = 1 if ws_id else 0
 
-    # Dynamically discover workspaces from Fabric REST API non-blockingly
-    try:
-        from app.fabric_client import list_workspaces as fc_list_workspaces
-        live_ws = await asyncio.to_thread(fc_list_workspaces)
-        if live_ws:
-            found = next((w for w in live_ws if w.get("id") == ws_id), None) if ws_id else None
-            if not found:
-                found = next((w for w in live_ws if w.get("type") != "Personal"), live_ws[0])
-            if found:
-                ws_id = found.get("id", ws_id)
-                ws_name = found.get("displayName") or found.get("name") or ws_name
-    except Exception:
-        pass
+    # Reuse warm workspace cache first; if ws_id is already known, warm cache in background
+    cached_ws = _workspaces_list_cache.get("data")
+    if cached_ws and _workspaces_list_cache.get("expires_at", 0) > now:
+        ws_id = cached_ws.get("active_workspace_id") or ws_id
+        ws_name = cached_ws.get("active_workspace_name") or ws_name
+        ws_count = len(cached_ws.get("workspaces") or []) or ws_count
+    elif ws_id and ws_name:
+        asyncio.create_task(list_fabric_workspaces(refresh=False))
+    else:
+        try:
+            ws_res = await list_fabric_workspaces(refresh=False)
+            ws_list = ws_res.get("workspaces") or []
+            if ws_list:
+                ws_id = ws_res.get("active_workspace_id") or ws_id
+                ws_name = ws_res.get("active_workspace_name") or ws_name
+                ws_count = len(ws_list)
+        except Exception:
+            pass
 
     if not ws_name:
         ws_name = tenant_name or "Fabric Workspace"
 
     FABRIC_STATUS_CACHE = {
-        "authenticated": True,
+        "authenticated": bool(account),
         "workspace_id": ws_id,
         "workspace_name": ws_name,
         "target_folder": "Workspace Root (Zero Container)",
-        "workspaces_count": 1,
-        "user_identity": user_email or account.get("name", "Fabric User"),
-        "auth_method": "Azure CLI SSO",
+        "workspaces_count": ws_count,
+        "user_identity": user_email or account.get("name", "Not Connected"),
+        "auth_method": "Azure CLI SSO" if account else "Disconnected",
         "tenant_id": tenant_id,
         "tenant_name": tenant_name,
         "account_name": account.get("name", ""),
         "account_type": account.get("account_type", "Azure CLI"),
-        "expires_in_minutes": 60,
+        "expires_in_minutes": 60 if account else 0,
     }
     FABRIC_STATUS_CACHE_TIME = now
     return FABRIC_STATUS_CACHE
@@ -577,11 +621,14 @@ def resolve_project_workspace(proj_id: Optional[str]) -> tuple[str, str]:
     if is_guid:
         return target_ws_str, meta.get("targetWorkspaceName") or target_ws_str
 
-    # Otherwise, it's a workspace name (e.g. "PBT_DATA_AGENT")
-    # Query live Fabric workspaces to resolve its GUID
+    # Query warm cache first, then live Fabric workspaces to resolve its GUID
     try:
-        from app.fabric_client import list_workspaces as fc_list_workspaces
-        live_ws = fc_list_workspaces()
+        cached_ws = _workspaces_list_cache.get("data")
+        if cached_ws and _workspaces_list_cache.get("expires_at", 0) > time.time():
+            live_ws = cached_ws.get("workspaces") or []
+        else:
+            from app.fabric_client import list_workspaces as fc_list_workspaces
+            live_ws = fc_list_workspaces()
         for w in live_ws:
             disp = (w.get("displayName") or w.get("name") or "").strip()
             if disp.lower() == target_ws_str.lower():
@@ -949,7 +996,7 @@ async def list_fabric_workspaces(refresh: bool = False) -> dict[str, Any]:
 
     try:
         from app.fabric_client import list_workspaces as fc_list_workspaces
-        live_ws = fc_list_workspaces()
+        live_ws = await asyncio.to_thread(fc_list_workspaces)
         if live_ws:
             ws_found = next((w for w in live_ws if w.get("id") == default_ws_id), None)
             if not default_ws_id or not ws_found:
@@ -1017,20 +1064,25 @@ async def get_workspace_items(workspace_id: str | None = None, refresh: bool = F
     folders_out: list[dict[str, Any]] = []
     ws_name = os.getenv("ALLOWED_WORKSPACE_NAME", "Microsoft Fabric Workspace")
 
-    # 1. Try Live Microsoft Fabric REST API
+    # 1. Try Live Microsoft Fabric REST API (non-blocking)
     try:
         from app.fabric_client import list_workspace_items as fc_list_items, list_folders as fc_list_folders, list_workspaces as fc_list_workspaces
-        all_ws = fc_list_workspaces()
+        cached_ws = _workspaces_list_cache.get("data")
+        if not refresh and cached_ws and _workspaces_list_cache.get("expires_at", 0) > now:
+            all_ws = cached_ws.get("workspaces") or []
+        else:
+            all_ws = await asyncio.to_thread(fc_list_workspaces)
         for w in all_ws:
             if w.get("id") == ws_id:
                 ws_name = w.get("displayName", ws_name)
                 break
 
-        folders_res = fc_list_folders(ws_id)
+        folders_res, items_res = await asyncio.gather(
+            asyncio.to_thread(fc_list_folders, ws_id),
+            asyncio.to_thread(fc_list_items, ws_id),
+        )
         if folders_res:
             folders_out = folders_res
-
-        items_res = fc_list_items(ws_id)
         raw_items = items_res.get("items", []) if isinstance(items_res, dict) else []
         for it in raw_items:
             items_out.append({
@@ -1084,7 +1136,7 @@ async def get_workspace_tree(workspace_id: str | None = None) -> dict[str, Any]:
     ws_id = (workspace_id and str(workspace_id).strip()) or os.getenv("ALLOWED_WORKSPACE_ID", "db7344c1-ecd9-44d6-849f-f2de49484f9f")
     try:
         from app.fabric_client import get_workspace_tree as fc_get_tree
-        tree = fc_get_tree(ws_id)
+        tree = await asyncio.to_thread(fc_get_tree, ws_id)
         if tree and "folders" in tree:
             return tree
     except Exception as e:

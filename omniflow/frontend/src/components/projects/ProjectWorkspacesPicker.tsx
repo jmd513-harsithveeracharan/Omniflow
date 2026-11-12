@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Database, Loader2 } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Database, Loader2, RefreshCw } from 'lucide-react';
 import { FabricWorkspaceSummary } from '../../types';
 import { fetchFabricWorkspaces } from '../../services/api';
 
@@ -14,29 +14,33 @@ export const ProjectWorkspacesPicker: React.FC<ProjectWorkspacesPickerProps> = (
 }) => {
   const [workspaces, setWorkspaces] = useState<FabricWorkspaceSummary[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  const loadWorkspaces = useCallback(async (forceRefresh = false, isMountedCheck: () => boolean = () => true) => {
+    try {
+      setIsLoading(true);
+      setLoadError(null);
+      const res = await fetchFabricWorkspaces(forceRefresh);
+      if (isMountedCheck()) {
+        setWorkspaces(res.workspaces || []);
+      }
+    } catch (err) {
+      console.warn('Failed to fetch Fabric workspaces', err);
+      if (isMountedCheck()) {
+        setWorkspaces([]);
+        setLoadError('Unable to reach Fabric workspaces API.');
+      }
+    } finally {
+      if (isMountedCheck()) setIsLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
     let isMounted = true;
-    const load = async (forceRefresh = false) => {
-      try {
-        setIsLoading(true);
-        const res = await fetchFabricWorkspaces(forceRefresh);
-        if (isMounted) {
-          const list = res.workspaces || [];
-          setWorkspaces(list);
-        }
-      } catch (err) {
-        console.warn('Failed to fetch Fabric workspaces', err);
-        if (isMounted) setWorkspaces([]);
-      } finally {
-        if (isMounted) setIsLoading(false);
-      }
-    };
-
-    load(true);
+    loadWorkspaces(false, () => isMounted);
 
     const handleAccountSwitched = () => {
-      load(true);
+      loadWorkspaces(true, () => isMounted);
     };
 
     window.addEventListener('fabric-account-switched', handleAccountSwitched);
@@ -44,7 +48,7 @@ export const ProjectWorkspacesPicker: React.FC<ProjectWorkspacesPickerProps> = (
       isMounted = false;
       window.removeEventListener('fabric-account-switched', handleAccountSwitched);
     };
-  }, []);
+  }, [loadWorkspaces]);
 
   const toggleWorkspace = (name: string) => {
     if (selectedWorkspaces.includes(name)) {
@@ -60,11 +64,32 @@ export const ProjectWorkspacesPicker: React.FC<ProjectWorkspacesPickerProps> = (
         <label style={{ fontSize: '12px', fontWeight: 600, color: '#a1a1aa', margin: 0 }}>
           FABRIC WORKSPACES IN SCOPE ({selectedWorkspaces.length} SELECTED)
         </label>
-        {isLoading && (
-          <span style={{ fontSize: '11px', color: '#71717a', display: 'flex', alignItems: 'center', gap: '4px' }}>
-            <Loader2 width={11} height={11} className="spin" /> Syncing...
-          </span>
-        )}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          {isLoading ? (
+            <span style={{ fontSize: '11px', color: '#71717a', display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <Loader2 width={11} height={11} className="animate-spin" /> Syncing...
+            </span>
+          ) : (
+            <button
+              type="button"
+              onClick={() => loadWorkspaces(true)}
+              title="Refresh Fabric workspaces"
+              style={{
+                background: 'transparent',
+                border: 'none',
+                color: '#a1a1aa',
+                cursor: 'pointer',
+                fontSize: '11px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '4px',
+                padding: '2px 4px',
+              }}
+            >
+              <RefreshCw width={11} height={11} /> Refresh
+            </button>
+          )}
+        </div>
       </div>
 
       <div
@@ -78,9 +103,20 @@ export const ProjectWorkspacesPicker: React.FC<ProjectWorkspacesPickerProps> = (
         }}
       >
         {isLoading ? (
-          <div style={{ padding: '24px 16px', textAlign: 'center', color: '#71717a', fontSize: '12px' }}>
-            <Loader2 width={14} height={14} className="spin" style={{ display: 'inline', marginRight: '6px' }} />
-            Loading workspaces from Microsoft Fabric...
+          <div style={{ padding: '24px 16px', textAlign: 'center', color: '#71717a', fontSize: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+            <Loader2 width={14} height={14} className="animate-spin" />
+            <span>Loading workspaces from Microsoft Fabric...</span>
+          </div>
+        ) : loadError ? (
+          <div style={{ padding: '24px 16px', textAlign: 'center', color: '#fca5a5', fontSize: '12px' }}>
+            {loadError}{' '}
+            <button
+              type="button"
+              onClick={() => loadWorkspaces(true)}
+              style={{ color: '#38bdf8', background: 'none', border: 'none', textDecoration: 'underline', cursor: 'pointer', fontSize: '12px' }}
+            >
+              Retry
+            </button>
           </div>
         ) : workspaces.length === 0 ? (
           <div style={{ padding: '24px 16px', textAlign: 'center', color: '#71717a', fontSize: '12px' }}>

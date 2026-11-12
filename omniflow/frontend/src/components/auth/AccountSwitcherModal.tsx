@@ -4,6 +4,8 @@ import { X, RefreshCw, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { FabricAccountProfile } from '../../types';
 import {
   fetchFabricAccounts,
+  getCachedFabricAccounts,
+  setCachedFabricAccounts,
   switchFabricAccount,
   removeFabricAccount,
   triggerBrowserLogin,
@@ -21,15 +23,13 @@ interface AccountSwitcherModalProps {
   onAccountSwitched: () => void;
 }
 
-let _cachedFabricAccounts: FabricAccountProfile[] = [];
-
 export const AccountSwitcherModal: React.FC<AccountSwitcherModalProps> = ({
   isOpen,
   onClose,
   onAccountSwitched,
 }) => {
-  const [accounts, setAccounts] = useState<FabricAccountProfile[]>(_cachedFabricAccounts);
-  const [isLoading, setIsLoading] = useState(_cachedFabricAccounts.length === 0);
+  const [accounts, setAccounts] = useState<FabricAccountProfile[]>(() => getCachedFabricAccounts());
+  const [isLoading, setIsLoading] = useState(() => getCachedFabricAccounts().length === 0);
   const [switchingId, setSwitchingId] = useState<string | null>(null);
   const [removingId, setRemovingId] = useState<string | null>(null);
   const [tenantInput, setTenantInput] = useState('');
@@ -42,15 +42,20 @@ export const AccountSwitcherModal: React.FC<AccountSwitcherModalProps> = ({
   const [isPollingDeviceCode, setIsPollingDeviceCode] = useState(false);
 
   const loadAccounts = async (forceRefresh = false) => {
+    const cached = getCachedFabricAccounts();
     try {
-      if (_cachedFabricAccounts.length === 0 || forceRefresh) {
+      if (cached.length === 0 || forceRefresh) {
         setIsLoading(true);
       }
       const list = await fetchFabricAccounts(forceRefresh);
-      _cachedFabricAccounts = list;
+      setCachedFabricAccounts(list);
       setAccounts(list);
     } catch (err) {
       console.warn('Failed to load accounts', err);
+      setStatusMsg({
+        text: err instanceof Error ? err.message : 'Unable to load Azure CLI accounts. Try Refresh or Sign-in below.',
+        type: 'error',
+      });
     } finally {
       setIsLoading(false);
     }
@@ -58,8 +63,9 @@ export const AccountSwitcherModal: React.FC<AccountSwitcherModalProps> = ({
 
   useEffect(() => {
     if (isOpen) {
-      if (_cachedFabricAccounts.length > 0) {
-        setAccounts(_cachedFabricAccounts);
+      const cached = getCachedFabricAccounts();
+      if (cached.length > 0) {
+        setAccounts(cached);
         setIsLoading(false);
       }
       loadAccounts(false);
@@ -105,7 +111,7 @@ export const AccountSwitcherModal: React.FC<AccountSwitcherModalProps> = ({
       setStatusMsg({ text: `Switching active session to ${account.name}...`, type: 'info' });
       const optimistic = prev.map((a) => ({ ...a, is_active: a.id === account.id }));
       setAccounts(optimistic);
-      _cachedFabricAccounts = optimistic;
+      setCachedFabricAccounts(optimistic);
 
       const res = await switchFabricAccount(account.id, account.tenant_id);
       if (res.success) {
@@ -114,12 +120,12 @@ export const AccountSwitcherModal: React.FC<AccountSwitcherModalProps> = ({
         window.dispatchEvent(new CustomEvent('fabric-account-switched', { detail: account }));
       } else {
         setAccounts(prev);
-        _cachedFabricAccounts = prev;
+        setCachedFabricAccounts(prev);
         setStatusMsg({ text: res.message || 'Failed to switch account', type: 'error' });
       }
     } catch (err) {
       setAccounts(prev);
-      _cachedFabricAccounts = prev;
+      setCachedFabricAccounts(prev);
       setStatusMsg({ text: err instanceof Error ? err.message : 'Error switching account', type: 'error' });
     } finally {
       setSwitchingId(null);
@@ -133,24 +139,24 @@ export const AccountSwitcherModal: React.FC<AccountSwitcherModalProps> = ({
       setStatusMsg({ text: `Disconnecting ${account.email}...`, type: 'info' });
       const nextAccounts = prev.filter((a) => a.id !== account.id);
       setAccounts(nextAccounts);
-      _cachedFabricAccounts = nextAccounts;
+      setCachedFabricAccounts(nextAccounts);
 
       const res = await removeFabricAccount(account.id, account.email);
       if (res.success) {
         setStatusMsg({ text: `Disconnected ${account.name || account.email}`, type: 'success' });
         const updated = res.accounts || nextAccounts;
         setAccounts(updated);
-        _cachedFabricAccounts = updated;
+        setCachedFabricAccounts(updated);
         onAccountSwitched();
         window.dispatchEvent(new CustomEvent('fabric-account-switched'));
       } else {
         setAccounts(prev);
-        _cachedFabricAccounts = prev;
+        setCachedFabricAccounts(prev);
         setStatusMsg({ text: res.message || 'Failed to disconnect account', type: 'error' });
       }
     } catch (err) {
       setAccounts(prev);
-      _cachedFabricAccounts = prev;
+      setCachedFabricAccounts(prev);
       setStatusMsg({ text: err instanceof Error ? err.message : 'Error disconnecting account', type: 'error' });
     } finally {
       setRemovingId(null);

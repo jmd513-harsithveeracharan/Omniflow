@@ -74,7 +74,7 @@ export const DeviceCodeBanner: React.FC<DeviceCodeBannerProps> = ({
           Go to {verificationUri} <ExternalLink width={11} height={11} />
         </a>
         <span style={{ fontSize: '11px', color: '#a1a1aa', display: 'flex', alignItems: 'center', gap: '4px' }}>
-          <Loader2 width={11} height={11} className="spin" /> Waiting for browser approval...
+          <Loader2 width={11} height={11} className="animate-spin" /> Waiting for browser approval...
         </span>
       </div>
     </div>

@@ -20,7 +20,7 @@ const API_BASE = '/api';
 
 export async function fetchFabricStatus(): Promise<FabricStatus> {
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 8000);
+  const timeoutId = setTimeout(() => controller.abort(), 25000);
   try {
     const res = await fetch(`${API_BASE}/fabric/status`, { signal: controller.signal });
     if (!res.ok) throw new Error(`Failed to fetch Fabric status: ${res.statusText}`);
@@ -518,11 +518,41 @@ export async function fetchFabricWorkspaces(refresh: boolean = false): Promise<{
   }
 }
 
+let _sharedFabricAccounts: import('../types').FabricAccountProfile[] = [];
+let _inFlightAccountsPromise: Promise<import('../types').FabricAccountProfile[]> | null = null;
+
+export function getCachedFabricAccounts(): import('../types').FabricAccountProfile[] {
+  return _sharedFabricAccounts;
+}
+
+export function setCachedFabricAccounts(list: import('../types').FabricAccountProfile[]): void {
+  _sharedFabricAccounts = list;
+}
+
 export async function fetchFabricAccounts(refresh = false): Promise<import('../types').FabricAccountProfile[]> {
+  if (!refresh && _sharedFabricAccounts.length > 0) {
+    return _sharedFabricAccounts;
+  }
+  if (!refresh && _inFlightAccountsPromise) {
+    return _inFlightAccountsPromise;
+  }
   const url = refresh ? `${API_BASE}/auth/accounts?refresh=true` : `${API_BASE}/auth/accounts`;
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`Failed to fetch accounts: ${res.statusText}`);
-  return res.json();
+  const reqPromise = (async () => {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 28000);
+    try {
+      const res = await fetch(url, { signal: controller.signal });
+      if (!res.ok) throw new Error(`Failed to fetch accounts: ${res.statusText}`);
+      const list: import('../types').FabricAccountProfile[] = await res.json();
+      _sharedFabricAccounts = Array.isArray(list) ? list : [];
+      return _sharedFabricAccounts;
+    } finally {
+      clearTimeout(timeoutId);
+      _inFlightAccountsPromise = null;
+    }
+  })();
+  _inFlightAccountsPromise = reqPromise;
+  return reqPromise;
 }
 
 export async function removeFabricAccount(

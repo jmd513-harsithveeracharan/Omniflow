@@ -9,7 +9,6 @@ import json
 import logging
 import os
 import secrets
-import subprocess
 import threading
 import time
 from typing import Any, Callable, Optional
@@ -17,16 +16,24 @@ from typing import Any, Callable, Optional
 from fastapi import APIRouter
 from pydantic import BaseModel
 
+from omniflow.auth.az_cli import (
+    _ACTIVE_FABRIC_ACCOUNT,
+    format_az_account,
+    get_azure_cli_account as _get_azure_cli_account,
+    read_azure_profile_accounts,
+    run_az_cmd as _run_az_cmd,
+)
+
 logger = logging.getLogger("omniflow.auth_fabric")
 
 fabric_auth_router = APIRouter(tags=["Fabric Tenancy & SSO"])
 
 _cache_invalidation_hooks: list[Callable[[], None]] = []
 
-# Fast in-memory caching to eliminate the 3-second cold CLI list delay
+# Fast in-memory caching to avoid cold CLI delays
 _ACCOUNTS_CACHE: list[dict[str, Any]] | None = None
 _ACCOUNTS_CACHE_TIME: float = 0.0
-_ACCOUNTS_CACHE_TTL: float = 120.0  # 2 minutes TTL
+_ACCOUNTS_CACHE_TTL: float = 300.0  # 5 minutes TTL
 
 
 def register_cache_invalidation_hook(hook: Callable[[], None]) -> None:
@@ -47,53 +54,6 @@ def invalidate_all_auth_caches() -> None:
             hook()
         except Exception as e:
             logger.warning(f"Failed to execute cache invalidation hook: {e}")
-
-
-_ACTIVE_FABRIC_ACCOUNT: Optional[dict[str, Any]] = None
-
-
-def _run_az_cmd(args: list[str], timeout: int = 30) -> tuple[int, str, str]:
-    is_windows = os.name == "nt"
-    full_cmd = ["az.cmd" if is_windows else "az"] + args
-    try:
-        proc = subprocess.run(full_cmd, capture_output=True, text=True, timeout=timeout, shell=is_windows)
-        return proc.returncode, proc.stdout, proc.stderr
-    except subprocess.TimeoutExpired:
-        logger.warning(f"Timeout ({timeout}s) executing az: {' '.join(full_cmd)}")
-        return 1, "", f"Operation timed out after {timeout}s"
-    except Exception as e:
-        logger.warning(f"Error executing az {' '.join(full_cmd)}: {e}")
-        return 1, "", str(e)
-
-
-def _get_azure_cli_account() -> Optional[dict[str, Any]]:
-    global _ACTIVE_FABRIC_ACCOUNT
-    rc, out, _ = _run_az_cmd(["account", "show", "--output", "json"], timeout=15)
-    if rc == 0 and out.strip():
-        try:
-            data = json.loads(out)
-            user_name = data.get("user", {}).get("name", "")
-            if not user_name:
-                return None
-            tenant_id = data.get("tenantId") or data.get("homeTenantId") or os.getenv("AZURE_TENANT_ID", "")
-            sub_id = data.get("id", "")
-            tenant_display = data.get("tenantDisplayName") or data.get("name", "Fabric Tenant")
-            _ACTIVE_FABRIC_ACCOUNT = {
-                "id": sub_id,
-                "name": user_name.split("@")[0].replace(".", " ").title() if "@" in user_name else user_name,
-                "email": user_name,
-                "tenant_id": tenant_id,
-                "tenant_name": tenant_display,
-                "subscription_id": sub_id,
-                "is_active": True,
-                "account_type": data.get("name", "Azure CLI"),
-                "default_workspace_id": os.getenv("ALLOWED_WORKSPACE_ID", ""),
-                "default_workspace_name": os.getenv("ALLOWED_WORKSPACE_NAME", tenant_display or "Fabric Workspace"),
-            }
-            return _ACTIVE_FABRIC_ACCOUNT
-        except Exception as e:
-            logger.warning(f"Failed parsing az account show: {e}")
-    return None
 
 
 class BrowserLoginRequest(BaseModel):
@@ -122,37 +82,28 @@ def get_fabric_accounts(refresh: bool = False) -> list[dict[str, Any]]:
     if not refresh and _ACCOUNTS_CACHE is not None and (now - _ACCOUNTS_CACHE_TIME) < _ACCOUNTS_CACHE_TTL:
         return _ACCOUNTS_CACHE
 
-    rc, out, _ = _run_az_cmd(["account", "list", "--output", "json"], timeout=15)
+    if not refresh:
+        fast_accounts = read_azure_profile_accounts()
+        if fast_accounts:
+            _ACCOUNTS_CACHE, _ACCOUNTS_CACHE_TIME = fast_accounts, now
+            return fast_accounts
+
+    rc, out, _ = _run_az_cmd(["account", "list", "--output", "json"], timeout=25)
     if rc == 0 and out.strip():
         try:
             az_accounts = json.loads(out)
-            accounts: list[dict[str, Any]] = []
-            for a in az_accounts:
-                user_email = a.get("user", {}).get("name", "")
-                if not user_email:
-                    continue
-                name = user_email.split("@")[0].replace(".", " ").title()
-                sub_id = a.get("id", "")
-                tenant_id = a.get("tenantId") or a.get("homeTenantId") or os.getenv("AZURE_TENANT_ID", "")
-                tenant_name = a.get("tenantDisplayName") or a.get("name") or "Corporate Tenant"
-                is_active = bool(a.get("isDefault", False))
-                raw_type = a.get("name", "Azure CLI")
-                account_type = raw_type.split(":")[0].strip()
-
-                accounts.append({
-                    "id": sub_id, "name": name, "email": user_email,
-                    "tenant_id": tenant_id, "tenant_name": tenant_name,
-                    "subscription_id": sub_id, "is_active": is_active,
-                    "account_type": account_type,
-                    "default_workspace_id": os.getenv("ALLOWED_WORKSPACE_ID", ""),
-                    "default_workspace_name": os.getenv("ALLOWED_WORKSPACE_NAME", tenant_name or "Fabric Workspace"),
-                })
+            accounts = [acc for raw in az_accounts if (acc := format_az_account(raw)) is not None]
             if accounts:
                 accounts.sort(key=lambda x: not x["is_active"])
                 _ACCOUNTS_CACHE, _ACCOUNTS_CACHE_TIME = accounts, time.time()
                 return accounts
         except Exception as e:
             logger.warning(f"Failed parsing az account list: {e}")
+
+    fast_fallback = read_azure_profile_accounts()
+    if fast_fallback:
+        _ACCOUNTS_CACHE, _ACCOUNTS_CACHE_TIME = fast_fallback, time.time()
+        return fast_fallback
 
     cli_acc = _get_azure_cli_account()
     if cli_acc:
@@ -226,11 +177,10 @@ def poll_fabric_device_code(req: DeviceCodePollRequest) -> dict[str, Any]:
 
 @fabric_auth_router.post("/auth/switch-account")
 def switch_fabric_account(req: SwitchAccountRequest) -> dict[str, Any]:
-    global _ACTIVE_FABRIC_ACCOUNT
     sub_id = req.account_id
     try:
         rc, _, err = _run_az_cmd(["account", "set", "--subscription", sub_id], timeout=30)
-        account = _get_azure_cli_account()
+        account = _get_azure_cli_account() or {}
         if rc == 0:
             invalidate_all_auth_caches()
             return {
@@ -242,7 +192,7 @@ def switch_fabric_account(req: SwitchAccountRequest) -> dict[str, Any]:
         return {"success": False, "message": f"Failed to switch account: {err or 'Subscription not accessible'}", "account": account}
     except Exception as exc:
         logger.exception(f"Unexpected error switching fabric account: {exc}")
-        return {"success": False, "message": f"Switch failed: {str(exc)}", "account": _ACTIVE_FABRIC_ACCOUNT}
+        return {"success": False, "message": f"Switch failed: {str(exc)}", "account": _get_azure_cli_account()}
 
 
 @fabric_auth_router.post("/auth/accounts/remove")
@@ -284,7 +234,7 @@ def logout_fabric() -> dict[str, Any]:
 
 def _prewarm_fabric_cache() -> None:
     try:
-        get_fabric_accounts(refresh=True)
+        get_fabric_accounts(refresh=False)
     except Exception as e:
         logger.debug(f"Prewarm accounts failed: {e}")
 

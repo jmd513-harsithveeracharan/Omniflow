@@ -1112,6 +1112,7 @@ export const App: React.FC = () => {
         onClose={() => setIsFabricConnectionModalOpen(false)}
         status={status}
         onRefreshStatus={() => fetchFabricStatus().then(setStatus)}
+        onOpenAccountSwitcher={() => setIsAccountModalOpen(true)}
       />
 
       <AccountSwitcherModal

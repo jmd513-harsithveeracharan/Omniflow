@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, FolderPlus, FolderGit2 } from 'lucide-react';
+import { X, FolderPlus, FolderGit2, Loader2 } from 'lucide-react';
 import { ProjectRecord, ProjectMetadata, ProjectMember, UserProfile } from '../../types';
 import { ProjectTeamSearch } from './ProjectTeamSearch';
 import { ProjectWorkspacesPicker } from './ProjectWorkspacesPicker';
@@ -266,8 +266,10 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
               type="submit"
               disabled={isSaving || !name.trim()}
               className="projects-modal-btn-submit"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
             >
-              {isSaving ? 'Saving...' : project ? 'Save changes' : 'Create project'}
+              {isSaving && <Loader2 width={13} height={13} className="animate-spin" />}
+              <span>{isSaving ? 'Saving...' : project ? 'Save changes' : 'Create project'}</span>
             </button>
           </div>
         </form>
