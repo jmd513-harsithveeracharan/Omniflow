@@ -28,7 +28,7 @@ class GraphEngine:
     """High-performance NetworkX lineage and graph analysis engine."""
 
     def __init__(self, default_graph: nx.DiGraph | None = None) -> None:
-        self._default_g = default_graph or build_mesh_from_project("PRJ-PELI-BIOTHERMAL")
+        self._default_g = default_graph or build_rich_medallion_galaxy()
 
     def get_mesh(
         self,
@@ -36,7 +36,7 @@ class GraphEngine:
         project_id: str | None = None,
     ) -> GraphMeshResponse:
         """Serializes the NetworkX DiGraph into a client-ready GraphMeshResponse."""
-        target_pid = project_id.strip() if (project_id and project_id not in ("all", "galaxy", "default")) else "PRJ-PELI-BIOTHERMAL"
+        target_pid = project_id.strip() if (project_id and project_id not in ("all", "galaxy", "default")) else "default"
         if plan:
             g = build_mesh_from_plan(plan)
         else:

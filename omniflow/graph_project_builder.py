@@ -15,7 +15,7 @@ import re
 from typing import Any, Literal
 import networkx as nx
 
-from omniflow.graph_generator import add_edge, add_node
+from omniflow.graph_generator import add_edge, add_node, build_rich_medallion_galaxy
 from omniflow.graph_models import infer_layer_name
 from omniflow.graph_workspace_builder import build_workspace_project_graph
 
@@ -140,10 +140,6 @@ def build_mesh_from_project(project_id: str | None) -> nx.DiGraph:
     """Compiles a scoped NetworkX Relationship Graph for a specific project."""
     clean_pid = project_id.strip() if project_id else ""
 
-    if clean_pid and ("PELI" in clean_pid.upper() or "BIOTHERMAL" in clean_pid.upper()):
-        from omniflow.graph_peli_builder import build_peli_biothermal_graph
-        return build_peli_biothermal_graph()
-
     proj_folder = os.path.join(BASE_DIR, "generated_artifacts", clean_pid) if clean_pid else ""
     lineage_files: list[str] = []
     if proj_folder and os.path.isdir(proj_folder):
@@ -250,6 +246,5 @@ def build_mesh_from_project(project_id: str | None) -> nx.DiGraph:
     if clean_pid and clean_pid.lower() not in ("all", "galaxy", "default", "prj-default"):
         return build_workspace_project_graph(clean_pid)
 
-    from omniflow.graph_peli_builder import build_peli_biothermal_graph
-    return build_peli_biothermal_graph()
+    return build_rich_medallion_galaxy()
 

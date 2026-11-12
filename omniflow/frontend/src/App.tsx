@@ -982,7 +982,7 @@ export const App: React.FC = () => {
         {activeView === 'mesh' && (
           <div className="flex-1 w-full h-full relative overflow-hidden bg-[#090d16]" style={{ height: 'calc(100vh - 56px)' }}>
             <GraphMeshView
-              projectId={activeProjectId || (projects.length > 0 ? projects[0].id : 'PRJ-PELI-BIOTHERMAL')}
+              projectId={activeProjectId || (projects.length > 0 ? projects[0].id : 'default')}
               projects={projects.map((p) => ({ id: p.id, name: p.name }))}
               onSelectProject={(newPid) => {
                 if (newPid && newPid !== 'all') {

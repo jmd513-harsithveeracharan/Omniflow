@@ -25,7 +25,6 @@ omniflow/
 ├── graph_generator.py          # NetworkX DAG generator & Medallion constellation builder
 ├── graph_models.py             # Pydantic data models for graph nodes, links, and layers
 ├── graph_project_builder.py    # Dynamic project mesh generator
-├── graph_peli_builder.py       # Specialized relationship graph builder for Peli BioThermal platform
 │
 ├── agents/                     # Multi-agent autonomous workflow system
 │   ├── orchestrator.py         # MultiAgentOrchestrator coordinating all 6 specialized agents

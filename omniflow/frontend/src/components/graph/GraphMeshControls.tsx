@@ -87,12 +87,6 @@ export const GraphMeshControls: React.FC<GraphMeshControlsProps> = ({
 
   // Filter out any legacy 'all' projects; only real projects
   const displayProjects = projects.filter((p) => p.id !== 'all');
-  if (!displayProjects.some((p) => p.id === 'PRJ-PELI-BIOTHERMAL')) {
-    displayProjects.unshift({
-      id: 'PRJ-PELI-BIOTHERMAL',
-      name: 'Peli BioThermal Cold-Chain Platform',
-    });
-  }
 
   const activeProject =
     displayProjects.find((p) => p.id === selectedProjectId) || displayProjects[0];

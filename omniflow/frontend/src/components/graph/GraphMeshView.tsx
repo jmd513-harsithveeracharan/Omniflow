@@ -27,7 +27,7 @@ export const GraphMeshView: React.FC<GraphMeshViewProps> = ({
   const [data, setData] = useState<GraphMeshResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const initialProjectId = projectId || (projects.length > 0 ? projects[0].id : 'PRJ-PELI-BIOTHERMAL');
+  const initialProjectId = projectId || (projects.length > 0 ? projects[0].id : 'default');
   const [selectedProjectId, setSelectedProjectId] = useState<string>(initialProjectId);
 
   // Filter & Camera Controls State
@@ -51,7 +51,7 @@ export const GraphMeshView: React.FC<GraphMeshViewProps> = ({
   }, [projectId]);
 
   const loadMesh = (pId: string = selectedProjectId) => {
-    const targetId = pId || selectedProjectId || (projects.length > 0 ? projects[0].id : 'PRJ-PELI-BIOTHERMAL');
+    const targetId = pId || selectedProjectId || (projects.length > 0 ? projects[0].id : 'default');
     setIsLoading(true);
     setError(null);
     fetchGraphMesh(plan, targetId)
