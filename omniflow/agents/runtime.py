@@ -73,9 +73,9 @@ from omniflow.agents.schemas import (
     ToolCheckItem,
 )
 try:
-    from app.llm_router import chat, chat_json
-except ImportError:
     from omniflow.config.llm_adapter import chat, chat_json
+except ImportError:
+    from app.llm_router import chat, chat_json
 from omniflow.agents.tool_synthesizer import synthesize_and_register_tool
 from omniflow.db.execution_logger import ExecutionDatabaseLogger
 from omniflow.db.postgres_repo import NEON_URI, PostgresRepository
@@ -191,17 +191,20 @@ class DynamicAgentRuntime:
         as_json: bool = True,
     ) -> Any:
         """Invokes enterprise LLM (Azure OpenAI / ChatGPT) via app.llm_router API."""
+        effort = os.getenv("OMNIFLOW_AGENT_EFFORT", "low")
         if as_json:
             return chat_json(
                 [{"role": "user", "content": prompt}],
                 complexity="high",
                 target_model=self.agent_meta.model_name,
+                effort=effort,
                 session_id=session_id,
             )
         return chat(
             [{"role": "user", "content": prompt}],
             complexity="standard",
             target_model=self.agent_meta.model_name,
+            effort=effort,
             session_id=session_id,
         )
 
@@ -291,7 +294,7 @@ PROJECT BRIEF:
 - Code: {req.project_code}
 - Name: {req.project_name}
 - Target Platform: Microsoft Fabric ({capacity_sku})
-- Business Request: {req.prompt_text}
+- Business Request: {req.prompt_text[:1800]}
 
 AUTONOMOUS DISCOVERED CONTEXT FROM NEON POSTGRESQL:
 - Data Sources: {detected_sources}
@@ -343,7 +346,11 @@ You MUST respond ONLY with a single valid JSON object matching this exact schema
         except Exception as e:
             _stream("agent.planner", f"Primary LLM warning: {e}. Falling back to multi-provider router...", indent=1)
             try:
-                raw_plan_json = chat_json([{"role": "user", "content": planner_prompt}], complexity="high")
+                raw_plan_json = chat_json(
+                    [{"role": "user", "content": planner_prompt}],
+                    complexity="high",
+                    effort=os.getenv("OMNIFLOW_AGENT_EFFORT", "low"),
+                )
             except Exception as llm_err:
                 _stream("agent.planner", f"LLM provider error: {llm_err}", indent=1)
 

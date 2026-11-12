@@ -1,0 +1,311 @@
+{
+  "request_context": {
+    "user_id": "architect@omniflow.ai",
+    "environment": "production",
+    "objective": "End-to-end PostgreSQL catalog discovery, Bronze-Silver-Gold Medallion synthesis, data cleaning, PII protection, and Fabric workspace deployment"
+  },
+  "project_context": {
+    "project_summary": {
+      "project_code": "PRJ-TEST-PROJECT",
+      "project_name": "Test Project",
+      "business_domain": "postgres_medallion",
+      "sla_target_minutes": 15
+    },
+    "platform_summary": {
+      "target_workspace": "PBT_DATA_AGENT",
+      "primary_engine": "Microsoft Fabric Spark (Delta Lake) & T-SQL Warehouse",
+      "storage_format": "Delta Lake (V-Order & Optimize Z-Order Compaction)"
+    },
+    "solution_summary": {
+      "target_architecture": "Microsoft Fabric Medallion Architecture (PostgreSQL Source -> 01 Raw Bronze -> 02 Stage Curation -> 03 Silver Harmonized -> 04 Gold Kimball Warehouse)",
+      "target_folder_structure": {
+        "root_folder": "Postgres_Medallion_Platform",
+        "subfolders": {
+          "raw": "01 Raw",
+          "stage": "02 Stage",
+          "silver": "03 Silver",
+          "gold": "04 Gold"
+        }
+      },
+      "engineering_best_practices": [
+        "Bronze Layer (01 Raw): Immutable append-only Delta landing with original types preserved plus _ingested_at, _source_schema, and _batch_run_id metadata columns.",
+        "Incremental Watermark Strategy: High-watermark CDC extraction on updated_at / started_at / created_at for transactional & telemetry tables; full snapshot refresh for small reference/config tables.",
+        "Stage Curation (02 Stage): Windowed ROW_NUMBER() deduplication partitioned by Primary Key ordered by latest watermark DESC; strict schema evolution & null-key quarantine routing.",
+        "Security & Privacy: Drop secret columns (users.password_hash) prior to Silver; apply salted SHA-256 deterministic masking to PII fields (email, phone, street_address, first_name, last_name).",
+        "Silver Layer (03 Silver): Idempotent Delta MERGE INTO upserts enforced on primary keys, normalized money/numeric precisions (DECIMAL(12,6)), trimmed standardized text, and validated FK referential checks.",
+        "Gold Layer (04 Gold): Kimball Star Schema modeled for Direct Lake Power BI analytics with dim_customer, dim_product, dim_project, dim_agent, fact_sales_orders, fact_agent_executions, and fact_llm_token_cost."
+      ],
+      "expected_deliverables": [
+        "lh_postgres_medallion_bronze (Lakehouse in 01 Raw)",
+        "pl_postgres_medallion_bronze_ingest (DataPipeline in 01 Raw with externalConnections)",
+        "nb_postgres_medallion_curate (PySpark Notebook in 02 Stage)",
+        "lh_postgres_medallion_silver (Lakehouse in 03 Silver)",
+        "wh_postgres_medallion_gold (Warehouse in 04 Gold)"
+      ]
+    }
+  },
+  "retrieved_context": {
+    "data_sources": [
+      {
+        "source_name": "PostgreSQL Platform & Source CRM Database",
+        "system_type": "PostgreSQL / Neon",
+        "connector_type": "postgres",
+        "schemas_in_scope": ["source_crm", "public"],
+        "discover_all_tables_on_connect": true,
+        "cleaning_and_transformation_rules": [
+          {
+            "table": "source_crm.customers",
+            "rule": "Trim/INITCAP first_name & last_name, normalize email lowercase before SHA-256 hashing, mask phone & street_address, deduplicate on customer_id by updated_at DESC."
+          },
+          {
+            "table": "source_crm.orders",
+            "rule": "Cast total_amount DECIMAL(12,2), standardize status uppercase, reject negative totals to quarantine table, validate customer_id FK against Silver dim_customer."
+          },
+          {
+            "table": "source_crm.order_items",
+            "rule": "Assert quantity > 0 and discount BETWEEN 0 AND 1; recompute net_line_amount = ROUND(quantity * unit_price - COALESCE(discount, 0), 2) and reconcile against source_crm.orders.total_amount."
+          },
+          {
+            "table": "public.users",
+            "rule": "Exclude password_hash before promoting to Silver; apply deterministic SHA-256 hashing to email; standardize user display names."
+          },
+          {
+            "table": "public.llm_token_logs",
+            "rule": "Coalesce cached_tokens to 0, compute effective_billed_tokens = prompt_tokens + completion_tokens, cast total_cost_usd to DECIMAL(12,6), enforce run_id and project_id FK joins."
+          },
+          {
+            "table": "public.agent_runs",
+            "rule": "Derive duration_seconds = DATEDIFF(second, started_at, completed_at), flatten token_usage JSONB metrics into typed integer columns, filter invalid run references."
+          }
+        ],
+        "relationships": [
+          "source_crm.orders.customer_id -> source_crm.customers.customer_id (Many-to-One)",
+          "source_crm.order_items.order_id -> source_crm.orders.order_id (Many-to-One)",
+          "source_crm.order_items.product_id -> source_crm.products.product_id (Many-to-One)",
+          "public.runs.project_id -> public.projects.project_id (Many-to-One)",
+          "public.tasks.run_id -> public.runs.run_id (Many-to-One)",
+          "public.tasks.assigned_agent_id -> public.agents.agent_id (Many-to-One)",
+          "public.agent_runs.run_id -> public.runs.run_id (Many-to-One)",
+          "public.agent_runs.task_id -> public.tasks.task_id (Many-to-One)",
+          "public.agent_runs.agent_id -> public.agents.agent_id (Many-to-One)",
+          "public.tool_runs.agent_run_id -> public.agent_runs.agent_run_id (Many-to-One)",
+          "public.tool_runs.tool_id -> public.tools.tool_id (Many-to-One)",
+          "public.llm_token_logs.run_id -> public.runs.run_id (Many-to-One)",
+          "public.llm_token_logs.project_id -> public.projects.project_id (Many-to-One)",
+          "public.artifacts.run_id -> public.runs.run_id (Many-to-One)",
+          "public.lineage_graph_edges.project_id -> public.projects.project_id (Many-to-One)",
+          "public.project_members.user_id -> public.users.id (Many-to-One)"
+        ],
+        "tables": [
+          {
+            "table_name": "source_crm.customers",
+            "primary_key": "customer_id",
+            "watermark_column": "updated_at",
+            "ingestion_mode": "incremental_merge",
+            "pii_columns": ["first_name", "last_name", "email", "phone", "street_address"],
+            "columns": [
+              {"name": "customer_id", "type": "integer", "is_pk": true},
+              {"name": "first_name", "type": "character varying", "is_pii": true},
+              {"name": "last_name", "type": "character varying", "is_pii": true},
+              {"name": "email", "type": "character varying", "is_pii": true},
+              {"name": "phone", "type": "character varying", "is_pii": true},
+              {"name": "company", "type": "character varying"},
+              {"name": "street_address", "type": "character varying", "is_pii": true},
+              {"name": "city", "type": "character varying"},
+              {"name": "country", "type": "character varying"},
+              {"name": "created_at", "type": "timestamp with time zone"},
+              {"name": "updated_at", "type": "timestamp with time zone"}
+            ]
+          },
+          {
+            "table_name": "source_crm.orders",
+            "primary_key": "order_id",
+            "watermark_column": "updated_at",
+            "ingestion_mode": "incremental_merge",
+            "columns": [
+              {"name": "order_id", "type": "integer", "is_pk": true},
+              {"name": "customer_id", "type": "integer"},
+              {"name": "order_date", "type": "timestamp with time zone"},
+              {"name": "status", "type": "character varying"},
+              {"name": "total_amount", "type": "numeric"},
+              {"name": "payment_method", "type": "character varying"},
+              {"name": "shipping_address", "type": "character varying", "is_pii": true},
+              {"name": "updated_at", "type": "timestamp with time zone"}
+            ]
+          },
+          {
+            "table_name": "source_crm.order_items",
+            "primary_key": "order_item_id",
+            "watermark_column": "order_id",
+            "ingestion_mode": "incremental_merge",
+            "columns": [
+              {"name": "order_item_id", "type": "integer", "is_pk": true},
+              {"name": "order_id", "type": "integer"},
+              {"name": "product_id", "type": "integer"},
+              {"name": "quantity", "type": "integer"},
+              {"name": "unit_price", "type": "numeric"},
+              {"name": "discount", "type": "numeric"},
+              {"name": "line_total", "type": "numeric"}
+            ]
+          },
+          {
+            "table_name": "source_crm.products",
+            "primary_key": "product_id",
+            "watermark_column": "product_id",
+            "ingestion_mode": "full_scd2",
+            "columns": [
+              {"name": "product_id", "type": "integer", "is_pk": true},
+              {"name": "sku", "type": "character varying"},
+              {"name": "product_name", "type": "character varying"},
+              {"name": "category", "type": "character varying"},
+              {"name": "unit_price", "type": "numeric"},
+              {"name": "cost", "type": "numeric"},
+              {"name": "is_active", "type": "boolean"}
+            ]
+          },
+          {
+            "table_name": "public.projects",
+            "primary_key": "project_id",
+            "watermark_column": "updated_at",
+            "ingestion_mode": "full_merge",
+            "columns": [
+              {"name": "project_id", "type": "uuid", "is_pk": true},
+              {"name": "project_code", "type": "character varying"},
+              {"name": "project_name", "type": "text"},
+              {"name": "description", "type": "text"},
+              {"name": "primary_language", "type": "character varying"},
+              {"name": "target_platform", "type": "character varying"},
+              {"name": "status", "type": "character varying"},
+              {"name": "created_by", "type": "text"},
+              {"name": "created_at", "type": "timestamp with time zone"},
+              {"name": "updated_at", "type": "timestamp with time zone"},
+              {"name": "is_pinned", "type": "integer"},
+              {"name": "is_archived", "type": "integer"},
+              {"name": "metadata", "type": "jsonb"}
+            ]
+          },
+          {
+            "table_name": "public.runs",
+            "primary_key": "run_id",
+            "watermark_column": "completed_at",
+            "ingestion_mode": "incremental_merge",
+            "columns": [
+              {"name": "run_id", "type": "uuid", "is_pk": true},
+              {"name": "project_id", "type": "uuid"},
+              {"name": "user_id", "type": "text"},
+              {"name": "request", "type": "text"},
+              {"name": "request_type", "type": "text"},
+              {"name": "status", "type": "text"},
+              {"name": "priority", "type": "integer"},
+              {"name": "started_at", "type": "timestamp with time zone"},
+              {"name": "completed_at", "type": "timestamp with time zone"},
+              {"name": "current_step", "type": "text"},
+              {"name": "final_result", "type": "jsonb"},
+              {"name": "error_summary", "type": "text"}
+            ]
+          },
+          {
+            "table_name": "public.agent_runs",
+            "primary_key": "agent_run_id",
+            "watermark_column": "completed_at",
+            "ingestion_mode": "incremental_merge",
+            "columns": [
+              {"name": "agent_run_id", "type": "uuid", "is_pk": true},
+              {"name": "run_id", "type": "uuid"},
+              {"name": "task_id", "type": "uuid"},
+              {"name": "agent_id", "type": "uuid"},
+              {"name": "status", "type": "text"},
+              {"name": "iteration_count", "type": "integer"},
+              {"name": "token_usage", "type": "jsonb"},
+              {"name": "started_at", "type": "timestamp with time zone"},
+              {"name": "completed_at", "type": "timestamp with time zone"},
+              {"name": "error", "type": "text"}
+            ]
+          },
+          {
+            "table_name": "public.tool_runs",
+            "primary_key": "tool_run_id",
+            "watermark_column": "completed_at",
+            "ingestion_mode": "incremental_merge",
+            "columns": [
+              {"name": "tool_run_id", "type": "uuid", "is_pk": true},
+              {"name": "agent_run_id", "type": "uuid"},
+              {"name": "tool_id", "type": "uuid"},
+              {"name": "http_status", "type": "integer"},
+              {"name": "status", "type": "text"},
+              {"name": "execution_time_ms", "type": "integer"},
+              {"name": "started_at", "type": "timestamp with time zone"},
+              {"name": "completed_at", "type": "timestamp with time zone"}
+            ]
+          },
+          {
+            "table_name": "public.llm_token_logs",
+            "primary_key": "log_id",
+            "watermark_column": "created_at",
+            "ingestion_mode": "incremental_append",
+            "columns": [
+              {"name": "log_id", "type": "uuid", "is_pk": true},
+              {"name": "project_id", "type": "uuid"},
+              {"name": "run_id", "type": "uuid"},
+              {"name": "model_name", "type": "character varying"},
+              {"name": "agent_name", "type": "character varying"},
+              {"name": "prompt_tokens", "type": "integer"},
+              {"name": "completion_tokens", "type": "integer"},
+              {"name": "cached_tokens", "type": "integer"},
+              {"name": "total_cost_usd", "type": "numeric"},
+              {"name": "created_at", "type": "timestamp with time zone"}
+            ]
+          },
+          {
+            "table_name": "public.fabric_items",
+            "primary_key": "item_id",
+            "watermark_column": "updated_at",
+            "ingestion_mode": "incremental_merge",
+            "columns": [
+              {"name": "item_id", "type": "uuid", "is_pk": true},
+              {"name": "workspace_id", "type": "uuid"},
+              {"name": "fabric_item_id", "type": "text"},
+              {"name": "item_type", "type": "character varying"},
+              {"name": "item_name", "type": "text"},
+              {"name": "layer", "type": "character varying"},
+              {"name": "status", "type": "text"},
+              {"name": "created_at", "type": "timestamp with time zone"},
+              {"name": "updated_at", "type": "timestamp with time zone"}
+            ]
+          },
+          {
+            "table_name": "public.lineage_graph_edges",
+            "primary_key": "edge_id",
+            "watermark_column": "created_at",
+            "ingestion_mode": "incremental_merge",
+            "columns": [
+              {"name": "edge_id", "type": "uuid", "is_pk": true},
+              {"name": "project_id", "type": "uuid"},
+              {"name": "source_table_id", "type": "uuid"},
+              {"name": "target_table_id", "type": "uuid"},
+              {"name": "source_column_id", "type": "uuid"},
+              {"name": "target_column_id", "type": "uuid"},
+              {"name": "transformation_type", "type": "character varying"},
+              {"name": "is_active", "type": "boolean"},
+              {"name": "created_at", "type": "timestamp with time zone"}
+            ]
+          },
+          {
+            "table_name": "public.users",
+            "primary_key": "id",
+            "watermark_column": "created_at",
+            "ingestion_mode": "full_merge",
+            "pii_columns": ["email", "password_hash", "name"],
+            "columns": [
+              {"name": "id", "type": "character varying", "is_pk": true},
+              {"name": "email", "type": "character varying", "is_pii": true},
+              {"name": "password_hash", "type": "text", "is_pii": true},
+              {"name": "name", "type": "character varying", "is_pii": true},
+              {"name": "created_at", "type": "timestamp with time zone"}
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

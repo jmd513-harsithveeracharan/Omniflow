@@ -9,9 +9,9 @@ import networkx as nx
 import psycopg2
 
 try:
-    from app.llm_router import chat
-except ImportError:
     from omniflow.config.llm_adapter import chat
+except ImportError:
+    from app.llm_router import chat
 
 from omniflow.db.catalog_seeder import get_table_schema_context_from_db
 from omniflow.db.postgres_repo import NEON_URI
@@ -249,21 +249,16 @@ def build_workspace_manifest_tool(
     raw_layer: str = "raw",
     curated_layer: str = "curated",
     analytical_layer: str = "analytics",
-    containment_folder: str | None = None,
     **_: Any,
 ) -> dict[str, Any]:
-    provisioned_items: list[dict[str, str]] = []
-    if containment_folder:
-        provisioned_items.append({"item_type": "Folder", "display_name": containment_folder})
-    provisioned_items.extend([
+    provisioned_items = [
         {"item_type": "Lakehouse", "display_name": f"lh_{domain}_{raw_layer}", "tier": "raw_ingestion"},
         {"item_type": "Lakehouse", "display_name": f"lh_{domain}_{curated_layer}", "tier": "curated_harmonized"},
         {"item_type": "Warehouse", "display_name": f"wh_{domain}_{analytical_layer}", "tier": "analytical_serving"},
-    ])
+    ]
     manifest = {
         "$schema": "https://developer.microsoft.com/json-schemas/fabric/workspace-provisioning/v1.json",
         "project_code": project_code,
-        "containment_folder": containment_folder or "Workspace Root",
         "capacity_sku": capacity_sku,
         "provisioned_items": provisioned_items,
     }
@@ -337,12 +332,22 @@ def build_pyspark_notebook_tool(
 
     code_str = None
     try:
+        compact_configs = [
+            {
+                "table": c["table_name"],
+                "pk": c["primary_key"],
+                "wm": c["watermark"],
+                "pii": c["pii_columns"],
+            }
+            for c in table_configs
+        ]
         llm_prompt = (
             f"You are a Principal Microsoft Fabric Data Engineer.\n"
             f"Write an enterprise PySpark Synapse Delta Lake notebook to curate Bronze raw data into the Silver lakehouse.\n"
             f"Raw Lakehouse: '{raw_lh}'\n"
             f"Curated Lakehouse: '{curated_lh}'\n"
-            f"Tables and schemas to curate:\n{json.dumps(table_configs, indent=2)}\n\n"
+            f"All {len(compact_configs)} tables (write a clean parameterized loop over `TABLE_CONFIGS`):\n"
+            f"{json.dumps(compact_configs)}\n\n"
             f"Mandatory requirements:\n"
             f"1. Start with '# Fabric Notebook source', standard metadata header with kernel 'synapse_pyspark' and default lakehouse '{curated_lh}'.\n"
             f"2. Separate logic into clean Synapse cells marked with '# CELL ********************'.\n"
@@ -352,7 +357,11 @@ def build_pyspark_notebook_tool(
             f"6. Run OPTIMIZE and ZORDER BY primary_key.\n"
             f"Return ONLY valid executable PySpark python code. Do not wrap in markdown fences."
         )
-        llm_resp = chat([{"role": "user", "content": llm_prompt}], target_model="omni-flow-gpt-6-luna")
+        llm_resp = chat(
+            [{"role": "user", "content": llm_prompt}],
+            target_model="omni-flow-gpt-6-luna",
+            effort=os.getenv("OMNIFLOW_AGENT_EFFORT", "low"),
+        )
         if llm_resp and ("from pyspark.sql" in llm_resp or "spark" in llm_resp):
             cleaned = llm_resp.strip()
             if cleaned.startswith("```python"):
@@ -470,7 +479,11 @@ def build_warehouse_ddl_tool(
             f"3. Use standard Fabric T-SQL DDL syntax ([dbo].[table_name]).\n"
             f"Return ONLY clean executable T-SQL DDL statements. No markdown fences."
         )
-        llm_resp = chat([{"role": "user", "content": llm_prompt}], target_model="omni-flow-gpt-6-luna")
+        llm_resp = chat(
+            [{"role": "user", "content": llm_prompt}],
+            target_model="omni-flow-gpt-6-luna",
+            effort=os.getenv("OMNIFLOW_AGENT_EFFORT", "low"),
+        )
         if llm_resp and "CREATE TABLE" in llm_resp.upper():
             cleaned = llm_resp.strip()
             if cleaned.startswith("```sql"):
@@ -577,7 +590,7 @@ def build_data_quality_suite_tool(
         prompt = (
             f"You are a Senior Data Quality & Governance Engineer for Microsoft Fabric.\n"
             f"Write an automated PySpark Data Quality & Reconciliation suite script for project '{project_code}'.\n"
-            f"Tables: {tables}\n"
+            f"Tables ({len(tables)} total): {tables} — parameterize checks cleanly in a loop over `TABLES`.\n"
             f"Bronze: '{raw_lh}', Silver: '{curated_lh}'\n"
             f"Requirements:\n"
             f"1. Reconcile source-to-Bronze row counts (assert variance < 0.5%).\n"
@@ -587,7 +600,11 @@ def build_data_quality_suite_tool(
             f"5. Return a structured test results dictionary with status PASSED/FAILED.\n"
             f"Return ONLY valid executable PySpark code. No markdown fences."
         )
-        llm_resp = chat([{"role": "user", "content": prompt}], target_model="omni-flow-gpt-6-luna")
+        llm_resp = chat(
+            [{"role": "user", "content": prompt}],
+            target_model="omni-flow-gpt-6-luna",
+            effort=os.getenv("OMNIFLOW_AGENT_EFFORT", "low"),
+        )
         if llm_resp and ("spark" in llm_resp or "def " in llm_resp):
             cleaned = llm_resp.strip()
             if cleaned.startswith("```python"):

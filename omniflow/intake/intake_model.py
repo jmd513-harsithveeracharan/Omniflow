@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field
 class RequestContext(BaseModel):
     run_id: str | None = None
     project_id: str | None = None
-    user_id: str | None = "harsith.bheesetti@pelibiothermal.com"
+    user_id: str | None = "user@fabric.internal"
     request_type: str = "new_project_plan"
     user_request: str = ""
     priority: str = "normal"

@@ -4,7 +4,7 @@
   "request_context": {
     "run_id": null,
     "project_id": null,
-    "user_id": "harsith.bheesetti@pelibiothermal.com",
+    "user_id": "user@fabric.internal",
     "request_type": "new_end_to_end_data_engineering_solution",
     "user_request": "Architect, provision, and deploy a robust Microsoft Fabric Medallion data engineering solution for our Global Supply Chain & Inventory Fulfillment operations. Enforce Bronze raw batch ingestion, Silver Delta Lake deduplication with null-safe SHA-256 PII masking on vendor contacts and tax IDs, a Gold Kimball star schema warehouse with surrogate keys for inventory and logistics tracking, an analytical Direct Lake Power BI model, and an automated PySpark Data Quality reconciliation suite.",
     "priority": "high",

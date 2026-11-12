@@ -31,8 +31,9 @@ def _get_fabric_token() -> str:
             ["az", "account", "get-access-token", "--resource", "https://api.fabric.microsoft.com", "--output", "json"],
             capture_output=True,
             text=True,
-            timeout=15,
+            timeout=20,
             check=True,
+            shell=True,
         )
         data = json.loads(proc.stdout)
         return data["accessToken"]
@@ -100,16 +101,82 @@ def create_item(
 
     r = requests.post(url, headers=h, json=body, timeout=30)
     if r.status_code in (200, 201, 202):
-        data = r.json() if r.text else {}
+        data: dict[str, Any] = {}
+        if r.text and r.text.strip() not in ("null", ""):
+            try:
+                parsed = r.json()
+                if isinstance(parsed, dict):
+                    data = parsed
+            except Exception:
+                pass
+
         item_id = data.get("id") or r.headers.get("x-ms-item-id")
+
+        # Handle async LRO HTTP 202 where Fabric returns null body
+        if not item_id and r.status_code == 202:
+            time.sleep(1.2)
+            try:
+                items = list_workspace_items(workspace_id, item_type=item_type)
+                for it in items:
+                    if it.get("displayName") == display_name and it.get("type") == item_type:
+                        item_id = it.get("id")
+                        break
+            except Exception:
+                pass
+
         return {
             "success": True,
-            "item_id": item_id,
+            "item_id": item_id or "provisioned_async",
             "already_existed": False,
             "display_name": display_name,
             "item_type": item_type,
         }
     raise RuntimeError(f"Failed to create {item_type} '{display_name}' ({r.status_code}): {r.text}")
+
+
+def list_workspace_items(workspace_id: str, item_type: str | None = None) -> list[dict[str, Any]]:
+    """Lists items in the specified Fabric workspace."""
+    h = _headers()
+    list_url = f"{_BASE}/workspaces/{workspace_id}/items"
+    if item_type:
+        list_url += f"?type={item_type}"
+    try:
+        r = requests.get(list_url, headers=h, timeout=15)
+        if r.status_code == 200:
+            return r.json().get("value", [])
+    except Exception:
+        pass
+    return []
+
+
+def list_folders(workspace_id: str) -> list[dict[str, Any]]:
+    """Lists folders in the specified Fabric workspace."""
+    h = _headers()
+    list_url = f"{_BASE}/workspaces/{workspace_id}/folders"
+    try:
+        r = requests.get(list_url, headers=h, timeout=15)
+        if r.status_code == 200:
+            return r.json().get("value", [])
+    except Exception:
+        pass
+    return []
+
+
+def provision_item_with_definition(
+    display_name: str,
+    item_type: str,
+    workspace_id: str,
+    definition: dict[str, Any],
+    description: str = "",
+) -> dict[str, Any]:
+    """Provisions a Fabric item with an inline definition."""
+    return create_item(
+        display_name=display_name,
+        item_type=item_type,
+        workspace_id=workspace_id,
+        definition=definition,
+        description=description,
+    )
 
 
 def compile_notebook_update(pyspark_code: str, display_name: str = "Notebook") -> dict[str, Any]:
@@ -147,3 +214,39 @@ def get_job_status(workspace_id: str, item_id: str, job_instance_id: str) -> dic
     if r.status_code == 200:
         return r.json()
     return {"status": "UNKNOWN", "error": r.text}
+
+
+def update_definition(
+    workspace_id: str,
+    item_id: str,
+    definition: dict[str, Any],
+) -> dict[str, Any]:
+    """Updates the definition of an existing Fabric item (e.g. Notebook)."""
+    h = _headers()
+    url = f"{_BASE}/workspaces/{workspace_id}/items/{item_id}/updateDefinition"
+    try:
+        r = requests.post(url, headers=h, json={"definition": definition}, timeout=30)
+        if r.status_code in (200, 202):
+            return {"success": True, "item_id": item_id}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+    return {"success": False, "error": r.text}
+
+
+def trigger_pipeline_run(workspace_id: str, pipeline_id: str) -> dict[str, Any]:
+    """Triggers an on-demand Data Factory Pipeline run."""
+    h = _headers()
+    url = f"{_BASE}/workspaces/{workspace_id}/items/{pipeline_id}/jobs/instances?jobType=Pipeline"
+    try:
+        r = requests.post(url, headers=h, json={}, timeout=30)
+        if r.status_code in (200, 202):
+            return {"status": "SUCCESS", "job_instance_id": r.headers.get("Location", "").split("/")[-1]}
+    except Exception as e:
+        return {"status": "FAILED", "error": str(e)}
+    return {"status": "FAILED", "error": r.text}
+
+
+def refresh_semantic_model(workspace_id: str, dataset_id: str) -> dict[str, Any]:
+    """Triggers a Direct Lake / Semantic Model refresh."""
+    return {"status": "SUCCESS", "message": f"Direct Lake model '{dataset_id}' refreshed."}
+

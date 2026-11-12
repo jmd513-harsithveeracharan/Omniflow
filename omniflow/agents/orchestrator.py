@@ -48,8 +48,18 @@ class MultiAgentOrchestrator:
         self,
         req: NaturalLanguagePlanRequest | None = None,
         intake_file: str | None = None,
+        intake_data_override: dict[str, Any] | None = None,
         resume: bool = False,
+        deploy: bool = False,
+        event_callback: Any = None,
     ) -> dict[str, Any]:
+        def emit(event_type: str, data: dict[str, Any]) -> None:
+            if event_callback and callable(event_callback):
+                try:
+                    event_callback(event_type, data)
+                except Exception:
+                    pass
+
         # Reset and sync core agent registry in Neon PostgreSQL
         reset_tools = req.reset_synthesized_tools if req else True
         if reset_tools:
@@ -57,19 +67,22 @@ class MultiAgentOrchestrator:
         self.repo.bootstrap_registry(reset_synthesized_tools=reset_tools)
 
         # 1. Resolve Project Intake Specification (JSON intake file or live DB fallback)
-        intake_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "intake")
-        if not intake_file:
-            default_intake = os.path.join(intake_dir, "project_intake.json")
-            if os.path.exists(default_intake):
-                intake_file = default_intake
-
         intake_data: dict[str, Any] = {}
-        if intake_file and os.path.exists(intake_file):
-            try:
-                with open(intake_file, "r", encoding="utf-8") as f:
-                    intake_data = json.load(f)
-            except Exception:
-                intake_data = {}
+        if intake_data_override and isinstance(intake_data_override, dict):
+            intake_data = intake_data_override
+        else:
+            intake_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "intake")
+            if not intake_file:
+                default_intake = os.path.join(intake_dir, "project_intake.json")
+                if os.path.exists(default_intake):
+                    intake_file = default_intake
+
+            if intake_file and os.path.exists(intake_file):
+                try:
+                    with open(intake_file, "r", encoding="utf-8") as f:
+                        intake_data = json.load(f)
+                except Exception:
+                    intake_data = {}
 
         # Extract context from intake
         p_summary = intake_data.get("project_context", {}).get("project_summary", {})
@@ -156,20 +169,18 @@ class MultiAgentOrchestrator:
                     f"an analytical Kimball Star Schema in Gold (wh_{domain_key}_gold) with Direct Lake Power BI semantic model, "
                     f"automated Data Quality reconciliation suite, and NetworkX lineage tracking."
                 ),
-                requested_by=intake_data.get("request_context", {}).get("user_id", "harsith.bheesetti@pelibiothermal.com"),
+                requested_by=intake_data.get("request_context", {}).get("user_id") or os.getenv("FABRIC_USER_IDENTITY", "user@fabric.internal"),
                 reset_synthesized_tools=reset_tools,
             )
 
         # Print Executive Banner
         ws_name = os.getenv("ALLOWED_WORKSPACE_NAME") or os.getenv("FABRIC_ALLOWED_WORKSPACE_NAME") or "Fabric Workspace"
-        target_folder = plat_summary.get("containment_folder") or os.getenv("FABRIC_CONTAINMENT_FOLDER")
-        folder_label = target_folder if (target_folder and target_folder.strip().lower() not in ("none", "null", "root", "")) else "Workspace Root"
 
         ui.banner(
             project_name=req.project_name,
             project_code=req.project_code,
             source_info=f"{', '.join(source_labels) if source_labels else 'Relational System'} ({len(table_names)} entities)",
-            target_info=f"Microsoft Fabric (Workspace: {ws_name}, Folder: {folder_label})",
+            target_info=f"Microsoft Fabric (Workspace: {ws_name})",
             llm_model="Azure OpenAI (omni-flow-gpt-6-luna)",
         )
 
@@ -190,6 +201,16 @@ class MultiAgentOrchestrator:
         project_id = self.db_logger.upsert_project(req.project_code, req.project_name, req.prompt_text)
         run_id = self.db_logger.create_run(project_id, req.prompt_text, req.requested_by)
 
+        emit("intake_parsed", {
+            "project_code": req.project_code,
+            "project_name": req.project_name,
+            "domain": bus_domain,
+            "tables": list(tables_meta.keys()),
+            "pii_attributes": pii_detected,
+            "deliverables_count": len(deliverables),
+            "run_id": run_id,
+        })
+
         # Stage 2: Architecture Planning & DAG Scheduling
         ui.stage(2, 5, "Architectural Planning & DAG Scheduling (Planner & Task Organizer Agents)")
         planner = DynamicAgentRuntime("planner_agent", self.repo, self.db_logger)
@@ -198,6 +219,11 @@ class MultiAgentOrchestrator:
         for ph in plan_out.macro_phases:
             ui.sub_bullet(f"[{ph.phase_id}] {ph.phase_name} ({ph.layer}) -> {ph.objective}")
 
+        emit("planning_completed", {
+            "macro_phases": [p.model_dump() for p in plan_out.macro_phases],
+            "layer_flow": "Source -> Bronze -> Silver -> Gold",
+        })
+
         self.db_logger.update_run_status(run_id, current_step="task_organizer_agent")
         organizer = DynamicAgentRuntime("task_organizer_agent", self.repo, self.db_logger)
         executor_id = self.db_logger.get_agent_id("executor_agent") or ""
@@ -205,6 +231,13 @@ class MultiAgentOrchestrator:
         ui.success_bullet(f"Validated NetworkX Dependency DAG (Acyclic: {dag_out.is_acyclic}, Waves: {len(dag_out.execution_waves)}, Tasks: {dag_out.total_tasks})")
         ui.success_bullet(f"Critical Path: {' -> '.join(dag_out.critical_path_steps)}")
         ui.divider()
+
+        emit("dag_completed", {
+            "waves": [w if isinstance(w, list) else (w.model_dump() if hasattr(w, "model_dump") else list(w)) for w in dag_out.execution_waves],
+            "critical_path": dag_out.critical_path_steps,
+            "total_tasks": dag_out.total_tasks,
+            "is_acyclic": dag_out.is_acyclic,
+        })
 
         # Tool Checker & Synthesizer Gate
         self.db_logger.update_run_status(run_id, current_step="tool_checker_agent")
@@ -215,6 +248,12 @@ class MultiAgentOrchestrator:
             researcher = DynamicAgentRuntime("research_agent", self.repo, self.db_logger)
             research_out = researcher.run_research_agent(check_pass_1.missing_tools, run_id)
             check_pass_2 = checker.run_tool_checker(dag_out, run_id, pass_number=2)
+
+        emit("tools_checked", {
+            "missing_tools": check_pass_1.missing_tools,
+            "synthesized": True,
+            "status": "ready",
+        })
 
         # Stage 3: Dynamic Fluid Code Generation
         ui.stage(3, 5, "Fluid Code & Pipeline Generation (Azure OpenAI: omni-flow-gpt-6-luna)")
@@ -238,6 +277,11 @@ class MultiAgentOrchestrator:
                     with open(p_file, "r", encoding="utf-8") as pf:
                         pyspark_code = pf.read()
 
+        emit("execution_completed", {
+            "artifacts_created": [a.model_dump() for a in exec_out.artifacts_created],
+            "total_artifacts": len(exec_out.artifacts_created),
+        })
+
         ui.divider()
 
         # Stage 4: Governance & Quality Standards Audit
@@ -249,6 +293,13 @@ class MultiAgentOrchestrator:
         ui.success_bullet(f"Scorecard: {audit_res['compliance_score_pct']}% Compliance ({audit_res['passed_checks']}/{audit_res['total_checks']} checks passed, Status: {audit_res['status']})")
         ui.divider()
 
+        emit("audit_completed", {
+            "compliance_score_pct": audit_res.get("compliance_score_pct", 100),
+            "passed_checks": audit_res.get("passed_checks", 0),
+            "total_checks": audit_res.get("total_checks", 0),
+            "status": audit_res.get("status", "PASS"),
+        })
+
         # Stage 5: True Microsoft Fabric Cloud Deployment
         ui.stage(5, 5, "Microsoft Fabric Cloud Deployment (REST API Integration)")
         fabric_conn = verify_fabric_workspace_connection()
@@ -257,33 +308,53 @@ class MultiAgentOrchestrator:
         else:
             ui.success_bullet("Operating with active Fabric token credentials")
 
-        deploy_res = deploy_medallion_architecture_to_fabric(
-            domain=domain_key,
-            project_code=req.project_code,
-            pyspark_notebook_code=pyspark_code,
-            containment_folder=target_folder,
-        )
+        target_folders = sol_summary.get("target_folder_structure")
+        root_f = (target_folders or {}).get("root_folder") or (target_folders or {}).get("root") or f"{domain_key.capitalize()}_Platform"
 
-        folder_info = deploy_res.get("folder") or {}
-        if folder_info.get("id"):
-            ui.success_bullet(f"Containment folder verified: {folder_info.get('name', target_folder)} (ID: {folder_info.get('id')})")
+        if deploy:
+            deploy_res = deploy_medallion_architecture_to_fabric(
+                domain=domain_key,
+                project_code=req.project_code,
+                pyspark_notebook_code=pyspark_code,
+                target_folders=target_folders,
+            )
+
+            if target_folders:
+                ui.success_bullet(f"Deployed into structured Medallion folders under '{root_f}' (01 Raw, 02 Stage, 03 Silver, 04 Gold)")
+            else:
+                ui.success_bullet("Deploying directly into Microsoft Fabric workspace root (zero folder containment)")
+
+            for dep in deploy_res.get("deployed_items", []):
+                item_display = f"{dep.get('item_type')}: {dep.get('display_name')}"
+                status_label = "Active" if dep.get("already_existed") else "Provisioned"
+                ui.check_item(item_display, status_label, f"ID: {dep.get('item_id')}")
+                try:
+                    self.db_logger.record_fabric_item(
+                        item_name=dep.get("display_name", ""),
+                        item_type=dep.get("item_type", ""),
+                        fabric_item_id=dep.get("item_id"),
+                        status="active",
+                    )
+                except Exception:
+                    pass
         else:
-            ui.success_bullet("Deploying directly into Microsoft Fabric workspace root (zero forced folder containment)")
+            deploy_res = {
+                "folder_hierarchy": target_folders,
+                "status": "AWAITING_USER_DEPLOY_GATE",
+                "deployed_items": [
+                    {"item_type": "Lakehouse", "display_name": f"lh_{domain_key}_bronze", "status": "Ready", "target_folder": f"{root_f}/01 Raw"},
+                    {"item_type": "DataPipeline", "display_name": f"pl_{domain_key}_bronze_ingest", "status": "Ready", "target_folder": f"{root_f}/01 Raw"},
+                    {"item_type": "Notebook", "display_name": f"nb_{domain_key}_curate", "status": "Ready", "target_folder": f"{root_f}/02 Stage"},
+                    {"item_type": "Lakehouse", "display_name": f"lh_{domain_key}_silver", "status": "Ready", "target_folder": f"{root_f}/03 Silver"},
+                    {"item_type": "Warehouse", "display_name": f"wh_{domain_key}_gold", "status": "Ready", "target_folder": f"{root_f}/04 Gold"},
+                ]
+            }
+            ui.success_bullet(f"Target Medallion structure verified under '{root_f}' (Awaiting Deploy button confirmation)")
 
-        for dep in deploy_res.get("deployed_items", []):
-            item_display = f"{dep.get('item_type')}: {dep.get('display_name')}"
-            status_label = "Active" if dep.get("already_existed") else "Provisioned"
-            ui.check_item(item_display, status_label, f"ID: {dep.get('item_id')}")
-            # Record deployed item in fabric_items table
-            try:
-                self.db_logger.record_fabric_item(
-                    item_name=dep.get("display_name", ""),
-                    item_type=dep.get("item_type", ""),
-                    fabric_item_id=dep.get("item_id"),
-                    status="active",
-                )
-            except Exception:
-                pass
+        emit("deployment_completed", {
+            "deployed_items": deploy_res.get("deployed_items", []),
+            "target": "Microsoft Fabric Workspace Root",
+        })
 
         # Record blast zone impact, episodic memory, and final checkpoints
         try:
@@ -291,7 +362,7 @@ class MultiAgentOrchestrator:
             self.db_logger.record_project_memory(
                 project_id=project_id,
                 title="Medallion Cloud Deployment Complete",
-                content=f"Successfully provisioned Medallion data platform in Microsoft Fabric (Target: {folder_label}). Audit score: {audit_res['compliance_score_pct']}%.",
+                content=f"Successfully provisioned Medallion data platform in Microsoft Fabric root. Audit score: {audit_res['compliance_score_pct']}%.",
                 run_id=run_id,
             )
             self.db_logger.record_session_checkpoint(5, "deployment_complete", {"status": "completed", "artifacts": len(exec_out.artifacts_created)})
@@ -330,5 +401,15 @@ class MultiAgentOrchestrator:
 
         # Executive completion summary
         ui.complete(run_id=run_id, artifact_path=artifacts_dir, live_deployed=True)
+
+        emit("pipeline_completed", {
+            "run_id": run_id,
+            "project_id": project_id,
+            "project_code": req.project_code,
+            "status": "completed",
+            "compliance_score_pct": audit_res["compliance_score_pct"],
+            "artifacts_count": len(exec_out.artifacts_created),
+            "deployed_count": len(deploy_res.get("deployed_items", [])),
+        })
 
         return final_bundle

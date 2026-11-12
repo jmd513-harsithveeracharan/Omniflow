@@ -2,10 +2,13 @@ from __future__ import annotations
 
 import json
 import os
+import threading
 import uuid
+from contextlib import contextmanager
 from typing import Any
 
 import psycopg2
+import psycopg2.pool
 from psycopg2.extras import Json
 
 from omniflow.db.seed_data import BASE_TOOLS, CORE_AGENTS, CORE_STANDARDS
@@ -17,6 +20,18 @@ NEON_URI = (
     or ""
 )
 
+_POOL: psycopg2.pool.ThreadedConnectionPool | None = None
+_POOL_LOCK = threading.Lock()
+_REGISTRY_BOOTSTRAPPED: bool = False
+
+
+def _get_connection_pool(db_uri: str, minconn: int = 1, maxconn: int = 10) -> psycopg2.pool.ThreadedConnectionPool:
+    global _POOL
+    with _POOL_LOCK:
+        if _POOL is None or _POOL.closed:
+            _POOL = psycopg2.pool.ThreadedConnectionPool(minconn, maxconn, db_uri, connect_timeout=8)
+        return _POOL
+
 
 class PostgresRepository:
     """Unified PostgreSQL repository for OmniFlow dynamic agents, tools, tasks, runs, and artifacts."""
@@ -24,19 +39,55 @@ class PostgresRepository:
     def __init__(self, db_uri: str = ""):
         self.db_uri = db_uri or NEON_URI or os.getenv("NEON_DATABASE_URL", "") or os.getenv("DATABASE_URL", "")
 
+    @contextmanager
     def _connect(self):
         if not self.db_uri:
             raise ValueError(
                 "CRITICAL: PostgreSQL connection string not configured!\n"
                 "Please set NEON_DATABASE_URL or DATABASE_URL in your .env or omniflow/.env file."
             )
-        return psycopg2.connect(self.db_uri, connect_timeout=8)
-        return psycopg2.connect(self.db_uri, connect_timeout=8)
+        try:
+            pool = _get_connection_pool(self.db_uri)
+            conn = pool.getconn()
+        except Exception:
+            # Fallback to direct connection if pooling is unavailable
+            conn = psycopg2.connect(self.db_uri, connect_timeout=8)
+            try:
+                yield conn
+            finally:
+                conn.close()
+            return
 
-    def bootstrap_registry(self, reset_synthesized_tools: bool = True) -> dict[str, int]:
+        try:
+            yield conn
+        finally:
+            try:
+                pool.putconn(conn)
+            except Exception:
+                pass
+
+    def bootstrap_registry(self, reset_synthesized_tools: bool = True, force: bool = False) -> dict[str, int]:
         """Ensures only the 5 core agents exist, seeds engineering_standards & base tools,
         and resets synthesized tools so Research Agent dynamic tool creation is demonstrated live.
+        Caches static seeding per process unless `force=True`.
         """
+        global _REGISTRY_BOOTSTRAPPED
+        if _REGISTRY_BOOTSTRAPPED and not force:
+            if reset_synthesized_tools:
+                dyn_tools = ("build_sap_rfc_cdc_connector_tool", "build_direct_lake_bim_tool")
+                with self._connect() as conn, conn.cursor() as cur:
+                    cur.execute(
+                        "DELETE FROM agent_tools WHERE tool_id IN (SELECT tool_id FROM tools WHERE tool_name IN %s);",
+                        (dyn_tools,),
+                    )
+                    cur.execute(
+                        "UPDATE tool_runs SET tool_id = NULL WHERE tool_id IN (SELECT tool_id FROM tools WHERE tool_name IN %s);",
+                        (dyn_tools,),
+                    )
+                    cur.execute("DELETE FROM tools WHERE tool_name IN %s;", (dyn_tools,))
+                    conn.commit()
+            return {"agents_seeded": len(CORE_AGENTS), "base_tools_seeded": len(BASE_TOOLS)}
+
         with self._connect() as conn, conn.cursor() as cur:
             # 1. Remove deprecated sub-planners so only the 5 requested agents exist
             deprecated = ("bronze_planner_agent", "silver_planner_agent", "gold_planner_agent")
@@ -190,6 +241,7 @@ class PostgresRepository:
                         (aid, tid),
                     )
             conn.commit()
+            _REGISTRY_BOOTSTRAPPED = True
             return {"agents_seeded": len(agent_ids), "base_tools_seeded": len(BASE_TOOLS)}
 
     def get_all_active_tools(self) -> dict[str, dict[str, Any]]:
