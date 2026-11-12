@@ -63,7 +63,7 @@ export const ProjectIntakeViewerModal: React.FC<ProjectIntakeViewerModalProps> =
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4.5 border-b border-[#232326] bg-[#1a1a1c]">
+        <div className="flex items-center justify-between px-6 py-4.5 border-b border-[#232326] bg-[#1a1a1c] shrink-0">
           <div className="flex items-center gap-3">
             <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-400">
               <FileJson width={18} height={18} />
@@ -96,7 +96,7 @@ export const ProjectIntakeViewerModal: React.FC<ProjectIntakeViewerModalProps> =
         </div>
 
         {/* Tab Switcher */}
-        <div className="flex items-center gap-2 px-6 pt-3 border-b border-[#232326] bg-[#141416]/50">
+        <div className="flex items-center gap-2 px-6 pt-3 border-b border-[#232326] bg-[#141416]/50 shrink-0">
           <button
             type="button"
             onClick={() => setActiveTab('structured')}
@@ -122,7 +122,7 @@ export const ProjectIntakeViewerModal: React.FC<ProjectIntakeViewerModalProps> =
         </div>
 
         {/* Modal Content */}
-        <div className="p-6 flex-1 overflow-y-auto space-y-4 text-xs">
+        <div className="p-6 flex-1 min-h-0 overflow-y-auto space-y-4 text-xs">
           {activeTab === 'structured' ? (
             <>
               {/* Summary Banner */}

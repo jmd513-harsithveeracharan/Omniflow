@@ -126,9 +126,9 @@ export const ConnectorModal: React.FC<ConnectorModalProps> = ({
         </div>
 
         {/* Body Split */}
-        <div className="flex-1 flex overflow-hidden">
+        <div className="flex-1 min-h-0 flex overflow-hidden">
           {/* Connector Selector */}
-          <div className="w-72 border-r border-border/70 p-3 bg-surface/30 space-y-2 overflow-y-auto shrink-0">
+          <div className="w-72 border-r border-border/70 p-3 bg-surface/30 space-y-2 overflow-y-auto min-h-0 shrink-0">
             <span className="text-[10px] uppercase font-semibold text-slate-400 px-1">Registered Sources</span>
             {CONNECTORS.map((c) => (
               <button
@@ -150,8 +150,8 @@ export const ConnectorModal: React.FC<ConnectorModalProps> = ({
           </div>
 
           {/* Table Discovery & Strategy Configuration */}
-          <div className="flex-1 flex flex-col bg-[#080d1a] overflow-hidden py-5">
-            <div className="flex items-center justify-between mb-4 px-5">
+          <div className="flex-1 min-h-0 flex flex-col bg-[#080d1a] overflow-hidden">
+            <div className="flex items-center justify-between px-5 pt-5 pb-4 shrink-0">
               <div>
                 <h3 className="text-xs font-semibold text-white uppercase tracking-wider">Discovered Schema Tables</h3>
                 <p className="text-[11px] text-slate-400">Select tables to ingest and configure Medallion Delta strategies</p>
@@ -167,7 +167,7 @@ export const ConnectorModal: React.FC<ConnectorModalProps> = ({
             </div>
 
             {testResult && (
-              <div className={`mx-5 p-2.5 rounded-lg mb-3 border text-xs flex items-center gap-2 ${
+              <div className={`mx-5 p-2.5 rounded-lg mb-3 border text-xs flex items-center gap-2 shrink-0 ${
                 testResult.success ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300' : 'bg-rose-500/10 border-rose-500/30 text-rose-300'
               }`}>
                 {testResult.success ? <CheckCircle2 className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
@@ -176,7 +176,7 @@ export const ConnectorModal: React.FC<ConnectorModalProps> = ({
             )}
 
             {/* Tables List */}
-            <div className="flex-1 overflow-y-auto pl-5 pr-2 space-y-2">
+            <div className="flex-1 min-h-0 overflow-y-auto px-5 pb-4 space-y-2">
               {tables.map((tbl, idx) => (
                 <div
                   key={tbl.name}
@@ -219,7 +219,7 @@ export const ConnectorModal: React.FC<ConnectorModalProps> = ({
             </div>
 
             {/* Footer Action */}
-            <div className="pt-4 border-t border-border/70 flex items-center justify-between shrink-0">
+            <div className="px-5 py-4 border-t border-border/70 flex items-center justify-between shrink-0">
               <span className="text-xs text-slate-400 font-mono">
                 {tables.filter((t) => t.selected).length} Tables Selected for Medallion Flow
               </span>

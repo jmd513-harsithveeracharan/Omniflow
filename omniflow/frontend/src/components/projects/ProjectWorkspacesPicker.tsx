@@ -97,6 +97,11 @@ export const ProjectWorkspacesPicker: React.FC<ProjectWorkspacesPickerProps> = (
           border: '1px solid rgba(255, 255, 255, 0.1)',
           borderRadius: '10px',
           background: 'rgba(24, 24, 27, 0.6)',
+          overflow: 'hidden',
+        }}
+      >
+      <div
+        style={{
           maxHeight: '175px',
           overflowY: 'auto',
           padding: '4px',
@@ -201,6 +206,7 @@ export const ProjectWorkspacesPicker: React.FC<ProjectWorkspacesPickerProps> = (
             </div>
           );
         }))}
+      </div>
       </div>
     </div>
   );

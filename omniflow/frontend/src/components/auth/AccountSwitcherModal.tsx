@@ -206,11 +206,11 @@ export const AccountSwitcherModal: React.FC<AccountSwitcherModalProps> = ({
       onClick={onClose}
     >
       <div
-        className="w-full max-w-[500px] bg-gradient-to-b from-[#141417] to-[#0d0d10] border border-white/[0.12] rounded-2xl p-6 shadow-2xl relative z-[100051] flex flex-col gap-5 text-sans select-none ring-1 ring-white/5"
+        className="w-full max-w-[500px] max-h-[90vh] overflow-hidden bg-gradient-to-b from-[#141417] to-[#0d0d10] border border-white/[0.12] rounded-2xl shadow-2xl relative z-[100051] flex flex-col text-sans select-none ring-1 ring-white/5"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-start justify-between">
+        <div className="flex items-start justify-between px-6 pt-6 pb-4 shrink-0">
           <div>
             <h3 className="text-[16px] font-semibold text-[#f4f4f5] tracking-tight">
               Fabric Accounts & Tenancy
@@ -229,6 +229,8 @@ export const AccountSwitcherModal: React.FC<AccountSwitcherModalProps> = ({
           </button>
         </div>
 
+        {/* Scrollable Body (scrollbar flush on modal right edge) */}
+        <div className="flex-1 min-h-0 overflow-y-auto px-6 pb-6 space-y-5">
         {/* Feedback Message */}
         {statusMsg && (
           <div
@@ -271,7 +273,7 @@ export const AccountSwitcherModal: React.FC<AccountSwitcherModalProps> = ({
             </button>
           </div>
 
-          <div className="flex flex-col gap-2 max-h-[240px] overflow-y-auto pr-0.5">
+          <div className="-mx-6 px-6 flex flex-col gap-2 max-h-[240px] overflow-y-auto">
             {isLoading && accounts.length === 0 ? (
               <AccountSkeletonList />
             ) : accounts.length === 0 ? (
@@ -302,6 +304,7 @@ export const AccountSwitcherModal: React.FC<AccountSwitcherModalProps> = ({
           onBrowserLogin={handleBrowserLogin}
           onDeviceCodeLogin={handleStartDeviceCode}
         />
+        </div>
       </div>
     </div>,
     document.body

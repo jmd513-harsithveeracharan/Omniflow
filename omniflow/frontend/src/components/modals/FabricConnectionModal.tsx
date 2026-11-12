@@ -61,9 +61,12 @@ export const FabricConnectionModal: React.FC<FabricConnectionModalProps> = ({
         style={{
           width: '560px',
           maxWidth: '92vw',
+          maxHeight: '90vh',
           background: '#121215',
           border: '1px solid rgba(255, 255, 255, 0.12)',
           borderRadius: '14px',
+          display: 'flex',
+          flexDirection: 'column',
           overflow: 'hidden',
           boxShadow: '0 24px 60px rgba(0, 0, 0, 0.8)',
           position: 'relative',
@@ -72,7 +75,7 @@ export const FabricConnectionModal: React.FC<FabricConnectionModalProps> = ({
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '1px solid rgba(255, 255, 255, 0.08)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '1px solid rgba(255, 255, 255, 0.08)', flexShrink: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: 'rgba(0, 210, 160, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <Layers width={20} height={20} style={{ color: '#00d2a0' }} />
@@ -91,7 +94,7 @@ export const FabricConnectionModal: React.FC<FabricConnectionModalProps> = ({
           </button>
         </div>
 
-        <div style={{ padding: '20px' }}>
+        <div style={{ padding: '20px', flex: 1, minHeight: 0, overflowY: 'auto' }}>
           {/* Active Status Strip */}
           <div style={{ background: 'rgba(255, 255, 255, 0.03)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '8px', padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '18px' }}>
             <div>

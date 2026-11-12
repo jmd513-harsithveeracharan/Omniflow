@@ -58,9 +58,12 @@ export const AddCustomConnectorModal: React.FC<AddCustomConnectorModalProps> = (
         style={{
           width: '520px',
           maxWidth: '92vw',
+          maxHeight: '90vh',
           background: '#141417',
           border: '1px solid rgba(255, 255, 255, 0.12)',
           borderRadius: '12px',
+          display: 'flex',
+          flexDirection: 'column',
           overflow: 'hidden',
           boxShadow: '0 24px 48px rgba(0, 0, 0, 0.6)',
           position: 'relative',
@@ -69,7 +72,7 @@ export const AddCustomConnectorModal: React.FC<AddCustomConnectorModalProps> = (
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '1px solid rgba(255,255,255,0.08)', flexShrink: 0 }}>
           <div>
             <h3 style={{ fontSize: '15px', fontWeight: 600, color: '#fff', margin: 0 }}>Add custom connector</h3>
             <p style={{ fontSize: '11.5px', color: '#71717a', margin: '2px 0 0 0' }}>Define connection parameters or auto-generate with AI</p>
@@ -83,7 +86,7 @@ export const AddCustomConnectorModal: React.FC<AddCustomConnectorModalProps> = (
           </button>
         </div>
 
-        <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px', flex: 1, minHeight: 0, overflowY: 'auto' }}>
           {/* AI Generation Box */}
           <div style={{ background: 'rgba(139, 92, 246, 0.08)', border: '1px solid rgba(139, 92, 246, 0.25)', borderRadius: '8px', padding: '14px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
@@ -156,7 +159,7 @@ export const AddCustomConnectorModal: React.FC<AddCustomConnectorModalProps> = (
         </div>
 
         {/* Footer */}
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', padding: '14px 20px', borderTop: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.02)' }}>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', padding: '14px 20px', borderTop: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.02)', flexShrink: 0 }}>
           <button
             type="button"
             onClick={onClose}

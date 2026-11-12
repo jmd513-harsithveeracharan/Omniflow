@@ -44,7 +44,7 @@ export const ProjectInstructionsModal: React.FC<ProjectInstructionsModalProps> =
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-5 border-b border-white/[0.08] bg-white/[0.02]">
+        <div className="flex items-center justify-between px-6 py-5 border-b border-white/[0.08] bg-white/[0.02] shrink-0">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl bg-emerald-500/10 border border-emerald-500/25 text-emerald-400 flex items-center justify-center shadow-inner">
               <BookOpen size={18} />
@@ -65,7 +65,7 @@ export const ProjectInstructionsModal: React.FC<ProjectInstructionsModalProps> =
         </div>
 
         {/* Body */}
-        <div className="p-6 flex-1 overflow-y-auto space-y-4">
+        <div className="p-6 flex-1 min-h-0 overflow-y-auto space-y-4">
           <p className="text-[12px] text-[#a1a1aa] leading-relaxed">
             Provide system guidance that Omniflow AI agents should enforce when writing PySpark notebooks, SQL models, and Medallion pipelines for this project.
           </p>
@@ -147,7 +147,7 @@ export const ProjectInstructionsModal: React.FC<ProjectInstructionsModalProps> =
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between px-6 py-4 border-t border-white/[0.08] bg-[#0e0e11]/90">
+        <div className="flex items-center justify-between px-6 py-4 border-t border-white/[0.08] bg-[#0e0e11]/90 shrink-0">
           <span className="text-[11px] text-zinc-500 hidden sm:inline">
             Rules apply across all agent sessions in this project
           </span>

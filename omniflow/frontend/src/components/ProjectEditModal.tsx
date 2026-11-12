@@ -240,9 +240,10 @@ export const ProjectEditModal: React.FC<ProjectEditModalProps> = ({
         </aside>
 
         {/* RIGHT CONTENT PANE */}
-        <div className="claude-settings-body">
-          {/* Header Row */}
-          <div className="pane-header-row" style={{ marginBottom: '14px' }}>
+        <div className="claude-settings-body claude-settings-body--framed">
+          {/* Pinned Header Row & Status Banners */}
+          <div style={{ padding: '22px 28px 0 28px', flexShrink: 0 }}>
+            <div className="pane-header-row" style={{ marginBottom: '14px' }}>
             <div>
               <h2 className="pane-title">{currentNav.label}</h2>
               <p className="pane-desc" style={{ marginTop: '2px', fontSize: '12px' }}>{currentNav.desc}</p>
@@ -330,7 +331,10 @@ export const ProjectEditModal: React.FC<ProjectEditModalProps> = ({
               <span>Project settings saved successfully</span>
             </div>
           )}
+          </div>
 
+          {/* Scrollable Body (scrollbar flush on modal right edge) */}
+          <div className="claude-settings-body-scroll">
           {/* TAB 1: GENERAL */}
           {activeTab === 'general' && (
             <div className="settings-tab-pane" style={{ display: 'flex', flexDirection: 'column', gap: '11px' }}>
@@ -620,17 +624,18 @@ export const ProjectEditModal: React.FC<ProjectEditModalProps> = ({
               <ProjectGitTab project={project} localPath={localPath} />
             </div>
           )}
+          </div>
 
-          {/* Action Footer */}
+          {/* Pinned Action Footer */}
           <div
             style={{
-              marginTop: 'auto',
-              paddingTop: '14px',
+              padding: '14px 28px 20px 28px',
               borderTop: '1px solid rgba(255, 255, 255, 0.08)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'flex-end',
               gap: '10px',
+              flexShrink: 0,
             }}
           >
             <button

@@ -90,7 +90,7 @@ export const ProjectAddContextModal: React.FC<ProjectAddContextModalProps> = ({
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-5 border-b border-white/[0.08] bg-white/[0.02]">
+        <div className="flex items-center justify-between px-6 py-5 border-b border-white/[0.08] bg-white/[0.02] shrink-0">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl bg-emerald-500/10 border border-emerald-500/25 text-emerald-400 flex items-center justify-center shadow-inner">
               <FolderArchive size={18} />
@@ -111,7 +111,7 @@ export const ProjectAddContextModal: React.FC<ProjectAddContextModalProps> = ({
         </div>
 
         {/* Modern Segmented Tab Switcher */}
-        <div className="px-6 pt-3.5 pb-1">
+        <div className="px-6 pt-3.5 pb-1 shrink-0">
           <div className="flex items-center gap-1 p-1 bg-black/40 border border-white/[0.08] rounded-xl">
             <button
               type="button"
@@ -153,7 +153,7 @@ export const ProjectAddContextModal: React.FC<ProjectAddContextModalProps> = ({
         </div>
 
         {/* Tab Body */}
-        <div className="p-6 flex-1 overflow-y-auto space-y-3">
+        <div className="p-6 flex-1 min-h-0 overflow-y-auto space-y-3">
           {activeTab === 'templates' && (
             <div className="space-y-2.5">
               <p className="text-[12px] text-[#8e918f]">

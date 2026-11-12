@@ -43,7 +43,7 @@ export const GovernanceModal: React.FC<GovernanceModalProps> = ({
       onClick={onClose}
     >
       <div
-        className="w-full max-w-2xl bg-[#0c1222] border border-rose-500/40 rounded-2xl shadow-2xl flex flex-col overflow-hidden"
+        className="w-full max-w-2xl max-h-[90vh] bg-[#0c1222] border border-rose-500/40 rounded-2xl shadow-2xl flex flex-col overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header with Hazard Colors */}
@@ -67,7 +67,7 @@ export const GovernanceModal: React.FC<GovernanceModalProps> = ({
         </div>
 
         {/* Body Content */}
-        <div className="p-6 space-y-4 overflow-y-auto max-h-[70vh]">
+        <div className="p-6 space-y-4 flex-1 min-h-0 overflow-y-auto">
           {/* Warning Banner */}
           <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/30 flex items-start gap-3">
             <AlertTriangle className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" />

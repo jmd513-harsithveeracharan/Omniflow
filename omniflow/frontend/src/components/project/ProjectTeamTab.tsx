@@ -239,7 +239,7 @@ export const ProjectTeamTab: React.FC<ProjectTeamTabProps> = ({ projectId }) => 
           {isLoading && <span style={{ fontSize: '11px', color: '#64748b' }}>Refreshing...</span>}
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '190px', overflowY: 'auto' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
           {members.length === 0 ? (
             <div style={{ color: '#64748b', fontSize: '12px', textAlign: 'center', padding: '16px' }}>
               No explicit members assigned. Current creator is project owner.

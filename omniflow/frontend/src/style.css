@@ -8549,8 +8549,8 @@ ul.chat-md-list {
     border-radius: 18px;
     width: 900px;
     max-width: 95vw;
-    height: 520px;
-    max-height: 88vh;
+    height: 680px;
+    max-height: 90vh;
     box-shadow: 0 24px 80px rgba(0, 0, 0, 0.9);
     display: flex;
     overflow: hidden;
@@ -8664,11 +8664,28 @@ ul.chat-md-list {
     display: flex;
     flex-direction: column;
     min-width: 0;
+    min-height: 0;
+}
+
+.claude-settings-body--framed {
+    padding: 0;
+    overflow: hidden;
+}
+
+.claude-settings-body-scroll {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 4px 28px 18px 28px;
+    display: flex;
+    flex-direction: column;
 }
 
 .settings-tab-pane {
     width: 100%;
     max-width: 100%;
+    flex-shrink: 0;
     overflow-x: hidden;
     box-sizing: border-box;
 }

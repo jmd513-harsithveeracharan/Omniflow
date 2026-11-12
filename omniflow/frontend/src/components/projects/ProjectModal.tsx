@@ -136,10 +136,12 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
           width: '580px',
           maxWidth: '95vw',
           maxHeight: '90vh',
-          overflowY: 'auto',
+          overflow: 'hidden',
+          display: 'flex',
+          flexDirection: 'column',
           background: '#18181b',
           borderRadius: '16px',
-          padding: '24px 26px',
+          padding: 0,
           border: '1px solid rgba(255, 255, 255, 0.12)',
           boxShadow: '0 24px 60px rgba(0, 0, 0, 0.8)',
           position: 'relative',
@@ -148,7 +150,16 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '22px 26px 16px 26px',
+            borderBottom: '1px solid rgba(255, 255, 255, 0.07)',
+            flexShrink: 0,
+          }}
+        >
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <div
               style={{
@@ -183,23 +194,28 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
           </button>
         </div>
 
-        {error && (
-          <div
-            style={{
-              padding: '8px 12px',
-              background: 'rgba(239, 68, 68, 0.15)',
-              border: '1px solid #ef4444',
-              borderRadius: '8px',
-              color: '#fca5a5',
-              fontSize: '12.5px',
-              marginBottom: '14px',
-            }}
-          >
-            {error}
-          </div>
-        )}
+        <form
+          onSubmit={handleSubmit}
+          style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'hidden' }}
+        >
+          {/* Scrollable Form Body (scrollbar flush on modal right edge) */}
+          <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'hidden', padding: '18px 26px' }}>
+          {error && (
+            <div
+              style={{
+                padding: '8px 12px',
+                background: 'rgba(239, 68, 68, 0.15)',
+                border: '1px solid #ef4444',
+                borderRadius: '8px',
+                color: '#fca5a5',
+                fontSize: '12.5px',
+                marginBottom: '14px',
+              }}
+            >
+              {error}
+            </div>
+          )}
 
-        <form onSubmit={handleSubmit}>
           {/* Project Name */}
           <div style={{ marginBottom: '16px' }}>
             <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#a1a1aa', marginBottom: '6px' }}>
@@ -245,7 +261,7 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
           />
 
           {/* Shared Context Toggle */}
-          <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', marginBottom: '22px' }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
             <input
               type="checkbox"
               checked={sharedContext}
@@ -256,9 +272,19 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
               Share multi-turn chat history & agent blast-radius lineage across project members
             </span>
           </label>
+          </div>
 
-          {/* Actions */}
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+          {/* Pinned Actions Footer */}
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'flex-end',
+              gap: '10px',
+              padding: '14px 26px 20px 26px',
+              borderTop: '1px solid rgba(255, 255, 255, 0.07)',
+              flexShrink: 0,
+            }}
+          >
             <button type="button" onClick={onClose} className="projects-modal-btn-cancel">
               Cancel
             </button>

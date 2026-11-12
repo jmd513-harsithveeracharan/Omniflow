@@ -115,9 +115,9 @@ export const SkillInspectorModal: React.FC<SkillInspectorModalProps> = ({
         </div>
 
         {/* Content Body: Left sidebar (skill list) & Right view (runbook details) */}
-        <div className="flex-1 flex overflow-hidden">
+        <div className="flex-1 min-h-0 flex overflow-hidden">
           {/* Skill List */}
-          <div className="w-80 border-r border-border/70 bg-surface/30 overflow-y-auto p-3 space-y-2 shrink-0">
+          <div className="w-80 border-r border-border/70 bg-surface/30 overflow-y-auto min-h-0 p-3 space-y-2 shrink-0">
             {skills.map((s) => {
               const isSelected = s.name === selectedSkillName;
               return (
@@ -145,14 +145,14 @@ export const SkillInspectorModal: React.FC<SkillInspectorModalProps> = ({
           </div>
 
           {/* Detailed Skill View */}
-          <div className="flex-1 flex flex-col bg-[#080d1a] overflow-hidden">
+          <div className="flex-1 min-h-0 flex flex-col bg-[#080d1a] overflow-hidden">
             {loading ? (
               <div className="flex-1 flex items-center justify-center text-slate-400 text-xs">
                 <Sparkles className="w-5 h-5 animate-spin text-brand-cyan mr-2" />
                 Loading skill runbook...
               </div>
             ) : activeSkillDetail ? (
-              <div className="flex-1 flex flex-col overflow-hidden">
+              <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
                 {/* Detail Bar */}
                 <div className="p-4 border-b border-border/60 bg-surface-card/40 flex items-center justify-between shrink-0">
                   <div>
@@ -186,7 +186,7 @@ export const SkillInspectorModal: React.FC<SkillInspectorModalProps> = ({
                 </div>
 
                 {/* Markdown Runbook Viewer */}
-                <div className="flex-1 overflow-y-auto p-6 font-mono text-xs text-slate-300 leading-relaxed space-y-4">
+                <div className="flex-1 min-h-0 overflow-y-auto p-6 font-mono text-xs text-slate-300 leading-relaxed space-y-4">
                   <div className="p-4 rounded-xl bg-surface-card/80 border border-border/80">
                     <div className="flex items-center gap-2 text-brand-cyan text-xs font-semibold mb-2">
                       <Code className="w-4 h-4" />
