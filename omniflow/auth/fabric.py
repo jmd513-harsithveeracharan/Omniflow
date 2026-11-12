@@ -13,7 +13,7 @@ import threading
 import time
 from typing import Any, Callable, Optional
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Body
 from pydantic import BaseModel
 
 from omniflow.auth.az_cli import (
@@ -22,6 +22,12 @@ from omniflow.auth.az_cli import (
     get_azure_cli_account as _get_azure_cli_account,
     read_azure_profile_accounts,
     run_az_cmd as _run_az_cmd,
+)
+from omniflow.auth.az_login_flows import (
+    cancel_browser_login_flow,
+    poll_device_code_flow,
+    run_browser_login_flow,
+    start_device_code_flow,
 )
 
 logger = logging.getLogger("omniflow.auth_fabric")
@@ -60,6 +66,10 @@ class BrowserLoginRequest(BaseModel):
     tenant: Optional[str] = None
 
 
+class DeviceCodeStartRequest(BaseModel):
+    tenant: Optional[str] = None
+
+
 class SwitchAccountRequest(BaseModel):
     account_id: str
     tenant_id: Optional[str] = None
@@ -93,6 +103,15 @@ def get_fabric_accounts(refresh: bool = False) -> list[dict[str, Any]]:
         try:
             az_accounts = json.loads(out)
             accounts = [acc for raw in az_accounts if (acc := format_az_account(raw)) is not None]
+            # Merge any tenant-only (--allow-no-subscriptions) accounts from azureProfile.json
+            profile_accounts = read_azure_profile_accounts()
+            if profile_accounts:
+                seen = {(a.get("email", "").lower(), a.get("tenant_id", "")) for a in accounts}
+                for p_acc in profile_accounts:
+                    key = (p_acc.get("email", "").lower(), p_acc.get("tenant_id", ""))
+                    if key not in seen:
+                        accounts.append(p_acc)
+                        seen.add(key)
             if accounts:
                 accounts.sort(key=lambda x: not x["is_active"])
                 _ACCOUNTS_CACHE, _ACCOUNTS_CACHE_TIME = accounts, time.time()
@@ -117,62 +136,60 @@ def get_fabric_accounts(refresh: bool = False) -> list[dict[str, Any]]:
 
 @fabric_auth_router.post("/auth/login/browser")
 def login_fabric_browser(req: BrowserLoginRequest = BrowserLoginRequest()) -> dict[str, Any]:
-    cmd = ["login"]
-    if req.tenant and req.tenant.strip():
-        cmd.extend(["--tenant", req.tenant.strip()])
+    res = run_browser_login_flow(req.tenant, timeout_seconds=150)
+    if not res.get("success"):
+        return {
+            "success": False,
+            "message": res.get("message") or "Microsoft browser sign-in did not complete.",
+            "accounts": get_fabric_accounts(refresh=False),
+        }
 
-    rc, _, err = _run_az_cmd(cmd, timeout=60)
     invalidate_all_auth_caches()
     accounts = get_fabric_accounts(refresh=True)
-    active = next((a for a in accounts if a.get("is_active")), accounts[0] if accounts else None)
+    email = res.get("email")
+    matched = None
+    if email:
+        matched = next((a for a in accounts if a.get("email", "").lower() == email.lower()), None)
+    active = matched or next((a for a in accounts if a.get("is_active")), accounts[0] if accounts else None)
+    display_identity = (active or {}).get("email") or email or "Authenticated account"
     return {
-        "success": rc == 0,
-        "message": f"Connected Fabric account: {active.get('email')}" if (rc == 0 and active) else f"Sign-in completed ({err[:80]})",
+        "success": True,
+        "message": f"Connected Fabric account: {display_identity}",
         "accounts": accounts,
     }
 
 
+@fabric_auth_router.post("/auth/login/browser/cancel")
+def cancel_fabric_browser_login() -> dict[str, Any]:
+    return cancel_browser_login_flow()
+
+
 @fabric_auth_router.post("/auth/login/device-code")
-def login_fabric_device_code() -> dict[str, Any]:
-    client_id = "04b07795-8ddb-461a-bbee-02f9e1bf7b46"
-    try:
-        import urllib.parse, urllib.request
-        data = urllib.parse.urlencode({
-            "client_id": client_id,
-            "scope": "https://management.core.windows.net//.default openid profile offline_access",
-        }).encode("utf-8")
-        req = urllib.request.Request(
-            "https://login.microsoftonline.com/common/oauth2/v2.0/devicecode",
-            data=data,
-            headers={"Content-Type": "application/x-www-form-urlencoded"},
-        )
-        with urllib.request.urlopen(req, timeout=10) as resp:
-            body = json.loads(resp.read().decode("utf-8"))
-            return {
-                "success": True,
-                "device_code": body.get("device_code"),
-                "user_code": body.get("user_code"),
-                "verification_uri": body.get("verification_uri", "https://microsoft.com/devicelogin"),
-                "message": body.get("message", "Enter code at https://microsoft.com/devicelogin"),
-                "expires_in": body.get("expires_in", 900),
-                "interval": body.get("interval", 5),
-            }
-    except Exception as e:
-        logger.warning(f"Device code direct request fallback: {e}")
-        code = f"FABRIC-{secrets.token_hex(3).upper()}"
-        return {
-            "success": True,
-            "device_code": f"DC-{secrets.token_hex(4).upper()}",
-            "user_code": code,
-            "verification_uri": "https://microsoft.com/devicelogin",
-            "message": f"Go to https://microsoft.com/devicelogin and enter code: {code}",
-        }
+def login_fabric_device_code(
+    req: DeviceCodeStartRequest | None = Body(default=None),
+) -> dict[str, Any]:
+    tenant = req.tenant if req else None
+    return start_device_code_flow(tenant=tenant)
 
 
 @fabric_auth_router.post("/auth/login/device-code/poll")
 def poll_fabric_device_code(req: DeviceCodePollRequest) -> dict[str, Any]:
-    account = _get_azure_cli_account()
-    return {"status": "authenticated", "user_identity": account.get("email", "user@fabric.internal")}
+    res = poll_device_code_flow(req.device_code)
+    if res.get("status") == "authenticated":
+        invalidate_all_auth_caches()
+        accounts = get_fabric_accounts(refresh=True)
+        email = res.get("user_identity")
+        matched = None
+        if email:
+            matched = next((a for a in accounts if a.get("email", "").lower() == email.lower()), None)
+        active = matched or next((a for a in accounts if a.get("is_active")), accounts[0] if accounts else None)
+        return {
+            "success": True,
+            "status": "authenticated",
+            "user_identity": (active or {}).get("email") or email or "Microsoft Account",
+            "tenant_id": (active or {}).get("tenant_id") or res.get("tenant_id"),
+        }
+    return res
 
 
 @fabric_auth_router.post("/auth/switch-account")

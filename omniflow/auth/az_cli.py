@@ -7,6 +7,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import shutil
 import subprocess
 import threading
 from typing import Any, Optional
@@ -17,19 +18,51 @@ _AZ_LOCK = threading.Lock()
 _ACTIVE_FABRIC_ACCOUNT: Optional[dict[str, Any]] = None
 
 
-def run_az_cmd(args: list[str], timeout: int = 30) -> tuple[int, str, str]:
-    """Executes an Azure CLI command serialized by a lock to prevent MSAL cache contention."""
+def build_az_env(disable_wam_broker: bool = False) -> dict[str, str]:
+    """Builds a clean Azure CLI subprocess environment, optionally disabling Windows WAM."""
+    env = os.environ.copy()
+    env["PYTHONUNBUFFERED"] = "1"
+    env.setdefault("AZURE_CORE_NO_COLOR", "true")
+    if disable_wam_broker:
+        env["AZURE_CORE_ENABLE_BROKER_ON_WINDOWS"] = "false"
+    return env
+
+
+def resolve_az_command(args: list[str], disable_wam_broker: bool = False) -> tuple[list[str], bool, dict[str, str]]:
+    """Resolves Azure CLI directly to its MSI python.exe on Windows to avoid cmd.exe orphans."""
+    env = build_az_env(disable_wam_broker=disable_wam_broker)
     is_windows = os.name == "nt"
-    full_cmd = ["az.cmd" if is_windows else "az"] + args
+    if is_windows:
+        az_path = shutil.which("az.cmd") or shutil.which("az")
+        if az_path:
+            msi_python = os.path.abspath(os.path.join(os.path.dirname(az_path), "..", "python.exe"))
+            if os.path.isfile(msi_python):
+                env["AZ_INSTALLER"] = "MSI"
+                return [msi_python, "-IBm", "azure.cli", *args], False, env
+        return ["az.cmd", *args], True, env
+    return [shutil.which("az") or "az", *args], False, env
+
+
+def run_az_cmd(args: list[str], timeout: int = 30, disable_wam_broker: bool = False) -> tuple[int, str, str]:
+    """Executes an Azure CLI command serialized by a lock to prevent MSAL cache contention."""
+    full_cmd, use_shell, env = resolve_az_command(args, disable_wam_broker=disable_wam_broker)
     with _AZ_LOCK:
         try:
-            proc = subprocess.run(full_cmd, capture_output=True, text=True, timeout=timeout, shell=is_windows)
+            proc = subprocess.run(
+                full_cmd,
+                capture_output=True,
+                text=True,
+                timeout=timeout,
+                shell=use_shell,
+                env=env,
+                stdin=subprocess.DEVNULL,
+            )
             return proc.returncode, proc.stdout, proc.stderr
         except subprocess.TimeoutExpired:
-            logger.warning(f"Timeout ({timeout}s) executing az: {' '.join(full_cmd)}")
+            logger.warning(f"Timeout ({timeout}s) executing az: {' '.join(args)}")
             return 1, "", f"Operation timed out after {timeout}s"
         except Exception as e:
-            logger.warning(f"Error executing az {' '.join(full_cmd)}: {e}")
+            logger.warning(f"Error executing az {' '.join(args)}: {e}")
             return 1, "", str(e)
 
 
@@ -95,3 +128,4 @@ def get_azure_cli_account() -> Optional[dict[str, Any]]:
         except Exception as e:
             logger.warning(f"Failed parsing az account show: {e}")
     return None
+

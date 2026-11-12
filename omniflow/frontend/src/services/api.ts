@@ -593,9 +593,17 @@ export async function triggerBrowserLogin(
   return res.json();
 }
 
-export async function startDeviceCodeLogin(): Promise<import('../types').DeviceCodeInitResponse> {
+export async function cancelBrowserLogin(): Promise<void> {
+  await fetch(`${API_BASE}/auth/login/browser/cancel`, { method: 'POST' }).catch(() => {});
+}
+
+export async function startDeviceCodeLogin(
+  tenant?: string
+): Promise<import('../types').DeviceCodeInitResponse> {
   const res = await fetch(`${API_BASE}/auth/login/device-code`, {
     method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ tenant: tenant || null }),
   });
   if (!res.ok) throw new Error(`Failed to start device code flow: ${res.statusText}`);
   return res.json();

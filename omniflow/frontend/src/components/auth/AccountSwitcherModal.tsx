@@ -1,21 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { createPortal } from 'react-dom';
-import { X, RefreshCw, AlertCircle, CheckCircle2 } from 'lucide-react';
-import { FabricAccountProfile } from '../../types';
-import {
-  fetchFabricAccounts,
-  getCachedFabricAccounts,
-  setCachedFabricAccounts,
-  switchFabricAccount,
-  removeFabricAccount,
-  triggerBrowserLogin,
-  startDeviceCodeLogin,
-  pollDeviceCodeLogin,
-} from '../../services/api';
+import { X, RefreshCw, AlertCircle, CheckCircle2, Loader2 } from 'lucide-react';
 import { DeviceCodeBanner } from './DeviceCodeBanner';
 import { AccountItemRow } from './AccountItemRow';
 import { AccountSkeletonList } from './AccountSkeletonList';
 import { AccountConnectSection } from './AccountConnectSection';
+import { useAccountSwitcher } from './useAccountSwitcher';
 
 interface AccountSwitcherModalProps {
   isOpen: boolean;
@@ -28,177 +18,28 @@ export const AccountSwitcherModal: React.FC<AccountSwitcherModalProps> = ({
   onClose,
   onAccountSwitched,
 }) => {
-  const [accounts, setAccounts] = useState<FabricAccountProfile[]>(() => getCachedFabricAccounts());
-  const [isLoading, setIsLoading] = useState(() => getCachedFabricAccounts().length === 0);
-  const [switchingId, setSwitchingId] = useState<string | null>(null);
-  const [removingId, setRemovingId] = useState<string | null>(null);
-  const [tenantInput, setTenantInput] = useState('');
-  const [statusMsg, setStatusMsg] = useState<{ text: string; type: 'success' | 'error' | 'info' } | null>(null);
-
-  // Device Code state
-  const [deviceCode, setDeviceCode] = useState<string | null>(null);
-  const [userCode, setUserCode] = useState<string | null>(null);
-  const [verificationUri, setVerificationUri] = useState<string>('https://login.microsoft.com/device');
-  const [isPollingDeviceCode, setIsPollingDeviceCode] = useState(false);
-
-  const loadAccounts = async (forceRefresh = false) => {
-    const cached = getCachedFabricAccounts();
-    try {
-      if (cached.length === 0 || forceRefresh) {
-        setIsLoading(true);
-      }
-      const list = await fetchFabricAccounts(forceRefresh);
-      setCachedFabricAccounts(list);
-      setAccounts(list);
-    } catch (err) {
-      console.warn('Failed to load accounts', err);
-      setStatusMsg({
-        text: err instanceof Error ? err.message : 'Unable to load Azure CLI accounts. Try Refresh or Sign-in below.',
-        type: 'error',
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    if (isOpen) {
-      const cached = getCachedFabricAccounts();
-      if (cached.length > 0) {
-        setAccounts(cached);
-        setIsLoading(false);
-      }
-      loadAccounts(false);
-      setStatusMsg(null);
-      setDeviceCode(null);
-      setUserCode(null);
-    }
-  }, [isOpen]);
-
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => { if (e.key === 'Escape' && isOpen) onClose(); };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, onClose]);
-
-  useEffect(() => {
-    if (!deviceCode || !isPollingDeviceCode) return;
-    const interval = setInterval(async () => {
-      try {
-        const res = await pollDeviceCodeLogin(deviceCode);
-        if (res.status === 'authenticated') {
-          setIsPollingDeviceCode(false);
-          setDeviceCode(null);
-          setStatusMsg({ text: `Connected: ${res.user_identity || 'Authenticated'}`, type: 'success' });
-          await loadAccounts(true);
-          onAccountSwitched();
-        } else if (res.status === 'declined' || res.status === 'expired' || res.status === 'error') {
-          setIsPollingDeviceCode(false);
-          setDeviceCode(null);
-          setStatusMsg({ text: res.error || 'Authentication stopped', type: 'error' });
-        }
-      } catch { /* continue polling */ }
-    }, 4000);
-    return () => clearInterval(interval);
-  }, [deviceCode, isPollingDeviceCode]);
+  const {
+    accounts,
+    isLoading,
+    switchingId,
+    removingId,
+    tenantInput,
+    setTenantInput,
+    statusMsg,
+    isBrowserLoggingIn,
+    isStartingDeviceCode,
+    userCode,
+    verificationUri,
+    isPollingDeviceCode,
+    loadAccounts,
+    handleSwitch,
+    handleRemoveAccount,
+    handleBrowserLogin,
+    handleCancelBrowserLogin,
+    handleStartDeviceCode,
+  } = useAccountSwitcher(isOpen, onClose, onAccountSwitched);
 
   if (!isOpen) return null;
-
-  const handleSwitch = async (account: FabricAccountProfile) => {
-    const prev = [...accounts];
-    try {
-      setSwitchingId(account.id);
-      setStatusMsg({ text: `Switching active session to ${account.name}...`, type: 'info' });
-      const optimistic = prev.map((a) => ({ ...a, is_active: a.id === account.id }));
-      setAccounts(optimistic);
-      setCachedFabricAccounts(optimistic);
-
-      const res = await switchFabricAccount(account.id, account.tenant_id);
-      if (res.success) {
-        setStatusMsg({ text: `Switched active session to ${account.name}`, type: 'success' });
-        onAccountSwitched();
-        window.dispatchEvent(new CustomEvent('fabric-account-switched', { detail: account }));
-      } else {
-        setAccounts(prev);
-        setCachedFabricAccounts(prev);
-        setStatusMsg({ text: res.message || 'Failed to switch account', type: 'error' });
-      }
-    } catch (err) {
-      setAccounts(prev);
-      setCachedFabricAccounts(prev);
-      setStatusMsg({ text: err instanceof Error ? err.message : 'Error switching account', type: 'error' });
-    } finally {
-      setSwitchingId(null);
-    }
-  };
-
-  const handleRemoveAccount = async (account: FabricAccountProfile) => {
-    const prev = [...accounts];
-    try {
-      setRemovingId(account.id);
-      setStatusMsg({ text: `Disconnecting ${account.email}...`, type: 'info' });
-      const nextAccounts = prev.filter((a) => a.id !== account.id);
-      setAccounts(nextAccounts);
-      setCachedFabricAccounts(nextAccounts);
-
-      const res = await removeFabricAccount(account.id, account.email);
-      if (res.success) {
-        setStatusMsg({ text: `Disconnected ${account.name || account.email}`, type: 'success' });
-        const updated = res.accounts || nextAccounts;
-        setAccounts(updated);
-        setCachedFabricAccounts(updated);
-        onAccountSwitched();
-        window.dispatchEvent(new CustomEvent('fabric-account-switched'));
-      } else {
-        setAccounts(prev);
-        setCachedFabricAccounts(prev);
-        setStatusMsg({ text: res.message || 'Failed to disconnect account', type: 'error' });
-      }
-    } catch (err) {
-      setAccounts(prev);
-      setCachedFabricAccounts(prev);
-      setStatusMsg({ text: err instanceof Error ? err.message : 'Error disconnecting account', type: 'error' });
-    } finally {
-      setRemovingId(null);
-    }
-  };
-
-  const handleBrowserLogin = async () => {
-    try {
-      setIsLoading(true);
-      setStatusMsg({ text: 'Launching Microsoft browser sign-in...', type: 'info' });
-      const res = await triggerBrowserLogin(tenantInput.trim() || undefined);
-      setStatusMsg({ text: res.message, type: res.success ? 'success' : 'error' });
-      if (res.success) {
-        await loadAccounts(true);
-        onAccountSwitched();
-      }
-    } catch (err) {
-      setStatusMsg({ text: String(err), type: 'error' });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleStartDeviceCode = async () => {
-    try {
-      setIsLoading(true);
-      setStatusMsg(null);
-      const res = await startDeviceCodeLogin();
-      if (res.success && res.device_code && res.user_code) {
-        setDeviceCode(res.device_code);
-        setUserCode(res.user_code);
-        setVerificationUri(res.verification_uri || 'https://login.microsoft.com/device');
-        setIsPollingDeviceCode(true);
-      } else {
-        setStatusMsg({ text: res.error || 'Failed to start device login', type: 'error' });
-      }
-    } catch (err) {
-      setStatusMsg({ text: String(err), type: 'error' });
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   return createPortal(
     <div
@@ -234,7 +75,7 @@ export const AccountSwitcherModal: React.FC<AccountSwitcherModalProps> = ({
         {/* Feedback Message */}
         {statusMsg && (
           <div
-            className={`flex items-center gap-2 px-3 py-2 rounded-xl text-[12px] transition-all ${
+            className={`flex items-center justify-between gap-2 px-3 py-2 rounded-xl text-[12px] transition-all ${
               statusMsg.type === 'success'
                 ? 'bg-emerald-500/10 text-emerald-300 border border-emerald-500/20'
                 : statusMsg.type === 'error'
@@ -242,12 +83,25 @@ export const AccountSwitcherModal: React.FC<AccountSwitcherModalProps> = ({
                 : 'bg-blue-500/10 text-blue-300 border border-blue-500/20'
             }`}
           >
-            {statusMsg.type === 'success' ? (
-              <CheckCircle2 size={14} className="flex-shrink-0 text-emerald-400" />
-            ) : (
-              <AlertCircle size={14} className="flex-shrink-0" />
+            <div className="flex items-center gap-2 min-w-0">
+              {statusMsg.type === 'success' ? (
+                <CheckCircle2 size={14} className="flex-shrink-0 text-emerald-400" />
+              ) : statusMsg.type === 'info' && (isBrowserLoggingIn || isStartingDeviceCode) ? (
+                <Loader2 size={14} className="flex-shrink-0 animate-spin text-blue-300" />
+              ) : (
+                <AlertCircle size={14} className="flex-shrink-0" />
+              )}
+              <span className="truncate">{statusMsg.text}</span>
+            </div>
+            {isBrowserLoggingIn && (
+              <button
+                type="button"
+                onClick={handleCancelBrowserLogin}
+                className="flex-shrink-0 px-2 py-0.5 rounded-md text-[11px] font-medium bg-white/10 hover:bg-white/20 text-white cursor-pointer"
+              >
+                Cancel
+              </button>
             )}
-            <span className="truncate">{statusMsg.text}</span>
           </div>
         )}
 
@@ -299,7 +153,7 @@ export const AccountSwitcherModal: React.FC<AccountSwitcherModalProps> = ({
         <AccountConnectSection
           tenantInput={tenantInput}
           setTenantInput={setTenantInput}
-          isLoading={isLoading}
+          isLoading={isBrowserLoggingIn || isStartingDeviceCode}
           isPollingDeviceCode={isPollingDeviceCode}
           onBrowserLogin={handleBrowserLogin}
           onDeviceCodeLogin={handleStartDeviceCode}
