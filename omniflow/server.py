@@ -1924,20 +1924,9 @@ async def handle_chat_stream(req: ChatRequest) -> StreamingResponse:
         )
 
         if is_tier3_trigger:
-            stages = [
-                {"id": "s1", "title": "Architect Agent: Ingesting Context & Data Contracts", "status": "completed", "duration": "1.2s", "target": "Architect"},
-                {"id": "s2", "title": "Modeler Agent: Formulating Bronze, Silver, Gold Kimball Phases", "status": "completed", "duration": "2.1s", "target": "Modeler"},
-                {"id": "s3", "title": "Task Organizer: Validating NetworkX Acyclic DAG Waves", "status": "completed", "duration": "0.9s", "target": "DAG"},
-                {"id": "s4", "title": "Tool Synthesizer: Auditing & Synthesizing Dynamic Code Tools", "status": "completed", "duration": "1.5s", "target": "Tools"},
-                {"id": "s5", "title": "Fluid Executor: Generating PySpark & T-SQL Star Schema", "status": "completed", "duration": "3.4s", "target": "Executor"},
-                {"id": "s6", "title": "Quality Auditor: 100% AST Syntax & SHA-256 PII Validation", "status": "completed", "duration": "0.6s", "target": "Auditor"},
-                {"id": "s7", "title": "Fabric Deployer: Validating Medallion Folder Structure", "status": "completed", "duration": "1.1s", "target": "Deployer"},
-            ]
-            for st in stages:
-                await asyncio.sleep(0.25)
-                yield f"data: {json.dumps({'type': 'thought_step', 'step': st})}\n\n"
+            yield f"data: {json.dumps({'type': 'thought_step', 'step': {'id': 's1', 'title': 'Architect Agent: Analyzing Intake Contracts & Source Schemas', 'status': 'in_progress', 'target': 'Architect'}})}\n\n"
 
-            # Execute real pipeline in background worker (dry-run synthesis without immediate deployment)
+            # Execute real pipeline in background worker with live SSE callbacks & keepalives
             orch = MultiAgentOrchestrator()
             # Dynamic resolution of project identity
             proj_name = ""
@@ -1969,14 +1958,62 @@ async def handle_chat_stream(req: ChatRequest) -> StreamingResponse:
             ws_id, ws_name = resolve_project_workspace(proj_id or proj_code)
             ws_display = ws_name or os.getenv("ALLOWED_WORKSPACE_NAME") or "Fabric Workspace"
             synth_res: dict[str, Any] | None = None
+            pipeline_resume = "--resume" in req.message.lower()
+            event_queue: asyncio.Queue[tuple[str, dict[str, Any]]] = asyncio.Queue()
+            loop = asyncio.get_running_loop()
+
+            def on_pipeline_event(evt_type: str, evt_data: dict[str, Any]) -> None:
+                try:
+                    loop.call_soon_threadsafe(event_queue.put_nowait, (evt_type, evt_data))
+                except Exception:
+                    pass
+
+            def run_pipeline_worker() -> None:
+                try:
+                    res = orch.run_pipeline(
+                        req=plan_req,
+                        intake_data_override=intake_override,
+                        resume=pipeline_resume,
+                        deploy=False,
+                        event_callback=on_pipeline_event,
+                    )
+                    loop.call_soon_threadsafe(event_queue.put_nowait, ("__done__", {"result": res}))
+                except Exception as exc:
+                    loop.call_soon_threadsafe(event_queue.put_nowait, ("__error__", {"error": str(exc)}))
+
+            stage_map: dict[str, dict[str, str]] = {
+                "intake_parsed": {"id": "s1", "title": "Architect Agent: Intake Contracts & Source Schemas Validated", "status": "completed", "target": "Architect"},
+                "planning_completed": {"id": "s2", "title": "Planner Agent: Medallion Architecture & Phases Formulated", "status": "completed", "target": "Modeler"},
+                "dag_completed": {"id": "s3", "title": "Task Organizer: NetworkX Acyclic DAG Waves Scheduled", "status": "completed", "target": "DAG"},
+                "tools_checked": {"id": "s4", "title": "Tool Synthesizer: Code Generation Tools Verified", "status": "completed", "target": "Tools"},
+                "execution_completed": {"id": "s5", "title": "Fluid Executor: PySpark, T-SQL & Pipeline Artifacts Generated", "status": "completed", "target": "Executor"},
+                "audit_completed": {"id": "s6", "title": "Quality Auditor: AST Syntax & SHA-256 PII Audit Passed", "status": "completed", "target": "Auditor"},
+            }
+            worker_task = asyncio.create_task(asyncio.to_thread(run_pipeline_worker))
+            pipeline_err: str | None = None
             try:
-                synth_res = await asyncio.to_thread(
-                    orch.run_pipeline,
-                    req=plan_req,
-                    intake_data_override=intake_override,
-                    resume=is_resume,
-                    deploy=False,
-                )
+                while True:
+                    try:
+                        evt_type, evt_data = await asyncio.wait_for(event_queue.get(), timeout=2.5)
+                    except asyncio.TimeoutError:
+                        yield ": keepalive\n\n"
+                        continue
+
+                    if evt_type == "__done__":
+                        synth_res = evt_data.get("result")
+                        yield f"data: {json.dumps({'type': 'thought_step', 'step': {'id': 's7', 'title': 'Fabric Deployer: Medallion Blueprint Ready for Provisioning', 'status': 'completed', 'target': 'Deployer'}})}\n\n"
+                        break
+                    if evt_type == "__error__":
+                        pipeline_err = evt_data.get("error") or "Unknown pipeline synthesis error"
+                        break
+                    mapped_step = stage_map.get(evt_type)
+                    if mapped_step:
+                        yield f"data: {json.dumps({'type': 'thought_step', 'step': mapped_step})}\n\n"
+
+                await worker_task
+                if pipeline_err:
+                    raise RuntimeError(pipeline_err)
+
                 plan_obj, summary_text = build_dynamic_plan_object(
                     intake=intake_override or {},
                     res=synth_res,
@@ -2063,12 +2100,7 @@ async def handle_chat_stream(req: ChatRequest) -> StreamingResponse:
             p_code = p_code or "FABRIC-STUDIO"
             p_root = active_plan.get("root_folder") or f"{p_code}_Platform"
 
-            conn_id_match = re.search(r"connectionId\s*['\"]?(conn_[a-zA-Z0-9_\-]+)['\"]?", req.message)
-            active_conn_id = conn_id_match.group(1) if conn_id_match else None
-            tables_match = re.search(r"selected tables:\s*([^\n]+)", req.message, re.IGNORECASE)
-            chosen_tables = [t.strip() for t in tables_match.group(1).split(",") if t.strip()] if tables_match else []
-
-            # 1. Classify component type and target engine
+            # Reuse active_conn_id and chosen_tables already parsed at request entry
             is_sql = any(w in req.message.lower() for w in ["procedure", "stored proc", "sp_", "sql", "ddl", "query", "view", "warehouse"])
             is_spark = any(w in req.message.lower() for w in ["spark", "notebook", "pyspark", "transform", "scd2", "delta", "merge", "lakehouse"])
             is_pipeline = any(w in req.message.lower() for w in ["pipeline", "orchestrat", "activity", "schedule", "trigger"]) or (active_conn_id is not None)
@@ -2423,11 +2455,21 @@ if __name__ == "__main__":
     import uvicorn
     port = int(os.getenv("PORT", "8090"))
     print(f"\n[OmniFlow] Launching Fabric Studio on http://127.0.0.1:{port}\n")
+    reload_enabled = os.getenv("OMNIFLOW_RELOAD", "false").lower() == "true"
     uvicorn.run(
         "omniflow.server:app",
         host="127.0.0.1",
         port=port,
-        reload=True,
+        reload=reload_enabled,
         reload_dirs=[BASE_DIR],
-        reload_excludes=["sessions_store.json", "*.json", "*.tmp", "frontend/*", "*.log"],
+        reload_excludes=[
+            "sessions_store.json",
+            "*.json",
+            "*.tmp",
+            "*.log",
+            "frontend/*",
+            "generated_artifacts/*",
+            "**/generated_artifacts/**",
+            "**/synthesized_tools.py",
+        ],
     )

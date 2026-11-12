@@ -22,6 +22,7 @@ NEON_URI = (
 
 _POOL: psycopg2.pool.ThreadedConnectionPool | None = None
 _POOL_LOCK = threading.Lock()
+_REGISTRY_BOOTSTRAPPED: bool = False
 
 
 def _get_connection_pool(db_uri: str, minconn: int = 1, maxconn: int = 10) -> psycopg2.pool.ThreadedConnectionPool:
@@ -65,10 +66,28 @@ class PostgresRepository:
             except Exception:
                 pass
 
-    def bootstrap_registry(self, reset_synthesized_tools: bool = True) -> dict[str, int]:
+    def bootstrap_registry(self, reset_synthesized_tools: bool = True, force: bool = False) -> dict[str, int]:
         """Ensures only the 5 core agents exist, seeds engineering_standards & base tools,
         and resets synthesized tools so Research Agent dynamic tool creation is demonstrated live.
+        Caches static seeding per process unless `force=True`.
         """
+        global _REGISTRY_BOOTSTRAPPED
+        if _REGISTRY_BOOTSTRAPPED and not force:
+            if reset_synthesized_tools:
+                dyn_tools = ("build_sap_rfc_cdc_connector_tool", "build_direct_lake_bim_tool")
+                with self._connect() as conn, conn.cursor() as cur:
+                    cur.execute(
+                        "DELETE FROM agent_tools WHERE tool_id IN (SELECT tool_id FROM tools WHERE tool_name IN %s);",
+                        (dyn_tools,),
+                    )
+                    cur.execute(
+                        "UPDATE tool_runs SET tool_id = NULL WHERE tool_id IN (SELECT tool_id FROM tools WHERE tool_name IN %s);",
+                        (dyn_tools,),
+                    )
+                    cur.execute("DELETE FROM tools WHERE tool_name IN %s;", (dyn_tools,))
+                    conn.commit()
+            return {"agents_seeded": len(CORE_AGENTS), "base_tools_seeded": len(BASE_TOOLS)}
+
         with self._connect() as conn, conn.cursor() as cur:
             # 1. Remove deprecated sub-planners so only the 5 requested agents exist
             deprecated = ("bronze_planner_agent", "silver_planner_agent", "gold_planner_agent")
@@ -222,6 +241,7 @@ class PostgresRepository:
                         (aid, tid),
                     )
             conn.commit()
+            _REGISTRY_BOOTSTRAPPED = True
             return {"agents_seeded": len(agent_ids), "base_tools_seeded": len(BASE_TOOLS)}
 
     def get_all_active_tools(self) -> dict[str, dict[str, Any]]:
