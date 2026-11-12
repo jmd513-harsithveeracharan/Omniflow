@@ -114,7 +114,7 @@ cp omniflow/.env.example omniflow/.env
 Fill in your credentials in `omniflow/.env`:
 ```ini
 # Neon PostgreSQL Metadata & Tool Registry
-NEON_DATABASE_URL=postgresql://neondb_owner:npg_o2FUwbtRgqA8@ep-summer-field-b50f50p0-pooler.c-7.us-east-2.aws.neon.tech/neondb?sslmode=require
+NEON_DATABASE_URL=postgresql://<user>:<password>@<neon-host>/<database>?sslmode=require
 
 # Azure OpenAI / LLM Credentials
 AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com/
