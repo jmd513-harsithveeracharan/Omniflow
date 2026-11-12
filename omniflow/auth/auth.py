@@ -399,7 +399,7 @@ def remove_project_member(project_id: str, payload: dict[str, str]) -> dict[str,
 # -----------------------------------------------------------------------------
 # Microsoft Fabric Account & Tenancy Submodule
 # -----------------------------------------------------------------------------
-from omniflow.auth_fabric import (
+from omniflow.auth.fabric import (
     fabric_auth_router,
     register_cache_invalidation_hook,
     invalidate_all_auth_caches,

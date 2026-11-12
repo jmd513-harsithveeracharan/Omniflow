@@ -11,17 +11,17 @@ from __future__ import annotations
 from typing import Any
 import networkx as nx
 
-from omniflow.graph_models import (
+from omniflow.graph.models import (
     BlastZoneResponse,
     GraphEdge,
     GraphMeshResponse,
     GraphNode,
 )
-from omniflow.graph_generator import (
+from omniflow.graph.generator import (
     build_mesh_from_plan,
     build_rich_medallion_galaxy,
 )
-from omniflow.graph_project_builder import build_mesh_from_project
+from omniflow.graph.project_builder import build_mesh_from_project
 
 
 class GraphEngine:

@@ -13,18 +13,26 @@ The `omniflow/` package contains everything needed to run both the FastAPI backe
 ```
 omniflow/
 ├── server.py                   # Main FastAPI application entrypoint (REST API, SSE Chat, Static Web)
-├── auth_fabric.py              # Microsoft Fabric authentication (Azure CLI SSO, Device Code, Account Switcher)
-├── auth.py                     # Token cache, session auth, and RBAC user store
-├── git_service.py              # Git repository manager (project branches, commit history, retrieval)
-├── intent_router.py            # Chat prompt classifier (General Chat, Project Q&A, Fast-Path, Medallion DAG)
 │
-├── connectors_catalog.py       # Catalog of Microsoft Fabric Native vs Custom PySpark connectors
-├── connectors_interceptor.py   # Secure credential interception gate & connection vault
+├── auth/                       # Authentication & Microsoft Fabric Entra SSO
+│   ├── auth.py                 # Token cache, session auth, and RBAC user store
+│   └── fabric.py               # Azure CLI SSO, Device Code, and Account Switcher
 │
-├── graph_service.py            # GraphEngine for the interactive Relationship Graph & Blast-Zone analysis
-├── graph_generator.py          # NetworkX DAG generator & Medallion constellation builder
-├── graph_models.py             # Pydantic data models for graph nodes, links, and layers
-├── graph_project_builder.py    # Dynamic project mesh generator
+├── connectors/                 # Source System Connectors & Live Schema Inspection
+│   ├── catalog.py              # Catalog of Fabric Native vs Custom PySpark connectors
+│   ├── interceptor.py          # Secure credential interception gate & connection vault
+│   └── live_inspector.py       # Dynamic driver-dispatched live database schema inspector
+│
+├── graph/                      # NetworkX Relationship Graph & Lineage Engine
+│   ├── service.py              # GraphEngine for interactive Graph Mesh & Blast-Zone analysis
+│   ├── generator.py            # NetworkX DAG generator & Medallion constellation builder
+│   ├── project_builder.py      # Dynamic project mesh generator from artifacts & workspaces
+│   ├── workspace_builder.py    # Live Fabric workspace graph builder
+│   └── models.py               # Pydantic data models for graph nodes, links, and layers
+│
+├── services/                   # Core Application Services
+│   ├── git_service.py          # Git repository manager (branches, commit history, retrieval)
+│   └── intent_router.py        # Chat prompt classifier (General Chat, Project Q&A, DAG)
 │
 ├── agents/                     # Multi-agent autonomous workflow system
 │   ├── orchestrator.py         # MultiAgentOrchestrator coordinating all 6 specialized agents
@@ -39,16 +47,19 @@ omniflow/
 │
 ├── db/                         # Database persistence layers
 │   ├── postgres_repo.py        # Neon PostgreSQL repository for tools, runs, and project context
-│   └── sqlite_store.py         # Local SQLite session checkpointing store
+│   ├── execution_logger.py     # Persistent agent/tool run and lineage edge logging
+│   └── catalog_seeder.py       # Source table schema metadata resolver
 │
 ├── tools/                      # Core engineering & deployment tools
 │   ├── fabric_deployer.py      # Deploys items (Lakehouse, Warehouse, Notebook, Pipeline) via Fabric REST
 │   ├── dag_runner.py           # GenericDAGProvisioner with NetworkX parallel topological waves
 │   ├── fabric_adapter.py       # Folder creation and item listing wrappers
 │   ├── asset_indexer.py        # Workspace asset cataloger and cache indexer
-│   └── sql_transpiler.py       # SQLGlot AST transpiler for source SQL to Spark SQL
+│   └── skill_loader.py         # Dynamic skill discovery and loader
 │
-├── intake/                     # Enterprise Project Intake Specifications
+├── intake/                     # Enterprise Project Intake Specifications & Helpers
+│   ├── helpers.py              # Intake JSON extraction, connection hydration & plan builders
+│   ├── project_intake_postgres_test.json # PostgreSQL end-to-end test intake spec
 │   ├── project_intake.json               # General Medallion intake specification
 │   ├── project_intake_delivery.json      # Courier & fleet delivery platform intake
 │   ├── project_intake_fintech.json       # Cross-border payments & AML fraud intake

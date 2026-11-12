@@ -15,11 +15,11 @@ import re
 from typing import Any, Literal
 import networkx as nx
 
-from omniflow.graph_generator import add_edge, add_node, build_rich_medallion_galaxy
-from omniflow.graph_models import infer_layer_name
-from omniflow.graph_workspace_builder import build_workspace_project_graph
+from omniflow.graph.generator import add_edge, add_node, build_rich_medallion_galaxy
+from omniflow.graph.models import infer_layer_name
+from omniflow.graph.workspace_builder import build_workspace_project_graph
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
 def _classify_artifact_node(node_id: str) -> tuple[

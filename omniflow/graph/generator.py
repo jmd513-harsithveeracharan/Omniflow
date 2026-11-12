@@ -271,7 +271,7 @@ def build_mesh_from_plan(plan: dict[str, Any] | None) -> nx.DiGraph:
 
     add_node(g, "src_lake", f"{folder} Source Gateway", "source", "source", radius=20.0, desc="OneLake Landing Zone")
 
-    from omniflow.graph_models import infer_layer_name
+    from omniflow.graph.models import infer_layer_name
 
     for lh in lakehouses:
         lh_name = str(lh)

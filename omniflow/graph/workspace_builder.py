@@ -13,8 +13,8 @@ from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 import networkx as nx
 
-from omniflow.graph_generator import add_edge, add_node
-from omniflow.graph_models import infer_layer_name
+from omniflow.graph.generator import add_edge, add_node
+from omniflow.graph.models import infer_layer_name
 
 _WS_GRAPH_CACHE: dict[str, tuple[float, nx.DiGraph]] = {}
 _WS_CACHE_TTL_SEC = 180.0

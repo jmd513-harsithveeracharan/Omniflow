@@ -19,7 +19,7 @@ import uuid
 import time
 from typing import Any
 
-from omniflow.connectors_catalog import (
+from omniflow.connectors.catalog import (
     ConnectorField,
     ConnectorDefinition,
     IngestionPathway,
@@ -27,8 +27,8 @@ from omniflow.connectors_catalog import (
     synthesize_dynamic_connector,
     FABRIC_NATIVE_CONNECTORS,
 )
-from omniflow.connectors_live_inspector import run_live_schema_inspection
-from omniflow.intake_helpers import extract_intake_json
+from omniflow.connectors.live_inspector import run_live_schema_inspection
+from omniflow.intake.helpers import extract_intake_json
 
 # Secure In-Memory Connection Vault (Keyed by connection_id)
 # Passwords/tokens stay here and are never injected into LLM prompts.

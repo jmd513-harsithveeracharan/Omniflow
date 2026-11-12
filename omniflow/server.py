@@ -41,25 +41,25 @@ from omniflow.tools.fabric_deployer import (
 )
 from omniflow.tools.dag_runner import FabricItemSpec, GenericDAGProvisioner
 from omniflow.auth import auth_router, init_auth_db, register_cache_invalidation_hook
-from omniflow.git_service import git_router
-from omniflow.intent_router import (
+from omniflow.services.git_service import git_router
+from omniflow.services.intent_router import (
     classify_prompt_intent,
     build_general_chat_prompt,
     build_project_qa_prompt,
     ProjectContext,
 )
-from omniflow.connectors_interceptor import (
+from omniflow.connectors.interceptor import (
     detect_connector_need,
     execute_source_inspection,
     CONNECTOR_REGISTRY,
     CONNECTIONS_VAULT,
 )
-from omniflow.intake_helpers import (
+from omniflow.intake.helpers import (
     extract_intake_json,
     merge_connection_into_intake,
     build_dynamic_plan_object,
 )
-from omniflow.graph_service import GraphEngine
+from omniflow.graph.service import GraphEngine
 
 graph_engine = GraphEngine()
 

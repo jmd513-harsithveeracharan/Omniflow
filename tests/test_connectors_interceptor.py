@@ -6,7 +6,7 @@ and On-The-Fly Dynamic Python Schema Inspection.
 """
 
 import pytest
-from omniflow.connectors_interceptor import (
+from omniflow.connectors.interceptor import (
     detect_connector_need,
     execute_source_inspection,
     generate_python_inspector_script,
@@ -95,8 +95,8 @@ def test_dummy_sandbox_inspection():
 
 
 def test_dynamic_non_native_source_synthesis():
-    from omniflow.connectors_catalog import classify_source_pathway, synthesize_dynamic_connector, IngestionPathway
-    from omniflow.connectors_interceptor import detect_connector_need
+    from omniflow.connectors.catalog import classify_source_pathway, synthesize_dynamic_connector, IngestionPathway
+    from omniflow.connectors.interceptor import detect_connector_need
 
     # 1. Stripe is not native in Fabric -> PySpark Notebook Ingestion
     is_native, pathway, expl = classify_source_pathway("stripe")
