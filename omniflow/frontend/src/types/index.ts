@@ -344,8 +344,8 @@ export interface ProvisionAndInspectResult {
 export interface GraphMeshNode {
   id: string;
   label: string;
-  type: 'source' | 'lakehouse' | 'warehouse' | 'table' | 'column' | 'notebook' | 'pipeline' | 'metric';
-  layer: 'source' | 'bronze' | 'silver' | 'gold' | 'warehouse' | 'bi' | 'shared';
+  type: 'source' | 'schema' | 'lakehouse' | 'warehouse' | 'table' | 'column' | 'notebook' | 'pipeline' | 'metric';
+  layer: string;
   parent_id?: string | null;
   data_type?: string | null;
   is_primary_key?: boolean;

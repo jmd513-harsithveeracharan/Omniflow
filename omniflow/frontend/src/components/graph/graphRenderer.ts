@@ -1,7 +1,12 @@
 import { D3SimNode, D3SimLink } from './graphSimulation';
 import { GraphMeshNode } from '../../types';
-import { LAYER_COLORS, DEFAULT_NODE_COLOR, wrapLabel } from './graphTheme';
-export { LAYER_COLORS, DEFAULT_NODE_COLOR, wrapLabel } from './graphTheme';
+import {
+  getLayerColor,
+  isSchemaContainerNode,
+  traceNodeOutline,
+  wrapLabel,
+} from './graphTheme';
+export { LAYER_COLORS, DEFAULT_NODE_COLOR, getLayerColor, wrapLabel } from './graphTheme';
 
 export interface RenderGraphOptions {
   ctx: CanvasRenderingContext2D;
@@ -132,8 +137,8 @@ export function renderGraphMesh(opts: RenderGraphOptions): void {
       lineWidth = 0.85 - t * 0.30;
       strokeColor = `rgba(161, 161, 170, ${(0.28 - t * 0.21).toFixed(3)})`;
     } else {
-      lineWidth = 0.5;
-      strokeColor = `rgba(255, 255, 255, ${(0.06 - t * 0.04).toFixed(3)})`;
+      lineWidth = 0.65;
+      strokeColor = `rgba(255, 255, 255, ${(0.13 - t * 0.08).toFixed(3)})`;
     }
     if (!strokeColor) continue;
 
@@ -199,35 +204,41 @@ export function renderGraphMesh(opts: RenderGraphOptions): void {
 
     const isCurrentActive = n.id === selectedNode?.id;
     const isCurrentHovered = n.id === hoveredNode?.id;
-    const baseColor = LAYER_COLORS[n.layer] || DEFAULT_NODE_COLOR;
+    const baseColor = getLayerColor(n.layer);
 
     ctx.globalAlpha = Math.max(0.04, opacity);
 
-    // Node Circle
-    ctx.beginPath();
-    ctx.arc(n.x, n.y, n.radius, 0, Math.PI * 2);
+    // Node Shape: Schema/Container = Big Circle, Table = Square, Column = Small Circle
+    traceNodeOutline(ctx, n.type, n.x, n.y, n.radius);
     ctx.fillStyle = baseColor;
     ctx.fill();
 
-    // Vibrant accent ring & halo on hover, active, or search match
+    if (isSchemaContainerNode(n.type)) {
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.20)';
+      ctx.lineWidth = 1.0;
+      ctx.stroke();
+    } else if (n.type === 'table') {
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.16)';
+      ctx.lineWidth = 0.75;
+      ctx.stroke();
+    }
+
+    // Vibrant accent outline & halo matching node shape on hover, active, or search match
     if (isDirectMatch) {
-      ctx.beginPath();
-      ctx.arc(n.x, n.y, n.radius + 4.5, 0, Math.PI * 2);
+      traceNodeOutline(ctx, n.type, n.x, n.y, n.radius + 4.5);
       ctx.strokeStyle = '#38bdf8';
       ctx.lineWidth = 2.2;
       ctx.shadowColor = 'rgba(56, 189, 248, 0.85)';
       ctx.shadowBlur = 10;
       ctx.stroke();
 
-      ctx.beginPath();
-      ctx.arc(n.x, n.y, n.radius + 1.8, 0, Math.PI * 2);
+      traceNodeOutline(ctx, n.type, n.x, n.y, n.radius + 1.8);
       ctx.strokeStyle = 'rgba(255, 255, 255, 0.7)';
       ctx.lineWidth = 1.2;
       ctx.stroke();
       ctx.shadowBlur = 0;
     } else if (isCurrentActive) {
-      ctx.beginPath();
-      ctx.arc(n.x, n.y, n.radius + 3.2, 0, Math.PI * 2);
+      traceNodeOutline(ctx, n.type, n.x, n.y, n.radius + 3.2);
       ctx.strokeStyle = '#38bdf8';
       ctx.lineWidth = 1.8;
       ctx.shadowColor = 'rgba(56, 189, 248, 0.75)';
@@ -239,8 +250,7 @@ export function renderGraphMesh(opts: RenderGraphOptions): void {
       const ringAlpha = Math.min(1.0, t * 0.9);
       const blurAmount = t * 8.0;
 
-      ctx.beginPath();
-      ctx.arc(n.x, n.y, n.radius + ringExpand, 0, Math.PI * 2);
+      traceNodeOutline(ctx, n.type, n.x, n.y, n.radius + ringExpand);
       ctx.strokeStyle = `rgba(255, 255, 255, ${ringAlpha.toFixed(3)})`;
       ctx.lineWidth = 1.1 + t * 0.4;
       if (blurAmount > 1) {
@@ -257,41 +267,24 @@ export function renderGraphMesh(opts: RenderGraphOptions): void {
       (activeId && isClickConnected) || (n.isHub && zoomLevel > 0.70) || zoomLevel > 1.40;
 
     if (showLabel) {
-      let fontSize = 7.8;
-      let fontWeight = '400';
-      if (isDirectMatch) {
-        fontSize = 11.5; fontWeight = '700';
-      } else if (isCurrentActive || isCurrentHovered) {
-        fontSize = 10.5; fontWeight = '600';
-      } else if (n.radius >= 7.0) {
-        fontSize = 10.0; fontWeight = '500';
-      } else if (n.radius >= 5.0) {
-        fontSize = 9.0; fontWeight = '500';
-      }
-
-      let fontColor = '#cbd5e1';
-      if (isDirectMatch) fontColor = '#ffffff';
-      else if (isCurrentActive || isCurrentHovered) fontColor = '#f8fafc';
-      else if (n.type === 'column') fontColor = '#94a3b8';
+      const fontSize = isDirectMatch ? 11.5 : (isCurrentActive || isCurrentHovered) ? 10.5 : n.radius >= 7.0 ? 10.0 : n.radius >= 5.0 ? 9.0 : 7.8;
+      const fontWeight = isDirectMatch ? '700' : (isCurrentActive || isCurrentHovered) ? '600' : n.radius >= 5.0 ? '500' : '400';
+      const fontColor = isDirectMatch ? '#ffffff' : (isCurrentActive || isCurrentHovered) ? '#f8fafc' : n.type === 'column' ? '#94a3b8' : '#cbd5e1';
 
       const textDimAlpha = activeId && !isClickConnected ? Math.max(0.12, 1.0 - t * 0.88) : 1.0;
       ctx.globalAlpha = textDimAlpha * opacity;
-
       ctx.font = `${fontWeight} ${fontSize}px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
       ctx.fillStyle = fontColor;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'top';
 
-      // Memoized pre-wrapped lines (eliminates 12,000 throwaway string splits/sec)
       const lines = n._wrappedLines || wrapLabel(n.label, n.isHub ? 16 : 12);
       const lineHeight = fontSize * 1.25;
       const startY = n.y + n.radius + 3.5;
-
       for (let i = 0; i < lines.length; i++) {
         ctx.fillText(lines[i], n.x, startY + i * lineHeight);
       }
     }
   }
-
   ctx.restore();
 }

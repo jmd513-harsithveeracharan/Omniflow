@@ -17,8 +17,8 @@ def add_node(
     g: nx.DiGraph,
     node_id: str,
     label: str,
-    ntype: Literal["source", "lakehouse", "warehouse", "table", "column", "notebook", "pipeline", "metric"],
-    layer: Literal["source", "bronze", "silver", "gold", "warehouse", "bi", "shared"],
+    ntype: Literal["source", "schema", "lakehouse", "warehouse", "table", "column", "notebook", "pipeline", "metric"],
+    layer: str,
     parent_id: str | None = None,
     data_type: str | None = None,
     is_pk: bool = False,
@@ -271,51 +271,64 @@ def build_mesh_from_plan(plan: dict[str, Any] | None) -> nx.DiGraph:
 
     add_node(g, "src_lake", f"{folder} Source Gateway", "source", "source", radius=20.0, desc="OneLake Landing Zone")
 
+    from omniflow.graph_models import infer_layer_name
+
     for lh in lakehouses:
         lh_name = str(lh)
-        layer: Literal["bronze", "silver", "gold", "shared"] = "bronze"
-        if "silver" in lh_name.lower():
-            layer = "silver"
-        elif "gold" in lh_name.lower():
-            layer = "gold"
-        add_node(g, f"lh_{lh_name}", lh_name, "lakehouse", layer, radius=22.0, desc=f"Fabric Lakehouse '{lh_name}'")
+        layer = infer_layer_name(lh_name, "", "Lakehouse")
+        add_node(g, f"lh_{lh_name}", lh_name, "lakehouse", layer, radius=13.0, desc=f"Fabric Lakehouse '{lh_name}'")
 
-    for idx, nb in enumerate(notebooks):
+    for nb in notebooks:
         nb_name = str(nb.get("name") if isinstance(nb, dict) else nb)
-        layer_raw = str(nb.get("layer", "silver") if isinstance(nb, dict) else "silver").lower()
-        nb_layer: Literal["bronze", "silver", "gold", "shared"] = (
-            "bronze" if "bronze" in layer_raw else "gold" if "gold" in layer_raw else "silver"
-        )
-        add_node(g, f"nb_{nb_name}", nb_name, "notebook", nb_layer, radius=15.0, desc=f"PySpark Curation Notebook")
+        layer_raw = str(nb.get("layer", "silver") if isinstance(nb, dict) else "silver")
+        nb_layer = infer_layer_name(layer_raw) if layer_raw else "silver"
+        add_node(g, f"nb_{nb_name}", nb_name, "notebook", nb_layer, radius=7.5, desc="PySpark Curation Notebook")
 
     # Connect Pipeline
     if pipeline:
         pl_name = pipeline.get("name") if isinstance(pipeline, dict) else str(pipeline)
-        add_node(g, f"pl_{pl_name}", str(pl_name), "pipeline", "shared", radius=18.0, desc="Fabric Pipeline Orchestrator")
+        add_node(g, f"pl_{pl_name}", str(pl_name), "pipeline", "shared", radius=9.0, desc="Fabric Pipeline Orchestrator")
         for nb in notebooks:
             nb_name = str(nb.get("name") if isinstance(nb, dict) else nb)
             add_edge(g, f"pl_{pl_name}", f"nb_{nb_name}", "DEPENDS_ON", "Sequential execution")
 
     # Connect Discovered/Provided Tables
     if tables and isinstance(tables, list):
+        created_schemas: set[str] = set()
         for tbl in tables:
-            tname = tbl.get("name", "table")
-            tid = f"tbl_{tname}"
-            layer_t: Literal["bronze", "silver", "gold"] = "bronze"
-            if "silver" in tname.lower():
-                layer_t = "silver"
-            elif "gold" in tname.lower():
-                layer_t = "gold"
-            add_node(g, tid, tname, "table", layer_t, radius=14.0, desc=f"Delta Table: {tname}")
-            add_edge(g, "src_lake", tid, "FEEDS", "Ingestion stream", True)
+            raw_tname = str(tbl.get("name", "table"))
+            schema_name = str(tbl.get("schema", "") or "")
+            if not schema_name and "." in raw_tname:
+                schema_name, tname = raw_tname.split(".", 1)
+            else:
+                tname = raw_tname
+            layer_t = infer_layer_name(str(tbl.get("layer") or f"{schema_name}_{tname}"), "", "Table")
+            if layer_t == "workspace":
+                layer_t = "bronze"
+
+            if schema_name:
+                sid = f"schema_{schema_name}"
+                if sid not in created_schemas:
+                    created_schemas.add(sid)
+                    add_node(g, sid, schema_name, "schema", layer_t, radius=12.5, desc=f"Schema container [{schema_name}]")
+                    add_edge(g, "src_lake", sid, "FEEDS", "Ingestion stream", True)
+                parent_hub = sid
+                rel_to_table = "CONTAINS"
+            else:
+                parent_hub = "src_lake"
+                rel_to_table = "FEEDS"
+
+            tid = f"tbl_{schema_name}_{tname}" if schema_name else f"tbl_{tname}"
+            add_node(g, tid, tname, "table", layer_t, parent_id=parent_hub, radius=7.0, desc=f"Delta Table: {raw_tname}")
+            add_edge(g, parent_hub, tid, rel_to_table, "Schema contains table" if schema_name else "Ingestion stream", not schema_name)
 
             cols = tbl.get("columns", [])
             for c in cols:
                 cname = c.get("name") if isinstance(c, dict) else str(c)
-                cid = f"col_{tname}_{cname}"
+                cid = f"col_{tid}_{cname}"
                 dtype = c.get("type", "string") if isinstance(c, dict) else "string"
                 pk = bool(c.get("is_pk", False)) if isinstance(c, dict) else False
-                add_node(g, cid, cname, "column", layer_t, parent_id=tid, data_type=dtype, is_pk=pk, radius=6.0)
+                add_node(g, cid, cname, "column", layer_t, parent_id=tid, data_type=dtype, is_pk=pk, radius=3.0)
                 add_edge(g, tid, cid, "CONTAINS")
     else:
         # Fallback to standard enterprise tables if none attached to plan

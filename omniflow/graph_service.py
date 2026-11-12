@@ -46,14 +46,20 @@ class GraphEngine:
 
         for node_id, data in g.nodes(data=True):
             deg = int(g.degree(node_id))
+            ntype = str(data.get("type", "table"))
             base_r = float(data.get("radius", 8.0))
-            adjusted_r = min(30.0, base_r + (deg * 0.45))
+            if ntype in ("schema", "source", "lakehouse", "warehouse"):
+                adjusted_r = max(11.5, min(20.0, base_r + (deg * 0.2)))
+            elif ntype == "column":
+                adjusted_r = 3.0
+            else:
+                adjusted_r = max(6.0, min(11.0, base_r + (deg * 0.12)))
             nodes.append(
                 GraphNode(
                     id=node_id,
                     label=data.get("label", node_id),
-                    type=data.get("type", "table"),
-                    layer=data.get("layer", "shared"),
+                    type=ntype,
+                    layer=str(data.get("layer", "shared")),
                     parent_id=data.get("parent_id"),
                     data_type=data.get("data_type"),
                     is_primary_key=bool(data.get("is_primary_key", False)),
@@ -80,14 +86,55 @@ class GraphEngine:
         stats = {
             "total_nodes": len(nodes),
             "total_edges": len(edges),
+            "schemas_count": sum(1 for n in nodes if n.type in ("schema", "lakehouse", "warehouse", "source")),
             "tables_count": sum(1 for n in nodes if n.type == "table"),
             "columns_count": sum(1 for n in nodes if n.type == "column"),
             "notebooks_count": sum(1 for n in nodes if n.type == "notebook"),
             "metrics_count": sum(1 for n in nodes if n.type == "metric"),
         }
-        layers = sorted(list({n.layer for n in nodes}))
+        layers = self._order_layers_topologically(g, nodes)
 
         return GraphMeshResponse(nodes=nodes, edges=edges, stats=stats, layers=layers)
+
+    def _order_layers_topologically(self, g: nx.DiGraph, nodes: list[GraphNode]) -> list[str]:
+        """Orders active layers upstream -> downstream from the DAG topology."""
+        present = list({n.layer for n in nodes if n.layer})
+        if len(present) <= 1:
+            return present
+
+        layer_dag = nx.DiGraph()
+        for lyr in present:
+            layer_dag.add_node(lyr)
+        for u, v, data in g.edges(data=True):
+            if data.get("relationship") == "CONTAINS":
+                continue
+            ul = str(g.nodes[u].get("layer", ""))
+            vl = str(g.nodes[v].get("layer", ""))
+            if ul and vl and ul != vl:
+                layer_dag.add_edge(ul, vl)
+
+        condensed = nx.condensation(layer_dag)
+        topo_rank: dict[str, int] = {}
+        for scc_id in nx.topological_sort(condensed):
+            preds = list(condensed.predecessors(scc_id))
+            depth = (max(topo_rank.get(p, 0) for p in preds) + 1) if preds else 0
+            topo_rank[scc_id] = depth
+
+        canonical_bias = {
+            "source": 0, "raw": 1, "landing": 1, "staging": 2, "stg": 2,
+            "bronze": 3, "silver": 4, "curated": 4, "warehouse": 5, "lakehouse": 5,
+            "gold": 6, "reporting": 7, "bi": 8, "orchestration": 9, "workspace": 10, "shared": 11,
+        }
+        scc_mapping = condensed.graph.get("mapping", {})
+        return sorted(
+            present,
+            key=lambda lyr: (
+                0 if (layer_dag.in_degree(lyr) + layer_dag.out_degree(lyr)) > 0 else 1,
+                topo_rank.get(scc_mapping.get(lyr), 0),
+                canonical_bias.get(lyr.lower(), 5),
+                lyr.lower(),
+            ),
+        )
 
     def analyze_blast_zone(self, node_id: str, plan: dict[str, Any] | None = None) -> BlastZoneResponse:
         """Calculates upstream ancestors and downstream blast-zone impact for a node."""

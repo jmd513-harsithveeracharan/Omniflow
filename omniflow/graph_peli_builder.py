@@ -73,9 +73,9 @@ def build_peli_biothermal_graph() -> nx.DiGraph:
         ("src_nanocool_iot", "NanoCool IoT Gateway", "Active Thermal Packaging & Probe Telemetry Stream"),
     ]
     for sid, sname, sdesc in sources:
-        add_node(g, sid, sname, "source", "source", radius=9.0, desc=sdesc)
+        add_node(g, sid, sname, "source", "source", radius=12.5, desc=sdesc)
 
-    # 2. Bronze / Staging Lakehouse (lh_stg with explicit source schemas)
+    # 2. Staging Lakehouse (lh_stg with explicit source schema hubs -> table squares -> columns)
     stg_tables = [
         ("tbl_stg_sap_vbak", "vbak", "src_sap_erp", "sap", [("vbeln", "string", True), ("erdat", "date", False), ("kunnr", "string", False), ("netwr", "decimal(14,2)", False), ("waerk", "string", False), ("vkorg", "string", False)]),
         ("tbl_stg_sap_vbap", "vbap", "src_sap_erp", "sap", [("vbeln", "string", True), ("posnr", "string", True), ("matnr", "string", False), ("kwmeng", "decimal(10,2)", False), ("netpr", "decimal(10,2)", False)]),
@@ -95,17 +95,24 @@ def build_peli_biothermal_graph() -> nx.DiGraph:
         ("tbl_stg_nanocool", "telemetry", "src_nanocool_iot", "nanocool", [("reading_id", "string", True), ("device_id", "string", False), ("temp_c", "decimal(5,2)", False), ("battery_pct", "int", False)]),
     ]
 
+    stg_schemas: set[str] = set()
     for tid, tname, src_id, s_schema, cols in stg_tables:
-        display_label = f"stg_{s_schema}_{tname}"
-        desc = f"[lh_stg].[{s_schema}].[{tname}] — Raw Lakehouse Delta Table"
-        add_node(g, tid, display_label, "table", "bronze", radius=6.5, desc=desc)
-        add_edge(g, src_id, tid, "FEEDS", desc=f"CDC Ingestion: {src_id} -> {display_label}")
+        schema_id = f"schema_stg_{s_schema}"
+        if schema_id not in stg_schemas:
+            stg_schemas.add(schema_id)
+            add_node(g, schema_id, f"lh_stg.{s_schema}", "schema", "staging", parent_id=src_id, radius=12.5, desc=f"[lh_stg].[{s_schema}] — Raw Staging Schema")
+            add_edge(g, src_id, schema_id, "FEEDS", desc=f"CDC Stream: {src_id} -> [lh_stg].[{s_schema}]", cross_layer=True)
+        desc = f"[lh_stg].[{s_schema}].[{tname}] — Raw Staging Delta Table"
+        add_node(g, tid, tname, "table", "staging", parent_id=schema_id, radius=6.8, desc=desc)
+        add_edge(g, schema_id, tid, "CONTAINS", desc=f"Schema [lh_stg].[{s_schema}] contains [{tname}]")
         for cname, dtype, is_pk in cols:
             cid = f"col_{tid}_{cname}"
-            add_node(g, cid, cname, "column", "bronze", parent_id=tid, data_type=dtype, is_pk=is_pk, radius=3.0, desc=f"[{s_schema}].[{tname}].[{cname}] ({dtype})")
+            add_node(g, cid, cname, "column", "staging", parent_id=tid, data_type=dtype, is_pk=is_pk, radius=3.0, desc=f"[{s_schema}].[{tname}].[{cname}] ({dtype})")
             add_edge(g, tid, cid, "CONTAINS", desc=f"{dtype}")
 
     # 3. Silver Dimensions & Facts from SQL DDLs (with explicit dim & fact schemas)
+    add_node(g, "schema_silver_dim", "wh_silver.dim", "schema", "silver", radius=13.0, desc="[wh_silver].[dim] — Conformed Dimension Schema")
+    add_node(g, "schema_silver_fact", "wh_silver.fact", "schema", "silver", radius=13.0, desc="[wh_silver].[fact] — Conformed Fact Schema")
     dim_dir = os.path.join(WH_PATH, "dim", "Tables")
     fact_dir = os.path.join(WH_PATH, "fact", "Tables")
 
@@ -133,7 +140,8 @@ def build_peli_biothermal_graph() -> nx.DiGraph:
     for df in dim_files:
         tname = df[:-4]
         tid = f"tbl_dim_{tname}"
-        add_node(g, tid, f"dim_{tname}", "table", "silver", radius=6.5, desc=f"[wh_silver].[dim].[{tname}] — Conformed Dimension")
+        add_node(g, tid, f"dim_{tname}", "table", "silver", parent_id="schema_silver_dim", radius=6.8, desc=f"[wh_silver].[dim].[{tname}] — Conformed Dimension")
+        add_edge(g, "schema_silver_dim", tid, "CONTAINS", desc="[wh_silver].[dim] contains table")
         cols = _parse_ddl_cols(os.path.join(dim_dir, df), max_cols=9)
         for cname, ctype, is_pk in cols:
             cid = f"col_dim_{tname}_{cname}"
@@ -143,22 +151,43 @@ def build_peli_biothermal_graph() -> nx.DiGraph:
     for ff in fact_files:
         tname = ff[:-4]
         tid = f"tbl_fact_{tname}"
-        add_node(g, tid, f"fact_{tname}", "table", "silver", radius=6.5, desc=f"[wh_silver].[fact].[{tname}] — Conformed Fact")
+        add_node(g, tid, f"fact_{tname}", "table", "silver", parent_id="schema_silver_fact", radius=6.8, desc=f"[wh_silver].[fact].[{tname}] — Conformed Fact")
+        add_edge(g, "schema_silver_fact", tid, "CONTAINS", desc="[wh_silver].[fact] contains table")
         cols = _parse_ddl_cols(os.path.join(fact_dir, ff), max_cols=9)
         for cname, ctype, is_pk in cols:
             cid = f"col_fact_{tname}_{cname}"
             add_node(g, cid, cname, "column", "silver", parent_id=tid, data_type=ctype, is_pk=is_pk, radius=3.0, desc=f"[fact].[{tname}].[{cname}] ({ctype})")
             add_edge(g, tid, cid, "CONTAINS", desc=f"{ctype}")
 
-    # 4. Gold DirectLake Marts & Semantic Models
+    # Staging Table -> Silver Schema/Table Lineage Bridges
+    stg_to_silver = [
+        ("tbl_stg_sap_vbak", "tbl_fact_sales_order", "Pipeline: SAP VBAK -> fact_sales_order"),
+        ("tbl_stg_sap_vbap", "tbl_fact_sales_order_line", "Pipeline: SAP VBAP -> fact_sales_order_line"),
+        ("tbl_stg_sap_vbrk", "tbl_fact_invoice", "Pipeline: SAP VBRK -> fact_invoice"),
+        ("tbl_stg_sap_vbrp", "tbl_fact_invoice_line", "Pipeline: SAP VBRP -> fact_invoice_line"),
+        ("tbl_stg_sap_kna1", "tbl_dim_customer", "Pipeline: SAP KNA1 -> dim_customer"),
+        ("tbl_stg_sap_mara", "tbl_dim_material", "Pipeline: SAP MARA -> dim_material"),
+        ("tbl_stg_sfdc_accounts", "tbl_dim_account", "Pipeline: SFDC Account -> dim_account"),
+        ("tbl_stg_sfdc_opps", "tbl_fact_opportunities", "Pipeline: SFDC Opportunity -> fact_opportunities"),
+        ("tbl_stg_evo_packout", "tbl_fact_packout_cgo", "Pipeline: EVO Packout -> fact_packout_cgo"),
+        ("tbl_stg_evo_shipments", "tbl_fact_ontime_shipment", "Pipeline: EVO Shipments -> fact_ontime_shipment"),
+        ("tbl_stg_cod_rentals", "tbl_fact_cod_rental", "Pipeline: COD Rentals -> fact_cod_rental"),
+        ("tbl_stg_nanocool", "tbl_fact_tic_conditioning_forms", "Pipeline: NanoCool Telemetry -> fact_tic_conditioning_forms"),
+    ]
+    for stg_id, silv_id, ldesc in stg_to_silver:
+        if stg_id in g and silv_id in g:
+            add_edge(g, stg_id, silv_id, "FEEDS", desc=ldesc, cross_layer=True)
+
+    # 4. Reporting Warehouse Schemas & BI Semantic Models
     gold_items = [
-        ("mart_wh_report", "wh_report", "warehouse", "gold", "[wh_report] — DirectLake Gold Reporting Mart"),
-        ("sm_price_overrides", "Price Overrides SemanticModel", "notebook", "gold", "Power BI DirectLake Semantic Model"),
-        ("sm_sales_scorecard", "Sales KPI Scorecard", "notebook", "gold", "Executive Commercial Revenue Model"),
+        ("mart_wh_report", "wh_report", "schema", "reporting", "[wh_report] — Reporting Warehouse Schema / Mart"),
+        ("sm_price_overrides", "Price Overrides SemanticModel", "notebook", "bi", "Power BI DirectLake Semantic Model"),
+        ("sm_sales_scorecard", "Sales KPI Scorecard", "notebook", "bi", "Executive Commercial Revenue Model"),
         ("sm_report_usage", "mdl_report_usage", "notebook", "bi", "Fabric Capacity & Report Telemetry Model"),
     ]
     for gid, gname, gtype, glayer, gdesc in gold_items:
-        add_node(g, gid, gname, gtype, glayer, radius=8.0, desc=gdesc)
+        rad = 13.0 if gtype == "schema" else 8.5
+        add_node(g, gid, gname, gtype, glayer, radius=rad, desc=gdesc)
 
     # 5. BI Metrics & KPIs
     metrics = [

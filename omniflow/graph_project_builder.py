@@ -2,8 +2,8 @@
 omniflow/graph_project_builder.py
 ---------------------------------
 Compiles project-scoped Relationship Graphs from generated artifacts,
-lineage DAG manifests, and enterprise Medallion architectures.
-Extracts both Table-level and Column-level entities.
+lineage DAG manifests, SQL DDLs, and live bound Fabric workspaces.
+Extracts Schema (container), Table (square), and Column (dot) hierarchy.
 """
 
 from __future__ import annotations
@@ -15,34 +15,48 @@ import re
 from typing import Any, Literal
 import networkx as nx
 
-from omniflow.graph_generator import add_node, add_edge, build_rich_medallion_galaxy
+from omniflow.graph_generator import add_edge, add_node
+from omniflow.graph_models import infer_layer_name
+from omniflow.graph_workspace_builder import build_workspace_project_graph
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
-def _classify_node_layer(node_id: str) -> tuple[
-    Literal["source", "lakehouse", "warehouse", "table", "column", "notebook", "pipeline", "metric"],
-    Literal["source", "bronze", "silver", "gold", "warehouse", "bi", "shared"],
+def _classify_artifact_node(node_id: str) -> tuple[
+    Literal["source", "schema", "lakehouse", "warehouse", "table", "column", "notebook", "pipeline", "metric"],
+    str,
     float,
 ]:
     nid = node_id.lower()
-    if nid.startswith("source") or "landing" in nid:
-        return "source", "source", 8.0
-    if "col_" in nid:
-        return "column", "shared", 3.0
-    if "bronze" in nid or ".raw" in nid:
-        return "table", "bronze", 5.5
-    if "silver" in nid or ".curated" in nid:
-        return "table", "silver", 5.5
-    if "gold" in nid or "wh_" in nid or "warehouse" in nid or "fact_" in nid or "dim_" in nid:
-        return "warehouse", "gold", 6.5
-    if "sm_" in nid or "direct_lake" in nid or "semantic" in nid or "metric" in nid:
-        return "metric", "bi", 7.5
-    if "nb_" in nid or "notebook" in nid or "curate" in nid:
-        return "notebook", "silver", 5.0
-    if "pl_" in nid or "pipeline" in nid or "ingest" in nid:
-        return "pipeline", "shared", 5.5
-    return "table", "shared", 5.0
+    if nid.startswith("source") or nid.startswith("src_") or "landing" in nid:
+        return "source", "source", 12.5
+    if nid.startswith("col_"):
+        return "column", infer_layer_name(nid), 3.0
+    if "." in nid:
+        schema_part, _ = nid.split(".", 1)
+        return "table", infer_layer_name(schema_part), 6.8
+    if nid.startswith("sm_") or "direct_lake" in nid or "semantic" in nid or "metric" in nid:
+        return "metric", "bi", 8.5
+    if nid.startswith("nb_") or "notebook" in nid or "curate" in nid:
+        return "notebook", infer_layer_name(nid), 7.5
+    if nid.startswith("pl_") or "pipeline" in nid or "ingest" in nid:
+        return "pipeline", "orchestration", 8.0
+    if nid.startswith("lh_"):
+        return "lakehouse", infer_layer_name(nid), 12.5
+    if nid.startswith("wh_"):
+        return "warehouse", infer_layer_name(nid), 12.5
+    return "table", infer_layer_name(nid), 6.8
+
+
+def _clean_artifact_label(raw: str, ntype: str) -> str:
+    if "." in raw:
+        return raw.split(".", 1)[-1]
+    if ntype == "source":
+        stripped = re.sub(r"^(source_|src_)", "", raw, flags=re.IGNORECASE)
+        return stripped.replace("_", " ").title() + " Source"
+    if ntype == "metric" and raw.lower().startswith("sm_"):
+        return "DirectLake: " + raw[3:].replace("_", " ").title()
+    return raw
 
 
 def _map_edge_relationship(rel_str: str) -> Literal["FEEDS", "CONTAINS", "TRANSFORMS_TO", "JOINS_WITH", "AGGREGATES", "DEPENDS_ON"]:
@@ -61,16 +75,14 @@ def _map_edge_relationship(rel_str: str) -> Literal["FEEDS", "CONTAINS", "TRANSF
 
 
 def _extract_project_table_columns(proj_folder: str) -> dict[str, list[dict[str, Any]]]:
-    """Extracts column schemas from Python curation notebooks or DDL files."""
+    """Extracts column schemas from Python TABLE_CONFIGS and T-SQL CREATE TABLE DDLs."""
     cols_by_table: dict[str, list[dict[str, Any]]] = {}
-    py_files = glob.glob(os.path.join(proj_folder, "*.py"))
 
-    for py_file in py_files:
+    for py_file in glob.glob(os.path.join(proj_folder, "*.py")):
         try:
             with open(py_file, "r", encoding="utf-8") as pf:
                 code = pf.read()
             if "TABLE_CONFIGS" in code:
-                # Extract table_name, primary_key, and pii_columns
                 matches = re.finditer(r'\{[^{}]*"table_name"\s*:\s*"([^"]+)"[^{}]*\}', code, re.DOTALL)
                 for m in matches:
                     block = m.group(0)
@@ -83,30 +95,58 @@ def _extract_project_table_columns(proj_folder: str) -> dict[str, list[dict[str,
                             col_list.append({"name": pk_match.group(1), "is_pk": True, "type": "bigint"})
                         pii_match = re.search(r'"pii_columns"\s*:\s*\[(.*?)\]', block, re.DOTALL)
                         if pii_match:
-                            for raw_col in re.findall(r'"([^"]+)"', pii_match.group(1))[:4]:
+                            for raw_col in re.findall(r'"([^"]+)"', pii_match.group(1))[:5]:
                                 col_list.append({"name": raw_col, "is_pk": False, "type": "string"})
                         cols_by_table[tname.lower()] = col_list
         except Exception:
             pass
+
+    for sql_file in glob.glob(os.path.join(proj_folder, "*.sql")):
+        try:
+            with open(sql_file, "r", encoding="utf-8", errors="ignore") as sf:
+                sql_text = sf.read()
+            ddl_blocks = re.finditer(
+                r"CREATE\s+TABLE\s+(?:\[?\w+\]?\.)?\[?(\w+)\]?\s*\((.*?)\);",
+                sql_text,
+                re.IGNORECASE | re.DOTALL,
+            )
+            for block in ddl_blocks:
+                tname = block.group(1).lower()
+                body = block.group(2)
+                parsed_cols: list[dict[str, Any]] = []
+                for idx, line in enumerate(body.splitlines()):
+                    col_m = re.match(r"\s*\[?([a-zA-Z0-9_]+)\]?\s+([a-zA-Z0-9_(),]+)", line.strip())
+                    if not col_m:
+                        continue
+                    cname = col_m.group(1)
+                    if cname.upper() in ("CONSTRAINT", "PRIMARY", "FOREIGN", "INDEX", "KEY") or cname.startswith("_"):
+                        continue
+                    parsed_cols.append({
+                        "name": cname,
+                        "is_pk": idx == 0 or cname.endswith("_sk") or cname.endswith("_id"),
+                        "type": col_m.group(2).lower(),
+                    })
+                    if len(parsed_cols) >= 7:
+                        break
+                if parsed_cols:
+                    cols_by_table[tname] = parsed_cols
+        except Exception:
+            pass
+
     return cols_by_table
 
 
 def build_mesh_from_project(project_id: str | None) -> nx.DiGraph:
     """Compiles a scoped NetworkX Relationship Graph for a specific project."""
-    if not project_id or project_id in ("all", "galaxy", "default"):
-        clean_pid = "PRJ-DEFAULT"
-    else:
-        clean_pid = project_id.strip()
+    clean_pid = project_id.strip() if project_id else ""
 
-    # Dedicated builder for Peli BioThermal if specifically requested by project code
     if clean_pid and ("PELI" in clean_pid.upper() or "BIOTHERMAL" in clean_pid.upper()):
         from omniflow.graph_peli_builder import build_peli_biothermal_graph
         return build_peli_biothermal_graph()
 
-    proj_folder = os.path.join(BASE_DIR, "generated_artifacts", clean_pid)
-
-    lineage_files = []
-    if os.path.isdir(proj_folder):
+    proj_folder = os.path.join(BASE_DIR, "generated_artifacts", clean_pid) if clean_pid else ""
+    lineage_files: list[str] = []
+    if proj_folder and os.path.isdir(proj_folder):
         lineage_files = (
             glob.glob(os.path.join(proj_folder, "*lineage*.json"))
             + glob.glob(os.path.join(proj_folder, "dag_*.json"))
@@ -120,102 +160,96 @@ def build_mesh_from_project(project_id: str | None) -> nx.DiGraph:
             g = nx.DiGraph()
             raw_nodes = data.get("nodes", [])
             raw_edges = data.get("edges", [])
+            created_schemas: dict[str, str] = {}
+            node_schema: dict[str, str] = {}
 
             for n in raw_nodes:
                 nid = str(n)
-                ntype, nlayer, radius = _classify_node_layer(nid)
-                clean_label = nid.split(".")[-1] if "." in nid else nid
-                clean_label = clean_label.replace("source_", "Source: ").replace("lh_", "").replace("wh_", "").replace("sm_", "DirectLake: ")
+                ntype, nlayer, radius = _classify_artifact_node(nid)
+                schema_id: str | None = None
+
+                if "." in nid:
+                    schema_name, _ = nid.split(".", 1)
+                    schema_id = f"schema_{schema_name}"
+                    if schema_id not in created_schemas:
+                        created_schemas[schema_id] = schema_name
+                        add_node(
+                            g,
+                            node_id=schema_id,
+                            label=schema_name,
+                            ntype="schema",
+                            layer=nlayer,
+                            radius=12.5,
+                            desc=f"Schema container [{schema_name}]",
+                            cluster=nlayer,
+                        )
+                    node_schema[nid] = schema_id
+
+                clean_label = _clean_artifact_label(nid, ntype)
                 add_node(
                     g,
                     node_id=nid,
                     label=clean_label,
                     ntype=ntype,
                     layer=nlayer,
+                    parent_id=schema_id,
                     radius=radius,
                     desc=f"Asset in {clean_pid}: {nid}",
                     cluster=nlayer,
                 )
+                if schema_id:
+                    add_edge(g, schema_id, nid, "CONTAINS", desc=f"Schema [{created_schemas[schema_id]}] contains {clean_label}")
 
+            seen_src_to_schema: set[tuple[str, str]] = set()
             for e in raw_edges:
                 src = e.get("from") or e.get("source")
                 tgt = e.get("to") or e.get("target")
                 rel = _map_edge_relationship(e.get("rel") or e.get("relationship", "DEPENDS_ON"))
-                if src and tgt and src in g.nodes and tgt in g.nodes:
-                    add_edge(g, src, tgt, rel, desc=f"{rel} flow in {clean_pid}")
+                if not (src and tgt and src in g.nodes and tgt in g.nodes):
+                    continue
+                if g.nodes[src].get("type") == "source" and tgt in node_schema:
+                    tgt_schema = node_schema[tgt]
+                    if (src, tgt_schema) not in seen_src_to_schema:
+                        seen_src_to_schema.add((src, tgt_schema))
+                        add_edge(g, src, tgt_schema, "FEEDS", desc=f"Ingests into schema {created_schemas.get(tgt_schema, tgt_schema)}", cross_layer=True)
+                else:
+                    is_cross = g.nodes[src].get("layer") != g.nodes[tgt].get("layer")
+                    add_edge(g, src, tgt, rel, desc=f"{rel} flow in {clean_pid}", cross_layer=is_cross)
 
-            # Enrich with table columns
             cols_by_table = _extract_project_table_columns(proj_folder)
             for nid in list(g.nodes):
+                if g.nodes[nid].get("type") != "table":
+                    continue
                 tname = nid.split(".")[-1].lower()
-                if tname in cols_by_table:
-                    for col in cols_by_table[tname]:
-                        cid = f"col_{nid}_{col['name']}"
-                        is_pk = bool(col.get("is_pk", False))
-                        add_node(
-                            g,
-                            node_id=cid,
-                            label=col["name"],
-                            ntype="column",
-                            layer=g.nodes[nid].get("layer", "shared"),
-                            parent_id=nid,
-                            is_pk=is_pk,
-                            radius=3.0,
-                            desc=f"Column of {tname} ({'Primary Key' if is_pk else 'Attribute'})",
-                        )
-                        add_edge(g, nid, cid, "CONTAINS", desc="Table schema column")
+                matched_cols = cols_by_table.get(tname) or next(
+                    (cols for k, cols in cols_by_table.items() if tname.startswith("fact_") and k.startswith("fact_")),
+                    [],
+                )
+                for col in matched_cols:
+                    cid = f"col_{nid}_{col['name']}"
+                    is_pk = bool(col.get("is_pk", False))
+                    add_node(
+                        g,
+                        node_id=cid,
+                        label=col["name"],
+                        ntype="column",
+                        layer=str(g.nodes[nid].get("layer", "shared")),
+                        parent_id=nid,
+                        data_type=str(col.get("type", "string")),
+                        is_pk=is_pk,
+                        radius=3.0,
+                        desc=f"Column of {tname} ({'Primary Key' if is_pk else col.get('type', 'Attribute')})",
+                    )
+                    add_edge(g, nid, cid, "CONTAINS", desc=str(col.get("type", "string")))
 
             if len(g.nodes) > 0:
                 return g
-        except Exception:
-            pass
+        except Exception as exc:
+            print(f"[GraphProjectBuilder] Artifact parse fallback for {clean_pid}: {exc}")
 
-    return _build_synthetic_project_dag(clean_pid)
+    if clean_pid and clean_pid.lower() not in ("all", "galaxy", "default", "prj-default"):
+        return build_workspace_project_graph(clean_pid)
 
+    from omniflow.graph_peli_builder import build_peli_biothermal_graph
+    return build_peli_biothermal_graph()
 
-def _build_synthetic_project_dag(project_code: str) -> nx.DiGraph:
-    """Builds a rich, domain-tailored Medallion architecture DAG with Tables & Columns."""
-    g = nx.DiGraph()
-    domain = project_code.replace("PRJ-", "").lower().replace("-", "_")
-
-    src_id = f"src_{domain}"
-    add_node(g, src_id, f"Source: {domain.upper()}", "source", "source", radius=8.0, desc="Enterprise Ingestion Gateway")
-
-    entities = [
-        ("customers", ["customer_id", "email", "full_name"]),
-        ("orders", ["order_id", "order_date", "total_amount"]),
-        ("transactions", ["txn_id", "account_id", "amount"]),
-        ("products", ["product_id", "sku", "unit_price"]),
-    ]
-
-    for ent, cols in entities:
-        b_id = f"lh_{domain}_bronze.{ent}"
-        add_node(g, b_id, f"bronze.{ent}", "table", "bronze", radius=5.5, desc="Raw Delta Table")
-        add_edge(g, src_id, b_id, "FEEDS", "CDC Batch Ingestion")
-
-        s_id = f"lh_{domain}_silver.{ent}"
-        add_node(g, s_id, f"silver.{ent}", "table", "silver", radius=5.5, desc="Deduplicated Conformed Table")
-        add_edge(g, b_id, s_id, "TRANSFORMS_TO", "PySpark Delta MERGE")
-
-        # Columns
-        for idx, cname in enumerate(cols):
-            is_pk = idx == 0
-            cid = f"col_{s_id}_{cname}"
-            add_node(g, cid, cname, "column", "silver", parent_id=s_id, is_pk=is_pk, radius=3.0)
-            add_edge(g, s_id, cid, "CONTAINS", "Column attribute")
-
-    fact_id = f"wh_{domain}_gold.fact_{domain}"
-    dim_id = f"wh_{domain}_gold.dim_customer"
-    add_node(g, fact_id, f"fact_{domain}", "warehouse", "gold", radius=6.5, desc="Kimball Star Schema Fact")
-    add_node(g, dim_id, f"dim_customer", "warehouse", "gold", radius=6.0, desc="Conformed Dimension")
-
-    add_edge(g, f"lh_{domain}_silver.transactions", fact_id, "AGGREGATES", "Star Schema Aggregation")
-    add_edge(g, f"lh_{domain}_silver.orders", fact_id, "AGGREGATES", "Star Schema Aggregation")
-    add_edge(g, f"lh_{domain}_silver.customers", dim_id, "TRANSFORMS_TO", "SCD-2 Dimension Upsert")
-
-    sm_id = f"sm_{domain}_direct_lake"
-    add_node(g, sm_id, f"DirectLake: {domain.upper()}", "metric", "bi", radius=7.5, desc="Power BI Direct Lake Semantic Model")
-    add_edge(g, fact_id, sm_id, "AGGREGATES", "DAX Direct Lake Query")
-    add_edge(g, dim_id, sm_id, "AGGREGATES", "DAX Relationship")
-
-    return g

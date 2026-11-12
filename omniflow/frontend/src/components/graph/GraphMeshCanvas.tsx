@@ -320,9 +320,15 @@ export const GraphMeshCanvas: React.FC<GraphMeshCanvasProps> = ({
     const mx = (e.clientX - rect.left - canvas.clientWidth / 2 - panRef.current.x) / zoomRef.current;
     const my = (e.clientY - rect.top - canvas.clientHeight / 2 - panRef.current.y) / zoomRef.current;
 
-    const clicked = simNodesRef.current.find(
-      (n) => n.x !== undefined && n.y !== undefined && Math.hypot(n.x - mx, n.y - my) <= n.radius + 6
-    );
+    const isHitNode = (n: (typeof simNodesRef.current)[number], mx: number, my: number, pad: number) => {
+      if (n.x === undefined || n.y === undefined) return false;
+      if (n.type === 'table') {
+        return Math.abs(n.x - mx) <= n.radius + pad && Math.abs(n.y - my) <= n.radius + pad;
+      }
+      return Math.hypot(n.x - mx, n.y - my) <= n.radius + pad;
+    };
+
+    const clicked = simNodesRef.current.find((n) => isHitNode(n, mx, my, 6));
 
     if (clicked) {
       if (hoverTimeoutRef.current) {
@@ -392,9 +398,13 @@ export const GraphMeshCanvas: React.FC<GraphMeshCanvasProps> = ({
     const my = (clientY - rect.top - canvas.clientHeight / 2 - panRef.current.y) / zoomRef.current;
 
     // Detect hovered node with Hover Intent Debounce (~90ms dwell) to eliminate sweep jitter
-    const foundHovered = simNodesRef.current.find(
-      (n) => n.x !== undefined && n.y !== undefined && Math.hypot(n.x - mx, n.y - my) <= n.radius + 5
-    ) || null;
+    const foundHovered = simNodesRef.current.find((n) => {
+      if (n.x === undefined || n.y === undefined) return false;
+      if (n.type === 'table') {
+        return Math.abs(n.x - mx) <= n.radius + 5 && Math.abs(n.y - my) <= n.radius + 5;
+      }
+      return Math.hypot(n.x - mx, n.y - my) <= n.radius + 5;
+    }) || null;
 
     const foundId = foundHovered?.id || null;
     const activeHoverId = hoveredNode?.id || null;

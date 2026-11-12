@@ -14,6 +14,7 @@ import {
   Network,
   Focus,
 } from 'lucide-react';
+import { getLayerColor, formatLayerLabel } from './graphTheme';
 
 interface ProjectOption {
   id: string;
@@ -47,15 +48,6 @@ interface GraphMeshControlsProps {
   };
 }
 
-const STANDARD_MEDALLION_LAYERS = [
-  { id: 'all', label: 'All', color: '#10b981' },
-  { id: 'source', label: 'Source', color: '#4ba473' },
-  { id: 'bronze', label: 'Bronze', color: '#c98539' },
-  { id: 'silver', label: 'Silver', color: '#469bb0' },
-  { id: 'gold', label: 'Gold', color: '#cbaf49' },
-  { id: 'bi', label: 'BI', color: '#ba5884' },
-];
-
 export const GraphMeshControls: React.FC<GraphMeshControlsProps> = ({
   searchQuery,
   onSearchChange,
@@ -63,6 +55,7 @@ export const GraphMeshControls: React.FC<GraphMeshControlsProps> = ({
   selectedLayers,
   onLayerSelect,
   onLayersChange,
+  layers = [],
   isPhysicsActive,
   onTogglePhysics,
   onZoomIn,
@@ -220,12 +213,19 @@ export const GraphMeshControls: React.FC<GraphMeshControlsProps> = ({
           </div>
         )}
 
-        {/* Right: Standardized Medallion Layer Filter Chips with Multi-Select */}
-        <div className="flex items-center gap-1 pointer-events-auto bg-[#18181b]/95 backdrop-blur-md border border-zinc-800 p-1.5 rounded-xl shadow-xl shadow-black/70">
-          <div className="flex items-center gap-1 text-[11px] text-zinc-400 px-1.5 font-medium">
+        {/* Right: Dynamic Architecture Layer Filter Chips */}
+        <div className="flex items-center gap-1 pointer-events-auto bg-[#18181b]/95 backdrop-blur-md border border-zinc-800 p-1.5 rounded-xl shadow-xl shadow-black/70 max-w-[46vw] overflow-x-auto">
+          <div className="flex items-center gap-1 text-[11px] text-zinc-400 px-1.5 font-medium shrink-0">
             <Layers className="w-3.5 h-3.5 text-zinc-300" />
           </div>
-          {STANDARD_MEDALLION_LAYERS.map((layer) => {
+          {[
+            { id: 'all', label: 'All', color: '#e4e4e7' },
+            ...layers.map((layerId) => ({
+              id: layerId,
+              label: formatLayerLabel(layerId),
+              color: getLayerColor(layerId),
+            })),
+          ].map((layer) => {
             const isAll = layer.id === 'all';
             const isSelected = isAll
               ? currentLayers.includes('all')
@@ -235,7 +235,7 @@ export const GraphMeshControls: React.FC<GraphMeshControlsProps> = ({
               <button
                 key={layer.id}
                 onClick={() => handleToggleLayer(layer.id)}
-                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${
+                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer shrink-0 ${
                   isSelected
                     ? 'bg-white/10 text-white'
                     : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/5'

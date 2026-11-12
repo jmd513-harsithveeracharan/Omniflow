@@ -9,7 +9,7 @@ import {
   SimulationLinkDatum,
 } from 'd3-force';
 import { GraphMeshNode, GraphMeshEdge } from '../../types';
-import { wrapLabel } from './graphTheme';
+import { computeDynamicLayerDepths, isSchemaContainerNode, wrapLabel } from './graphTheme';
 
 export interface D3SimNode extends SimulationNodeDatum, GraphMeshNode {
   id: string;
@@ -93,48 +93,55 @@ export function createSnowflakeSimulation(
   simLinks: D3SimLink[];
 } {
   const total = nodes.length;
+  const isContainerType = isSchemaContainerNode;
   const isHubNode = (n: GraphMeshNode) => n.type !== 'column' || n.degree >= 3;
 
-  const hubList = nodes.filter(isHubNode);
+  const rawNodeMap = new Map(nodes.map((n) => [n.id, n]));
   const spokeMap = new Map<string, GraphMeshNode[]>();
+  const parentSchemaOf = new Map<string, string>();
   for (const e of edges) {
     if (e.relationship === 'CONTAINS') {
-      const spokes = spokeMap.get(e.source) || [];
-      const colNode = nodes.find((n) => n.id === e.target);
-      if (colNode) spokes.push(colNode);
-      spokeMap.set(e.source, spokes);
+      const srcNode = rawNodeMap.get(e.source);
+      const tgtNode = rawNodeMap.get(e.target);
+      if (srcNode && tgtNode) {
+        const spokes = spokeMap.get(e.source) || [];
+        spokes.push(tgtNode);
+        spokeMap.set(e.source, spokes);
+        if (isContainerType(srcNode.type) && tgtNode.type !== 'column') {
+          parentSchemaOf.set(tgtNode.id, srcNode.id);
+        }
+      }
     }
   }
 
-  // Helper to extract base entity name from table ID/label for 360-degree domain clustering
+  const { layerDepths, maxLayerDepth } = computeDynamicLayerDepths(nodes, edges, rawNodeMap);
+
+  const hubList = nodes.filter(isHubNode);
+  const topLevelHubs = hubList.filter((n) => !parentSchemaOf.has(n.id));
+
+  // Helper to extract base entity name for 360-degree domain clustering
   const extractEntityBase = (n: GraphMeshNode) => {
     const raw = (n.label || n.id).toLowerCase();
     return raw
-      .replace(/^(source:\s*|source_|lh_|wh_|sm_|nb_|pl_|tbl_|raw_|silver_|gold_|curated_|curate_)/g, '')
+      .replace(/^(source:\s*|source_|src_|lh_|wh_|sm_|nb_|pl_|tbl_|raw_|silver_|gold_|curated_|curate_)/g, '')
       .replace(/(_bronze|_silver|_gold|_landing|_curated|_stage|_lake|_model)$/g, '')
       .trim();
   };
 
-  // 1. Separate hubs into Central Core (Gold/Warehouses/Sinks) vs Domain Entities (Bronze/Silver/Sources)
+  // Group top-level hubs into Central High-Connectivity Core vs Domain Sectors
   const isCentralCore = (n: GraphMeshNode) => {
-    const l = n.layer.toLowerCase();
+    const depth = layerDepths.get(n.layer.toLowerCase()) ?? 0;
+    const isLateCoreTier = maxLayerDepth >= 2 && depth >= Math.floor(maxLayerDepth * 0.6) && !isContainerType(n.type);
     const id = n.id.toLowerCase();
-    return (
-      l === 'gold' ||
-      l === 'warehouse' ||
-      id.includes('fact_') ||
-      id.includes('star_schema') ||
-      id.includes('orchestrator')
-    );
+    return isLateCoreTier || id.includes('fact_') || id.includes('star_schema') || id.includes('orchestrator');
   };
 
   const centralHubs: GraphMeshNode[] = [];
   const domainHubs: GraphMeshNode[] = [];
-  for (const n of hubList) {
+  for (const n of topLevelHubs) {
     (isCentralCore(n) ? centralHubs : domainHubs).push(n);
   }
 
-  // Group domain hubs into coherent business entity clusters across layers
   const domainMap = new Map<string, GraphMeshNode[]>();
   for (const hub of domainHubs) {
     const base = extractEntityBase(hub) || hub.id;
@@ -147,69 +154,64 @@ export function createSnowflakeSimulation(
   const numDomains = Math.max(1, domainKeys.length);
   const posMap = new Map<string, { x: number; y: number }>();
 
-  // 3. Space domains evenly in a full 360-degree circle around the center
+  const seedChildren = (parentNode: GraphMeshNode, px: number, py: number) => {
+    const children = spokeMap.get(parentNode.id) || [];
+    const childTables = children.filter((c) => c.type !== 'column');
+    const childCols = children.filter((c) => c.type === 'column');
+
+    childTables.forEach((tbl, tIdx) => {
+      const tAngle = (tIdx / Math.max(1, childTables.length)) * Math.PI * 2;
+      const tDist = 54 + (tIdx % 3) * 14;
+      const tx = px + Math.cos(tAngle) * tDist;
+      const ty = py + Math.sin(tAngle) * tDist;
+      posMap.set(tbl.id, { x: tx, y: ty });
+
+      const tCols = (spokeMap.get(tbl.id) || []).filter((c) => c.type === 'column');
+      tCols.forEach((col, cIdx) => {
+        const cAngle = (cIdx / Math.max(1, tCols.length)) * Math.PI * 2;
+        const rSpoke = 30 + (cIdx % 2) * 7;
+        posMap.set(col.id, { x: tx + Math.cos(cAngle) * rSpoke, y: ty + Math.sin(cAngle) * rSpoke });
+      });
+    });
+
+    childCols.forEach((spoke, sIdx) => {
+      const spokeAngle = (sIdx / Math.max(1, childCols.length)) * Math.PI * 2;
+      const rSpoke = 32 + (sIdx % 2) * 8;
+      posMap.set(spoke.id, { x: px + Math.cos(spokeAngle) * rSpoke, y: py + Math.sin(spokeAngle) * rSpoke });
+    });
+  };
+
+  // Space domains evenly around the circle using dynamic topological depth
   domainKeys.forEach((key, dIdx) => {
     const group = domainMap.get(key) || [];
     const domainAngle = (dIdx / numDomains) * Math.PI * 2 - Math.PI / 2;
 
     group.forEach((hub, idx) => {
-      const l = hub.layer.toLowerCase();
-      let distRatio = 0.58;
-      let angleOffset = 0;
-
-      if (l === 'source') {
-        distRatio = 0.88;
-        angleOffset = 0;
-      } else if (l === 'bronze') {
-        distRatio = 0.70;
-        angleOffset = -0.09 * (idx + 1);
-      } else if (l === 'silver') {
-        distRatio = 0.48;
-        angleOffset = 0.09 * (idx + 1);
-      } else if (l === 'bi') {
-        distRatio = 0.84;
-        angleOffset = 0.14;
-      }
+      const depth = layerDepths.get(hub.layer.toLowerCase()) ?? 0;
+      const tDepth = Math.min(1, depth / maxLayerDepth);
+      const distRatio = 0.86 - tDepth * 0.42;
+      const angleOffset = (idx - (group.length - 1) / 2) * 0.08;
 
       const angle = domainAngle + angleOffset;
       const hx = Math.cos(angle) * boundaryRadius * distRatio;
       const hy = Math.sin(angle) * boundaryRadius * distRatio;
       posMap.set(hub.id, { x: hx, y: hy });
-
-      // Circular flower spoke arrangement for columns
-      const spokes = spokeMap.get(hub.id) || [];
-      spokes.forEach((spoke, sIdx) => {
-        const spokeAngle = (sIdx / Math.max(1, spokes.length)) * Math.PI * 2;
-        const rSpoke = 32 + (sIdx % 2) * 8;
-        posMap.set(spoke.id, {
-          x: hx + Math.cos(spokeAngle) * rSpoke,
-          y: hy + Math.sin(spokeAngle) * rSpoke,
-        });
-      });
+      seedChildren(hub, hx, hy);
     });
   });
 
-  // 4. Central Hubs placed right in the inner circular core
+  // Central Hubs placed in the inner circular core
   const numCentral = Math.max(1, centralHubs.length);
   centralHubs.forEach((hub, cIdx) => {
     const angle = (cIdx / numCentral) * Math.PI * 2;
-    const dist = numCentral === 1 ? 0 : boundaryRadius * 0.22;
+    const dist = numCentral === 1 ? 0 : boundaryRadius * 0.24;
     const cx = Math.cos(angle) * dist;
     const cy = Math.sin(angle) * dist;
     posMap.set(hub.id, { x: cx, y: cy });
-
-    const spokes = spokeMap.get(hub.id) || [];
-    spokes.forEach((spoke, sIdx) => {
-      const spokeAngle = (sIdx / Math.max(1, spokes.length)) * Math.PI * 2;
-      const rSpoke = 32 + (sIdx % 2) * 8;
-      posMap.set(spoke.id, {
-        x: cx + Math.cos(spokeAngle) * rSpoke,
-        y: cy + Math.sin(spokeAngle) * rSpoke,
-      });
-    });
+    seedChildren(hub, cx, cy);
   });
 
-  // 5. Peripheral Singletons & Leaf Nodes: form the circular outer starfield rim at 0.88 - 0.94 * R
+  // Peripheral Singletons & Leaf Nodes
   let singletonIdx = 0;
   nodes.forEach((n) => {
     if (!posMap.has(n.id)) {
@@ -221,9 +223,15 @@ export function createSnowflakeSimulation(
 
   const simNodes: D3SimNode[] = nodes.map((n) => {
     const isHub = isHubNode(n);
-    const r = isHub ? (n.degree > 6 ? 7.5 : 5.5) : 3.0;
+    let r = 3.0;
+    if (isContainerType(n.type)) {
+      r = Math.min(15.0, Math.max(11.5, 11.0 + Math.sqrt(n.degree) * 0.45));
+    } else if (n.type === 'table') {
+      r = 6.5;
+    } else if (n.type !== 'column') {
+      r = 7.2;
+    }
 
-    // Use 2-line wrapped text dimensions to compute anti-overlap collision bounds
     const lines = wrapLabel(n.label, isHub ? 16 : 12);
     const maxLineChars = Math.max(...lines.map((l: string) => l.length));
     const textHalfWidth = Math.min(48, Math.max(10, maxLineChars * (isHub ? 2.5 : 1.9)));
@@ -246,54 +254,26 @@ export function createSnowflakeSimulation(
   for (const e of edges) {
     const src = nodeMap.get(e.source);
     const tgt = nodeMap.get(e.target);
-    if (src && tgt) {
-      simLinks.push({
-        id: e.id,
-        source: src,
-        target: tgt,
-        relationship: e.relationship,
-        description: e.description,
-      });
-    }
+    if (src && tgt) simLinks.push({ id: e.id, source: src, target: tgt, relationship: e.relationship, description: e.description });
   }
 
-  // Configure D3 Force Layout with Obsidian-Style Spherical Galaxy Physics
+  // D3 Force Layout: Schema->Table=68px, Table->Column=35px, Lineage=135px
   const simulation = forceSimulation<D3SimNode>(simNodes)
-    // 0. Anchor Center of Gravity at Origin
     .force('center', forceCenter(0, 0))
-    // 1. Multi-Body Coulomb Repulsion
-    .force(
-      'charge',
-      forceManyBody<D3SimNode>()
-        .strength((d) => (d.isHub ? -380 : -22))
-        .distanceMax(Math.max(480, boundaryRadius * 1.3))
-    )
-    // 2. Elastic Spring Links: Compact 38px column bouquet, 135px cluster separation
+    .force('charge', forceManyBody<D3SimNode>().strength((d) => (isContainerType(d.type) ? -460 : d.isHub ? -340 : -22)).distanceMax(Math.max(520, boundaryRadius * 1.35)))
     .force(
       'link',
       forceLink<D3SimNode, D3SimLink>(simLinks)
-        .distance((l) => (l.relationship === 'CONTAINS' ? 38 : 135))
-        .strength((l) => (l.relationship === 'CONTAINS' ? 0.95 : 0.18))
+        .distance((l) => (l.relationship !== 'CONTAINS' ? 135 : isContainerType((l.source as D3SimNode).type) ? 68 : 35))
+        .strength((l) => (l.relationship !== 'CONTAINS' ? 0.18 : isContainerType((l.source as D3SimNode).type) ? 0.72 : 0.95))
     )
-    // 3. Collision Barrier: Relaxed strength to prevent high-frequency jitter
-    .force(
-      'collide',
-      forceCollide<D3SimNode>()
-        .radius((d) => d.collisionRadius)
-        .strength(0.70)
-        .iterations(1)
-    )
-    // 4. Custom Spherical Harmonic Galaxy Envelope (Obsidian-Style)
+    .force('collide', forceCollide<D3SimNode>().radius((d) => d.collisionRadius).strength(0.70).iterations(1))
     .force('spherical', forceSphericalGalaxy(boundaryRadius))
     .alpha(0.35)
     .alphaDecay(0.04)
     .velocityDecay(0.48);
 
-  // Adaptive synchronous warmup (20-35 ticks based on graph density)
   const warmupTicks = simNodes.length > 200 ? 20 : 30;
-  for (let i = 0; i < warmupTicks; i++) {
-    simulation.tick();
-  }
-
+  for (let i = 0; i < warmupTicks; i++) simulation.tick();
   return { simulation, simNodes, simLinks };
 }

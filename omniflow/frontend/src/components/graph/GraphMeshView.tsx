@@ -175,6 +175,24 @@ export const GraphMeshView: React.FC<GraphMeshViewProps> = ({
         autoCenterTrigger={autoCenterTrigger}
       />
 
+      {/* Bottom-Right: Compact Shape Grammar Key (Color communicates Layer) */}
+      <div className="pointer-events-none absolute bottom-6 right-6 z-20 flex items-center gap-3 px-3 py-1.5 rounded-xl bg-[#18181b]/90 backdrop-blur-md border border-zinc-800/90 text-[11px] text-zinc-300 shadow-xl shadow-black/70">
+        <span className="flex items-center gap-1.5">
+          <span className="w-3 h-3 rounded-full bg-zinc-300/35 border border-zinc-300/80 inline-block" />
+          <span>Schema</span>
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="w-2.5 h-2.5 rounded-[2px] bg-zinc-200/85 inline-block" />
+          <span>Table</span>
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="w-1.5 h-1.5 rounded-full bg-zinc-400 inline-block" />
+          <span>Column</span>
+        </span>
+        <span className="h-3 w-px bg-zinc-700/80" />
+        <span className="text-zinc-400">Color = Layer</span>
+      </div>
+
       {/* Sleek Single-Point-of-Info Relationship Card (Redesigned) */}
       {hoveredHighlightedEdge && edgeTooltipPos && (
         <div
