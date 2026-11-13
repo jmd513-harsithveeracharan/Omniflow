@@ -129,11 +129,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
       }
     };
 
+    const handleOpenAccountModal = () => setIsAccountModalOpen(true);
     window.addEventListener('mousedown', handleClickOutside);
     window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('open-fabric-account-modal', handleOpenAccountModal);
     return () => {
       window.removeEventListener('mousedown', handleClickOutside);
       window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('open-fabric-account-modal', handleOpenAccountModal);
     };
   }, []);
 

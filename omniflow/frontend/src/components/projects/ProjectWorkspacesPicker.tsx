@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Database, Loader2, RefreshCw } from 'lucide-react';
+import { Database, Loader2, RefreshCw, KeyRound } from 'lucide-react';
 import { FabricWorkspaceSummary } from '../../types';
 import { fetchFabricWorkspaces } from '../../services/api';
 
@@ -22,13 +22,19 @@ export const ProjectWorkspacesPicker: React.FC<ProjectWorkspacesPickerProps> = (
       setLoadError(null);
       const res = await fetchFabricWorkspaces(forceRefresh);
       if (isMountedCheck()) {
-        setWorkspaces(res.workspaces || []);
+        if (res.error && (!res.workspaces || res.workspaces.length === 0)) {
+          setWorkspaces([]);
+          setLoadError(res.error);
+        } else {
+          setWorkspaces(res.workspaces || []);
+          if (res.error) setLoadError(res.error);
+        }
       }
     } catch (err) {
       console.warn('Failed to fetch Fabric workspaces', err);
       if (isMountedCheck()) {
         setWorkspaces([]);
-        setLoadError('Unable to reach Fabric workspaces API.');
+        setLoadError(err instanceof Error ? err.message : 'Unable to reach Fabric workspaces API.');
       }
     } finally {
       if (isMountedCheck()) setIsLoading(false);
@@ -111,6 +117,51 @@ export const ProjectWorkspacesPicker: React.FC<ProjectWorkspacesPickerProps> = (
           <div style={{ padding: '24px 16px', textAlign: 'center', color: '#71717a', fontSize: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
             <Loader2 width={14} height={14} className="animate-spin" />
             <span>Loading workspaces from Microsoft Fabric...</span>
+          </div>
+        ) : loadError && /auth|token|login|aadsts|credentials/i.test(loadError) ? (
+          <div style={{ padding: '20px 16px', textAlign: 'center' }}>
+            <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '32px', height: '32px', borderRadius: '50%', background: 'rgba(239, 68, 68, 0.15)', color: '#ef4444', marginBottom: '8px' }}>
+              <KeyRound width={16} height={16} />
+            </div>
+            <div style={{ fontSize: '13px', fontWeight: 600, color: '#fca5a5', marginBottom: '4px' }}>
+              Fabric Authentication Required
+            </div>
+            <p style={{ fontSize: '11.5px', color: '#a1a1aa', maxWidth: '380px', margin: '0 auto 12px auto', lineHeight: '1.4' }}>
+              The Azure session for this account is expired or not signed in. Please sign in or switch accounts in the Fabric Accounts modal.
+            </p>
+            <div style={{ display: 'flex', justifyContent: 'center', gap: '8px' }}>
+              <button
+                type="button"
+                onClick={() => window.dispatchEvent(new CustomEvent('open-fabric-account-modal'))}
+                style={{
+                  background: 'rgba(56, 189, 248, 0.15)',
+                  border: '1px solid rgba(56, 189, 248, 0.3)',
+                  color: '#38bdf8',
+                  borderRadius: '6px',
+                  padding: '5px 12px',
+                  fontSize: '11.5px',
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                }}
+              >
+                Sign in to Fabric Account
+              </button>
+              <button
+                type="button"
+                onClick={() => loadWorkspaces(true)}
+                style={{
+                  background: 'rgba(255, 255, 255, 0.06)',
+                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  color: '#d4d4d8',
+                  borderRadius: '6px',
+                  padding: '5px 12px',
+                  fontSize: '11.5px',
+                  cursor: 'pointer',
+                }}
+              >
+                Retry
+              </button>
+            </div>
           </div>
         ) : loadError ? (
           <div style={{ padding: '24px 16px', textAlign: 'center', color: '#fca5a5', fontSize: '12px' }}>

@@ -490,6 +490,8 @@ export async function fetchFabricWorkspaces(refresh: boolean = false): Promise<{
   activeWorkspaceId: string;
   activeWorkspaceName: string;
   workspaces: import('../types').FabricWorkspaceSummary[];
+  isFallback?: boolean;
+  error?: string | null;
 }> {
   try {
     const res = await fetch(`${API_BASE}/workspace/list${refresh ? '?refresh=true' : ''}`);
@@ -505,15 +507,19 @@ export async function fetchFabricWorkspaces(refresh: boolean = false): Promise<{
     }));
     return {
       activeWorkspaceId: String(data.active_workspace_id || ''),
-      activeWorkspaceName: String(data.active_workspace_name || data.active_workspace_id || 'Fabric Workspace'),
+      activeWorkspaceName: String(data.active_workspace_name || data.active_workspace_id || ''),
       workspaces: list,
+      isFallback: Boolean(data.is_fallback),
+      error: data.error || null,
     };
   } catch (err) {
-    console.warn('Failed to fetch workspace list from Fabric API, using fallback defaults', err);
+    console.warn('Failed to fetch workspace list from Fabric API', err);
     return {
       activeWorkspaceId: '',
-      activeWorkspaceName: 'Fabric Workspace',
+      activeWorkspaceName: '',
       workspaces: [],
+      isFallback: true,
+      error: err instanceof Error ? err.message : 'Unable to connect to Microsoft Fabric API',
     };
   }
 }
