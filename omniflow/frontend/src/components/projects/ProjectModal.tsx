@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, FolderPlus, FolderGit2, Loader2 } from 'lucide-react';
 import { ProjectRecord, ProjectMetadata, ProjectMember, UserProfile } from '../../types';
-import { ProjectTeamSearch } from './ProjectTeamSearch';
 import { ProjectWorkspacesPicker } from './ProjectWorkspacesPicker';
 
 interface ProjectModalProps {
@@ -68,14 +67,6 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
   }, [project, isOpen, currentUser]);
 
   if (!isOpen) return null;
-
-  const handleAddMember = (newMember: ProjectMember) => {
-    setMembers((prev) => [...prev, newMember]);
-  };
-
-  const handleRemoveMember = (id: string) => {
-    setMembers((prev) => prev.filter((m) => m.id !== id));
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -228,6 +219,7 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
               value={name}
               onChange={(e) => setName(e.target.value)}
               className="projects-modal-input"
+              style={{ outline: 'none' }}
               autoFocus
             />
           </div>
@@ -249,29 +241,27 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               className="projects-modal-input"
-              style={{ resize: 'vertical', lineHeight: '1.5' }}
+              style={{ resize: 'vertical', lineHeight: '1.5', outline: 'none' }}
             />
           </div>
 
-          {/* Team Collaboration with Account Discovery */}
-          <ProjectTeamSearch
-            members={members}
-            onAddMember={handleAddMember}
-            onRemoveMember={handleRemoveMember}
-          />
-
           {/* Shared Context Toggle */}
-          <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
-            <input
-              type="checkbox"
-              checked={sharedContext}
-              onChange={(e) => setSharedContext(e.target.checked)}
-              style={{ accentColor: '#38bdf8', width: '15px', height: '15px' }}
-            />
-            <span style={{ fontSize: '12.5px', color: '#d4d4d8' }}>
-              Share multi-turn chat history & agent blast-radius lineage across project members
-            </span>
-          </label>
+          <div style={{ marginBottom: '8px' }}>
+            <label style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={sharedContext}
+                onChange={(e) => setSharedContext(e.target.checked)}
+                style={{ accentColor: '#38bdf8', width: '15px', height: '15px', marginTop: '2px' }}
+              />
+              <span style={{ fontSize: '12.5px', color: '#d4d4d8', lineHeight: '1.4' }}>
+                Share multi-turn chat history & agent blast-radius lineage across project members
+              </span>
+            </label>
+            <p style={{ fontSize: '11.5px', color: '#71717a', margin: '6px 0 0 25px' }}>
+              Team collaborators and roles can be managed in Project Settings → Team & Members once created.
+            </p>
+          </div>
           </div>
 
           {/* Pinned Actions Footer */}

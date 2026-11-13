@@ -5782,14 +5782,22 @@ ul.chat-md-list {
     border-radius: 8px;
     color: #f4f4f5;
     font-size: 13px;
-    outline: none;
+    outline: none !important;
+    outline-width: 0 !important;
+    outline-offset: 0 !important;
     box-sizing: border-box;
     transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    -webkit-appearance: none;
+    appearance: none;
 }
 
-.projects-modal-input:focus {
-    border-color: #10b981;
-    box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2);
+.projects-modal-input:focus,
+.projects-modal-input:focus-visible {
+    outline: none !important;
+    outline-width: 0 !important;
+    outline-offset: 0 !important;
+    border-color: #10b981 !important;
+    box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2) !important;
 }
 
 .projects-modal-btn-cancel {
