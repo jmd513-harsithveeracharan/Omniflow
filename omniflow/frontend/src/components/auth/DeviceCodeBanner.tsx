@@ -19,65 +19,40 @@ export const DeviceCodeBanner: React.FC<DeviceCodeBannerProps> = ({
   };
 
   return (
-    <div
-      style={{
-        background: 'rgba(59, 130, 246, 0.1)',
-        border: '1px solid rgba(59, 130, 246, 0.3)',
-        borderRadius: '10px',
-        padding: '14px',
-        marginBottom: '18px',
-      }}
-    >
-      <div style={{ fontSize: '12.5px', color: '#93c5fd', marginBottom: '8px' }}>
-        1. Open Microsoft Device Login, and 2. Enter this code:
+    <div className="bg-blue-500/[0.08] border border-blue-500/25 rounded-xl p-3.5 space-y-2.5 animate-fadeIn">
+      <div className="text-[12px] text-blue-300 font-medium flex items-center justify-between">
+        <span>Enter code to authenticate:</span>
+        <span className="text-[11px] text-zinc-400 flex items-center gap-1.5">
+          <Loader2 size={11} className="animate-spin text-blue-400" />
+          Waiting for approval...
+        </span>
       </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
-        <div
-          style={{
-            fontFamily: 'monospace',
-            fontSize: '18px',
-            fontWeight: 700,
-            letterSpacing: '0.15em',
-            color: '#ffffff',
-            background: '#09090b',
-            padding: '6px 12px',
-            borderRadius: '6px',
-            border: '1px solid rgba(255,255,255,0.2)',
-          }}
-        >
+
+      <div className="flex items-center gap-2.5">
+        <div className="font-mono text-[16px] font-bold tracking-widest text-white bg-black/60 px-3 py-1.5 rounded-lg border border-white/15 select-all">
           {userCode}
         </div>
         <button
           type="button"
           onClick={handleCopyCode}
-          className="projects-modal-btn-cancel"
-          style={{ padding: '6px 10px', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}
+          className="px-3 py-1.5 rounded-lg text-[12px] font-medium bg-white/10 hover:bg-white/15 text-white border border-white/10 hover:border-white/20 transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
         >
-          {copiedCode ? <Check width={12} height={12} /> : <Copy width={12} height={12} />}
-          {copiedCode ? 'Copied!' : 'Copy Code'}
+          {copiedCode ? <Check size={13} className="text-emerald-400" /> : <Copy size={13} />}
+          <span>{copiedCode ? 'Copied' : 'Copy Code'}</span>
         </button>
       </div>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+
+      <div className="pt-0.5 flex items-center justify-between text-[11.5px]">
         <a
           href={verificationUri}
           target="_blank"
           rel="noreferrer"
-          style={{
-            fontSize: '12px',
-            color: '#38bdf8',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '4px',
-            textDecoration: 'none',
-          }}
+          className="inline-flex items-center gap-1.5 text-sky-400 hover:text-sky-300 hover:underline transition-colors"
         >
-          Go to {verificationUri} <ExternalLink width={11} height={11} />
+          <span>Open {verificationUri}</span>
+          <ExternalLink size={12} />
         </a>
-        <span style={{ fontSize: '11px', color: '#a1a1aa', display: 'flex', alignItems: 'center', gap: '4px' }}>
-          <Loader2 width={11} height={11} className="animate-spin" /> Waiting for browser approval...
-        </span>
       </div>
     </div>
   );
 };
-

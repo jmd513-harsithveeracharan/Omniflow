@@ -2,8 +2,6 @@ import React from 'react';
 import { Globe, KeyRound } from 'lucide-react';
 
 interface AccountConnectSectionProps {
-  tenantInput: string;
-  setTenantInput: (val: string) => void;
   isLoading: boolean;
   isPollingDeviceCode: boolean;
   onBrowserLogin: () => void;
@@ -11,49 +9,52 @@ interface AccountConnectSectionProps {
 }
 
 export const AccountConnectSection: React.FC<AccountConnectSectionProps> = ({
-  tenantInput,
-  setTenantInput,
   isLoading,
   isPollingDeviceCode,
   onBrowserLogin,
   onDeviceCodeLogin,
 }) => {
   return (
-    <div className="pt-3.5 border-t border-white/[0.08] flex flex-col gap-2.5">
-      <div>
-        <label className="block text-[10.5px] font-semibold text-[#71717a] tracking-wider uppercase mb-1 px-0.5">
-          Organization Domain or Tenant ID (Optional)
-        </label>
-        <input
-          type="text"
-          value={tenantInput}
-          onChange={(e) => setTenantInput(e.target.value)}
-          placeholder="e.g. yourcompany.com or tenant ID (prevents SSO default)"
-          className="w-full bg-[#151518] border border-white/10 focus:border-white/25 rounded-xl px-3 py-2 text-[12px] text-[#f4f4f5] placeholder-zinc-500 outline-none transition-colors"
-        />
+    <div className="pt-3 border-t border-white/[0.08]">
+      <div className="text-[11px] font-medium text-zinc-400 tracking-wide mb-2.5 px-0.5">
+        Connect New Account
       </div>
 
-      <div className="flex items-center gap-2.5">
+      <div className="grid grid-cols-2 gap-2.5">
         <button
           type="button"
           disabled={isLoading || isPollingDeviceCode}
           onClick={onBrowserLogin}
-          className="flex-1 flex items-center justify-center gap-2 py-2.5 px-3.5 rounded-xl text-[12.5px] font-medium bg-[#1e1e24] hover:bg-[#282830] text-[#f4f4f5] border border-white/10 hover:border-white/20 transition-all cursor-pointer disabled:opacity-50 shadow-sm"
+          className="group relative flex flex-col items-start gap-1.5 p-3 rounded-xl bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.08] hover:border-blue-500/40 transition-all cursor-pointer disabled:opacity-50 text-left hover:shadow-lg hover:shadow-blue-500/5 active:scale-[0.99]"
         >
-          <Globe size={14} className="text-[#a1a1aa]" />
-          <span>Browser Sign-in</span>
+          <div className="flex items-center gap-2 text-[13px] font-medium text-zinc-200 group-hover:text-white transition-colors">
+            <div className="w-6 h-6 rounded-md bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400 group-hover:bg-blue-500/20 transition-colors">
+              <Globe size={13} />
+            </div>
+            <span>Browser Sign-in</span>
+          </div>
+          <p className="text-[11px] text-zinc-500 group-hover:text-zinc-400 transition-colors leading-tight pl-0.5">
+            Interactive web login in default browser
+          </p>
         </button>
+
         <button
           type="button"
           disabled={isLoading || isPollingDeviceCode}
           onClick={onDeviceCodeLogin}
-          className="flex-1 flex items-center justify-center gap-2 py-2.5 px-3.5 rounded-xl text-[12.5px] font-medium bg-[#161619] hover:bg-[#1f1f24] text-[#d4d4d8] border border-white/10 hover:border-white/20 transition-all cursor-pointer disabled:opacity-50"
+          className="group relative flex flex-col items-start gap-1.5 p-3 rounded-xl bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.08] hover:border-amber-500/40 transition-all cursor-pointer disabled:opacity-50 text-left hover:shadow-lg hover:shadow-amber-500/5 active:scale-[0.99]"
         >
-          <KeyRound size={14} className="text-[#a1a1aa]" />
-          <span>Device Code Sign-in</span>
+          <div className="flex items-center gap-2 text-[13px] font-medium text-zinc-200 group-hover:text-white transition-colors">
+            <div className="w-6 h-6 rounded-md bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 group-hover:bg-amber-500/20 transition-colors">
+              <KeyRound size={13} />
+            </div>
+            <span>Device Code</span>
+          </div>
+          <p className="text-[11px] text-zinc-500 group-hover:text-zinc-400 transition-colors leading-tight pl-0.5">
+            Sign in via code on microsoft.com
+          </p>
         </button>
       </div>
     </div>
   );
 };
-

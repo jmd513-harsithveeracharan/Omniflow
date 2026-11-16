@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Check, Loader2, Building2, LogOut } from 'lucide-react';
+import { Check, Loader2, Building2, Trash2 } from 'lucide-react';
 import { FabricAccountProfile } from '../../types';
 
 interface AccountItemRowProps {
@@ -34,12 +34,12 @@ export const AccountItemRow: React.FC<AccountItemRowProps> = ({
     <div
       className={`group relative flex items-center justify-between p-3.5 rounded-xl transition-all duration-200 ${
         isActive
-          ? 'bg-gradient-to-r from-emerald-500/[0.08] via-[#16171a] to-[#141518] border border-emerald-500/30 ring-1 ring-emerald-500/15 shadow-lg shadow-black/40'
+          ? 'bg-gradient-to-r from-emerald-500/[0.08] via-[#141816] to-[#121413] border border-emerald-500/30 ring-1 ring-emerald-500/15 shadow-md shadow-emerald-950/20'
           : 'bg-[#131316] border border-white/[0.07] hover:border-white/15 hover:bg-[#18181d]'
       }`}
     >
       <div className="flex items-center gap-3 min-w-0 flex-1">
-        {/* Sleek Slate / Emerald Avatar */}
+        {/* Avatar */}
         <div
           className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold text-[13px] flex-shrink-0 transition-colors ${
             isActive
@@ -51,12 +51,15 @@ export const AccountItemRow: React.FC<AccountItemRowProps> = ({
         </div>
 
         <div className="min-w-0 flex-1 flex flex-col gap-0.5">
-          <div className="flex items-center gap-2">
-            <span className="text-[13.5px] font-semibold text-[#f4f4f5] tracking-tight truncate" title={account.name}>
+          <div className="flex items-center gap-2 min-w-0">
+            <span
+              className="text-[13.5px] font-semibold text-[#f4f4f5] tracking-tight truncate flex-1 min-w-0"
+              title={account.name}
+            >
               {account.name}
             </span>
             <span
-              className={`text-[10px] font-medium px-2 py-0.5 rounded-md whitespace-nowrap transition-colors ${
+              className={`text-[10px] font-medium px-2 py-0.5 rounded-md shrink-0 whitespace-nowrap transition-colors ${
                 isActive
                   ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/25'
                   : 'bg-white/[0.06] text-[#a1a1aa] border border-white/[0.06]'
@@ -142,7 +145,7 @@ export const AccountItemRow: React.FC<AccountItemRowProps> = ({
                 {isRemoving ? (
                   <Loader2 size={13} className="animate-spin text-rose-400" />
                 ) : (
-                  <LogOut size={13} />
+                  <Trash2 size={13} />
                 )}
               </button>
             )}
