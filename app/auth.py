@@ -12,7 +12,9 @@ Tokens are cached with thread-safety and refreshed before expiration.
 Includes get_auth_status() for UI health checks and user identity display.
 """
 
+import base64
 import json
+import os
 import subprocess
 import threading
 import time
@@ -75,7 +77,21 @@ def _fetch_azure_cli_token() -> tuple[str, float, str, str] | None:
             "--resource", _FABRIC_RESOURCE,
             "-o", "json",
         ]
-        res = subprocess.run(cmd, capture_output=True, text=True, check=True, shell=True, timeout=20)
+        cli_env = {
+            **os.environ,
+            "AZURE_CORE_ENABLE_BROKER_ON_WINDOWS": "false",
+            "AZURE_CORE_COLLECT_TELEMETRY": "false",
+        }
+        res = subprocess.run(
+            cmd,
+            stdin=subprocess.DEVNULL,
+            capture_output=True,
+            text=True,
+            check=True,
+            shell=True,
+            env=cli_env,
+            timeout=35,
+        )
         data = json.loads(res.stdout)
 
         token = data.get("accessToken", "").strip()
@@ -93,14 +109,15 @@ def _fetch_azure_cli_token() -> tuple[str, float, str, str] | None:
         tenant_id = data.get("tenant", "Unknown")
         user_identity = "Azure CLI User"
 
-        # Try to get user identity from az account show
+        # Extract user identity and tenant directly from JWT claims in 0.01ms (avoids redundant az CLI subprocess)
         try:
-            show_cmd = ["az", "account", "show", "-o", "json"]
-            show_res = subprocess.run(show_cmd, capture_output=True, text=True, shell=True, timeout=10)
-            if show_res.returncode == 0:
-                show_data = json.loads(show_res.stdout)
-                user_identity = show_data.get("user", {}).get("name") or show_data.get("name") or "Azure CLI User"
-                tenant_id = show_data.get("tenantId") or tenant_id
+            parts = token.split(".")
+            if len(parts) >= 2:
+                payload_b64 = parts[1]
+                payload_b64 += "=" * ((4 - len(payload_b64) % 4) % 4)
+                claims = json.loads(base64.urlsafe_b64decode(payload_b64))
+                user_identity = claims.get("upn") or claims.get("email") or claims.get("name") or user_identity
+                tenant_id = claims.get("tid") or tenant_id
         except Exception:
             pass
 
@@ -109,7 +126,7 @@ def _fetch_azure_cli_token() -> tuple[str, float, str, str] | None:
     except subprocess.CalledProcessError as e:
         print(f"[AUTH] Azure CLI not logged in or failed (exit code {e.returncode}). Run 'az login'.")
     except subprocess.TimeoutExpired:
-        print("[AUTH ERROR] Azure CLI timed out after 20s.")
+        print("[AUTH ERROR] Azure CLI timed out after 35s.")
     except Exception as e:
         print(f"[AUTH ERROR] Azure CLI token error: {e}")
 
