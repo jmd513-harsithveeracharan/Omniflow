@@ -94,13 +94,26 @@ export const AccountSwitcherModal: React.FC<AccountSwitcherModalProps> = ({
               <span className="truncate">{statusMsg.text}</span>
             </div>
             {isBrowserLoggingIn && (
-              <button
-                type="button"
-                onClick={handleCancelBrowserLogin}
-                className="flex-shrink-0 px-2 py-0.5 rounded-md text-[11px] font-medium bg-white/10 hover:bg-white/20 text-white cursor-pointer"
-              >
-                Cancel
-              </button>
+              <div className="flex items-center gap-1.5 flex-shrink-0">
+                <button
+                  type="button"
+                  onClick={async () => {
+                    await handleCancelBrowserLogin();
+                    handleStartDeviceCode();
+                  }}
+                  className="px-2 py-0.5 rounded-md text-[11px] font-medium bg-blue-500/20 hover:bg-blue-500/30 text-blue-200 border border-blue-400/30 transition-colors cursor-pointer whitespace-nowrap"
+                  title="If the browser window didn't pop up in front, switch to device code"
+                >
+                  Use Device Code Instead
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCancelBrowserLogin}
+                  className="px-2 py-0.5 rounded-md text-[11px] font-medium bg-white/10 hover:bg-white/20 text-white cursor-pointer"
+                >
+                  Cancel
+                </button>
+              </div>
             )}
           </div>
         )}

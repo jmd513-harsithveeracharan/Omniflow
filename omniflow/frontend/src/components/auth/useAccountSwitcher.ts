@@ -177,7 +177,7 @@ export function useAccountSwitcher(
       setUserCode(null);
       setIsBrowserLoggingIn(true);
       setStatusMsg({
-        text: 'Complete sign-in in the Microsoft browser window that opens...',
+        text: 'Waiting for Microsoft browser window... (Check taskbar/browser or switch to Device Code)',
         type: 'info',
       });
       const res = await triggerBrowserLogin(tenantInput.trim() || undefined);
