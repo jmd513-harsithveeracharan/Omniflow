@@ -305,12 +305,21 @@ def fetch_projects_cached(force_refresh: bool = False) -> list[dict[str, Any]]:
                         ]
 
                     if (pid == "PRJ-PELI-BIOTHERMAL" or pid == "PRJ-COMMERCIAL-REV") and "context_files" not in meta:
+                        content_str = ""
+                        peli_path = os.path.join(INTAKE_DIR, "project_intake.json")
+                        if os.path.exists(peli_path):
+                            try:
+                                with open(peli_path, "r", encoding="utf-8") as pf:
+                                    content_str = pf.read()
+                            except Exception:
+                                pass
                         meta["context_files"] = [
                             {
                                 "id": "ctx_peli_intake",
                                 "name": "project_intake.json",
                                 "type": "json",
-                                "size": 10479,
+                                "size": len(content_str) if content_str else 10479,
+                                "content": content_str,
                                 "is_intake_spec": True,
                                 "template_filename": "project_intake.json",
                                 "uploaded_at": "6 days ago",
@@ -318,6 +327,20 @@ def fetch_projects_cached(force_refresh: bool = False) -> list[dict[str, Any]]:
                         ]
                         if not meta.get("instructions"):
                             meta["instructions"] = "Add instructions to tailor Omniflow's responses"
+
+                    # Hydrate context file content from disk if empty
+                    for cf in meta.get("context_files", []):
+                        if not cf.get("content"):
+                            cand_name = cf.get("template_filename") or cf.get("name")
+                            if cand_name:
+                                cand_path = os.path.join(INTAKE_DIR, cand_name)
+                                if os.path.exists(cand_path):
+                                    try:
+                                        with open(cand_path, "r", encoding="utf-8") as tf:
+                                            cf["content"] = tf.read()
+                                            cf["size"] = len(cf["content"])
+                                    except Exception:
+                                        pass
                     
                     proj_desc = r[2] or ""
                     if pid == "PRJ-PELI-BIOTHERMAL" and not proj_desc:
@@ -979,6 +1002,20 @@ async def list_templates() -> list[dict[str, Any]]:
                 except Exception:
                     continue
     return templates
+
+
+@app.get("/api/intake/template")
+async def get_template_file(filename: str) -> dict[str, Any]:
+    safe_name = os.path.basename(filename)
+    fpath = os.path.join(INTAKE_DIR, safe_name)
+    if os.path.exists(fpath):
+        try:
+            with open(fpath, "r", encoding="utf-8") as f:
+                content = f.read()
+            return {"filename": safe_name, "content": content}
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Failed to read template: {e}")
+    raise HTTPException(status_code=404, detail="Template not found")
 
 
 @app.get("/api/workspace/list")

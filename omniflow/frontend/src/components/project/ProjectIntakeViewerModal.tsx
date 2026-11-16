@@ -1,77 +1,85 @@
-import React, { useState } from 'react';
-import { X, Copy, Check, FileJson, Layers, ShieldCheck } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, FileJson, Layers, Database, Code2, Copy, Check, Download, Loader2 } from 'lucide-react';
 import { ProjectContextFile } from '../../types';
+import { fetchIntakeTemplateContent } from '../../services/api';
+import { IntakeArchitectureTab } from './IntakeArchitectureTab';
+import { IntakeSourcesTab } from './IntakeSourcesTab';
+import { IntakeRawJsonTab } from './IntakeRawJsonTab';
 
 interface ProjectIntakeViewerModalProps {
   file: ProjectContextFile;
   onClose: () => void;
 }
 
-interface IntakeProjectContext {
-  project_summary?: {
-    project_name?: string;
-    business_objective?: string;
-    business_domain?: string;
-  };
-  platform_summary?: {
-    target_platform?: string;
-    capacity_sku?: string;
-    primary_language?: string;
-  };
-  solution_summary?: {
-    expected_deliverables?: string[];
-    success_criteria?: string[];
-  };
-}
-
 export const ProjectIntakeViewerModal: React.FC<ProjectIntakeViewerModalProps> = ({
   file,
   onClose,
 }) => {
-  const [activeTab, setActiveTab] = useState<'structured' | 'raw'>('structured');
+  const [activeTab, setActiveTab] = useState<'architecture' | 'sources' | 'raw'>('architecture');
+  const [content, setContent] = useState<string>(file.content || '');
+  const [isLoadingContent, setIsLoadingContent] = useState<boolean>(!file.content && Boolean(file.template_filename));
   const [isCopied, setIsCopied] = useState<boolean>(false);
 
-  let parsedContext: IntakeProjectContext = {};
+  useEffect(() => {
+    if (!content && file.template_filename) {
+      setIsLoadingContent(true);
+      fetchIntakeTemplateContent(file.template_filename)
+        .then((fetched) => {
+          if (fetched) setContent(fetched);
+        })
+        .finally(() => setIsLoadingContent(false));
+    }
+  }, [file, content]);
+
+  let parsed: Record<string, any> = {};
   try {
-    if (file.content) {
-      const full = JSON.parse(file.content);
-      parsedContext = full.project_context || {};
+    if (content) {
+      parsed = JSON.parse(content);
     }
   } catch {
-    parsedContext = {};
+    parsed = {};
   }
 
-  const pSum = parsedContext.project_summary || {};
-  const platSum = parsedContext.platform_summary || {};
-  const solSum = parsedContext.solution_summary || {};
-  const deliverables: string[] = solSum.expected_deliverables || [];
-  const criteria: string[] = solSum.success_criteria || [];
-
   const handleCopy = () => {
-    navigator.clipboard.writeText(file.content || '');
+    navigator.clipboard.writeText(content || '');
     setIsCopied(true);
     setTimeout(() => setIsCopied(false), 2000);
   };
 
+  const handleDownload = () => {
+    const blob = new Blob([content || '{}'], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = file.name || 'project_intake.json';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const hasSources = (parsed.retrieved_context?.data_sources || []).length > 0;
+  const fileSizeKb = ((content?.length || file.size || 0) / 1024).toFixed(1);
+
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in-50"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-fadeIn"
       onClick={onClose}
     >
       <div
-        className="w-full max-w-2xl bg-[#1a1a1c] border border-[#2e2f35] rounded-2xl shadow-[0_24px_64px_rgba(0,0,0,0.85)] overflow-hidden flex flex-col max-h-[88vh] animate-in zoom-in-95"
+        className="w-full max-w-3xl bg-gradient-to-b from-[#161619] to-[#0f0f12] border border-white/[0.12] rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] ring-1 ring-white/5 animate-scaleIn"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4.5 border-b border-[#232326] bg-[#1a1a1c] shrink-0">
+        <div className="flex items-center justify-between px-6 py-4.5 border-b border-white/[0.08] bg-white/[0.02] shrink-0">
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-400">
-              <FileJson width={18} height={18} />
+            <div className="w-9 h-9 rounded-xl bg-emerald-500/10 border border-emerald-500/25 text-emerald-400 flex items-center justify-center shadow-inner">
+              <FileJson size={18} />
             </div>
             <div>
-              <h3 className="text-sm font-semibold text-[#f0f0f2]">{file.name}</h3>
-              <p className="text-[11px] text-[#8e918f]">
-                Project Intake Specification • {(file.size / 1024).toFixed(1)} KB
+              <h3 className="text-[14.5px] font-semibold text-[#f4f4f5] tracking-tight">{file.name}</h3>
+              <p className="text-[11.5px] text-[#8e918f] mt-0.5">
+                Project Intake Specification • {fileSizeKb} KB
               </p>
             </div>
           </div>
@@ -80,113 +88,88 @@ export const ProjectIntakeViewerModal: React.FC<ProjectIntakeViewerModalProps> =
             <button
               type="button"
               onClick={handleCopy}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-[#8e918f] hover:text-[#f0f0f2] rounded-lg hover:bg-[#222225] border border-transparent hover:border-[#2a2b30] transition-colors"
+              className="flex items-center gap-1.5 px-3 py-1.5 text-[11.5px] font-medium text-zinc-300 hover:text-white rounded-lg bg-white/[0.04] hover:bg-white/[0.08] border border-white/10 transition-colors cursor-pointer"
             >
-              {isCopied ? <Check width={13} height={13} className="text-emerald-400" /> : <Copy width={13} height={13} />}
+              {isCopied ? <Check size={13} className="text-emerald-400" /> : <Copy size={13} />}
               <span>{isCopied ? 'Copied' : 'Copy'}</span>
             </button>
             <button
               type="button"
-              onClick={onClose}
-              className="p-1 rounded-lg text-[#8e918f] hover:text-white hover:bg-[#222225] transition-colors"
+              onClick={handleDownload}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-[11.5px] font-medium text-zinc-300 hover:text-white rounded-lg bg-white/[0.04] hover:bg-white/[0.08] border border-white/10 transition-colors cursor-pointer"
+              title="Download specification as JSON"
             >
-              <X width={16} height={16} />
+              <Download size={13} />
+              <span>Download</span>
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer ml-1"
+              title="Close modal (Esc)"
+            >
+              <X size={16} />
             </button>
           </div>
         </div>
 
         {/* Tab Switcher */}
-        <div className="flex items-center gap-2 px-6 pt-3 border-b border-[#232326] bg-[#141416]/50 shrink-0">
+        <div className="flex items-center gap-1 px-6 pt-3 border-b border-white/[0.08] bg-black/20 shrink-0">
           <button
             type="button"
-            onClick={() => setActiveTab('structured')}
-            className={`pb-2.5 px-1 text-xs font-medium border-b-2 transition-all ${
-              activeTab === 'structured'
-                ? 'border-emerald-500 text-[#f0f0f2]'
-                : 'border-transparent text-[#8e918f] hover:text-[#c4c7c5]'
+            onClick={() => setActiveTab('architecture')}
+            className={`flex items-center gap-2 pb-2.5 px-3 text-[12px] font-medium border-b-2 transition-all cursor-pointer ${
+              activeTab === 'architecture'
+                ? 'border-emerald-500 text-white'
+                : 'border-transparent text-zinc-400 hover:text-zinc-200'
             }`}
           >
-            Structured Overview
+            <Layers size={13} className={activeTab === 'architecture' ? 'text-emerald-400' : 'text-zinc-500'} />
+            <span>Architecture & Overview</span>
           </button>
+
+          {hasSources && (
+            <button
+              type="button"
+              onClick={() => setActiveTab('sources')}
+              className={`flex items-center gap-2 pb-2.5 px-3 text-[12px] font-medium border-b-2 transition-all cursor-pointer ${
+                activeTab === 'sources'
+                  ? 'border-emerald-500 text-white'
+                  : 'border-transparent text-zinc-400 hover:text-zinc-200'
+              }`}
+            >
+              <Database size={13} className={activeTab === 'sources' ? 'text-emerald-400' : 'text-zinc-500'} />
+              <span>Data Sources & Tables</span>
+            </button>
+          )}
+
           <button
             type="button"
             onClick={() => setActiveTab('raw')}
-            className={`pb-2.5 px-1 text-xs font-medium border-b-2 transition-all ${
+            className={`flex items-center gap-2 pb-2.5 px-3 text-[12px] font-medium border-b-2 transition-all cursor-pointer ${
               activeTab === 'raw'
-                ? 'border-emerald-500 text-[#f0f0f2]'
-                : 'border-transparent text-[#8e918f] hover:text-[#c4c7c5]'
+                ? 'border-emerald-500 text-white'
+                : 'border-transparent text-zinc-400 hover:text-zinc-200'
             }`}
           >
-            Raw JSON
+            <Code2 size={13} className={activeTab === 'raw' ? 'text-emerald-400' : 'text-zinc-500'} />
+            <span>Raw JSON</span>
           </button>
         </div>
 
-        {/* Modal Content */}
-        <div className="p-6 flex-1 min-h-0 overflow-y-auto space-y-4 text-xs">
-          {activeTab === 'structured' ? (
-            <>
-              {/* Summary Banner */}
-              <div className="p-4 rounded-xl bg-[#141416] border border-[#232326] space-y-2.5">
-                <div className="flex items-center justify-between">
-                  <span className="font-semibold text-[#f0f0f2] text-sm">
-                    {pSum.project_name || 'Enterprise Data Solution'}
-                  </span>
-                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-medium bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
-                    {platSum.target_platform || 'Microsoft Fabric'}
-                  </span>
-                </div>
-                <p className="text-[#c4c7c5] leading-relaxed">
-                  {pSum.business_objective || 'Medallion data architecture platform'}
-                </p>
-                <div className="flex items-center gap-5 pt-1.5 text-[11px] text-[#8e918f]">
-                  <span>Domain: <strong className="text-[#f0f0f2]">{pSum.business_domain || 'Analytics'}</strong></span>
-                  <span>SKU: <strong className="text-[#f0f0f2]">{platSum.capacity_sku || 'F64'}</strong></span>
-                  <span>Lang: <strong className="text-[#f0f0f2]">{platSum.primary_language || 'PySpark / SQL'}</strong></span>
-                </div>
-              </div>
-
-              {/* Deliverables */}
-              {deliverables.length > 0 && (
-                <div className="space-y-2">
-                  <span className="font-medium text-[#f0f0f2] flex items-center gap-1.5">
-                    <Layers width={14} height={14} className="text-emerald-400" />
-                    Target Deliverables ({deliverables.length})
-                  </span>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                    {deliverables.map((d, i) => (
-                      <div
-                        key={i}
-                        className="px-3 py-2 rounded-lg bg-[#141416] border border-[#232326] text-[#c4c7c5] font-mono text-[11px] truncate"
-                      >
-                        {d}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Success Criteria */}
-              {criteria.length > 0 && (
-                <div className="space-y-2 pt-1">
-                  <span className="font-medium text-[#f0f0f2] flex items-center gap-1.5">
-                    <ShieldCheck width={14} height={14} className="text-emerald-400" />
-                    Success Criteria ({criteria.length})
-                  </span>
-                  <ul className="space-y-1.5 text-[#8e918f]">
-                    {criteria.map((c, i) => (
-                      <li key={i} className="flex items-start gap-2 leading-relaxed">
-                        <span className="text-emerald-400 mt-0.5">•</span>
-                        <span>{c}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </>
+        {/* Content Body */}
+        <div className="p-6 flex-1 min-h-0 overflow-y-auto">
+          {isLoadingContent ? (
+            <div className="py-16 flex flex-col items-center justify-center gap-3 text-zinc-400">
+              <Loader2 size={24} className="animate-spin text-emerald-400" />
+              <span className="text-[12px]">Loading specification content...</span>
+            </div>
+          ) : activeTab === 'architecture' ? (
+            <IntakeArchitectureTab parsed={parsed} />
+          ) : activeTab === 'sources' ? (
+            <IntakeSourcesTab parsed={parsed} />
           ) : (
-            <pre className="p-4 rounded-xl bg-[#141416] border border-[#232326] text-[#c4c7c5] font-mono text-[11px] leading-relaxed overflow-x-auto whitespace-pre-wrap">
-              {file.content}
-            </pre>
+            <IntakeRawJsonTab content={content} filename={file.name} />
           )}
         </div>
       </div>

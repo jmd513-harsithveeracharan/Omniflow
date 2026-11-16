@@ -76,6 +76,18 @@ export async function fetchIntakeTemplates(): Promise<import('../types').IntakeT
   }
 }
 
+export async function fetchIntakeTemplateContent(filename: string): Promise<string> {
+  try {
+    const res = await fetch(`${API_BASE}/intake/template?filename=${encodeURIComponent(filename)}`);
+    if (!res.ok) return '';
+    const data = await res.json();
+    return data.content || '';
+  } catch (err) {
+    console.warn('Failed to fetch intake template content:', err);
+    return '';
+  }
+}
+
 export async function fetchSessionDetail(
   sessionId: string
 ): Promise<{
