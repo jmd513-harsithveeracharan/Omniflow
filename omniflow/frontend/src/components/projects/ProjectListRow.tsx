@@ -49,7 +49,13 @@ export const ProjectListRow: React.FC<ProjectListRowProps> = ({
   const cleanFallbackName = (project.id || '').startsWith('PRJ-')
     ? project.id.replace(/^PRJ-/, '').replace(/[-_]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()).trim()
     : (project.id || '');
-  const displayName = rawName && !rawName.startsWith('PRJ-') ? rawName : (cleanFallbackName || 'Project');
+  const isPostgresMedallion =
+    (project.id && project.id.toLowerCase().includes('postgresql')) ||
+    rawName.toLowerCase().includes('postgresql');
+  const displayName =
+    isPostgresMedallion && (rawName.toUpperCase() === 'POSTGRESQL MEDALLI' || !rawName.toLowerCase().includes('platform'))
+      ? 'PostgreSQL Medallion Platform'
+      : (rawName && !rawName.startsWith('PRJ-') ? rawName : (cleanFallbackName || 'Project'));
 
   return (
     <div

@@ -72,7 +72,7 @@ def merge_connection_into_intake(
     sol_sum.setdefault(
         "target_folder_structure",
         {
-            "root_folder": f"{re.sub(r'[^a-zA-Z0-9_]', '_', proj_name.lower()).strip('_')[:18].title()}_Platform",
+            "root_folder": f"{re.sub(r'[^a-zA-Z0-9_]', '_', proj_name).strip('_').title()}_Platform",
             "subfolders": {"raw": "01 Raw", "stage": "02 Stage", "silver": "03 Silver", "gold": "04 Gold"},
         },
     )

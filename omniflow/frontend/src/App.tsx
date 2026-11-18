@@ -173,6 +173,21 @@ export const App: React.FC = () => {
         if (shouldAutoSelect && !activeProjectId) {
           const defaultProj = projs[0];
           handleSelectProject(defaultProj.id, false);
+        } else if (activeProjectId) {
+          const normActive = activeProjectId.toLowerCase().replace(/[^a-z0-9]/g, '');
+          const match = projs.find(
+            (p) =>
+              p.id === activeProjectId ||
+              p.name.toLowerCase() === activeProjectId.toLowerCase() ||
+              (normActive.length >= 6 && p.id.toLowerCase().replace(/[^a-z0-9]/g, '').includes(normActive.slice(0, 10))) ||
+              (normActive.length >= 6 && p.name.toLowerCase().replace(/[^a-z0-9]/g, '').includes(normActive.slice(0, 10)))
+          );
+          if (match && match.id !== activeProjectId) {
+            setActiveProjectId(match.id);
+            try {
+              localStorage.setItem('omniflow_active_project_id', match.id);
+            } catch {}
+          }
         }
       } else {
         setActiveProjectId(null);
@@ -911,12 +926,14 @@ export const App: React.FC = () => {
                   p.id === activeProjectId ||
                   p.name === activeProjectId ||
                   p.id.toLowerCase() === activeProjectId.toLowerCase() ||
-                  p.id.replace(/^PRJ-/, '').replace(/[-_]+/g, ' ').toLowerCase() === activeProjectId.toLowerCase()
+                  p.name.toLowerCase() === activeProjectId.toLowerCase() ||
+                  p.id.replace(/^PRJ-/, '').replace(/[-_]+/g, ' ').toLowerCase() === activeProjectId.toLowerCase() ||
+                  (activeProjectId.toLowerCase().includes('postgresql') && p.name.toLowerCase().includes('postgresql'))
               ) || {
                 id: activeProjectId,
                 name: (activeProjectId.startsWith('PRJ-')
                   ? activeProjectId.replace(/^PRJ-/, '').replace(/[-_]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()).trim()
-                  : activeProjectId),
+                  : (activeProjectId.toUpperCase().includes('POSTGRESQL') ? 'PostgreSQL Medallion Platform' : activeProjectId.replace(/[-_]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()).trim())),
                 description: 'Active Enterprise Medallion Workspace',
                 metadata: {},
               }

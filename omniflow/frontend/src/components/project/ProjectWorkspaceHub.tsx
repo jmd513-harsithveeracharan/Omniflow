@@ -107,12 +107,18 @@ export const ProjectWorkspaceHub: React.FC<ProjectWorkspaceHubProps> = ({
   // Clean formatted name
   const rawName = localProject.name || '';
   const isPeliProject = localProject.id === 'PRJ-PELI-BIOTHERMAL' || rawName.toLowerCase().includes('peli');
+  const isPostgresMedallion =
+    (localProject.id && localProject.id.toLowerCase().includes('postgresql')) ||
+    rawName.toLowerCase().includes('postgresql');
+
   const cleanFallbackName = (localProject.id || '').startsWith('PRJ-')
     ? localProject.id.replace(/^PRJ-/, '').replace(/[-_]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()).trim()
     : (localProject.id || '');
 
   const displayName = isPeliProject
     ? 'Peli Bio Thermal'
+    : isPostgresMedallion && (rawName.toUpperCase() === 'POSTGRESQL MEDALLI' || !rawName.toLowerCase().includes('platform'))
+    ? 'PostgreSQL Medallion Platform'
     : (rawName && !rawName.startsWith('PRJ-') ? rawName : (cleanFallbackName || 'Project'));
   const displayDesc = isPeliProject
     ? (localProject.description && !localProject.description.toLowerCase().includes('cold-chain')

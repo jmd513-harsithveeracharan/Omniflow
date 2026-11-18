@@ -668,7 +668,7 @@ async def create_project_endpoint(req: ProjectRequest) -> dict[str, Any]:
     global PROJECTS_CACHE
     pname = (req.name or "New Project").strip()
     slug = re.sub(r'[^A-Z0-9]+', '-', pname.upper()).strip('-')
-    pid = req.id or f"PRJ-{slug[:18] or uuid.uuid4().hex[:6].upper()}"
+    pid = req.id or f"PRJ-{slug[:40] or uuid.uuid4().hex[:6].upper()}"
     desc = req.description or ""
     lpath = req.local_path or os.path.join(BASE_DIR, "generated_artifacts", pid)
     created_by = (req.created_by or "user@fabric.ai").strip()
@@ -941,8 +941,16 @@ async def get_project_detail(project_id: str) -> dict[str, Any]:
     pname = ""
 
     # Check cache first for instant sub-millisecond retrieval
+    norm_pid = project_id.lower().replace("-", " ").strip()
     for p in PROJECTS_CACHE:
-        if p["id"] == project_id or p.get("name") == project_id:
+        p_name = str(p.get("name") or "").lower()
+        p_id = str(p.get("id") or "").lower()
+        if (
+            p["id"] == project_id
+            or p.get("name") == project_id
+            or norm_pid in p_name
+            or norm_pid in p_id.replace("prj-", "").replace("-", " ")
+        ):
             project_data = dict(p)
             pcode = p["id"]
             pname = p["name"]
@@ -954,8 +962,23 @@ async def get_project_detail(project_id: str) -> dict[str, Any]:
             with repo._connect() as conn:
                 with conn.cursor() as cur:
                     cur.execute(
-                        "SELECT project_id, project_code, project_name, description, status, metadata FROM projects WHERE project_id::text = %s OR project_code = %s OR project_name = %s LIMIT 1;",
-                        (project_id, project_id, project_id),
+                        """
+                        SELECT project_id, project_code, project_name, description, status, metadata 
+                        FROM projects 
+                        WHERE project_id::text = %s 
+                           OR project_code = %s 
+                           OR project_name = %s 
+                           OR project_code ILIKE %s
+                           OR project_name ILIKE %s
+                        LIMIT 1;
+                        """,
+                        (
+                            project_id,
+                            project_id,
+                            project_id,
+                            f"%{project_id.replace('PRJ-', '').strip()}%",
+                            f"%{project_id.strip()}%",
+                        ),
                     )
                     row = cur.fetchone()
                     if row:
