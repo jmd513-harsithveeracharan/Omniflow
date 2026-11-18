@@ -107,7 +107,10 @@ def classify_prompt_intent(
         "build end-to-end platform", "build end to end platform",
         "launch autonomous pipeline", "full platform architecture",
         "enterprise medallion platform", "full medallion architecture",
-        "medallion pipeline blueprint",
+        "medallion pipeline blueprint", "medallion architecture plan",
+        "formulate the medallion", "formulate medallion",
+        "create medallion", "build medallion", "medallion plan",
+        "architecture plan"
     ]):
         return "FULL_BLUEPRINT"
 

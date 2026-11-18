@@ -635,6 +635,29 @@ def resolve_project_workspace(proj_id: Optional[str]) -> tuple[str, str]:
     target_ws = meta.get("targetWorkspace") or (workspaces[0] if workspaces else None)
 
     if not target_ws:
+        for cf in meta.get("context_files", []):
+            if cf.get("is_intake_spec") or "intake" in str(cf.get("name", "")).lower():
+                try:
+                    c = cf.get("content")
+                    if not c and cf.get("template_filename"):
+                        t_path = os.path.join(INTAKE_DIR, cf["template_filename"])
+                        if os.path.exists(t_path):
+                            with open(t_path, "r", encoding="utf-8") as f:
+                                c = f.read()
+                    elif not c and cf.get("name"):
+                        t_path = os.path.join(INTAKE_DIR, cf["name"])
+                        if os.path.exists(t_path):
+                            with open(t_path, "r", encoding="utf-8") as f:
+                                c = f.read()
+                    if c:
+                        parsed_c = json.loads(c) if isinstance(c, str) else c
+                        target_ws = parsed_c.get("project_context", {}).get("platform_summary", {}).get("target_workspace")
+                        if target_ws:
+                            break
+                except Exception:
+                    pass
+
+    if not target_ws:
         return default_ws_id, default_ws_name
 
     target_ws_str = str(target_ws).strip()
@@ -1612,9 +1635,20 @@ async def handle_chat_stream(req: ChatRequest) -> StreamingResponse:
 
     proj_id = req.project_id
     if not proj_id and sid.startswith("proj_"):
-        parts = sid.split("_")
-        if len(parts) >= 2:
-            proj_id = parts[1]
+        sid_no_prefix = sid[5:]
+        proj_id = sid_no_prefix.rsplit("_", 1)[0] if "_" in sid_no_prefix else sid_no_prefix
+
+    # 1. Resolve project record
+    resolved_proj = None
+    if proj_id:
+        cached_list = fetch_projects_cached()
+        resolved_proj = next((p for p in cached_list if p["id"] == proj_id or p.get("name") == proj_id), None)
+        if not resolved_proj:
+            norm_id = proj_id.lower().replace("-", " ").strip()
+            resolved_proj = next(
+                (p for p in cached_list if norm_id in str(p.get("name", "")).lower() or norm_id in str(p.get("id", "")).lower()),
+                None
+            )
 
     if sid not in SESSIONS:
         SESSIONS[sid] = {
@@ -1647,6 +1681,33 @@ async def handle_chat_stream(req: ChatRequest) -> StreamingResponse:
 
     # Detect if message contains intake JSON or connector resume instructions
     intake_override = extract_intake_json(req.message)
+    if not intake_override and resolved_proj:
+        p_meta = resolved_proj.get("metadata") or {}
+        for cf in p_meta.get("context_files", []):
+            if cf.get("is_intake_spec") or "intake" in str(cf.get("name", "")).lower():
+                raw_c = cf.get("content")
+                if not raw_c and cf.get("template_filename"):
+                    t_path = os.path.join(INTAKE_DIR, cf["template_filename"])
+                    if os.path.exists(t_path):
+                        try:
+                            with open(t_path, "r", encoding="utf-8") as f:
+                                raw_c = f.read()
+                        except Exception:
+                            pass
+                elif not raw_c and cf.get("name"):
+                    t_path = os.path.join(INTAKE_DIR, cf["name"])
+                    if os.path.exists(t_path):
+                        try:
+                            with open(t_path, "r", encoding="utf-8") as f:
+                                raw_c = f.read()
+                        except Exception:
+                            pass
+                if raw_c:
+                    try:
+                        intake_override = json.loads(raw_c) if isinstance(raw_c, str) else raw_c
+                        break
+                    except Exception:
+                        pass
     conn_id_match = re.search(r"connectionId\s*['\"]?(conn_[a-zA-Z0-9_\-]+)['\"]?", req.message)
     active_conn_id = conn_id_match.group(1) if conn_id_match else None
     tables_match = re.search(r"selected tables:\s*([^\n]+)", req.message, re.IGNORECASE)
@@ -1676,7 +1737,7 @@ async def handle_chat_stream(req: ChatRequest) -> StreamingResponse:
             save_sessions_to_disk()
 
         # Check for connector credential requirement (Interception Gate)
-        conn_def = detect_connector_need(req.message, SESSIONS[sid])
+        conn_def = detect_connector_need(req.message, SESSIONS[sid], intake_override)
         if conn_def:
             if intake_override:
                 SESSIONS[sid]["pending_intake"] = intake_override
@@ -1998,6 +2059,11 @@ async def handle_chat_stream(req: ChatRequest) -> StreamingResponse:
                     FabricItemSpec(name=f"pl_{clean_dom}_bronze_ingest", item_type="DataPipeline", depends_on=[f"lh_{clean_dom}_bronze"], folder_name=raw_f),
                 ]
             ws_id, ws_name = resolve_project_workspace(proj_id or proj_code)
+            plan_ws = active_plan.get("target_workspace")
+            if plan_ws and (not ws_name or ws_name == "Fabric Workspace"):
+                ws_name = plan_ws
+                if not ws_id:
+                    ws_id = plan_ws
             provisioner = GenericDAGProvisioner(workspace_id=ws_id)
             dag_res = await asyncio.to_thread(provisioner.execute_optimistic_provisioning, items_to_deploy, True)
             run_id = str(uuid.uuid4())
@@ -2045,6 +2111,13 @@ async def handle_chat_stream(req: ChatRequest) -> StreamingResponse:
                 "enterprise medallion platform",
                 "full medallion architecture",
                 "medallion pipeline blueprint",
+                "medallion architecture plan",
+                "formulate the medallion",
+                "formulate medallion",
+                "create medallion",
+                "build medallion",
+                "medallion plan",
+                "architecture plan",
             ]
         )
 
@@ -2056,9 +2129,13 @@ async def handle_chat_stream(req: ChatRequest) -> StreamingResponse:
             # Dynamic resolution of project identity
             proj_name = ""
             proj_code = ""
-            if sid.startswith("proj_"):
-                active_pid = sid[5:]
-                p_rec = next((p for p in fetch_projects_cached() if p["id"] == active_pid), None)
+            if resolved_proj:
+                proj_name = resolved_proj.get("name") or ""
+                proj_code = resolved_proj.get("id") or ""
+            elif sid.startswith("proj_"):
+                sid_no_prefix = sid[5:]
+                active_pid = sid_no_prefix.rsplit("_", 1)[0] if "_" in sid_no_prefix else sid_no_prefix
+                p_rec = next((p for p in fetch_projects_cached() if p["id"] == active_pid or p.get("name") == active_pid), None)
                 if p_rec:
                     proj_name = p_rec["name"]
                     proj_code = p_rec["id"]
@@ -2080,7 +2157,11 @@ async def handle_chat_stream(req: ChatRequest) -> StreamingResponse:
                 project_name=proj_name,
                 prompt_text=req.message,
             )
-            ws_id, ws_name = resolve_project_workspace(proj_id or proj_code)
+            ws_id, ws_name = resolve_project_workspace(proj_code or proj_id)
+            intake_ws = (intake_override or {}).get("project_context", {}).get("platform_summary", {}).get("target_workspace")
+            if intake_ws and (not ws_name or ws_name == "Fabric Workspace"):
+                ws_name = intake_ws
+                ws_id = intake_ws
             ws_display = ws_name or os.getenv("ALLOWED_WORKSPACE_NAME") or "Fabric Workspace"
             synth_res: dict[str, Any] | None = None
             pipeline_resume = "--resume" in req.message.lower()

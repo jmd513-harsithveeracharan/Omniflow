@@ -206,11 +206,15 @@ def _resolve_connector_from_label(label: str) -> ConnectorDefinition | None:
     return synthesize_dynamic_connector(label.strip())
 
 
-def detect_connector_need(message: str, session_data: dict[str, Any] | None = None) -> ConnectorDefinition | None:
+def detect_connector_need(
+    message: str,
+    session_data: dict[str, Any] | None = None,
+    intake_override: dict[str, Any] | None = None,
+) -> ConnectorDefinition | None:
     """
     TRULY DYNAMIC connector detection:
     1. If connectionId, --resume, or resume pipeline is present, returns None.
-    2. Parses Intake JSON `retrieved_context.data_sources` dynamically when present.
+    2. Parses Intake JSON `retrieved_context.data_sources` dynamically when present (from intake_override or message).
     3. Matches known presets cleanly or synthesizes a connector for arbitrary source names.
     """
     msg_lower = message.lower()
@@ -218,7 +222,7 @@ def detect_connector_need(message: str, session_data: dict[str, Any] | None = No
     if "connectionid" in msg_lower or "conn_" in msg_lower or "resume pipeline" in msg_lower or "--resume" in msg_lower:
         return None
 
-    intake = extract_intake_json(message)
+    intake = intake_override or extract_intake_json(message)
     if intake:
         sources = intake.get("retrieved_context", {}).get("data_sources", [])
         if isinstance(sources, list):
