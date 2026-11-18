@@ -2380,7 +2380,8 @@ async def handle_chat_stream(req: ChatRequest) -> StreamingResponse:
                     c_desc = cfile.get("description", "")
                     c_content = cfile.get("content", "")
                     if c_content:
-                        sys_prompt += f"- **{c_name}**: {c_desc}\n```\n{c_content[:2000]}\n```\n"
+                        max_chars = 35000 if cfile.get("is_intake_spec") or c_name.endswith(".json") else 8000
+                        sys_prompt += f"- **{c_name}**: {c_desc}\n```\n{c_content[:max_chars]}\n```\n"
                     else:
                         sys_prompt += f"- **{c_name}**: {c_desc}\n"
 
