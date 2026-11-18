@@ -2147,7 +2147,7 @@ async def handle_chat_stream(req: ChatRequest) -> StreamingResponse:
             if not proj_code:
                 proj_code = p_summary.get("project_code") or f"PRJ-{uuid.uuid4().hex[:6].upper()}"
 
-            clean_dom = re.sub(r"[^a-zA-Z0-9_]", "_", (p_summary.get("business_domain") or proj_name).lower()).strip("_")[:16] or "fabric"
+            clean_dom = re.sub(r"[^a-zA-Z0-9_]", "_", (p_summary.get("business_domain") or proj_name).lower()).strip("_")[:48] or "fabric"
             folder_struct = sol_summary.get("target_folder_structure", {})
             root_f = folder_struct.get("root_folder") or f"{clean_dom.capitalize()}_Platform"
             sub_f = folder_struct.get("subfolders", {"raw": "01 Raw", "stage": "02 Stage", "silver": "03 Silver", "gold": "04 Gold"})
@@ -2413,32 +2413,31 @@ async def handle_chat_stream(req: ChatRequest) -> StreamingResponse:
                 yield f"data: {json.dumps({'type': 'thought_step', 'step': st})}\n\n"
             await asyncio.sleep(0)
 
-            # Query Postgres repository with in-memory caching to eliminate 2.2s connection stall
-            global FABRIC_ITEMS_CACHE, FABRIC_ITEMS_CACHE_TIME
-            now = time.time()
-            if not FABRIC_ITEMS_CACHE or (now - FABRIC_ITEMS_CACHE_TIME > 60.0):
-                db_ctx = []
-                try:
-                    repo = PostgresRepository()
-                    with repo._connect() as conn:
-                        with conn.cursor() as cur:
-                            cur.execute("SELECT item_name, item_type, status FROM fabric_items ORDER BY created_at DESC LIMIT 10;")
-                            for itm in cur.fetchall():
-                                db_ctx.append(f"- {itm[0]} ({itm[1]}): {itm[2]}")
-                    FABRIC_ITEMS_CACHE = db_ctx
-                    FABRIC_ITEMS_CACHE_TIME = now
-                except Exception:
-                    db_ctx = FABRIC_ITEMS_CACHE
-            else:
-                db_ctx = FABRIC_ITEMS_CACHE
+            # Query Postgres repository for project-scoped Fabric items (prevent cross-project contamination)
+            db_ctx: list[str] = []
+            try:
+                repo = PostgresRepository()
+                with repo._connect() as conn:
+                    with conn.cursor() as cur:
+                        # Extract project domain keyword to prevent cross-project hallucination
+                        p_dom_kw = re.sub(r"[^a-zA-Z0-9]", "", (p_name or p_code).lower())
+                        cur.execute(
+                            "SELECT item_name, item_type, status FROM fabric_items WHERE item_name ILIKE %s ORDER BY created_at DESC LIMIT 10;",
+                            (f"%{p_dom_kw[:12]}%",) if len(p_dom_kw) >= 4 else ("%nomatch%",)
+                        )
+                        for itm in cur.fetchall():
+                            db_ctx.append(f"- {itm[0]} ({itm[1]}): {itm[2]}")
+            except Exception:
+                pass
 
             sys_prompt = (
                 f"You are Tenali AI (OmniFlow GPT-6 Luna), the autonomous enterprise Microsoft Fabric data engineering agent.\n"
                 f"Target Workspace: {os.getenv('ALLOWED_WORKSPACE_NAME', 'Fabric Workspace')}\n"
                 f"Active Project: {p_name} ({p_code})\n"
                 f"Active Tables & Lineage: {active_plan.get('tables', [])}\n"
-                f"Recent Fabric Items: {', '.join(db_ctx)}\n\n"
+                f"Recent Fabric Items for Active Project: {', '.join(db_ctx) if db_ctx else 'None provisioned yet for this project'}\n\n"
                 f"Instructions:\n"
+                f"- Project Isolation: Do NOT adopt, reference, or assume existing items from other projects or domains (such as Commercial Revenue or Logistics). Focus exclusively on the active project '{p_name}'.\n"
                 f"- Answer concisely and directly with exact, production-grade code.\n"
                 f"- Acoustic Phonetic Tolerance: The user may be speaking through a laptop microphone where browser speech recognition transcribes technical terms phonetically (e.g. 'she Ali' or 'eul uli' for 'CLI', 'restopia' for 'REST API', 'won lake' for 'OneLake', 'pie spark' for 'PySpark', 'tea sequel' for 'T-SQL'). Automatically and seamlessly interpret these terms in context without asking for clarification or correcting them unless requested.\n"
                 f"- Do NOT assume or force multi-tier Medallion folder hierarchies unless the user's project explicitly defines or asks for them.\n"
@@ -2582,7 +2581,7 @@ async def handle_chat_stream(req: ChatRequest) -> StreamingResponse:
 
             reply = "".join(reply_chunks)
             if active_conn_id and chosen_tables:
-                clean_p_dom = re.sub(r"[^a-zA-Z0-9_]", "_", p_name.lower()).strip("_")[:16] or "enterprise"
+                clean_p_dom = re.sub(r"[^a-zA-Z0-9_]", "_", p_name.lower()).strip("_")[:48] or "enterprise"
                 active_plan = {
                     "sourceName": p_name,
                     "project_code": p_code,

@@ -94,7 +94,7 @@ class MultiAgentOrchestrator:
         bus_domain = p_summary.get("business_domain", "Operational Analytics")
         intake_proj_code = p_summary.get("project_code")
         clean_domain = re.sub(r"[^a-zA-Z0-9]", "_", bus_domain.lower())
-        clean_domain = re.sub(r"_+", "_", clean_domain).strip("_")[:16]
+        clean_domain = re.sub(r"_+", "_", clean_domain).strip("_")[:48]
         domain_key = clean_domain or "enterprise"
         proj_code = req.project_code if req else (intake_proj_code or f"PRJ-{domain_key.upper().replace('_', '-')}")
         proj_code = re.sub(r"[^a-zA-Z0-9_\-]", "", proj_code)
