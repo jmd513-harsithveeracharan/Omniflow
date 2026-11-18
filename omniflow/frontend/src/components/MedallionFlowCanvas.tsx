@@ -11,11 +11,13 @@ import {
   Play,
   Maximize2,
   Minimize2,
-  RefreshCw,
   X,
 } from 'lucide-react';
 import { IngestionPlan } from '../types';
 import { GraphMeshView } from './graph/GraphMeshView';
+import { OneLakeTreePane } from './workbench/OneLakeTreePane';
+import { CodeEditorPane } from './workbench/CodeEditorPane';
+import { DeltaSchemaPane } from './workbench/DeltaSchemaPane';
 
 interface MedallionFlowCanvasProps {
   plan?: IngestionPlan | Record<string, unknown> | null;
@@ -47,13 +49,14 @@ export const MedallionFlowCanvas: React.FC<MedallionFlowCanvasProps> = ({
   const [selectedNode, setSelectedNode] = useState<DagNode | null>(null);
 
   // Dynamic DAG Computation from plan
-  const { dagNodes, dagEdges, treeItems, pysparkCode, jsonSpec } = React.useMemo(() => {
+  const { dagNodes, dagEdges, treeItems, pysparkCode, sqlCode, jsonSpec, rootFolder, domain } = React.useMemo(() => {
     if (!plan || typeof plan !== 'object') {
       return {
         dagNodes: [],
         dagEdges: [],
         treeItems: [],
         pysparkCode: '# No pipeline code generated yet.\n# Run an architecture prompt or attach an intake spec to synthesize PySpark Delta logic.',
+        sqlCode: '',
         jsonSpec: JSON.stringify(
           {
             status: 'idle',
@@ -62,14 +65,21 @@ export const MedallionFlowCanvas: React.FC<MedallionFlowCanvasProps> = ({
           null,
           2
         ),
+        rootFolder: 'Postgres_Medallion_Platform',
+        domain: 'postgres_medallion',
       };
     }
 
     const p = plan as Record<string, unknown>;
-    const folder = (p.folder as string) || 'AI_Test_Folder';
-    const lakehouses = (p.lakehouses as string[]) || [];
+    const rootF = (p.root_folder as string) || (p.folder as string) || 'Postgres_Medallion_Platform';
+    const cleanDomain = String(p.domain || 'postgres_medallion').replace(/[^a-zA-Z0-9_]/g, '_').toLowerCase();
+    const lakehouses = (p.lakehouses as string[]) || [`lh_${cleanDomain}_bronze`, `lh_${cleanDomain}_silver`];
     const notebooks = (p.notebooks as Array<Record<string, unknown>>) || [];
     const pipeline = p.pipeline as Record<string, unknown> | string | undefined;
+    const warehouseName =
+      (p.warehouse as string) ||
+      ((p.items as Array<Record<string, unknown>>)?.find((it) => it.type === 'Warehouse')?.name as string) ||
+      `wh_${cleanDomain}_gold`;
 
     const nodes: DagNode[] = [];
     const edges: Array<{ from: string; to: string }> = [];
@@ -77,7 +87,7 @@ export const MedallionFlowCanvas: React.FC<MedallionFlowCanvasProps> = ({
     // Source Node
     nodes.push({
       id: 'node_source',
-      label: `${folder} (Source Stream)`,
+      label: `${rootF} (Source Stream)`,
       type: 'source',
       layer: 'SOURCE',
       sub: 'OneLake Landing Zone',
@@ -87,13 +97,11 @@ export const MedallionFlowCanvas: React.FC<MedallionFlowCanvasProps> = ({
     });
 
     // Lakehouses & Notebooks
-    const lhBronze = lakehouses.find((l) => l.toLowerCase().includes('bronze')) || lakehouses[0] || 'lh_bronze';
-    const lhSilver = lakehouses.find((l) => l.toLowerCase().includes('silver')) || lakehouses[1] || 'lh_silver';
-    const lhGold = lakehouses.find((l) => l.toLowerCase().includes('gold')) || lakehouses[2] || 'lh_gold';
+    const lhBronze = lakehouses.find((l) => l.toLowerCase().includes('bronze')) || lakehouses[0] || `lh_${cleanDomain}_bronze`;
+    const lhSilver = lakehouses.find((l) => l.toLowerCase().includes('silver')) || lakehouses[1] || `lh_${cleanDomain}_silver`;
 
-    const nbBronze = notebooks.find((n) => String(n.layer || n.name).toLowerCase().includes('bronze')) || notebooks[0];
-    const nbSilver = notebooks.find((n) => String(n.layer || n.name).toLowerCase().includes('silver')) || notebooks[1];
-    const nbGold = notebooks.find((n) => String(n.layer || n.name).toLowerCase().includes('gold')) || notebooks[2];
+    const nbBronze = notebooks.find((n) => String(n.layer || n.name).toLowerCase().includes('bronze'));
+    const nbSilver = notebooks.find((n) => String(n.layer || n.name).toLowerCase().includes('silver')) || notebooks[0];
 
     nodes.push({
       id: 'node_bronze',
@@ -133,55 +141,49 @@ export const MedallionFlowCanvas: React.FC<MedallionFlowCanvasProps> = ({
       y: 50,
     });
 
-    if (nbSilver) {
+    const pyCurateCode =
+      (p.pyspark_code as string) ||
+      (nbSilver?.pyspark_code as string) ||
+      (nbSilver?.pyspark as string) ||
+      (nbSilver?.code as string) ||
+      '';
+
+    const sqlWarehouseCode = (p.sql_code as string) || '';
+
+    if (nbSilver || pyCurateCode) {
       nodes.push({
         id: 'node_nb_silver',
-        label: String(nbSilver.name || 'nb_silver_merge'),
+        label: String(nbSilver?.name || `nb_${cleanDomain}_curate`),
         type: 'notebook',
         layer: 'PYSPARK',
-        sub: String(nbSilver.description || 'Bronze -> Silver MERGE'),
+        sub: 'Bronze -> Silver MERGE & Masking',
         status: 'live',
         x: 600,
         y: 180,
-        code: (nbSilver.pyspark_code as string) || (nbSilver.pyspark as string) || '',
+        code: pyCurateCode,
       });
       edges.push({ from: 'node_bronze', to: 'node_silver' });
-      if (nbBronze) edges.push({ from: 'node_nb_bronze', to: 'node_nb_silver' });
+      edges.push({ from: 'node_bronze', to: 'node_nb_silver' });
     }
 
     nodes.push({
       id: 'node_gold',
-      label: lhGold,
+      label: warehouseName,
       type: 'lakehouse',
       layer: 'GOLD',
-      sub: 'Star Schema & Direct Lake',
+      sub: 'Kimball Star Schema & Direct Lake',
       status: 'live',
       x: 880,
       y: 50,
     });
-
-    if (nbGold) {
-      nodes.push({
-        id: 'node_nb_gold',
-        label: String(nbGold.name || 'nb_gold_star'),
-        type: 'notebook',
-        layer: 'PYSPARK',
-        sub: String(nbGold.description || 'Silver -> Gold Dimensional Modeling'),
-        status: 'live',
-        x: 880,
-        y: 180,
-        code: (nbGold.pyspark_code as string) || (nbGold.pyspark as string) || '',
-      });
-      edges.push({ from: 'node_silver', to: 'node_gold' });
-      if (nbSilver) edges.push({ from: 'node_nb_silver', to: 'node_nb_gold' });
-    }
+    edges.push({ from: 'node_silver', to: 'node_gold' });
 
     if (pipeline) {
-      const plName = typeof pipeline === 'object' ? String(pipeline.name || 'pl_daily_sales') : String(pipeline);
+      const plName = typeof pipeline === 'object' ? String(pipeline.name || `pl_${cleanDomain}_bronze_ingest`) : String(pipeline);
       const schedStr =
         typeof pipeline === 'object' && typeof pipeline.schedule === 'object'
-          ? String((pipeline.schedule as Record<string, unknown>).human || 'Daily at 02:00 UTC')
-          : 'Daily at 02:00 UTC';
+          ? String((pipeline.schedule as Record<string, unknown>).human || 'Hourly Micro-Batch CDC')
+          : 'Hourly Micro-Batch CDC';
 
       nodes.push({
         id: 'node_pipeline',
@@ -193,47 +195,39 @@ export const MedallionFlowCanvas: React.FC<MedallionFlowCanvasProps> = ({
         x: 1140,
         y: 120,
       });
-
-      if (nbGold) {
-        edges.push({ from: 'node_nb_gold', to: 'node_pipeline' });
-      } else if (nbSilver) {
-        edges.push({ from: 'node_nb_silver', to: 'node_pipeline' });
-      }
+      edges.push({ from: 'node_bronze', to: 'node_pipeline' });
     }
 
-    // Build tree
-    const folderClean = folder.replace('AI_Test_Folder/', '').trim();
-    const tree: string[] = ['📁 AI_Test_Folder/'];
-    if (folderClean && folderClean !== 'AI_Test_Folder') {
-      tree.push(`└── 📁 ${folderClean}/`);
-      const prefix = '    ';
-      lakehouses.forEach((lh) => tree.push(`${prefix}├── 🏢 ${lh} (Delta Lakehouse)`));
-      notebooks.forEach((nb) => tree.push(`${prefix}├── 📜 ${nb.name} [${nb.layer || 'PySpark'}]`));
-      if (pipeline) {
-        const plName = typeof pipeline === 'object' ? String(pipeline.name || 'pl_pipeline') : String(pipeline);
-        tree.push(`${prefix}└── ⚡ ${plName} (Data Factory Pipeline)`);
-      }
-    } else {
-      lakehouses.forEach((lh) => tree.push(`├── 🏢 ${lh} (Delta Lakehouse)`));
-      notebooks.forEach((nb) => tree.push(`├── 📜 ${nb.name} [${nb.layer || 'PySpark'}]`));
-      if (pipeline) {
-        const plName = typeof pipeline === 'object' ? String(pipeline.name || 'pl_pipeline') : String(pipeline);
-        tree.push(`└── ⚡ ${plName} (Data Factory Pipeline)`);
-      }
-    }
+    // Build hierarchical 5-item Medallion tree
+    const rawFolder = (p.folders as Record<string, string>)?.raw || '01 Raw';
+    const stageFolder = (p.folders as Record<string, string>)?.stage || '02 Stage';
+    const silverFolder = (p.folders as Record<string, string>)?.silver || '03 Silver';
+    const goldFolder = (p.folders as Record<string, string>)?.gold || '04 Gold';
+    const plName = typeof pipeline === 'object' ? String(pipeline.name || `pl_${cleanDomain}_bronze_ingest`) : String(pipeline || `pl_${cleanDomain}_bronze_ingest`);
+    const nbName = String(nbSilver?.name || `nb_${cleanDomain}_curate`);
 
-    // Code sample
-    const primaryCode =
-      (notebooks[0]?.pyspark_code as string) ||
-      (notebooks[0]?.pyspark as string) ||
-      '# PySpark code synthesized by Worker Agent';
+    const tree: string[] = [
+      `📁 ${rootF}/`,
+      `├── 📁 ${rawFolder}/`,
+      `│   ├── 🏢 ${lhBronze} (Delta Lakehouse)`,
+      `│   └── ⚡ ${plName} (Data Factory Pipeline)`,
+      `├── 📁 ${stageFolder}/`,
+      `│   └── 📜 ${nbName}.py [PySpark Delta Curation]`,
+      `├── 📁 ${silverFolder}/`,
+      `│   └── 🏢 ${lhSilver} (Delta Lakehouse)`,
+      `└── 📁 ${goldFolder}/`,
+      `    └── 🏛️ ${warehouseName} (Direct Lake T-SQL Warehouse)`,
+    ];
 
     return {
       dagNodes: nodes,
       dagEdges: edges,
       treeItems: tree,
-      pysparkCode: primaryCode,
+      pysparkCode: pyCurateCode || '# PySpark code synthesized by Worker Agent',
+      sqlCode: sqlWarehouseCode,
       jsonSpec: JSON.stringify(plan, null, 2),
+      rootFolder: rootF,
+      domain: cleanDomain,
     };
   }, [plan]);
 
@@ -245,8 +239,6 @@ export const MedallionFlowCanvas: React.FC<MedallionFlowCanvasProps> = ({
 
   const nodeMap = new Map<string, DagNode>();
   dagNodes.forEach((n) => nodeMap.set(n.id, n));
-
-  const activeCode = selectedNode?.code || pysparkCode;
 
   return (
     <div className={`bolt-workbench-pane-inner ${isFullscreen ? 'fullscreen-mode' : ''}`}>
@@ -488,130 +480,30 @@ export const MedallionFlowCanvas: React.FC<MedallionFlowCanvasProps> = ({
 
         {/* 2. OneLake Tree */}
         {activeTab === 'wbTree' && (
-          <div className="wb-view-pane active">
-            <div className="tree-toolbar">
-              <span className="tree-toolbar-label">OneLake Workspace Assets (AI_Test_Folder)</span>
-              <button className="btn-tree-refresh" type="button">
-                <RefreshCw width={12} height={12} />
-                <span>Sync Items</span>
-              </button>
-            </div>
-            {treeItems.length === 0 ? (
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', minHeight: '260px', color: '#94a3b8', textAlign: 'center', padding: '32px' }}>
-                <FolderTree width={32} height={32} style={{ opacity: 0.35, marginBottom: '10px' }} />
-                <p style={{ margin: 0, fontSize: '13px' }}>No OneLake workspace folder hierarchy generated yet.</p>
-              </div>
-            ) : (
-            <div className="tree-container">
-              {treeItems.map((item, idx) => {
-                const isNested = item.startsWith('    ');
-                const isChild = item.startsWith('├──') || item.startsWith('└──');
-                const padClass = isNested ? 'pl-8' : (isChild ? 'pl-4' : '');
-                return (
-                  <div
-                    key={idx}
-                    className={`tree-node-item ${padClass}`}
-                    style={{ whiteSpace: 'pre', fontFamily: 'var(--font-mono, "JetBrains Mono", monospace)' }}
-                  >
-                    {item}
-                  </div>
-                );
-              })}
-            </div>
-            )}
-          </div>
+          <OneLakeTreePane
+            treeItems={treeItems}
+            rootFolder={rootFolder}
+            workspaceName={((plan as Record<string, unknown>)?.target_workspace as string) || 'PBT_DATA_AGENT'}
+          />
         )}
 
         {/* 3. PySpark Studio Code Editor */}
         {activeTab === 'wbCode' && (
-          <div className="wb-view-pane active">
-            <div className="code-editor-header">
-              <div className="code-header-left">
-                <span className="wb-code-file-badge">{selectedNode ? `${selectedNode.label}.py` : 'nb_notebook.py'}</span>
-                <span className="wb-layer-pill">{selectedNode?.layer || 'PySpark 3.4'}</span>
-              </div>
-              <div className="code-header-right">
-                <span className="wb-code-stat-badge">{activeCode.split('\n').length} lines</span>
-                <button
-                  className="btn-copy-code"
-                  type="button"
-                  onClick={() => handleCopy(activeCode)}
-                >
-                  {copied ? <Check width={12} height={12} /> : <Copy width={12} height={12} />}
-                  <span>{copied ? 'Copied' : 'Copy Code'}</span>
-                </button>
-              </div>
-            </div>
-            <div className="code-editor-view-container">
-              <pre className="code-editor-view">
-                <code>{activeCode}</code>
-              </pre>
-            </div>
-          </div>
+          <CodeEditorPane
+            pysparkCode={pysparkCode}
+            sqlCode={sqlCode}
+            domain={domain}
+            selectedLabel={selectedNode?.label}
+          />
         )}
 
         {/* 4. Delta Schema Viewer */}
         {activeTab === 'wbTable' && (
-          <div className="wb-view-pane active">
-            <div className="schema-view-wrapper">
-              <div className="schema-view-header">
-                <div className="schema-header-left">
-                  <h4>lh_silver.cleansed_sales</h4>
-                  <span className="schema-pill">Silver Delta Table</span>
-                </div>
-              </div>
-              <div className="schema-table-container">
-                <table className="schema-data-table">
-                  <thead>
-                    <tr>
-                      <th>Column Name</th>
-                      <th>Data Type</th>
-                      <th>Nullable</th>
-                      <th>Primary Key</th>
-                      <th>Layer</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr>
-                      <td><strong>TransactionID</strong></td>
-                      <td><code>string (SHA-256)</code></td>
-                      <td>No</td>
-                      <td>Yes (Business PK)</td>
-                      <td>Silver</td>
-                    </tr>
-                    <tr>
-                      <td>CustomerID</td>
-                      <td><code>string</code></td>
-                      <td>No</td>
-                      <td>FK $\to$ dim_customer</td>
-                      <td>Bronze $\to$ Silver</td>
-                    </tr>
-                    <tr>
-                      <td>ProductID</td>
-                      <td><code>string</code></td>
-                      <td>No</td>
-                      <td>FK $\to$ dim_product</td>
-                      <td>Bronze $\to$ Silver</td>
-                    </tr>
-                    <tr>
-                      <td>SalesAmount</td>
-                      <td><code>decimal(10,2)</code></td>
-                      <td>Yes</td>
-                      <td>No</td>
-                      <td>Bronze $\to$ Silver</td>
-                    </tr>
-                    <tr>
-                      <td>_ingested_at</td>
-                      <td><code>timestamp</code></td>
-                      <td>No</td>
-                      <td>Audit Column</td>
-                      <td>System Metadata</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
+          <DeltaSchemaPane
+            schemaContracts={(plan as any)?.schema_contracts}
+            tables={(plan as any)?.tables}
+            domain={domain}
+          />
         )}
 
         {/* 5. Fabric JSON Spec */}

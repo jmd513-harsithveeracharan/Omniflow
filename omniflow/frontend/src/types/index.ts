@@ -184,10 +184,36 @@ export interface IngestionPlan {
   database: string;
   schedule: string;
   items: IngestionPlanItem[];
-  notebooks: string[];
+  notebooks: string[] | Array<Record<string, unknown>>;
   lakehouses: string[];
+  warehouse?: string;
+  pipeline?: string | Record<string, unknown>;
   root_folder?: string;
+  folder?: string;
   project_code?: string;
+  domain?: string;
+  pyspark_code?: string;
+  sql_code?: string;
+  schema_contracts?: Record<string, {
+    table_name: string;
+    layer?: string;
+    primary_key?: string;
+    watermark_column?: string;
+    columns: Array<{
+      name: string;
+      data_type?: string;
+      type?: string;
+      is_primary_key?: boolean;
+      is_pk?: boolean;
+      is_nullable?: boolean;
+      nullable?: boolean;
+      is_pii?: boolean;
+      pii?: boolean;
+      foreign_key?: string;
+    }>;
+  }>;
+  tables?: Array<Record<string, unknown>>;
+  folders?: Record<string, string>;
 }
 
 export type ThinkingStepStatus = 'pending' | 'running' | 'completed' | 'warning' | 'error';

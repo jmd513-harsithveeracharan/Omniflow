@@ -199,12 +199,14 @@ export const ThoughtTrace: React.FC<ThoughtTraceProps> = ({ meta, isStreaming = 
             const hasDetailOrOutput = Boolean(st.detail || st.output);
             const isRowExpanded = Boolean(expandedRows[idx]);
 
-            // Parse or fallback fields
-            const action = st.action || st.title.split(' ')[0] || 'Processed';
-            const target =
-              st.target ||
-              (st.title.includes(':') ? st.title.split(':')[1].trim() : st.title.replace(action, '').trim()) ||
-              st.title;
+            // Parse or fallback fields cleanly (prevent duplicate words like 'Architect Architect')
+            const rawAction = st.action || (st.title.includes(':') ? st.title.split(':')[0].trim() : st.title.split(' ')[0]) || 'Processed';
+            const action = rawAction.replace(/\s+(Agent|Engine|Module)$/i, '').trim() || rawAction;
+            let target = st.target || (st.title.includes(':') ? st.title.split(':')[1].trim() : st.title.replace(rawAction, '').trim());
+            if (target.toLowerCase() === action.toLowerCase() || target.toLowerCase() === rawAction.toLowerCase()) {
+              target = st.title.includes(':') ? st.title.split(':')[1].trim() : st.detail || '';
+            }
+            const cleanTarget = target.replace(/^[:\s-]+/, '').trim() || st.title;
 
             return (
               <div key={idx} className="antigravity-step-item" style={{ display: 'flex', flexDirection: 'column' }}>
@@ -256,7 +258,7 @@ export const ThoughtTrace: React.FC<ThoughtTraceProps> = ({ meta, isStreaming = 
 
                   {/* Target / File / Entity */}
                   <span style={{ color: '#f1f5f9', fontWeight: isInProgress ? 600 : 500 }}>
-                    {target}
+                    {cleanTarget}
                   </span>
 
                   {/* Diff stats (e.g. +38 -0, +46 lines) */}

@@ -258,16 +258,26 @@ export const App: React.FC = () => {
     }
   }, [activeView, activeProjectId, currentUser?.email]);
 
-  const handleNewSession = () => {
+  const handleNewSession = (explicitProjectId?: string | null) => {
     if (isStreaming) return;
-    setActiveProjectId(null);
+    const storedPid = localStorage.getItem('omniflow_active_project_id');
+    const projId = explicitProjectId !== undefined ? explicitProjectId : (activeProjectId || storedPid || null);
+    if (projId) {
+      setActiveProjectId(projId);
+    }
     setCurrentPlan(null);
-    const newSid = generateNewSessionId();
+    const newSid = projId
+      ? `proj_${projId}_${Math.random().toString(36).substring(2, 9)}`
+      : generateNewSessionId();
     setSessionId(newSid);
     setMessages([]);
     setActiveView('chat');
     try {
-      localStorage.removeItem('omniflow_active_project_id');
+      if (projId) {
+        localStorage.setItem('omniflow_active_project_id', projId);
+      } else {
+        localStorage.removeItem('omniflow_active_project_id');
+      }
       localStorage.setItem('omniflow_active_session_id', newSid);
       localStorage.setItem('omniflow_active_view', 'chat');
     } catch {}
@@ -730,7 +740,7 @@ export const App: React.FC = () => {
           setActiveCredentialRequest(credData);
         }
       },
-      activeProjectId || undefined,
+      activeProjectId || localStorage.getItem('omniflow_active_project_id') || undefined,
       images
     );
   };

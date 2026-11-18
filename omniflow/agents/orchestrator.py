@@ -268,14 +268,29 @@ class MultiAgentOrchestrator:
         exec_out = executor.run_executor(dag_out, run_id, artifacts_dir, resume=resume)
 
         pyspark_code = None
+        sql_code = None
         for art in exec_out.artifacts_created:
             status_tag = "Cached" if art.tool_used == "cache_reuse" else "Generated"
             ui.check_item(art.artifact_name, status_tag, f"{art.execution_time_ms} ms")
-            if art.artifact_name.endswith(".py") and "curate" in art.artifact_name:
-                p_file = os.path.join(artifacts_dir, art.artifact_name)
-                if os.path.exists(p_file):
-                    with open(p_file, "r", encoding="utf-8") as pf:
-                        pyspark_code = pf.read()
+            emit("artifact_generated", {
+                "artifact_name": art.artifact_name,
+                "execution_time_ms": art.execution_time_ms,
+                "tool_used": art.tool_used,
+            })
+            p_file = os.path.join(artifacts_dir, art.artifact_name)
+            if os.path.exists(p_file):
+                if art.artifact_name.endswith(".py") and ("curate" in art.artifact_name or not pyspark_code):
+                    try:
+                        with open(p_file, "r", encoding="utf-8") as pf:
+                            pyspark_code = pf.read()
+                    except Exception:
+                        pass
+                elif art.artifact_name.endswith(".sql") and ("gold" in art.artifact_name or "warehouse" in art.artifact_name or not sql_code):
+                    try:
+                        with open(p_file, "r", encoding="utf-8") as sf:
+                            sql_code = sf.read()
+                    except Exception:
+                        pass
 
         emit("execution_completed", {
             "artifacts_created": [a.model_dump() for a in exec_out.artifacts_created],
@@ -381,6 +396,10 @@ class MultiAgentOrchestrator:
             "executor_output": exec_out.model_dump(),
             "audit_output": audit_res,
             "fabric_deployment": deploy_res,
+            "pyspark_code": pyspark_code,
+            "sql_code": sql_code,
+            "artifacts_dir": artifacts_dir,
+            "tables_meta": tables_meta,
         }
         self.db_logger.update_run_status(
             run_id=run_id,
