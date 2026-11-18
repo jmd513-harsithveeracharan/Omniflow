@@ -5,13 +5,13 @@ export const CONNECTORS: ConnectorSummary[] = [
     id: 'postgres',
     name: 'PostgreSQL Database',
     category: 'RDBMS',
-    description: 'PostgreSQL 12+ on-prem or cloud (Azure Database, AWS RDS, GCP)',
+    description: 'PostgreSQL 12+ on-prem or cloud (Azure Database, AWS RDS, Neon)',
     fields: [
       { name: 'host', label: 'Host / Endpoint', type: 'string', required: true, default: 'localhost' },
       { name: 'port', label: 'Port', type: 'number', required: true, default: 5432 },
-      { name: 'database', label: 'Database Name', type: 'string', required: true, default: 'enterprise_dw' },
-      { name: 'user', label: 'Username', type: 'string', required: true, default: 'postgres' },
-      { name: 'password', label: 'Password', type: 'password', required: true, default: '********' },
+      { name: 'database', label: 'Database Name', type: 'string', required: true, default: 'postgres' },
+      { name: 'username', label: 'Username', type: 'string', required: true, default: 'postgres' },
+      { name: 'password', label: 'Password', type: 'password', required: true, default: '' },
     ],
   },
   {

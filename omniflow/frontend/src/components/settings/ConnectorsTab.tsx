@@ -82,6 +82,18 @@ export const ConnectorsTab: React.FC<ConnectorsTabProps> = ({
             <div className="popular-card-left">
               <span className="popular-card-icon">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14.5v-9l6 4.5-6 4.5z" fill="#336791" />
+                </svg>
+              </span>
+              <span className="popular-card-name">PostgreSQL</span>
+            </div>
+            <button type="button" className="btn-pill-connect" onClick={() => onOpenConnectorModal?.('postgres')}>Connect</button>
+          </div>
+
+          <div className="popular-card">
+            <div className="popular-card-left">
+              <span className="popular-card-icon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
                   <path d="M12 2v20M2 12h20M4.93 4.93l14.14 14.14M4.93 19.07l14.14-14.14" stroke="#29B5E8" strokeWidth="2" strokeLinecap="round" />
                   <circle cx="12" cy="12" r="2" fill="#29B5E8" />
                 </svg>
@@ -139,7 +151,26 @@ export const ConnectorsTab: React.FC<ConnectorsTabProps> = ({
             </div>
           </div>
 
-          {/* 2. Databricks Unity Catalog */}
+          {/* 2. PostgreSQL Relational Database */}
+          <div className="connector-row" data-status="not_connected">
+            <div className="connector-cell-name">
+              <span className="connector-avatar">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14.5v-9l6 4.5-6 4.5z" fill="#336791" />
+                </svg>
+              </span>
+              <div className="connector-name-details">
+                <span className="connector-name">PostgreSQL Database</span>
+                <span className="connector-meta">Neon DB, RDS, Azure Database & Local</span>
+              </div>
+            </div>
+            <div className="connector-cell-type">Relational Database</div>
+            <div className="connector-cell-action">
+              <button type="button" className="btn-pill-connect" onClick={() => onOpenConnectorModal?.('postgres')}>Connect</button>
+            </div>
+          </div>
+
+          {/* 3. Databricks Unity Catalog */}
           <div className="connector-row" data-status="not_connected">
             <div className="connector-cell-name">
               <span className="connector-avatar">
