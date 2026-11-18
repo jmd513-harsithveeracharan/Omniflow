@@ -49,13 +49,14 @@ export const MedallionFlowCanvas: React.FC<MedallionFlowCanvasProps> = ({
   const [selectedNode, setSelectedNode] = useState<DagNode | null>(null);
 
   // Dynamic DAG Computation from plan
-  const { dagNodes, dagEdges, treeItems, pysparkCode, sqlCode, jsonSpec, rootFolder, domain } = React.useMemo(() => {
+  const { dagNodes, dagEdges, treeItems, pysparkCode, qualityCode, sqlCode, jsonSpec, rootFolder, domain } = React.useMemo(() => {
     if (!plan || typeof plan !== 'object') {
       return {
         dagNodes: [],
         dagEdges: [],
         treeItems: [],
         pysparkCode: '# No pipeline code generated yet.\n# Run an architecture prompt or attach an intake spec to synthesize PySpark Delta logic.',
+        qualityCode: '',
         sqlCode: '',
         jsonSpec: JSON.stringify(
           {
@@ -148,6 +149,7 @@ export const MedallionFlowCanvas: React.FC<MedallionFlowCanvasProps> = ({
       (nbSilver?.code as string) ||
       '';
 
+    const qualitySuiteCode = (p.quality_code as string) || '';
     const sqlWarehouseCode = (p.sql_code as string) || '';
 
     if (nbSilver || pyCurateCode) {
@@ -198,25 +200,42 @@ export const MedallionFlowCanvas: React.FC<MedallionFlowCanvasProps> = ({
       edges.push({ from: 'node_bronze', to: 'node_pipeline' });
     }
 
-    // Build hierarchical 5-item Medallion tree
+    // Build hierarchical Enterprise Medallion tree with typed subfolders
     const rawFolder = (p.folders as Record<string, string>)?.raw || '01 Raw';
     const stageFolder = (p.folders as Record<string, string>)?.stage || '02 Stage';
     const silverFolder = (p.folders as Record<string, string>)?.silver || '03 Silver';
     const goldFolder = (p.folders as Record<string, string>)?.gold || '04 Gold';
     const plName = typeof pipeline === 'object' ? String(pipeline.name || `pl_${cleanDomain}_bronze_ingest`) : String(pipeline || `pl_${cleanDomain}_bronze_ingest`);
     const nbName = String(nbSilver?.name || `nb_${cleanDomain}_curate`);
+    const qualityName = `nb_${cleanDomain}_quality_suite`;
+    const semanticModelName = `sm_${cleanDomain}_gold_direct_lake`;
+    const masterPlName = `pl_master_medallion_orchestration`;
 
     const tree: string[] = [
       `📁 ${rootF}/`,
       `├── 📁 ${rawFolder}/`,
-      `│   ├── 🏢 ${lhBronze} (Delta Lakehouse)`,
-      `│   └── ⚡ ${plName} (Data Factory Pipeline)`,
+      `│   ├── 📁 01_lakehouse/`,
+      `│   │   └── 🏢 ${lhBronze} (Delta Lakehouse)`,
+      `│   └── 📁 02_pipelines/`,
+      `│       └── ⚡ ${plName} (Data Factory Pipeline)`,
       `├── 📁 ${stageFolder}/`,
-      `│   └── 📜 ${nbName}.py [PySpark Delta Curation]`,
+      `│   ├── 📁 01_notebooks/`,
+      `│   │   └── 📜 ${nbName}.py (PySpark Curation & PII Masking)`,
+      `│   └── 📁 02_quality/`,
+      `│       └── 📜 ${qualityName}.py (Great Expectations Audit Suite)`,
       `├── 📁 ${silverFolder}/`,
-      `│   └── 🏢 ${lhSilver} (Delta Lakehouse)`,
-      `└── 📁 ${goldFolder}/`,
-      `    └── 🏛️ ${warehouseName} (Direct Lake T-SQL Warehouse)`,
+      `│   ├── 📁 01_lakehouse/`,
+      `│   │   └── 🏢 ${lhSilver} (Harmonized Delta Lakehouse)`,
+      `│   └── 📁 02_notebooks/`,
+      `│       └── 📜 nb_silver_transformations.py (SCD2 Delta MERGE Upsert)`,
+      `├── 📁 ${goldFolder}/`,
+      `│   ├── 📁 01_warehouse/`,
+      `│   │   └── 🏛️ ${warehouseName} (Direct Lake T-SQL Warehouse)`,
+      `│   └── 📁 02_semantic_models/`,
+      `│       └── 📊 ${semanticModelName} (Direct Lake Power BI Semantic Model)`,
+      `└── 📁 05 Orchestration/`,
+      `    └── 📁 01_pipelines/`,
+      `        └── ⚡ ${masterPlName} (End-to-End Orchestrator Pipeline)`,
     ];
 
     return {
@@ -224,6 +243,7 @@ export const MedallionFlowCanvas: React.FC<MedallionFlowCanvasProps> = ({
       dagEdges: edges,
       treeItems: tree,
       pysparkCode: pyCurateCode || '# PySpark code synthesized by Worker Agent',
+      qualityCode: qualitySuiteCode,
       sqlCode: sqlWarehouseCode,
       jsonSpec: JSON.stringify(plan, null, 2),
       rootFolder: rootF,
@@ -491,6 +511,7 @@ export const MedallionFlowCanvas: React.FC<MedallionFlowCanvasProps> = ({
         {activeTab === 'wbCode' && (
           <CodeEditorPane
             pysparkCode={pysparkCode}
+            qualityCode={qualityCode}
             sqlCode={sqlCode}
             domain={domain}
             selectedLabel={selectedNode?.label}

@@ -51,22 +51,81 @@ def _headers() -> dict[str, str]:
 
 
 def get_or_create_folder(folder_name: str, workspace_id: str) -> dict[str, Any]:
-    """Gets an existing folder or creates it under the workspace."""
+    """
+    Gets an existing folder or creates it under the workspace.
+    Supports nested slash-delimited paths (e.g. 'Postgres_Medallion_Platform/01 Raw/01_lakehouse').
+    """
+    if not folder_name or not folder_name.strip():
+        return {"id": None, "displayName": "", "already_existed": False}
+
+    clean_name = folder_name.strip().strip("/")
+    parts = [p.strip() for p in clean_name.split("/") if p.strip()]
+    if not parts:
+        return {"id": None, "displayName": "", "already_existed": False}
+
     h = _headers()
     list_url = f"{_BASE}/workspaces/{workspace_id}/folders"
-    r = requests.get(list_url, headers=h, timeout=15)
-    if r.status_code == 200:
-        for f in r.json().get("value", []):
-            if f.get("displayName") == folder_name:
-                return {"id": f.get("id"), "displayName": folder_name, "already_existed": True}
+    existing_folders: list[dict[str, Any]] = []
+    try:
+        r = requests.get(list_url, headers=h, timeout=15)
+        if r.status_code == 200:
+            existing_folders = r.json().get("value", [])
+    except Exception:
+        pass
 
-    post_url = f"{_BASE}/workspaces/{workspace_id}/folders"
-    payload = {"displayName": folder_name}
-    r = requests.post(post_url, headers=h, json=payload, timeout=20)
-    if r.status_code in (200, 201):
-        res = r.json()
-        return {"id": res.get("id"), "displayName": folder_name, "already_existed": False}
-    raise RuntimeError(f"Failed to create folder '{folder_name}' in workspace {workspace_id}: {r.text}")
+    current_parent_id: str | None = None
+    last_res: dict[str, Any] = {"id": None, "displayName": parts[-1], "already_existed": False}
+
+    for part in parts:
+        matched = next(
+            (
+                f for f in existing_folders
+                if f.get("displayName") == part
+                and (f.get("parentFolderId") or None) == current_parent_id
+            ),
+            None,
+        )
+        if matched:
+            current_parent_id = matched.get("id")
+            last_res = {"id": current_parent_id, "displayName": part, "already_existed": True}
+        else:
+            post_url = f"{_BASE}/workspaces/{workspace_id}/folders"
+            payload: dict[str, Any] = {"displayName": part}
+            if current_parent_id:
+                payload["parentFolderId"] = current_parent_id
+            r = requests.post(post_url, headers=h, json=payload, timeout=20)
+            if r.status_code in (200, 201):
+                res = r.json()
+                current_parent_id = res.get("id")
+                new_f = {"id": current_parent_id, "displayName": part, "parentFolderId": payload.get("parentFolderId")}
+                existing_folders.append(new_f)
+                last_res = {"id": current_parent_id, "displayName": part, "already_existed": False}
+            elif current_parent_id:
+                # Fallback: retry without parentFolderId if workspace rejects nesting
+                rf = requests.post(post_url, headers=h, json={"displayName": part}, timeout=20)
+                if rf.status_code in (200, 201):
+                    res = rf.json()
+                    current_parent_id = res.get("id")
+                    last_res = {"id": current_parent_id, "displayName": part, "already_existed": False}
+                else:
+                    raise RuntimeError(f"Failed to create folder '{part}' in workspace {workspace_id}: {r.text}")
+            else:
+                raise RuntimeError(f"Failed to create folder '{part}' in workspace {workspace_id}: {r.text}")
+
+    return last_res
+
+
+def move_item_to_folder(item_id: str, folder_id: str, workspace_id: str) -> bool:
+    """Moves a provisioned Fabric item into its target folder."""
+    if not item_id or not folder_id or item_id in ("provisioned_async", "local-sim"):
+        return False
+    h = _headers()
+    url = f"{_BASE}/workspaces/{workspace_id}/items/{item_id}/moveToFolder"
+    try:
+        r = requests.post(url, headers=h, json={"targetFolderId": folder_id}, timeout=15)
+        return r.status_code in (200, 201)
+    except Exception:
+        return False
 
 
 def create_item(

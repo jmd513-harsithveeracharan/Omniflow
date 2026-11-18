@@ -20,6 +20,8 @@ export const OneLakeTreePane: React.FC<OneLakeTreePaneProps> = ({
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const itemCount = treeItems.filter((it) => it.includes('🏢') || it.includes('📜') || it.includes('⚡') || it.includes('🏛️') || it.includes('📊')).length || 9;
+
   if (!treeItems || treeItems.length === 0) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', minHeight: '260px', color: '#94a3b8', textAlign: 'center', padding: '32px' }}>
@@ -36,7 +38,7 @@ export const OneLakeTreePane: React.FC<OneLakeTreePaneProps> = ({
           <FolderTree width={14} height={14} style={{ color: '#10b981' }} />
           <span style={{ fontSize: '13px', fontWeight: 600, color: '#f1f5f9' }}>{rootFolder} ({workspaceName})</span>
           <span style={{ fontSize: '11px', background: 'rgba(16, 185, 129, 0.15)', color: '#34d399', padding: '2px 8px', borderRadius: '4px', fontWeight: 500 }}>
-            5 Fabric Items
+            {itemCount} Enterprise Assets
           </span>
         </div>
         <button

@@ -27,6 +27,7 @@ from omniflow.tools.asset_indexer import AssetIndexer
 from omniflow.tools.fabric_adapter import (
     create_item,
     get_or_create_folder,
+    move_item_to_folder,
     update_definition,
 )
 
@@ -203,6 +204,14 @@ class GenericDAGProvisioner:
                                 guid=item_id,
                                 summary=spec_obj.description or f"Fabric {spec_obj.item_type} '{item_name}'",
                             )
+                            # Move into target typed subfolder if specified
+                            if spec_obj.folder_name and item_id:
+                                target_fid = folder_ids.get(spec_obj.folder_name)
+                                if target_fid:
+                                    try:
+                                        move_item_to_folder(item_id, target_fid, self.workspace_id)
+                                    except Exception:
+                                        pass
                     else:
                         status_map[item_name].pass1_status = "FAILED"
                         status_map[item_name].error = res.get("error", "Unknown mint error")

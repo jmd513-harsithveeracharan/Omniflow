@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { Copy, Check, FileCode, Database } from 'lucide-react';
+import { Copy, Check, FileCode, Database, ShieldCheck } from 'lucide-react';
 import { CodeCard } from '../chat/CodeCard';
 
 interface CodeEditorPaneProps {
   pysparkCode: string;
   sqlCode: string;
+  qualityCode?: string;
   domain?: string;
   selectedLabel?: string;
 }
@@ -12,17 +13,32 @@ interface CodeEditorPaneProps {
 export const CodeEditorPane: React.FC<CodeEditorPaneProps> = ({
   pysparkCode,
   sqlCode,
+  qualityCode,
   domain = 'postgres_medallion',
   selectedLabel,
 }) => {
-  const [activeFile, setActiveFile] = useState<'pyspark' | 'sql'>('pyspark');
+  const [activeFile, setActiveFile] = useState<'pyspark' | 'quality' | 'sql'>('pyspark');
   const [copied, setCopied] = useState(false);
 
   const cleanDomain = domain.replace(/[^a-zA-Z0-9_]/g, '_').toLowerCase();
   const pyFileName = selectedLabel && selectedLabel.includes('.py') ? selectedLabel : `nb_${cleanDomain}_curate.py`;
+  const qualityFileName = `nb_${cleanDomain}_quality_suite.py`;
   const sqlFileName = `wh_${cleanDomain}_gold.sql`;
 
-  const codeToShow = activeFile === 'pyspark' ? pysparkCode : (sqlCode || '-- No T-SQL Warehouse DDL generated yet.');
+  let codeToShow = pysparkCode;
+  let activeLang = 'python';
+  let activeLabel = pyFileName;
+
+  if (activeFile === 'quality') {
+    codeToShow = qualityCode || '# PySpark Great Expectations Quality Suite';
+    activeLang = 'python';
+    activeLabel = qualityFileName;
+  } else if (activeFile === 'sql') {
+    codeToShow = sqlCode || '-- No T-SQL Warehouse DDL generated yet.';
+    activeLang = 'sql';
+    activeLabel = sqlFileName;
+  }
+
   const linesCount = codeToShow.split('\n').length;
 
   const handleCopy = () => {
@@ -33,8 +49,8 @@ export const CodeEditorPane: React.FC<CodeEditorPaneProps> = ({
 
   return (
     <div className="wb-view-pane active" style={{ display: 'flex', flexDirection: 'column', height: '100%', background: '#090a0f' }}>
-      <div className="code-editor-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 16px', borderBottom: '1px solid rgba(255, 255, 255, 0.08)', background: 'rgba(0,0,0,0.3)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+      <div className="code-editor-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 16px', borderBottom: '1px solid rgba(255, 255, 255, 0.08)', background: 'rgba(0,0,0,0.3)', flexWrap: 'wrap', gap: '8px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
           <button
             type="button"
             onClick={() => setActiveFile('pyspark')}
@@ -55,6 +71,28 @@ export const CodeEditorPane: React.FC<CodeEditorPaneProps> = ({
             <FileCode width={13} height={13} />
             <span>{pyFileName}</span>
           </button>
+          {qualityCode && (
+            <button
+              type="button"
+              onClick={() => setActiveFile('quality')}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '4px 10px',
+                borderRadius: '6px',
+                fontSize: '12px',
+                fontWeight: 500,
+                cursor: 'pointer',
+                border: activeFile === 'quality' ? '1px solid #38bdf8' : '1px solid rgba(255,255,255,0.08)',
+                background: activeFile === 'quality' ? 'rgba(56, 189, 248, 0.15)' : 'transparent',
+                color: activeFile === 'quality' ? '#38bdf8' : '#94a3b8',
+              }}
+            >
+              <ShieldCheck width={13} height={13} />
+              <span>{qualityFileName}</span>
+            </button>
+          )}
           {sqlCode && (
             <button
               type="button"
@@ -78,7 +116,7 @@ export const CodeEditorPane: React.FC<CodeEditorPaneProps> = ({
             </button>
           )}
           <span style={{ fontSize: '11px', color: '#64748b', marginLeft: '6px' }}>
-            {activeFile === 'pyspark' ? 'Delta MERGE Curation' : 'Direct Lake Mart DDL'}
+            {activeFile === 'pyspark' ? 'Delta MERGE Curation' : (activeFile === 'quality' ? 'Quality & Schema Rules' : 'Direct Lake Mart DDL')}
           </span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -98,9 +136,9 @@ export const CodeEditorPane: React.FC<CodeEditorPaneProps> = ({
       </div>
       <div style={{ flex: 1, minHeight: 0, overflow: 'auto', padding: '16px' }}>
         <CodeCard
-          language={activeFile === 'pyspark' ? 'python' : 'sql'}
+          language={activeLang}
           code={codeToShow}
-          filename={activeFile === 'pyspark' ? pyFileName : sqlFileName}
+          filename={activeLabel}
         />
       </div>
     </div>

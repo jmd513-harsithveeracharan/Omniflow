@@ -193,6 +193,7 @@ export interface IngestionPlan {
   project_code?: string;
   domain?: string;
   pyspark_code?: string;
+  quality_code?: string;
   sql_code?: string;
   schema_contracts?: Record<string, {
     table_name: string;

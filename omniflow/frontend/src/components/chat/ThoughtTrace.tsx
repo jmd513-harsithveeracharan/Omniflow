@@ -199,14 +199,33 @@ export const ThoughtTrace: React.FC<ThoughtTraceProps> = ({ meta, isStreaming = 
             const hasDetailOrOutput = Boolean(st.detail || st.output);
             const isRowExpanded = Boolean(expandedRows[idx]);
 
-            // Parse or fallback fields cleanly (prevent duplicate words like 'Architect Architect')
-            const rawAction = st.action || (st.title.includes(':') ? st.title.split(':')[0].trim() : st.title.split(' ')[0]) || 'Processed';
-            const action = rawAction.replace(/\s+(Agent|Engine|Module)$/i, '').trim() || rawAction;
-            let target = st.target || (st.title.includes(':') ? st.title.split(':')[1].trim() : st.title.replace(rawAction, '').trim());
-            if (target.toLowerCase() === action.toLowerCase() || target.toLowerCase() === rawAction.toLowerCase()) {
-              target = st.title.includes(':') ? st.title.split(':')[1].trim() : st.detail || '';
+            // Parse and format fields cleanly (guaranteed zero duplicate words like 'Architect Architect')
+            let action = (st.action || '').trim();
+            let target = (st.target || '').trim();
+            const title = (st.title || '').trim();
+
+            if (!action) {
+              if (title.includes(':')) {
+                action = title.split(':')[0].trim().replace(/\s+(Agent|Engine|Module)$/i, '');
+                target = title.split(':')[1].trim();
+              } else {
+                const words = title.split(' ');
+                action = words[0] || 'Task';
+                target = words.slice(1).join(' ') || title;
+              }
+            } else if (!target && title.includes(':')) {
+              target = title.split(':')[1].trim();
             }
-            const cleanTarget = target.replace(/^[:\s-]+/, '').trim() || st.title;
+
+            // Deduplicate: If target starts with action or is identical, clean it up
+            if (target.toLowerCase() === action.toLowerCase()) {
+              target = title.includes(':') ? title.split(':')[1].trim() : (st.detail || title);
+            }
+            if (target.toLowerCase().startsWith(action.toLowerCase() + ' ')) {
+              target = target.slice(action.length).trim();
+            }
+            const cleanTarget = target.replace(/^[:\s-]+/, '').trim() || title;
+            const displayAction = (cleanTarget.toLowerCase() === action.toLowerCase()) ? '' : action;
 
             return (
               <div key={idx} className="antigravity-step-item" style={{ display: 'flex', flexDirection: 'column' }}>
@@ -235,9 +254,11 @@ export const ThoughtTrace: React.FC<ThoughtTraceProps> = ({ meta, isStreaming = 
                   }}
                 >
                   {/* Action */}
-                  <span style={{ color: isInProgress ? '#38bdf8' : '#94a3b8', fontWeight: 400 }}>
-                    {action}
-                  </span>
+                  {displayAction && (
+                    <span style={{ color: isInProgress ? '#38bdf8' : '#94a3b8', fontWeight: 400 }}>
+                      {displayAction}
+                    </span>
+                  )}
 
                   {/* Badge (e.g. PY, TS, SQL, DAG, CLI) */}
                   {st.badge && (
