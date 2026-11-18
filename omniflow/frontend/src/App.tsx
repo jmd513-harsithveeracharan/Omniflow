@@ -391,6 +391,25 @@ export const App: React.FC = () => {
     try {
       const detail = await fetchProjectDetail(projectId);
       if (detail) {
+        if (detail.project) {
+          const detailProj = detail.project;
+          setProjects((prev) => {
+            const matchIndex = prev.findIndex(
+              (p) =>
+                p.id === projectId ||
+                p.id === detailProj.id ||
+                p.name === detailProj.name ||
+                p.name === projectId
+            );
+            if (matchIndex >= 0) {
+              const updated = [...prev];
+              updated[matchIndex] = { ...updated[matchIndex], ...detailProj };
+              return updated;
+            } else {
+              return [detailProj, ...prev];
+            }
+          });
+        }
         setCurrentPlan(detail.plan || null);
         if (detail.messages && detail.messages.length > 0) {
           setMessages(
@@ -887,7 +906,13 @@ export const App: React.FC = () => {
         {activeView === 'project' && activeProjectId && (
           <ProjectWorkspaceHub
             project={
-              projects.find((p) => p.id === activeProjectId) || {
+              projects.find(
+                (p) =>
+                  p.id === activeProjectId ||
+                  p.name === activeProjectId ||
+                  p.id.toLowerCase() === activeProjectId.toLowerCase() ||
+                  p.id.replace(/^PRJ-/, '').replace(/[-_]+/g, ' ').toLowerCase() === activeProjectId.toLowerCase()
+              ) || {
                 id: activeProjectId,
                 name: (activeProjectId.startsWith('PRJ-')
                   ? activeProjectId.replace(/^PRJ-/, '').replace(/[-_]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()).trim()
@@ -938,7 +963,33 @@ export const App: React.FC = () => {
               } catch {}
             }}
             onUpdateProject={async (updated) => {
-              setProjects((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
+              setProjects((prev) => {
+                const matchIndex = prev.findIndex(
+                  (p) =>
+                    p.id === updated.id ||
+                    p.name === updated.name ||
+                    (updated.id && p.id.toLowerCase() === updated.id.toLowerCase())
+                );
+                if (matchIndex >= 0) {
+                  const copy = [...prev];
+                  copy[matchIndex] = { ...copy[matchIndex], ...updated };
+                  return copy;
+                }
+                return [updated, ...prev];
+              });
+              try {
+                const cachedStr = localStorage.getItem('omniflow_cached_projects');
+                const cached = cachedStr ? JSON.parse(cachedStr) : [];
+                const cIdx = cached.findIndex(
+                  (p: any) => p.id === updated.id || p.name === updated.name
+                );
+                if (cIdx >= 0) {
+                  cached[cIdx] = { ...cached[cIdx], ...updated };
+                } else {
+                  cached.unshift(updated);
+                }
+                localStorage.setItem('omniflow_cached_projects', JSON.stringify(cached));
+              } catch {}
               await updateProject(updated.id, {
                 name: updated.name,
                 description: updated.description,

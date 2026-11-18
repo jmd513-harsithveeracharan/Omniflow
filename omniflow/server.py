@@ -735,9 +735,11 @@ async def create_project_endpoint(req: ProjectRequest) -> dict[str, Any]:
 @app.post("/api/projects/update")
 async def update_project_endpoint(req: ProjectRequest) -> dict[str, Any]:
     global PROJECTS_CACHE
+    found = False
     if req.id:
         for p in PROJECTS_CACHE:
-            if p["id"] == req.id:
+            if p["id"] == req.id or p.get("name") == req.id or (req.name and p.get("name") == req.name):
+                found = True
                 if req.name is not None:
                     p["name"] = req.name
                 if req.description is not None:
@@ -756,6 +758,18 @@ async def update_project_endpoint(req: ProjectRequest) -> dict[str, Any]:
                 if req.metadata is not None:
                     p["metadata"] = req.metadata
                 break
+
+        if not found and req.id:
+            PROJECTS_CACHE.insert(0, {
+                "id": req.id,
+                "name": req.name or req.id,
+                "description": req.description or "",
+                "status": "active",
+                "is_pinned": int(req.is_pinned or 0),
+                "is_archived": int(req.is_archived or 0),
+                "metadata": req.metadata or {},
+                "created_at": get_utc_iso(),
+            })
 
     # Persist updates to Postgres in background
     try:
@@ -784,9 +798,9 @@ async def update_project_endpoint(req: ProjectRequest) -> dict[str, Any]:
                     if updates:
                         updates.append("updated_at = NOW()")
                         set_clause = ", ".join(updates)
-                        params.extend([req.id, req.id])
+                        params.extend([req.id, req.id, req.id, req.name or req.id])
                         cur.execute(
-                            f"UPDATE projects SET {set_clause} WHERE project_code = %s OR project_id::text = %s;",
+                            f"UPDATE projects SET {set_clause} WHERE project_code = %s OR project_id::text = %s OR project_name = %s OR project_name = %s;",
                             tuple(params),
                         )
                         conn.commit()
@@ -928,7 +942,7 @@ async def get_project_detail(project_id: str) -> dict[str, Any]:
 
     # Check cache first for instant sub-millisecond retrieval
     for p in PROJECTS_CACHE:
-        if p["id"] == project_id:
+        if p["id"] == project_id or p.get("name") == project_id:
             project_data = dict(p)
             pcode = p["id"]
             pname = p["name"]
@@ -940,19 +954,28 @@ async def get_project_detail(project_id: str) -> dict[str, Any]:
             with repo._connect() as conn:
                 with conn.cursor() as cur:
                     cur.execute(
-                        "SELECT project_id, project_code, project_name, description, status FROM projects WHERE project_id = %s OR project_code = %s LIMIT 1;",
-                        (project_id, project_id),
+                        "SELECT project_id, project_code, project_name, description, status, metadata FROM projects WHERE project_id::text = %s OR project_code = %s OR project_name = %s LIMIT 1;",
+                        (project_id, project_id, project_id),
                     )
                     row = cur.fetchone()
                     if row:
+                        db_meta = row[5]
+                        if isinstance(db_meta, str):
+                            try:
+                                db_meta = json.loads(db_meta)
+                            except Exception:
+                                db_meta = {}
+                        elif not isinstance(db_meta, dict):
+                            db_meta = {}
                         project_data = {
-                            "id": str(row[0]),
-                            "code": row[1],
+                            "id": row[1] or str(row[0]),
+                            "code": row[1] or str(row[0]),
                             "name": row[2],
                             "description": row[3] or "",
                             "status": row[4],
+                            "metadata": db_meta,
                         }
-                        pcode = row[1]
+                        pcode = row[1] or str(row[0])
                         pname = row[2]
         except Exception:
             pass

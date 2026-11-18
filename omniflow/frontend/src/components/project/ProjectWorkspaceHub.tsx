@@ -38,10 +38,16 @@ export const ProjectWorkspaceHub: React.FC<ProjectWorkspaceHubProps> = ({
   onDeleteProject,
   onDeleteSession,
 }) => {
+  const [localProject, setLocalProject] = useState<ProjectRecord>(project);
   const [isMenuOpen, setIsMenuOpen] = useState<boolean>(false);
   const menuContainerRef = useRef<HTMLDivElement>(null);
-  const isPinned = Boolean(project.is_pinned);
-  const metadata = project.metadata || {};
+
+  useEffect(() => {
+    setLocalProject(project);
+  }, [project]);
+
+  const isPinned = Boolean(localProject.is_pinned);
+  const metadata = localProject.metadata || {};
   const contextFiles = metadata.context_files || [];
   const instructions = metadata.instructions || '';
 
@@ -60,51 +66,59 @@ export const ProjectWorkspaceHub: React.FC<ProjectWorkspaceHubProps> = ({
       ...metadata,
       instructions: newInstructions,
     };
-    await onUpdateProject({
-      ...project,
+    const updated = {
+      ...localProject,
       metadata: updatedMeta,
-    });
+    };
+    setLocalProject(updated);
+    await onUpdateProject(updated);
   };
 
   const handleAddContextFile = async (newFile: ProjectContextFile) => {
-    const updatedFiles = [...contextFiles.filter((f) => f.id !== newFile.id), newFile];
+    const currentFiles = metadata.context_files || [];
+    const updatedFiles = [...currentFiles.filter((f) => f.id !== newFile.id), newFile];
     const updatedMeta: ProjectMetadata = {
       ...metadata,
       context_files: updatedFiles,
     };
-    await onUpdateProject({
-      ...project,
+    const updated = {
+      ...localProject,
       metadata: updatedMeta,
-    });
+    };
+    setLocalProject(updated);
+    await onUpdateProject(updated);
   };
 
   const handleRemoveContextFile = async (fileId: string) => {
-    const updatedFiles = contextFiles.filter((f) => f.id !== fileId);
+    const currentFiles = metadata.context_files || [];
+    const updatedFiles = currentFiles.filter((f) => f.id !== fileId);
     const updatedMeta: ProjectMetadata = {
       ...metadata,
       context_files: updatedFiles,
     };
-    await onUpdateProject({
-      ...project,
+    const updated = {
+      ...localProject,
       metadata: updatedMeta,
-    });
+    };
+    setLocalProject(updated);
+    await onUpdateProject(updated);
   };
 
   // Clean formatted name
-  const rawName = project.name || '';
-  const isPeliProject = project.id === 'PRJ-PELI-BIOTHERMAL' || rawName.toLowerCase().includes('peli');
-  const cleanFallbackName = (project.id || '').startsWith('PRJ-')
-    ? project.id.replace(/^PRJ-/, '').replace(/[-_]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()).trim()
-    : (project.id || '');
+  const rawName = localProject.name || '';
+  const isPeliProject = localProject.id === 'PRJ-PELI-BIOTHERMAL' || rawName.toLowerCase().includes('peli');
+  const cleanFallbackName = (localProject.id || '').startsWith('PRJ-')
+    ? localProject.id.replace(/^PRJ-/, '').replace(/[-_]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()).trim()
+    : (localProject.id || '');
 
   const displayName = isPeliProject
     ? 'Peli Bio Thermal'
     : (rawName && !rawName.startsWith('PRJ-') ? rawName : (cleanFallbackName || 'Project'));
   const displayDesc = isPeliProject
-    ? (project.description && !project.description.toLowerCase().includes('cold-chain')
-        ? project.description
+    ? (localProject.description && !localProject.description.toLowerCase().includes('cold-chain')
+        ? localProject.description
         : 'Working on the client Project where need to establish a data platform.')
-    : (project.description || 'Enterprise workspace for data engineering pipelines.');
+    : (localProject.description || 'Enterprise workspace for data engineering pipelines.');
 
   return (
     <div className="flex-1 w-full h-full overflow-y-auto bg-[#131314] text-[#f0f0f2] selection:bg-emerald-500/30">
