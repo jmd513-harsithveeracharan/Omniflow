@@ -12,6 +12,11 @@ import {
   Maximize2,
   Minimize2,
   X,
+  ZoomIn,
+  ZoomOut,
+  RotateCcw,
+  ArrowRight,
+  Database,
 } from 'lucide-react';
 import { IngestionPlan } from '../types';
 import { GraphMeshView } from './graph/GraphMeshView';
@@ -28,15 +33,18 @@ interface MedallionFlowCanvasProps {
 interface DagNode {
   id: string;
   label: string;
-  type: 'source' | 'lakehouse' | 'notebook' | 'pipeline';
+  type: 'source' | 'lakehouse' | 'notebook' | 'pipeline' | 'warehouse' | 'semantic_model';
   layer: string;
+  folderCategory?: string;
+  fullPath?: string;
   sub: string;
   status: 'pending' | 'deploying' | 'live' | 'error';
   x: number;
   y: number;
   code?: string;
+  glowColor: string;
+  iconSymbol: string;
 }
-
 
 export const MedallionFlowCanvas: React.FC<MedallionFlowCanvasProps> = ({
   plan,
@@ -47,8 +55,9 @@ export const MedallionFlowCanvas: React.FC<MedallionFlowCanvasProps> = ({
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [copied, setCopied] = useState(false);
   const [selectedNode, setSelectedNode] = useState<DagNode | null>(null);
+  const [zoomLevel, setZoomLevel] = useState<number>(1);
 
-  // Dynamic DAG Computation from plan
+  // Dynamic 9-item Enterprise Medallion DAG computation
   const { dagNodes, dagEdges, treeItems, pysparkCode, qualityCode, sqlCode, jsonSpec, rootFolder, domain } = React.useMemo(() => {
     if (!plan || typeof plan !== 'object') {
       return {
@@ -82,65 +91,20 @@ export const MedallionFlowCanvas: React.FC<MedallionFlowCanvasProps> = ({
       ((p.items as Array<Record<string, unknown>>)?.find((it) => it.type === 'Warehouse')?.name as string) ||
       `wh_${cleanDomain}_gold`;
 
-    const nodes: DagNode[] = [];
-    const edges: Array<{ from: string; to: string }> = [];
+    const rawFolder = (p.folders as Record<string, string>)?.raw || '01 Raw';
+    const stageFolder = (p.folders as Record<string, string>)?.stage || '02 Stage';
+    const silverFolder = (p.folders as Record<string, string>)?.silver || '03 Silver';
+    const goldFolder = (p.folders as Record<string, string>)?.gold || '04 Gold';
+    const orchFolder = '05 Orchestration';
 
-    // Source Node
-    nodes.push({
-      id: 'node_source',
-      label: `${rootF} (Source Stream)`,
-      type: 'source',
-      layer: 'SOURCE',
-      sub: 'OneLake Landing Zone',
-      status: 'live',
-      x: 40,
-      y: 120,
-    });
-
-    // Lakehouses & Notebooks
     const lhBronze = lakehouses.find((l) => l.toLowerCase().includes('bronze')) || lakehouses[0] || `lh_${cleanDomain}_bronze`;
     const lhSilver = lakehouses.find((l) => l.toLowerCase().includes('silver')) || lakehouses[1] || `lh_${cleanDomain}_silver`;
-
-    const nbBronze = notebooks.find((n) => String(n.layer || n.name).toLowerCase().includes('bronze'));
+    const plName = typeof pipeline === 'object' ? String(pipeline.name || `pl_${cleanDomain}_bronze_ingest`) : String(pipeline || `pl_${cleanDomain}_bronze_ingest`);
     const nbSilver = notebooks.find((n) => String(n.layer || n.name).toLowerCase().includes('silver')) || notebooks[0];
-
-    nodes.push({
-      id: 'node_bronze',
-      label: lhBronze,
-      type: 'lakehouse',
-      layer: 'BRONZE',
-      sub: 'Raw Ingestion Zone',
-      status: 'live',
-      x: 320,
-      y: 50,
-    });
-
-    if (nbBronze) {
-      nodes.push({
-        id: 'node_nb_bronze',
-        label: String(nbBronze.name || 'nb_bronze_ingest'),
-        type: 'notebook',
-        layer: 'PYSPARK',
-        sub: String(nbBronze.description || 'Source -> Bronze Ingest'),
-        status: 'live',
-        x: 320,
-        y: 180,
-        code: (nbBronze.pyspark_code as string) || (nbBronze.pyspark as string) || '',
-      });
-      edges.push({ from: 'node_source', to: 'node_bronze' });
-      edges.push({ from: 'node_source', to: 'node_nb_bronze' });
-    }
-
-    nodes.push({
-      id: 'node_silver',
-      label: lhSilver,
-      type: 'lakehouse',
-      layer: 'SILVER',
-      sub: 'Delta MERGE Deduplication',
-      status: 'live',
-      x: 600,
-      y: 50,
-    });
+    const nbCurateName = String(nbSilver?.name || `nb_${cleanDomain}_curate`);
+    const qualityName = `nb_${cleanDomain}_quality_suite`;
+    const semanticModelName = `sm_${cleanDomain}_gold_direct_lake`;
+    const masterPlName = `pl_master_medallion_orchestration`;
 
     const pyCurateCode =
       (p.pyspark_code as string) ||
@@ -148,69 +112,177 @@ export const MedallionFlowCanvas: React.FC<MedallionFlowCanvasProps> = ({
       (nbSilver?.pyspark as string) ||
       (nbSilver?.code as string) ||
       '';
-
     const qualitySuiteCode = (p.quality_code as string) || '';
     const sqlWarehouseCode = (p.sql_code as string) || '';
 
-    if (nbSilver || pyCurateCode) {
-      nodes.push({
-        id: 'node_nb_silver',
-        label: String(nbSilver?.name || `nb_${cleanDomain}_curate`),
-        type: 'notebook',
-        layer: 'PYSPARK',
-        sub: 'Bronze -> Silver MERGE & Masking',
+    const nodes: DagNode[] = [
+      // 0. Source Landing Zone
+      {
+        id: 'node_source',
+        label: `${cleanDomain.replace('_', ' ').toUpperCase()} SOURCE`,
+        type: 'source',
+        layer: 'SOURCE',
+        folderCategory: 'In Scope (12 Tables)',
+        fullPath: 'PostgreSQL Platform / Neon CRM Database',
+        sub: 'Relational CDC Tables Ingestion',
         status: 'live',
-        x: 600,
-        y: 180,
-        code: pyCurateCode,
-      });
-      edges.push({ from: 'node_bronze', to: 'node_silver' });
-      edges.push({ from: 'node_bronze', to: 'node_nb_silver' });
-    }
-
-    nodes.push({
-      id: 'node_gold',
-      label: warehouseName,
-      type: 'lakehouse',
-      layer: 'GOLD',
-      sub: 'Kimball Star Schema & Direct Lake',
-      status: 'live',
-      x: 880,
-      y: 50,
-    });
-    edges.push({ from: 'node_silver', to: 'node_gold' });
-
-    if (pipeline) {
-      const plName = typeof pipeline === 'object' ? String(pipeline.name || `pl_${cleanDomain}_bronze_ingest`) : String(pipeline);
-      const schedStr =
-        typeof pipeline === 'object' && typeof pipeline.schedule === 'object'
-          ? String((pipeline.schedule as Record<string, unknown>).human || 'Hourly Micro-Batch CDC')
-          : 'Hourly Micro-Batch CDC';
-
-      nodes.push({
-        id: 'node_pipeline',
+        x: 20,
+        y: 95,
+        glowColor: '#38bdf8',
+        iconSymbol: '🔌',
+      },
+      // 1. Raw Bronze Layer (01 Raw)
+      {
+        id: 'node_bronze',
+        label: lhBronze,
+        type: 'lakehouse',
+        layer: '01 RAW',
+        folderCategory: '01_lakehouse',
+        fullPath: `${rootF}/${rawFolder}/01_lakehouse`,
+        sub: 'Delta Lakehouse (Raw Landing)',
+        status: 'live',
+        x: 270,
+        y: 35,
+        glowColor: '#f59e0b',
+        iconSymbol: '🏢',
+      },
+      {
+        id: 'node_pl_bronze',
         label: plName,
         type: 'pipeline',
-        layer: 'PIPELINE',
-        sub: schedStr,
+        layer: '01 RAW',
+        folderCategory: '02_pipelines',
+        fullPath: `${rootF}/${rawFolder}/02_pipelines`,
+        sub: 'ADF Copy Activity (CDC Watermark)',
         status: 'live',
-        x: 1140,
-        y: 120,
-      });
-      edges.push({ from: 'node_bronze', to: 'node_pipeline' });
-    }
+        x: 270,
+        y: 155,
+        glowColor: '#f59e0b',
+        iconSymbol: '⚡',
+      },
+      // 2. Stage Curation Layer (02 Stage)
+      {
+        id: 'node_nb_curate',
+        label: `${nbCurateName}.py`,
+        type: 'notebook',
+        layer: '02 STAGE',
+        folderCategory: '01_notebooks',
+        fullPath: `${rootF}/${stageFolder}/01_notebooks`,
+        sub: 'Delta MERGE & SHA-256 Masking',
+        status: 'live',
+        x: 520,
+        y: 35,
+        code: pyCurateCode,
+        glowColor: '#c084fc',
+        iconSymbol: '📜',
+      },
+      {
+        id: 'node_nb_quality',
+        label: `${qualityName}.py`,
+        type: 'notebook',
+        layer: '02 STAGE',
+        folderCategory: '02_quality',
+        fullPath: `${rootF}/${stageFolder}/02_quality`,
+        sub: 'Great Expectations Anomaly Suite',
+        status: 'live',
+        x: 520,
+        y: 155,
+        code: qualitySuiteCode,
+        glowColor: '#c084fc',
+        iconSymbol: '🛡️',
+      },
+      // 3. Silver Harmonized Layer (03 Silver)
+      {
+        id: 'node_silver',
+        label: lhSilver,
+        type: 'lakehouse',
+        layer: '03 SILVER',
+        folderCategory: '01_lakehouse',
+        fullPath: `${rootF}/${silverFolder}/01_lakehouse`,
+        sub: 'Harmonized Clean Delta Lakehouse',
+        status: 'live',
+        x: 770,
+        y: 35,
+        glowColor: '#10b981',
+        iconSymbol: '🏢',
+      },
+      {
+        id: 'node_nb_silver',
+        label: 'nb_silver_transformations.py',
+        type: 'notebook',
+        layer: '03 SILVER',
+        folderCategory: '02_notebooks',
+        fullPath: `${rootF}/${silverFolder}/02_notebooks`,
+        sub: 'SCD Type 2 History & Lineage',
+        status: 'live',
+        x: 770,
+        y: 155,
+        code: pyCurateCode,
+        glowColor: '#10b981',
+        iconSymbol: '📜',
+      },
+      // 4. Gold Kimball Warehouse & Semantic Layer (04 Gold)
+      {
+        id: 'node_gold',
+        label: warehouseName,
+        type: 'warehouse',
+        layer: '04 GOLD',
+        folderCategory: '01_warehouse',
+        fullPath: `${rootF}/${goldFolder}/01_warehouse`,
+        sub: 'Direct Lake T-SQL Warehouse',
+        status: 'live',
+        x: 1020,
+        y: 35,
+        code: sqlWarehouseCode,
+        glowColor: '#eab308',
+        iconSymbol: '🏛️',
+      },
+      {
+        id: 'node_sm_gold',
+        label: semanticModelName,
+        type: 'semantic_model',
+        layer: '04 GOLD',
+        folderCategory: '02_semantic_models',
+        fullPath: `${rootF}/${goldFolder}/02_semantic_models`,
+        sub: 'Direct Lake Power BI Semantic Model',
+        status: 'live',
+        x: 1020,
+        y: 155,
+        glowColor: '#eab308',
+        iconSymbol: '📊',
+      },
+      // 5. Master Orchestration Layer (05 Orchestration)
+      {
+        id: 'node_master_orchestrator',
+        label: masterPlName,
+        type: 'pipeline',
+        layer: '05 ORCHESTRATION',
+        folderCategory: '01_pipelines',
+        fullPath: `${rootF}/${orchFolder}/01_pipelines`,
+        sub: 'Master End-to-End Orchestrator',
+        status: 'live',
+        x: 1270,
+        y: 95,
+        glowColor: '#f43f5e',
+        iconSymbol: '⚡',
+      },
+    ];
+
+    const edges: Array<{ from: string; to: string }> = [
+      { from: 'node_source', to: 'node_bronze' },
+      { from: 'node_source', to: 'node_pl_bronze' },
+      { from: 'node_pl_bronze', to: 'node_bronze' },
+      { from: 'node_bronze', to: 'node_nb_curate' },
+      { from: 'node_nb_curate', to: 'node_nb_quality' },
+      { from: 'node_nb_quality', to: 'node_silver' },
+      { from: 'node_silver', to: 'node_nb_silver' },
+      { from: 'node_silver', to: 'node_gold' },
+      { from: 'node_gold', to: 'node_sm_gold' },
+      { from: 'node_gold', to: 'node_master_orchestrator' },
+      { from: 'node_sm_gold', to: 'node_master_orchestrator' },
+    ];
 
     // Build hierarchical Enterprise Medallion tree with typed subfolders
-    const rawFolder = (p.folders as Record<string, string>)?.raw || '01 Raw';
-    const stageFolder = (p.folders as Record<string, string>)?.stage || '02 Stage';
-    const silverFolder = (p.folders as Record<string, string>)?.silver || '03 Silver';
-    const goldFolder = (p.folders as Record<string, string>)?.gold || '04 Gold';
-    const plName = typeof pipeline === 'object' ? String(pipeline.name || `pl_${cleanDomain}_bronze_ingest`) : String(pipeline || `pl_${cleanDomain}_bronze_ingest`);
-    const nbName = String(nbSilver?.name || `nb_${cleanDomain}_curate`);
-    const qualityName = `nb_${cleanDomain}_quality_suite`;
-    const semanticModelName = `sm_${cleanDomain}_gold_direct_lake`;
-    const masterPlName = `pl_master_medallion_orchestration`;
-
     const tree: string[] = [
       `📁 ${rootF}/`,
       `├── 📁 ${rawFolder}/`,
@@ -220,7 +292,7 @@ export const MedallionFlowCanvas: React.FC<MedallionFlowCanvasProps> = ({
       `│       └── ⚡ ${plName} (Data Factory Pipeline)`,
       `├── 📁 ${stageFolder}/`,
       `│   ├── 📁 01_notebooks/`,
-      `│   │   └── 📜 ${nbName}.py (PySpark Curation & PII Masking)`,
+      `│   │   └── 📜 ${nbCurateName}.py (PySpark Curation & PII Masking)`,
       `│   └── 📁 02_quality/`,
       `│       └── 📜 ${qualityName}.py (Great Expectations Audit Suite)`,
       `├── 📁 ${silverFolder}/`,
@@ -263,7 +335,7 @@ export const MedallionFlowCanvas: React.FC<MedallionFlowCanvasProps> = ({
   return (
     <div className={`bolt-workbench-pane-inner ${isFullscreen ? 'fullscreen-mode' : ''}`}>
       {/* Workbench Header */}
-      <div className="workbench-header">
+      <div className="workbench-header" style={{ background: '#0b0d13', borderBottom: '1px solid rgba(255, 255, 255, 0.08)' }}>
         <div className="workbench-tab-group">
           <button
             className={`wb-tab ${activeTab === 'wbDAG' ? 'active' : ''}`}
@@ -272,6 +344,9 @@ export const MedallionFlowCanvas: React.FC<MedallionFlowCanvasProps> = ({
           >
             <Layers width={13} height={13} />
             <span>Pipeline Flow</span>
+            <span style={{ fontSize: '9px', padding: '1px 5px', borderRadius: '4px', background: 'rgba(56, 189, 248, 0.15)', color: '#38bdf8', fontWeight: 600, marginLeft: '4px' }}>
+              {dagNodes.length} Assets
+            </span>
           </button>
           <button
             className={`wb-tab ${activeTab === 'wbMesh' ? 'active' : ''}`}
@@ -280,7 +355,9 @@ export const MedallionFlowCanvas: React.FC<MedallionFlowCanvasProps> = ({
           >
             <Network width={13} height={13} />
             <span>Relationship Graph</span>
-            <span style={{ fontSize: '9px', padding: '1px 5px', borderRadius: '4px', background: 'rgba(16, 185, 129, 0.15)', color: '#10b981', fontWeight: 600, marginLeft: '4px' }}>Lineage</span>
+            <span style={{ fontSize: '9px', padding: '1px 5px', borderRadius: '4px', background: 'rgba(16, 185, 129, 0.15)', color: '#10b981', fontWeight: 600, marginLeft: '4px' }}>
+              Lineage
+            </span>
           </button>
           <button
             className={`wb-tab ${activeTab === 'wbTree' ? 'active' : ''}`}
@@ -289,6 +366,9 @@ export const MedallionFlowCanvas: React.FC<MedallionFlowCanvasProps> = ({
           >
             <FolderTree width={13} height={13} />
             <span>OneLake Tree</span>
+            <span style={{ fontSize: '9px', padding: '1px 5px', borderRadius: '4px', background: 'rgba(255, 255, 255, 0.08)', color: '#94a3b8', fontWeight: 500, marginLeft: '4px' }}>
+              Hierarchy
+            </span>
           </button>
           <button
             className={`wb-tab ${activeTab === 'wbCode' ? 'active' : ''}`}
@@ -297,6 +377,9 @@ export const MedallionFlowCanvas: React.FC<MedallionFlowCanvasProps> = ({
           >
             <Code2 width={13} height={13} />
             <span>PySpark Studio</span>
+            <span style={{ fontSize: '9px', padding: '1px 5px', borderRadius: '4px', background: 'rgba(192, 132, 252, 0.15)', color: '#c084fc', fontWeight: 600, marginLeft: '4px' }}>
+              PySpark + SQL
+            </span>
           </button>
           <button
             className={`wb-tab ${activeTab === 'wbTable' ? 'active' : ''}`}
@@ -305,6 +388,9 @@ export const MedallionFlowCanvas: React.FC<MedallionFlowCanvasProps> = ({
           >
             <Table2 width={13} height={13} />
             <span>Delta Schema</span>
+            <span style={{ fontSize: '9px', padding: '1px 5px', borderRadius: '4px', background: 'rgba(52, 211, 153, 0.15)', color: '#34d399', fontWeight: 600, marginLeft: '4px' }}>
+              Contracts
+            </span>
           </button>
           <button
             className={`wb-tab ${activeTab === 'wbJson' ? 'active' : ''}`}
@@ -323,9 +409,21 @@ export const MedallionFlowCanvas: React.FC<MedallionFlowCanvasProps> = ({
               onClick={onDeploy}
               title="Deploy Pipeline to Fabric REST API"
               type="button"
+              style={{
+                background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
+                boxShadow: '0 0 14px rgba(2, 132, 199, 0.35)',
+                border: '1px solid rgba(56, 189, 248, 0.4)',
+                padding: '4px 12px',
+                borderRadius: '6px',
+                color: '#fff',
+                fontWeight: 600,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+              }}
             >
-              <Play width={12} height={12} />
-              <span>Deploy</span>
+              <Play width={12} height={12} fill="#fff" />
+              <span>Deploy to Fabric</span>
             </button>
           )}
           <button
@@ -350,7 +448,7 @@ export const MedallionFlowCanvas: React.FC<MedallionFlowCanvasProps> = ({
       </div>
 
       {/* Workbench Tab Content */}
-      <div className="workbench-content">
+      <div className="workbench-content" style={{ background: '#07090e' }}>
         {/* Knowledge Mesh Graph RAG */}
         {activeTab === 'wbMesh' && (
           <div className="wb-view-pane active" style={{ padding: 0, overflow: 'hidden', position: 'relative', height: '100%', minHeight: '480px' }}>
@@ -360,7 +458,7 @@ export const MedallionFlowCanvas: React.FC<MedallionFlowCanvasProps> = ({
 
         {/* 1. Pipeline Flow SVG Canvas */}
         {activeTab === 'wbDAG' && (
-          <div className="wb-view-pane active">
+          <div className="wb-view-pane active" style={{ position: 'relative', height: '100%', overflow: 'hidden' }}>
             {dagNodes.length === 0 ? (
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', minHeight: '340px', color: '#94a3b8', textAlign: 'center', padding: '32px' }}>
                 <Layers width={36} height={36} style={{ opacity: 0.35, marginBottom: '12px' }} />
@@ -370,130 +468,360 @@ export const MedallionFlowCanvas: React.FC<MedallionFlowCanvasProps> = ({
                 </p>
               </div>
             ) : (
-            <div className="dag-canvas-viewport">
-              <svg
-                viewBox="0 0 1180 320"
-                width="100%"
-                height="100%"
-                className="flow-svg"
-                style={{ minHeight: '340px' }}
+              <div
+                className="dag-canvas-viewport"
+                style={{
+                  height: '100%',
+                  overflow: 'auto',
+                  position: 'relative',
+                  backgroundColor: '#07090e',
+                  backgroundImage:
+                    'radial-gradient(circle at 50% 50%, rgba(56, 189, 248, 0.04) 0%, transparent 80%), radial-gradient(rgba(255, 255, 255, 0.08) 1px, transparent 1px)',
+                  backgroundSize: '100% 100%, 26px 26px',
+                  padding: '24px 30px',
+                }}
               >
-                <defs>
-                  <linearGradient id="edgeGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-                    <stop offset="0%" stopColor="#0ea5e9" stopOpacity="0.7" />
-                    <stop offset="100%" stopColor="#38bdf8" stopOpacity="1" />
-                  </linearGradient>
-                  <linearGradient id="nodeGrad_source" x1="0%" y1="0%" x2="100%" y2="100%">
-                    <stop offset="0%" stopColor="#0b1d3a" stopOpacity="0.96" />
-                    <stop offset="100%" stopColor="#061325" stopOpacity="0.98" />
-                  </linearGradient>
-                  <linearGradient id="nodeGrad_lakehouse" x1="0%" y1="0%" x2="100%" y2="100%">
-                    <stop offset="0%" stopColor="#092642" stopOpacity="0.96" />
-                    <stop offset="100%" stopColor="#051627" stopOpacity="0.98" />
-                  </linearGradient>
-                  <linearGradient id="nodeGrad_notebook" x1="0%" y1="0%" x2="100%" y2="100%">
-                    <stop offset="0%" stopColor="#33220b" stopOpacity="0.96" />
-                    <stop offset="100%" stopColor="#1c1205" stopOpacity="0.98" />
-                  </linearGradient>
-                  <linearGradient id="nodeGrad_pipeline" x1="0%" y1="0%" x2="100%" y2="100%">
-                    <stop offset="0%" stopColor="#3b0f1d" stopOpacity="0.96" />
-                    <stop offset="100%" stopColor="#1f060d" stopOpacity="0.98" />
-                  </linearGradient>
-                </defs>
+                {/* Canvas Zoom & View Controls Pill */}
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: '16px',
+                    right: '20px',
+                    zIndex: 20,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    background: 'rgba(15, 20, 30, 0.85)',
+                    backdropFilter: 'blur(12px)',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    borderRadius: '8px',
+                    padding: '3px 6px',
+                    boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
+                  }}
+                >
+                  <button
+                    type="button"
+                    onClick={() => setZoomLevel((z) => Math.max(0.6, z - 0.15))}
+                    title="Zoom Out"
+                    style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: '4px', display: 'flex' }}
+                  >
+                    <ZoomOut width={13} height={13} />
+                  </button>
+                  <span style={{ fontSize: '11px', color: '#cbd5e1', fontFamily: 'monospace', minWidth: '36px', textAlign: 'center' }}>
+                    {Math.round(zoomLevel * 100)}%
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setZoomLevel((z) => Math.min(1.8, z + 0.15))}
+                    title="Zoom In"
+                    style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: '4px', display: 'flex' }}
+                  >
+                    <ZoomIn width={13} height={13} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setZoomLevel(1)}
+                    title="Reset Zoom"
+                    style={{ background: 'transparent', border: 'none', color: '#64748b', cursor: 'pointer', padding: '4px', display: 'flex' }}
+                  >
+                    <RotateCcw width={12} height={12} />
+                  </button>
+                </div>
 
-                {/* Edges */}
-                {dagEdges.map((e, idx) => {
-                  const fromNode = nodeMap.get(e.from);
-                  const toNode = nodeMap.get(e.to);
-                  if (!fromNode || !toNode) return null;
-                  const x1 = fromNode.x + 240;
-                  const y1 = fromNode.y + 36;
-                  const x2 = toNode.x;
-                  const y2 = toNode.y + 36;
-                  const dx = Math.max((x2 - x1) * 0.5, 40);
-                  const cx1 = x1 + dx;
-                  const cx2 = x2 - dx;
+                <div
+                  style={{
+                    transform: `scale(${zoomLevel})`,
+                    transformOrigin: 'top left',
+                    transition: 'transform 0.15s ease-out',
+                    minWidth: '1540px',
+                    minHeight: '280px',
+                  }}
+                >
+                  <svg
+                    viewBox="0 0 1520 270"
+                    width="1520"
+                    height="270"
+                    className="flow-svg"
+                    style={{ display: 'block' }}
+                  >
+                    <defs>
+                      <linearGradient id="edgeGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                        <stop offset="0%" stopColor="#0ea5e9" stopOpacity="0.4" />
+                        <stop offset="100%" stopColor="#38bdf8" stopOpacity="0.9" />
+                      </linearGradient>
+                      <filter id="nodeGlow" x="-20%" y="-20%" width="140%" height="140%">
+                        <feDropShadow dx="0" dy="4" stdDeviation="8" floodColor="rgba(56, 189, 248, 0.25)" />
+                      </filter>
+                    </defs>
 
-                  return (
-                    <g key={idx} className="flow-edge-group">
-                      <path
-                        d={`M${x1},${y1} C${cx1},${y1} ${cx2},${y2} ${x2},${y2}`}
-                        fill="none"
-                        stroke="rgba(14, 165, 233, 0.2)"
-                        strokeWidth="4"
-                      />
-                      <path
-                        d={`M${x1},${y1} C${cx1},${y1} ${cx2},${y2} ${x2},${y2}`}
-                        fill="none"
-                        stroke="url(#edgeGrad)"
-                        strokeWidth="2"
-                        strokeDasharray="7, 5"
-                        className="flow-edge-line"
-                      />
-                      <polygon
-                        points={`${x2},${y2} ${x2 - 8},${y2 - 4.5} ${x2 - 8},${y2 + 4.5}`}
-                        fill="#38bdf8"
-                      />
-                    </g>
-                  );
-                })}
+                    {/* Edges with animated data pulse */}
+                    {dagEdges.map((e, idx) => {
+                      const fromNode = nodeMap.get(e.from);
+                      const toNode = nodeMap.get(e.to);
+                      if (!fromNode || !toNode) return null;
+                      const x1 = fromNode.x + 210;
+                      const y1 = fromNode.y + 38;
+                      const x2 = toNode.x;
+                      const y2 = toNode.y + 38;
+                      const dx = Math.max((x2 - x1) * 0.45, 30);
+                      const cx1 = x1 + dx;
+                      const cx2 = x2 - dx;
 
-                {/* Nodes */}
-                {dagNodes.map((n) => {
-                  const isLake = n.type === 'lakehouse';
-                  const isNote = n.type === 'notebook';
-                  const isPipe = n.type === 'pipeline';
-                  const accentColor = isLake ? '#0ea5e9' : isNote ? '#fbbf24' : isPipe ? '#f43f5e' : '#38bdf8';
+                      return (
+                        <g key={idx} className="flow-edge-group">
+                          {/* Ambient underlying path */}
+                          <path
+                            d={`M${x1},${y1} C${cx1},${y1} ${cx2},${y2} ${x2},${y2}`}
+                            fill="none"
+                            stroke="rgba(255, 255, 255, 0.05)"
+                            strokeWidth="3.5"
+                          />
+                          {/* Pulsing gradient flow line */}
+                          <path
+                            d={`M${x1},${y1} C${cx1},${y1} ${cx2},${y2} ${x2},${y2}`}
+                            fill="none"
+                            stroke="url(#edgeGrad)"
+                            strokeWidth="1.8"
+                            strokeDasharray="6, 5"
+                            className="flow-edge-line"
+                          />
+                          <polygon
+                            points={`${x2},${y2} ${x2 - 7},${y2 - 3.5} ${x2 - 7},${y2 + 3.5}`}
+                            fill="#38bdf8"
+                          />
+                        </g>
+                      );
+                    })}
 
-                  return (
-                    <g
-                      key={n.id}
-                      className={`flow-node ${selectedNode?.id === n.id ? 'active' : ''}`}
-                      transform={`translate(${n.x},${n.y})`}
-                      onClick={() => {
-                        setSelectedNode(n);
-                        if (n.type === 'notebook') {
-                          setActiveTab('wbCode');
-                        }
-                      }}
-                      style={{ cursor: 'pointer' }}
-                    >
-                      <rect
-                        x="0"
-                        y="0"
-                        width="240"
-                        height="72"
-                        rx="12"
-                        fill={`url(#nodeGrad_${n.type})`}
-                        stroke={selectedNode?.id === n.id ? '#38bdf8' : 'rgba(255,255,255,0.12)'}
-                        strokeWidth="1.3"
-                        className="flow-node-bg"
-                      />
-                      {/* Top Accent Strip */}
-                      <path
-                        d="M 0,12 Q 0,0 12,0 L 228,0 Q 240,0 240,12 L 240,3.5 L 0,3.5 Z"
-                        fill={accentColor}
-                        opacity="0.95"
-                      />
-                      {/* Title */}
-                      <text x="16" y="28" fontSize="13" fontWeight="600" fill="#f8fafc">
-                        {n.label}
-                      </text>
-                      {/* Badge */}
-                      <text x="16" y="46" fontSize="9.5" fontWeight="700" fill={accentColor} letterSpacing="0.06em">
-                        {n.layer}
-                      </text>
-                      {/* Sub */}
-                      <text x="16" y="60" fontSize="10" fill="#94a3b8">
-                        {n.sub}
-                      </text>
-                      {/* Status Dot */}
-                      <circle cx="224" cy="20" r="4.5" fill="#10b981" />
-                    </g>
-                  );
-                })}
-              </svg>
-            </div>
+                    {/* All 9 Nodes + Source Node */}
+                    {dagNodes.map((n) => {
+                      const isSelected = selectedNode?.id === n.id;
+                      const displayTitle = n.label.length > 21 ? n.label.slice(0, 19) + '…' : n.label;
+
+                      return (
+                        <g
+                          key={n.id}
+                          className={`flow-node ${isSelected ? 'active' : ''}`}
+                          transform={`translate(${n.x},${n.y})`}
+                          onClick={() => setSelectedNode(n)}
+                          style={{ cursor: 'pointer' }}
+                        >
+                          {/* Card background */}
+                          <rect
+                            x="0"
+                            y="0"
+                            width="210"
+                            height="76"
+                            rx="10"
+                            fill="#0d111a"
+                            stroke={isSelected ? n.glowColor : 'rgba(255,255,255,0.1)'}
+                            strokeWidth={isSelected ? '2' : '1'}
+                            style={{
+                              filter: isSelected ? `drop-shadow(0 0 12px ${n.glowColor}50)` : 'none',
+                              transition: 'all 0.2s ease',
+                            }}
+                          />
+
+                          {/* Top Colored Layer Strip */}
+                          <path
+                            d="M 0,10 Q 0,0 10,0 L 200,0 Q 210,0 210,10 L 210,3 L 0,3 Z"
+                            fill={n.glowColor}
+                            opacity="0.9"
+                          />
+
+                          {/* Layer Badge & Folder Tag */}
+                          <text x="14" y="24" fontSize="9" fontWeight="700" fill={n.glowColor} letterSpacing="0.06em">
+                            {n.layer}
+                          </text>
+                          {n.folderCategory && (
+                            <text x="78" y="24" fontSize="8.5" fill="#64748b" fontFamily="monospace">
+                              📁 {n.folderCategory}
+                            </text>
+                          )}
+
+                          {/* Main Asset Label */}
+                          <text
+                            x="14"
+                            y="45"
+                            fontSize="12.5"
+                            fontWeight="600"
+                            fill={isSelected ? '#ffffff' : '#f1f5f9'}
+                            fontFamily="monospace"
+                          >
+                            {displayTitle}
+                          </text>
+
+                          {/* Subtitle / Spec */}
+                          <text x="14" y="63" fontSize="9.5" fill="#94a3b8">
+                            {n.sub.length > 28 ? n.sub.slice(0, 26) + '…' : n.sub}
+                          </text>
+
+                          {/* Live Status Indicator Pulse */}
+                          <circle cx="194" cy="20" r="4" fill="#10b981" />
+                          <circle cx="194" cy="20" r="7" fill="none" stroke="#10b981" strokeWidth="1" opacity="0.4" />
+                        </g>
+                      );
+                    })}
+                  </svg>
+                </div>
+
+                {/* Selected Node Interactive Inspector Footer */}
+                {selectedNode && (
+                  <div
+                    style={{
+                      position: 'absolute',
+                      bottom: '16px',
+                      left: '24px',
+                      right: '24px',
+                      zIndex: 30,
+                      background: 'rgba(13, 17, 26, 0.94)',
+                      backdropFilter: 'blur(16px)',
+                      border: `1px solid ${selectedNode.glowColor}55`,
+                      borderRadius: '10px',
+                      padding: '12px 18px',
+                      boxShadow: '0 8px 32px rgba(0,0,0,0.6)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: '16px',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <span style={{ fontSize: '18px' }}>{selectedNode.iconSymbol}</span>
+                      <div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span style={{ fontWeight: 600, fontSize: '13.5px', color: '#f8fafc', fontFamily: 'monospace' }}>
+                            {selectedNode.label}
+                          </span>
+                          <span
+                            style={{
+                              fontSize: '9.5px',
+                              fontWeight: 700,
+                              padding: '2px 6px',
+                              borderRadius: '4px',
+                              background: `${selectedNode.glowColor}20`,
+                              color: selectedNode.glowColor,
+                            }}
+                          >
+                            {selectedNode.layer}
+                          </span>
+                        </div>
+                        <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '2px' }}>
+                          <span>Target: <code>{selectedNode.fullPath}</code></span>
+                          <span style={{ margin: '0 6px', color: '#475569' }}>•</span>
+                          <span>{selectedNode.sub}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      {(selectedNode.type === 'notebook' || selectedNode.code) && (
+                        <button
+                          type="button"
+                          onClick={() => setActiveTab('wbCode')}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '5px',
+                            background: 'rgba(192, 132, 252, 0.15)',
+                            border: '1px solid rgba(192, 132, 252, 0.3)',
+                            color: '#c084fc',
+                            fontSize: '11.5px',
+                            fontWeight: 600,
+                            padding: '4px 10px',
+                            borderRadius: '6px',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          <Code2 width={12} height={12} />
+                          <span>Inspect Code</span>
+                          <ArrowRight width={11} height={11} />
+                        </button>
+                      )}
+                      {selectedNode.type === 'warehouse' && (
+                        <button
+                          type="button"
+                          onClick={() => setActiveTab('wbCode')}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '5px',
+                            background: 'rgba(234, 179, 8, 0.15)',
+                            border: '1px solid rgba(234, 179, 8, 0.3)',
+                            color: '#eab308',
+                            fontSize: '11.5px',
+                            fontWeight: 600,
+                            padding: '4px 10px',
+                            borderRadius: '6px',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          <Database width={12} height={12} />
+                          <span>Inspect SQL DDL</span>
+                          <ArrowRight width={11} height={11} />
+                        </button>
+                      )}
+                      {selectedNode.type === 'lakehouse' && (
+                        <button
+                          type="button"
+                          onClick={() => setActiveTab('wbTable')}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '5px',
+                            background: 'rgba(52, 211, 153, 0.15)',
+                            border: '1px solid rgba(52, 211, 153, 0.3)',
+                            color: '#34d399',
+                            fontSize: '11.5px',
+                            fontWeight: 600,
+                            padding: '4px 10px',
+                            borderRadius: '6px',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          <Table2 width={12} height={12} />
+                          <span>Inspect Schema</span>
+                          <ArrowRight width={11} height={11} />
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => setActiveTab('wbTree')}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '5px',
+                          background: 'rgba(255, 255, 255, 0.05)',
+                          border: '1px solid rgba(255, 255, 255, 0.1)',
+                          color: '#e2e8f0',
+                          fontSize: '11.5px',
+                          padding: '4px 10px',
+                          borderRadius: '6px',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        <FolderTree width={12} height={12} />
+                        <span>Locate in OneLake</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedNode(null)}
+                        style={{
+                          background: 'transparent',
+                          border: 'none',
+                          color: '#64748b',
+                          cursor: 'pointer',
+                          padding: '4px',
+                          display: 'flex',
+                        }}
+                        title="Close Inspector"
+                      >
+                        <X width={14} height={14} />
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
             )}
           </div>
         )}

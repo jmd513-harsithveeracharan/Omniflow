@@ -32,6 +32,41 @@ const getBadgeStyle = (badge: string): React.CSSProperties => {
       border: '1px solid rgba(192, 132, 252, 0.25)',
     };
   }
+  if (b === 'SCHEMA') {
+    return {
+      background: 'rgba(56, 189, 248, 0.12)',
+      color: '#38bdf8',
+      border: '1px solid rgba(56, 189, 248, 0.25)',
+    };
+  }
+  if (b === 'PII') {
+    return {
+      background: 'rgba(245, 158, 11, 0.14)',
+      color: '#fbbf24',
+      border: '1px solid rgba(245, 158, 11, 0.3)',
+    };
+  }
+  if (b === 'PHASE') {
+    return {
+      background: 'rgba(16, 185, 129, 0.12)',
+      color: '#34d399',
+      border: '1px solid rgba(16, 185, 129, 0.25)',
+    };
+  }
+  if (b === 'AST' || b === 'TEST' || b === 'AUDIT') {
+    return {
+      background: 'rgba(192, 132, 252, 0.14)',
+      color: '#c084fc',
+      border: '1px solid rgba(192, 132, 252, 0.3)',
+    };
+  }
+  if (b === 'ADF' || b === 'REST') {
+    return {
+      background: 'rgba(14, 165, 233, 0.14)',
+      color: '#38bdf8',
+      border: '1px solid rgba(14, 165, 233, 0.3)',
+    };
+  }
   if (b === 'DAG' || b === 'DELTA') {
     return {
       background: 'rgba(52, 211, 153, 0.12)',
@@ -334,15 +369,26 @@ export const ThoughtTrace: React.FC<ThoughtTraceProps> = ({ meta, isStreaming = 
                       overflowY: 'auto',
                     }}
                   >
-                    {st.output ? (
-                      <div style={{ fontFamily: 'var(--font-mono, "JetBrains Mono", monospace)', fontSize: '11.5px' }}>
-                        <div style={{ color: '#64748b', marginBottom: '2px', fontSize: '10.5px' }}>
-                          ...\Fabric_AI &gt; {action} {target}
+                    {st.detail && (
+                      <div style={{ color: '#94a3b8', marginBottom: st.output ? '6px' : '0' }}>{st.detail}</div>
+                    )}
+                    {st.output && (
+                      <div style={{
+                        fontFamily: 'var(--font-mono, "JetBrains Mono", monospace)',
+                        fontSize: '11px',
+                        background: 'rgba(5, 7, 12, 0.75)',
+                        border: '1px solid rgba(255, 255, 255, 0.08)',
+                        borderRadius: '6px',
+                        padding: '8px 10px',
+                        marginTop: '4px',
+                        overflowX: 'auto',
+                      }}>
+                        <div style={{ color: '#38bdf8', marginBottom: '4px', fontSize: '10px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <span style={{ color: '#10b981' }}>❯</span>
+                          <span>Fabric_AI &gt; {action} {cleanTarget}</span>
                         </div>
-                        <div style={{ color: '#cbd5e1' }}>{st.output}</div>
+                        <div style={{ color: '#cbd5e1', whiteSpace: 'pre', lineHeight: '1.45' }}>{st.output}</div>
                       </div>
-                    ) : (
-                      <div>{st.detail}</div>
                     )}
                   </div>
                 )}

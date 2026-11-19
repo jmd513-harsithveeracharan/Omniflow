@@ -2264,11 +2264,123 @@ async def handle_chat_stream(req: ChatRequest) -> StreamingResponse:
 
                     if evt_type == "__done__":
                         synth_res = evt_data.get("result")
-                        yield f"data: {json.dumps({'type': 'thought_step', 'step': {'id': 's7', 'title': f'Deployer: Blueprint Ready for {ws_display}', 'action': 'Validated', 'badge': 'FABRIC', 'target': ws_display, 'status': 'completed', 'detail': f'All 5 deliverables synthesized and ready for one-click deployment into {ws_display}.'}})}\n\n"
+                        yield f"data: {json.dumps({'type': 'thought_step', 'step': {'id': 's7', 'title': f'Deployer: Enterprise Blueprint Ready for {ws_display}', 'action': 'Validated', 'badge': 'FABRIC', 'target': ws_display, 'status': 'completed', 'detail': f'All 9 deliverables synthesized and ready for one-click deployment into {ws_display}.'}})}\n\n"
                         break
                     if evt_type == "__error__":
                         pipeline_err = evt_data.get("error") or "Unknown pipeline synthesis error"
                         break
+
+                    # 1. Granular source entity discovery
+                    if evt_type == "source_entity_discovered":
+                        t_ent = evt_data.get("entity", "")
+                        step_item = {
+                            "id": f"src_{t_ent}",
+                            "title": f"Architect: Discovered {t_ent}",
+                            "action": "Discovered",
+                            "badge": "SCHEMA",
+                            "target": t_ent,
+                            "status": "completed",
+                            "detail": f"{evt_data.get('columns_count', 0)} attributes | PK: {evt_data.get('primary_key')} | CDC Watermark: {evt_data.get('watermark')}",
+                        }
+                        yield f"data: {json.dumps({'type': 'thought_step', 'step': step_item})}\n\n"
+                        continue
+
+                    # 2. PII Protection Flagging
+                    if evt_type == "pii_detected":
+                        pii_cols = evt_data.get("columns", [])
+                        step_item = {
+                            "id": "pii_protection_gate",
+                            "title": f"Auditor: PII Gate Active ({len(pii_cols)} sensitive fields)",
+                            "action": "Flagged",
+                            "badge": "PII",
+                            "target": f"{len(pii_cols)} fields",
+                            "status": "completed",
+                            "detail": f"Enforcing Salted SHA-256 masking on: {', '.join(pii_cols[:5])}",
+                        }
+                        yield f"data: {json.dumps({'type': 'thought_step', 'step': step_item})}\n\n"
+                        continue
+
+                    # 3. Macro Phase Formulation
+                    if evt_type == "macro_phase_planned":
+                        ph_id = evt_data.get("phase_id", "PH")
+                        step_item = {
+                            "id": f"ph_{ph_id}",
+                            "title": f"Modeler: [{ph_id}] {evt_data.get('phase_name')}",
+                            "action": "Planned",
+                            "badge": "PHASE",
+                            "target": evt_data.get("layer", "Medallion"),
+                            "status": "completed",
+                            "detail": evt_data.get("objective", ""),
+                        }
+                        yield f"data: {json.dumps({'type': 'thought_step', 'step': step_item})}\n\n"
+                        continue
+
+                    # 4. Live Individual Task Start (Real-time pulsing progress)
+                    if evt_type == "task_started":
+                        art_name = evt_data.get("artifact_name", "")
+                        badge = "PY" if art_name.endswith(".py") else ("SQL" if art_name.endswith(".sql") else "JSON")
+                        step_item = {
+                            "id": f"task_{art_name}",
+                            "title": f"Executor: Synthesizing {art_name}",
+                            "action": "Synthesizing",
+                            "badge": badge,
+                            "target": art_name,
+                            "status": "in_progress",
+                            "detail": f"Invoking tool {evt_data.get('tool_name')} ({evt_data.get('description', '')})...",
+                        }
+                        yield f"data: {json.dumps({'type': 'thought_step', 'step': step_item})}\n\n"
+                        continue
+
+                    # 5. Live Individual Task Completed (With execution duration & code snippet)
+                    if evt_type == "task_completed":
+                        art_name = evt_data.get("artifact_name", "")
+                        ms = evt_data.get("execution_time_ms", 0)
+                        sec_str = f"{ms / 1000:.1f}s" if ms >= 1000 else f"{ms}ms"
+                        badge = "PY" if art_name.endswith(".py") else ("SQL" if art_name.endswith(".sql") else "JSON")
+                        preview = evt_data.get("code_preview", "")
+                        step_item = {
+                            "id": f"task_{art_name}",
+                            "title": f"Executor: {art_name}",
+                            "action": "Completed",
+                            "badge": badge,
+                            "target": art_name,
+                            "status": "completed",
+                            "duration": sec_str,
+                            "detail": f"Generated {art_name} ({evt_data.get('lines_count', 0)} lines) via {evt_data.get('tool_used')}",
+                            "output": preview,
+                        }
+                        yield f"data: {json.dumps({'type': 'thought_step', 'step': step_item})}\n\n"
+                        continue
+
+                    # 6. Audit Checks
+                    if evt_type == "audit_check":
+                        b_badge = evt_data.get("badge", "AUDIT")
+                        step_item = {
+                            "id": f"chk_{b_badge}",
+                            "title": f"Auditor: {evt_data.get('check_name')}",
+                            "action": "Verified",
+                            "badge": b_badge,
+                            "target": evt_data.get("check_name"),
+                            "status": "completed",
+                            "detail": evt_data.get("detail", ""),
+                        }
+                        yield f"data: {json.dumps({'type': 'thought_step', 'step': step_item})}\n\n"
+                        continue
+
+                    # 7. Fabric Preflight Checks
+                    if evt_type == "fabric_preflight":
+                        step_item = {
+                            "id": f"fb_{evt_data.get('step')}",
+                            "title": f"Deployer: {evt_data.get('step')}",
+                            "action": "Validated",
+                            "badge": "FABRIC",
+                            "target": evt_data.get("workspace_id", "Fabric"),
+                            "status": "completed",
+                            "detail": evt_data.get("detail", ""),
+                        }
+                        yield f"data: {json.dumps({'type': 'thought_step', 'step': step_item})}\n\n"
+                        continue
+
                     if evt_type == "artifact_generated":
                         art_name = evt_data.get("artifact_name", "")
                         ms = evt_data.get("execution_time_ms", 0)
@@ -2276,22 +2388,6 @@ async def handle_chat_stream(req: ChatRequest) -> StreamingResponse:
                         badge = "PY" if art_name.endswith(".py") else ("SQL" if art_name.endswith(".sql") else "JSON")
                         action = "Generated"
                         detail = f"Synthesized and verified {art_name}"
-                        if "curate" in art_name:
-                            badge = "PY"
-                            action = "Synthesizing"
-                            detail = "PySpark Delta MERGE upsert script with salted SHA-256 PII masking"
-                        elif "gold" in art_name:
-                            badge = "SQL"
-                            action = "Synthesizing"
-                            detail = "Kimball Star Schema DDL with dim_customers and fact_sales_orders"
-                        elif "quality" in art_name:
-                            badge = "TEST"
-                            action = "Created"
-                            detail = "Great Expectations null-key quarantine and schema constraints"
-                        elif "ingestion" in art_name:
-                            badge = "ADF"
-                            action = "Configured"
-                            detail = "Fabric Data Factory Copy Activity with High-Watermark CDC tracking"
                         step_item = {
                             "id": f"art_{art_name}",
                             "title": f"Executor: {art_name}",

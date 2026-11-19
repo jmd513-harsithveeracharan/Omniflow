@@ -560,8 +560,22 @@ You MUST respond ONLY with a single valid JSON object matching this exact schema
         )
         return output
 
-    def run_executor(self, dag: OrganizerDAGOutput, run_id: str, output_dir: str, resume: bool = False) -> ExecutorAgentOutput:
+    def run_executor(
+        self,
+        dag: OrganizerDAGOutput,
+        run_id: str,
+        output_dir: str,
+        resume: bool = False,
+        event_callback: Any = None,
+    ) -> ExecutorAgentOutput:
         """Executes all DAG tasks in topological order, writes files + PostgreSQL artifacts/tool_runs."""
+        def emit(evt_type: str, evt_data: dict[str, Any]) -> None:
+            if event_callback and callable(event_callback):
+                try:
+                    event_callback(evt_type, evt_data)
+                except Exception:
+                    pass
+
         self.reload_from_db()
         os.makedirs(output_dir, exist_ok=True)
         created_artifacts: list[ExecutedArtifactItem] = []
@@ -575,6 +589,16 @@ You MUST respond ONLY with a single valid JSON object matching this exact schema
         )
 
         for task in dag.tasks:
+            # Emit live start event for the individual task
+            emit("task_started", {
+                "task_id": task.task_id,
+                "step_code": task.step_code,
+                "artifact_name": task.target_artifact_name,
+                "artifact_type": task.artifact_type,
+                "tool_name": task.required_tool,
+                "description": task.description or f"Generating {task.target_artifact_name}",
+            })
+
             file_path = os.path.join(output_dir, task.target_artifact_name)
             existing_candidate = None
 
@@ -640,6 +664,17 @@ You MUST respond ONLY with a single valid JSON object matching this exact schema
                             status="completed",
                         )
                     )
+                    emit("task_completed", {
+                        "task_id": task.task_id,
+                        "step_code": task.step_code,
+                        "artifact_name": task.target_artifact_name,
+                        "artifact_type": task.artifact_type,
+                        "tool_used": "cache_reuse",
+                        "cached": True,
+                        "execution_time_ms": 5,
+                        "lines_count": len(content_str.splitlines()),
+                        "code_preview": "\n".join(content_str.splitlines()[:6]),
+                    })
                     continue
                 except Exception:
                     pass
@@ -656,11 +691,13 @@ You MUST respond ONLY with a single valid JSON object matching this exact schema
                 with open(file_path, "w", encoding="utf-8") as f:
                     f.write(content_str)
                 raw_bytes = content_str.encode("utf-8")
+                preview_code = content_str
             else:
                 json_text = json.dumps(definition_obj, indent=2)
                 with open(file_path, "w", encoding="utf-8") as f:
                     f.write(json_text)
                 raw_bytes = json_text.encode("utf-8")
+                preview_code = json_text
 
             def_hash = hashlib.sha256(raw_bytes).hexdigest()
             artifact_id = self.db_logger.insert_artifact(
@@ -695,6 +732,17 @@ You MUST respond ONLY with a single valid JSON object matching this exact schema
                     status="completed",
                 )
             )
+            emit("task_completed", {
+                "task_id": task.task_id,
+                "step_code": task.step_code,
+                "artifact_name": task.target_artifact_name,
+                "artifact_type": task.artifact_type,
+                "tool_used": task.required_tool,
+                "cached": False,
+                "execution_time_ms": elapsed_ms,
+                "lines_count": len(preview_code.splitlines()),
+                "code_preview": "\n".join(preview_code.splitlines()[:8]),
+            })
 
         return ExecutorAgentOutput(
             run_id=run_id,
