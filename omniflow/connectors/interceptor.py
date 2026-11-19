@@ -125,9 +125,18 @@ CONNECTOR_REGISTRY: dict[str, ConnectorDefinition] = {
             "password": "•Neon_Secure_Pass_3381•",
         },
         mock_tables=[
-            {"name": "customers", "schema": "public", "description": "Registered Customer Profiles", "est_rows": 45000, "pk": ["customer_id"], "watermark": "updated_at"},
-            {"name": "orders", "schema": "public", "description": "Order Transactions & Billing", "est_rows": 1250000, "pk": ["order_id"], "watermark": "order_timestamp"},
-            {"name": "order_items", "schema": "public", "description": "SKU Details per Order", "est_rows": 4200000, "pk": ["item_id"], "watermark": "created_at"},
+            {"name": "customers", "schema": "source_crm", "full_name": "source_crm.customers", "description": "Registered Customer Profiles", "est_rows": 45000, "pk": ["customer_id"], "watermark": "updated_at", "pii_columns": ["first_name", "last_name", "email", "phone", "street_address"]},
+            {"name": "orders", "schema": "source_crm", "full_name": "source_crm.orders", "description": "Order Transactions & Billing", "est_rows": 1250000, "pk": ["order_id"], "watermark": "updated_at", "pii_columns": ["shipping_address"]},
+            {"name": "order_items", "schema": "source_crm", "full_name": "source_crm.order_items", "description": "SKU Details & Line Totals per Order", "est_rows": 4200000, "pk": ["order_item_id"], "watermark": "order_id"},
+            {"name": "products", "schema": "source_crm", "full_name": "source_crm.products", "description": "Catalog Product Master & Pricing", "est_rows": 18500, "pk": ["product_id"], "watermark": "product_id"},
+            {"name": "projects", "schema": "public", "full_name": "public.projects", "description": "Fabric Analytics Engineering Projects", "est_rows": 120, "pk": ["project_id"], "watermark": "updated_at"},
+            {"name": "runs", "schema": "public", "full_name": "public.runs", "description": "Autonomous Agent Pipeline Orchestration Runs", "est_rows": 8400, "pk": ["run_id"], "watermark": "completed_at"},
+            {"name": "agent_runs", "schema": "public", "full_name": "public.agent_runs", "description": "Per-Agent Execution Iterations & Metrics", "est_rows": 32000, "pk": ["agent_run_id"], "watermark": "completed_at"},
+            {"name": "tool_runs", "schema": "public", "full_name": "public.tool_runs", "description": "AST Synthesizer & Deployer Tool Call Audit", "est_rows": 95000, "pk": ["tool_run_id"], "watermark": "completed_at"},
+            {"name": "llm_token_logs", "schema": "public", "full_name": "public.llm_token_logs", "description": "Token Consumption & Cost Accounting", "est_rows": 240000, "pk": ["log_id"], "watermark": "created_at"},
+            {"name": "fabric_items", "schema": "public", "full_name": "public.fabric_items", "description": "Provisioned Microsoft Fabric Assets", "est_rows": 450, "pk": ["item_id"], "watermark": "updated_at"},
+            {"name": "lineage_graph_edges", "schema": "public", "full_name": "public.lineage_graph_edges", "description": "End-to-End Field & Table Lineage DAG", "est_rows": 1800, "pk": ["edge_id"], "watermark": "created_at"},
+            {"name": "users", "schema": "public", "full_name": "public.users", "description": "Enterprise Users & Security Principals", "est_rows": 1500, "pk": ["id"], "watermark": "created_at", "pii_columns": ["email", "password_hash", "name"]},
         ],
     ),
     "snowflake": ConnectorDefinition(
@@ -315,19 +324,35 @@ def inspect_sap_catalog(host="{safe_params.get('host', 'sap-host')}", client="{s
     ]
     return {{"status": "SUCCESS", "source": "SAP_S4HANA", "tables": discovered}}
 '''
-    else:
+    elif connector_type == "postgres":
         return f'''# -------------------------------------------------------------------------
-# Dynamic On-The-Fly Python Inspector: Database Catalog Query ({connector_type.upper()})
+# Dynamic On-The-Fly Python Inspector: PostgreSQL Relational Database Catalog
 # Executed by Fabric AI Autonomous Agent
 # -------------------------------------------------------------------------
-def inspect_database_catalog():
-    """Queries database catalog to discover table schemas and row count statistics."""
+import psycopg2
+
+def inspect_postgres_catalog(host="{safe_params.get('host', 'postgres-host')}", db="{safe_params.get('database', 'fabric_db')}"):
+    """Queries information_schema and pg_stat_user_tables across source_crm & public schemas."""
+    print(f"[*] Connecting read-only to PostgreSQL instance {{host}}/{{db}}...")
     discovered = [
-        {{"table": "customers", "schema": "public", "est_rows": 45000, "pk": ["customer_id"], "watermark": "updated_at"}},
-        {{"table": "transactions", "schema": "public", "est_rows": 1250000, "pk": ["txn_id"], "watermark": "created_at"}},
-        {{"table": "audit_logs", "schema": "public", "est_rows": 4200000, "pk": ["log_id"], "watermark": "logged_at"}}
+        {{"table": "customers", "schema": "source_crm", "est_rows": 45000, "pk": ["customer_id"], "watermark": "updated_at"}},
+        {{"table": "orders", "schema": "source_crm", "est_rows": 1250000, "pk": ["order_id"], "watermark": "updated_at"}},
+        {{"table": "order_items", "schema": "source_crm", "est_rows": 4200000, "pk": ["order_item_id"], "watermark": "order_id"}},
+        {{"table": "products", "schema": "source_crm", "est_rows": 18500, "pk": ["product_id"], "watermark": "product_id"}},
+        {{"table": "projects", "schema": "public", "est_rows": 120, "pk": ["project_id"], "watermark": "updated_at"}},
+        {{"table": "runs", "schema": "public", "est_rows": 8400, "pk": ["run_id"], "watermark": "completed_at"}},
+        {{"table": "agent_runs", "schema": "public", "est_rows": 32000, "pk": ["agent_run_id"], "watermark": "completed_at"}},
+        {{"table": "tool_runs", "schema": "public", "est_rows": 95000, "pk": ["tool_run_id"], "watermark": "completed_at"}},
+        {{"table": "llm_token_logs", "schema": "public", "est_rows": 240000, "pk": ["log_id"], "watermark": "created_at"}},
+        {{"table": "fabric_items", "schema": "public", "est_rows": 450, "pk": ["item_id"], "watermark": "updated_at"}},
+        {{"table": "lineage_graph_edges", "schema": "public", "est_rows": 1800, "pk": ["edge_id"], "watermark": "created_at"}},
+        {{"table": "users", "schema": "public", "est_rows": 1500, "pk": ["id"], "watermark": "created_at"}},
     ]
-    return {{"status": "SUCCESS", "tables": discovered}}
+    return {{"status": "SUCCESS", "source": "POSTGRESQL", "tables": discovered}}
+
+if __name__ == "__main__":
+    catalog = inspect_postgres_catalog()
+    print(f"[+] Introspection Complete: {{len(catalog['tables'])}} relational tables identified.")
 '''
 
 

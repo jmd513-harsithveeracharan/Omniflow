@@ -246,7 +246,7 @@ def build_dynamic_plan_object(
 
     # High-quality fallback code if none on disk
     if not pyspark_code:
-        tbl_names_str = ", ".join(f'"{t.get("table_name")}"' for t in source_tables[:5]) or '"source_crm.customers", "source_crm.orders"'
+        tbl_names_str = ", ".join(f'"{t.get("table_name")}"' for t in source_tables) or '"source_crm.customers", "source_crm.orders"'
         pyspark_code = (
             f"# Fabric PySpark Notebook: nb_{clean_dom}_curate\n"
             f"# Runtime: Microsoft Fabric Synapse PySpark (Delta Lake)\n\n"

@@ -208,7 +208,13 @@ class DynamicAgentRuntime:
             session_id=session_id,
         )
 
-    def run_planner(self, req: NaturalLanguagePlanRequest, run_id: str) -> PlannerOutput:
+    def run_planner(
+        self,
+        req: NaturalLanguagePlanRequest,
+        run_id: str,
+        intake_tables: list[str] | None = None,
+        intake_pii: list[str] | None = None,
+    ) -> PlannerOutput:
         """Two-Pass Planner: executes self-directed tool calls to query Neon PostgreSQL catalog across
         Metadata, Governance, Architecture Decisions, and Constraints, then shapes the macro & granular plan.
         """
@@ -228,26 +234,35 @@ class DynamicAgentRuntime:
         # 1. Autonomous Context Call: Discover registered tables & data sources
         _stream("agent.planner", "Executing tool: search_database_catalog_tool('ALL')", indent=1)
         cat_res = self.execute_tool_call("search_database_catalog_tool", {"query": "ALL"}, agent_run_id=agent_run_id)
-        discovered_tables = cat_res.get("table_names", ["orders", "customers", "BKPF", "BSEG"])
         discovered_sources = [
             s["source_name"] for s in cat_res.get("data_sources", [])
-            if any(k in s["source_name"].lower() for k in ("sap", "postgres", "erp", "operational"))
+            if any(k in s["source_name"].lower() for k in ("sap", "postgres", "erp", "operational", "crm"))
         ]
         if not discovered_sources:
-            discovered_sources = ["SAP ECC ERP (RFC/ODP)", "PostgreSQL Operational DB"]
+            discovered_sources = ["PostgreSQL Platform & Source CRM Database"]
         detected_sources = discovered_sources
+
+        if intake_tables and len(intake_tables) > 0:
+            discovered_tables = intake_tables
+            _stream("db.postgres", f"Grounded with {len(discovered_tables)} verified intake entities: {discovered_tables}", indent=2)
+        else:
+            discovered_tables = cat_res.get("table_names", ["customers", "orders", "order_items", "products"])
+            _stream("db.postgres", f"Found {len(discovered_tables)} candidate tables from catalog: {discovered_tables}", indent=2)
         _stream("db.postgres", f"Found {len(discovered_sources)} data sources: {discovered_sources}", indent=2)
-        _stream("db.postgres", f"Found {len(discovered_tables)} candidate tables: {discovered_tables}", indent=2)
 
         # 2. Autonomous Context Call: Retrieve exact columns, PII tags, and foreign key relationships
-        _stream("agent.planner", f"Executing tool: get_table_schema_and_lineage_tool({discovered_tables})", indent=1)
-        schema_res = self.execute_tool_call("get_table_schema_and_lineage_tool", {"table_names": discovered_tables}, agent_run_id=agent_run_id)
-        all_pii = []
-        for s in schema_res.get("schemas", []):
-            all_pii.extend(s.get("pii_columns", []))
-        all_pii = sorted(list(set(all_pii))) if all_pii else ["customer_email", "tax_id", "iban_number", "customer_name"]
-        _stream("db.postgres", f"Retrieved {schema_res.get('retrieved_tables_count', 0)} schemas & {len(schema_res.get('relationships', []))} foreign key relations", indent=2)
-        _stream("db.postgres", f"Identified sensitive PII columns: {all_pii}", indent=2)
+        if intake_pii and len(intake_pii) > 0:
+            all_pii = sorted(list(set(intake_pii)))
+            _stream("db.postgres", f"Enforcing {len(all_pii)} verified PII attributes from intake specification: {all_pii}", indent=2)
+        else:
+            _stream("agent.planner", f"Executing tool: get_table_schema_and_lineage_tool({discovered_tables[:6]})", indent=1)
+            schema_res = self.execute_tool_call("get_table_schema_and_lineage_tool", {"table_names": discovered_tables}, agent_run_id=agent_run_id)
+            all_pii = []
+            for s in schema_res.get("schemas", []):
+                all_pii.extend(s.get("pii_columns", []))
+            all_pii = sorted(list(set(all_pii))) if all_pii else ["email", "phone", "street_address", "first_name", "last_name"]
+            _stream("db.postgres", f"Retrieved {schema_res.get('retrieved_tables_count', 0)} schemas & {len(schema_res.get('relationships', []))} foreign key relations", indent=2)
+            _stream("db.postgres", f"Identified sensitive PII columns: {all_pii}", indent=2)
 
         # 3. Autonomous Context Call: Query mandatory governance and compliance policies
         _stream("agent.planner", f"Executing tool: query_governance_and_compliance_policies_tool('{req.project_code}')", indent=1)

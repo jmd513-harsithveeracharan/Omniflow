@@ -172,6 +172,13 @@ class MultiAgentOrchestrator:
                 requested_by=intake_data.get("request_context", {}).get("user_id") or os.getenv("FABRIC_USER_IDENTITY", "user@fabric.internal"),
                 reset_synthesized_tools=reset_tools,
             )
+        elif table_names and not any(t in req.prompt_text for t in table_names[:2]):
+            req.prompt_text = (
+                f"{req.prompt_text.strip()}\n\n"
+                f"Target Operational Entities ({len(table_names)}): {', '.join(table_names)}.\n"
+                f"Identified Sensitive PII: {', '.join(pii_detected)}.\n"
+                f"Architecture: Bronze (lh_{domain_key}_bronze) -> Silver (lh_{domain_key}_silver) -> Gold (wh_{domain_key}_gold)."
+            )
 
         # Print Executive Banner
         ws_name = os.getenv("ALLOWED_WORKSPACE_NAME") or os.getenv("FABRIC_ALLOWED_WORKSPACE_NAME") or "Fabric Workspace"
@@ -225,7 +232,7 @@ class MultiAgentOrchestrator:
         # Stage 2: Architecture Planning & DAG Scheduling
         ui.stage(2, 5, "Architectural Planning & DAG Scheduling (Planner & Task Organizer Agents)")
         planner = DynamicAgentRuntime("planner_agent", self.repo, self.db_logger)
-        plan_out = planner.run_planner(req, run_id)
+        plan_out = planner.run_planner(req, run_id, intake_tables=table_names, intake_pii=pii_detected)
         ui.success_bullet(f"Formulated {len(plan_out.macro_phases)} Medallion Architecture Phases:")
         for ph in plan_out.macro_phases:
             ui.sub_bullet(f"[{ph.phase_id}] {ph.phase_name} ({ph.layer}) -> {ph.objective}")

@@ -1771,15 +1771,38 @@ async def handle_chat_stream(req: ChatRequest) -> StreamingResponse:
                         break
                     except Exception:
                         pass
-        # Fallback if project is postgres medallion and intake was not in context files directly
-        if not intake_override and ("postgres" in str(resolved_proj.get("name", "")).lower() or "postgres" in str(resolved_proj.get("id", "")).lower()):
-            pg_path = os.path.join(INTAKE_DIR, "project_intake_postgres_test.json")
-            if os.path.exists(pg_path):
-                try:
-                    with open(pg_path, "r", encoding="utf-8") as f:
-                        intake_override = json.load(f)
-                except Exception:
-                    pass
+        # Multi-domain intake template fallback if intake was not in context files directly
+        if not intake_override and resolved_proj:
+            p_text = f"{resolved_proj.get('name', '')} {resolved_proj.get('id', '')} {resolved_proj.get('description', '')}".lower()
+            domain_file_map = {
+                "postgres": "project_intake_postgres_test.json",
+                "fintech": "project_intake_fintech.json",
+                "payment": "project_intake_fintech.json",
+                "health": "project_intake_healthcare.json",
+                "supply": "project_intake_supplychain.json",
+                "logistic": "project_intake_supplychain.json",
+                "delivery": "project_intake_delivery.json",
+            }
+            for kw, fn in domain_file_map.items():
+                if kw in p_text:
+                    cand_path = os.path.join(INTAKE_DIR, fn)
+                    if os.path.exists(cand_path):
+                        try:
+                            with open(cand_path, "r", encoding="utf-8") as f:
+                                intake_override = json.load(f)
+                            break
+                        except Exception:
+                            pass
+            if not intake_override:
+                def_path = os.path.join(INTAKE_DIR, "project_intake_postgres_test.json")
+                if not os.path.exists(def_path):
+                    def_path = os.path.join(INTAKE_DIR, "project_intake.json")
+                if os.path.exists(def_path):
+                    try:
+                        with open(def_path, "r", encoding="utf-8") as f:
+                            intake_override = json.load(f)
+                    except Exception:
+                        pass
     conn_id_match = re.search(r"connectionId\s*['\"]?(conn_[a-zA-Z0-9_\-]+)['\"]?", req.message)
     active_conn_id = conn_id_match.group(1) if conn_id_match else None
     tables_match = re.search(r"selected tables:\s*([^\n]+)", req.message, re.IGNORECASE)
@@ -2190,6 +2213,10 @@ async def handle_chat_stream(req: ChatRequest) -> StreamingResponse:
                 "build medallion",
                 "medallion plan",
                 "architecture plan",
+                "resume pipeline",
+                "connectionid",
+                "selected tables",
+                "--resume",
             ]
         )
 
