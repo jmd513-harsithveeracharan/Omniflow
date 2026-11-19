@@ -2099,6 +2099,12 @@ async def handle_chat_stream(req: ChatRequest) -> StreamingResponse:
 
         if is_deploy_trigger:
             active_plan = SESSIONS[sid].get("active_plan")
+            if not active_plan and proj_id:
+                for other_s in SESSIONS.values():
+                    if other_s.get("project_id") == proj_id and other_s.get("active_plan"):
+                        active_plan = other_s["active_plan"]
+                        SESSIONS[sid]["active_plan"] = active_plan
+                        break
             if not active_plan:
                 no_plan_msg = (
                     "No active architecture plan was found to deploy. "

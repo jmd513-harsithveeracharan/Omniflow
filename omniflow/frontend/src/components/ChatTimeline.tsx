@@ -181,10 +181,14 @@ export const ChatTimeline: React.FC<ChatTimelineProps> = ({
           const hasPlan =
             !isUser &&
             (cleanContent.includes('Architecture Deployed') ||
+              cleanContent.includes('Architecture Synthesized') ||
+              cleanContent.includes('Target Root Folder') ||
               cleanContent.includes('Target Folder') ||
               cleanContent.includes('Proposed Fabric Architecture') ||
-              cleanContent.includes('Microsoft Fabric Architecture Plan') ||
+              cleanContent.includes('Microsoft Fabric Architecture') ||
+              cleanContent.includes('Fabric Medallion Hierarchy') ||
               cleanContent.includes('Medallion Lakehouses') ||
+              cleanContent.includes('Deploy to Fabric') ||
               cleanContent.includes('Architecture Plan:'));
           const isDeployed =
             cleanContent.includes('Architecture Deployed') ||
