@@ -1627,6 +1627,65 @@ def _format_chat_message(m: dict[str, Any]) -> dict[str, Any]:
     return {"role": role, "content": content}
 
 
+def resolve_project_record(proj_id_or_name: str | None) -> dict[str, Any] | None:
+    """Robustly resolves a project by ID, project_code, name, or normalized slug."""
+    if not proj_id_or_name:
+        return None
+    cached = fetch_projects_cached()
+    raw = str(proj_id_or_name).strip()
+    raw_lower = raw.lower()
+    clean_target = re.sub(r"[^a-z0-9]", "", raw_lower)
+
+    # 1. Exact ID or Name match
+    for p in cached:
+        if p["id"].lower() == raw_lower or p.get("name", "").lower() == raw_lower:
+            return p
+
+    # 2. Substring or Alphanumeric match (handles PRJ-POSTGRESQL-MEDALLI matching PRJ-POSTGRESQL-MEDALLION)
+    for p in cached:
+        p_clean_id = re.sub(r"[^a-z0-9]", "", str(p["id"]).lower())
+        p_clean_name = re.sub(r"[^a-z0-9]", "", str(p.get("name", "")).lower())
+        if clean_target and (
+            clean_target in p_clean_id
+            or p_clean_id in clean_target
+            or clean_target in p_clean_name
+            or p_clean_name in clean_target
+        ):
+            return p
+
+    # 3. Fallback database lookup with ILIKE
+    try:
+        repo = PostgresRepository()
+        with repo._connect() as conn, conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT project_id, project_code, project_name, description, status, metadata
+                FROM projects
+                WHERE project_code ILIKE %s OR project_name ILIKE %s OR project_id::text = %s
+                LIMIT 1;
+                """,
+                (f"%{raw[:15]}%", f"%{raw[:15]}%", raw)
+            )
+            row = cur.fetchone()
+            if row:
+                meta = row[5]
+                if isinstance(meta, str):
+                    try:
+                        meta = json.loads(meta)
+                    except Exception:
+                        meta = {}
+                return {
+                    "id": row[1] or str(row[0]),
+                    "name": row[2],
+                    "description": row[3],
+                    "status": row[4],
+                    "metadata": meta or {},
+                }
+    except Exception as e:
+        print(f"[resolve_project_record DB Fallback Notice]: {e}")
+    return None
+
+
 @app.post("/api/chat/stream")
 async def handle_chat_stream(req: ChatRequest) -> StreamingResponse:
     sid = req.session_id or f"sess_{uuid.uuid4().hex[:9]}"
@@ -1639,25 +1698,20 @@ async def handle_chat_stream(req: ChatRequest) -> StreamingResponse:
         proj_id = sid_no_prefix.rsplit("_", 1)[0] if "_" in sid_no_prefix else sid_no_prefix
 
     # 1. Resolve project record
-    resolved_proj = None
-    if proj_id:
-        cached_list = fetch_projects_cached()
-        resolved_proj = next((p for p in cached_list if p["id"] == proj_id or p.get("name") == proj_id), None)
-        if not resolved_proj:
-            norm_id = proj_id.lower().replace("-", " ").strip()
-            resolved_proj = next(
-                (p for p in cached_list if norm_id in str(p.get("name", "")).lower() or norm_id in str(p.get("id", "")).lower()),
-                None
-            )
-    else:
+    resolved_proj = resolve_project_record(proj_id)
+    if not resolved_proj:
         cached_list = fetch_projects_cached()
         msg_l = req.message.lower()
-        if "postgres" in msg_l or "medallion" in msg_l or "pbt_data_agent" in msg_l:
+        for p in cached_list:
+            p_kws = [k for k in re.split(r"[^a-z0-9]+", p.get("name", "").lower()) if len(k) >= 4]
+            if any(kw in msg_l for kw in p_kws):
+                resolved_proj = p
+                break
+        if not resolved_proj and ("postgres" in msg_l or "medallion" in msg_l or "pbt_data_agent" in msg_l):
             resolved_proj = next((p for p in cached_list if "postgres" in str(p.get("name", "")).lower() or "postgres" in str(p.get("id", "")).lower()), None)
-            if not resolved_proj and cached_list:
-                resolved_proj = next((p for p in cached_list if p.get("metadata", {}).get("context_files")), None)
-        if resolved_proj:
-            proj_id = resolved_proj["id"]
+
+    if resolved_proj:
+        proj_id = resolved_proj["id"]
 
     if sid not in SESSIONS:
         SESSIONS[sid] = {
@@ -1703,7 +1757,7 @@ async def handle_chat_stream(req: ChatRequest) -> StreamingResponse:
                                 raw_c = f.read()
                         except Exception:
                             pass
-                elif not raw_c and cf.get("name"):
+                if not raw_c and cf.get("name"):
                     t_path = os.path.join(INTAKE_DIR, cf["name"])
                     if os.path.exists(t_path):
                         try:
@@ -1717,6 +1771,15 @@ async def handle_chat_stream(req: ChatRequest) -> StreamingResponse:
                         break
                     except Exception:
                         pass
+        # Fallback if project is postgres medallion and intake was not in context files directly
+        if not intake_override and ("postgres" in str(resolved_proj.get("name", "")).lower() or "postgres" in str(resolved_proj.get("id", "")).lower()):
+            pg_path = os.path.join(INTAKE_DIR, "project_intake_postgres_test.json")
+            if os.path.exists(pg_path):
+                try:
+                    with open(pg_path, "r", encoding="utf-8") as f:
+                        intake_override = json.load(f)
+                except Exception:
+                    pass
     conn_id_match = re.search(r"connectionId\s*['\"]?(conn_[a-zA-Z0-9_\-]+)['\"]?", req.message)
     active_conn_id = conn_id_match.group(1) if conn_id_match else None
     tables_match = re.search(r"selected tables:\s*([^\n]+)", req.message, re.IGNORECASE)

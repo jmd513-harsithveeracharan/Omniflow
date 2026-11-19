@@ -12,6 +12,7 @@ interface ColumnContract {
   is_pii?: boolean;
   pii?: boolean;
   foreign_key?: string;
+  layer?: string;
 }
 
 interface TableContract {
@@ -26,6 +27,11 @@ interface DeltaSchemaPaneProps {
   schemaContracts?: Record<string, TableContract>;
   tables?: Array<Record<string, unknown>>;
   domain?: string;
+}
+
+function cleanText(str?: string): string {
+  if (!str) return '';
+  return str.replace(/\$\\to\$/g, '→').replace(/\\to/g, '→').replace(/\$/g, '').trim();
 }
 
 export const DeltaSchemaPane: React.FC<DeltaSchemaPaneProps> = ({
@@ -177,11 +183,11 @@ export const DeltaSchemaPane: React.FC<DeltaSchemaPaneProps> = ({
 
               let constraintText = 'None';
               if (isPk) constraintText = 'Yes (Primary Key)';
-              else if (c.foreign_key) constraintText = `FK → ${c.foreign_key}`;
+              else if (c.foreign_key) constraintText = cleanText(`FK → ${c.foreign_key}`);
               else if (isWm) constraintText = 'Watermark (CDC)';
               else if (isAudit) constraintText = 'Audit Column';
 
-              let layerText = 'Silver Delta MERGE';
+              let layerText = cleanText(c.layer || 'Silver Delta MERGE');
               if (isPii) layerText = '🛡️ Salted SHA-256 Masked';
               else if (isAudit) layerText = 'System Metadata';
 

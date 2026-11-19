@@ -549,6 +549,10 @@ export const MedallionFlowCanvas: React.FC<MedallionFlowCanvasProps> = ({
                         <stop offset="0%" stopColor="#0ea5e9" stopOpacity="0.4" />
                         <stop offset="100%" stopColor="#38bdf8" stopOpacity="0.9" />
                       </linearGradient>
+                      <linearGradient id="nodeBgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stopColor="#111624" />
+                        <stop offset="100%" stopColor="#080b12" />
+                      </linearGradient>
                       <filter id="nodeGlow" x="-20%" y="-20%" width="140%" height="140%">
                         <feDropShadow dx="0" dy="4" stdDeviation="8" floodColor="rgba(56, 189, 248, 0.25)" />
                       </filter>
@@ -596,7 +600,11 @@ export const MedallionFlowCanvas: React.FC<MedallionFlowCanvasProps> = ({
                     {/* All 9 Nodes + Source Node */}
                     {dagNodes.map((n) => {
                       const isSelected = selectedNode?.id === n.id;
-                      const displayTitle = n.label.length > 21 ? n.label.slice(0, 19) + '…' : n.label;
+                      // Smart non-destructive truncation that preserves layer and file extensions
+                      const displayTitle =
+                        n.label.length <= 26
+                          ? n.label
+                          : `${n.label.slice(0, 15)}…${n.label.slice(n.label.includes('.') ? -8 : -7)}`;
 
                       return (
                         <g
@@ -606,18 +614,18 @@ export const MedallionFlowCanvas: React.FC<MedallionFlowCanvasProps> = ({
                           onClick={() => setSelectedNode(n)}
                           style={{ cursor: 'pointer' }}
                         >
-                          {/* Card background */}
+                          {/* Card background with glass gradient */}
                           <rect
                             x="0"
                             y="0"
                             width="210"
                             height="76"
                             rx="10"
-                            fill="#0d111a"
+                            fill="url(#nodeBgGrad)"
                             stroke={isSelected ? n.glowColor : 'rgba(255,255,255,0.1)'}
                             strokeWidth={isSelected ? '2' : '1'}
                             style={{
-                              filter: isSelected ? `drop-shadow(0 0 12px ${n.glowColor}50)` : 'none',
+                              filter: isSelected ? `drop-shadow(0 0 16px ${n.glowColor}60)` : 'drop-shadow(0 2px 8px rgba(0,0,0,0.5))',
                               transition: 'all 0.2s ease',
                             }}
                           />

@@ -554,14 +554,25 @@ export const App: React.FC = () => {
     });
   }, []);
 
+  const credCardRef = React.useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (activeCredentialRequest && credCardRef.current) {
+      setTimeout(() => {
+        credCardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }, 120);
+    }
+  }, [activeCredentialRequest]);
+
   const handleSendMessage = async (
     text: string,
     model?: string,
     effort?: string,
     mode?: 'auto' | 'general' | 'project',
-    images?: string[]
+    images?: string[],
+    overrideSessionId?: string
   ) => {
     if (!text.trim() && (!images || images.length === 0)) return;
+    const targetSessionId = overrideSessionId || sessionId;
 
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
@@ -618,7 +629,7 @@ export const App: React.FC = () => {
 
     await streamChatTurn(
       text,
-      sessionId,
+      targetSessionId,
       (chunk) => {
         if (controller.signal.aborted) return;
         assistantContent += chunk;
@@ -974,7 +985,7 @@ export const App: React.FC = () => {
                 localStorage.setItem('omniflow_active_session_id', newSid);
                 localStorage.setItem('omniflow_active_view', 'chat');
               } catch {}
-              handleSendMessage(prompt, model, effort, 'project');
+              handleSendMessage(prompt, model, effort, 'project', undefined, newSid);
             }}
             onOpenRelationshipGraph={(pId) => {
               setActiveProjectId(pId);
@@ -1104,11 +1115,13 @@ export const App: React.FC = () => {
               )}
 
               {activeCredentialRequest && (
-                <CredentialInterceptionCard
-                  data={activeCredentialRequest}
-                  onConfirmResume={handleResumeFromCredentialInterception}
-                  onDismiss={() => setActiveCredentialRequest(null)}
-                />
+                <div ref={credCardRef} className="w-full flex-shrink-0">
+                  <CredentialInterceptionCard
+                    data={activeCredentialRequest}
+                    onConfirmResume={handleResumeFromCredentialInterception}
+                    onDismiss={() => setActiveCredentialRequest(null)}
+                  />
+                </div>
               )}
 
               <PromptDock
