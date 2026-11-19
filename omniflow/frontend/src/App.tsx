@@ -1115,13 +1115,11 @@ export const App: React.FC = () => {
               )}
 
               {activeCredentialRequest && (
-                <div ref={credCardRef} className="w-full flex-shrink-0">
-                  <CredentialInterceptionCard
-                    data={activeCredentialRequest}
-                    onConfirmResume={handleResumeFromCredentialInterception}
-                    onDismiss={() => setActiveCredentialRequest(null)}
-                  />
-                </div>
+                <CredentialInterceptionCard
+                  data={activeCredentialRequest}
+                  onConfirmResume={handleResumeFromCredentialInterception}
+                  onDismiss={() => setActiveCredentialRequest(null)}
+                />
               )}
 
               <PromptDock
