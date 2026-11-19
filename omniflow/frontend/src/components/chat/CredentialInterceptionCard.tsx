@@ -4,7 +4,6 @@ import {
   ShieldCheck,
   Eye,
   EyeOff,
-  Zap,
   Play,
   CheckCircle2,
   AlertCircle,
@@ -44,7 +43,6 @@ export const CredentialInterceptionCard: React.FC<CredentialInterceptionCardProp
   const [inspectResult, setInspectResult] = useState<ProvisionAndInspectResult | null>(null);
   const [selectedTables, setSelectedTables] = useState<Record<string, boolean>>({});
   const [showCode, setShowCode] = useState<boolean>(false);
-  const [usedDemoPresets, setUsedDemoPresets] = useState<boolean>(false);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -59,12 +57,6 @@ export const CredentialInterceptionCard: React.FC<CredentialInterceptionCardProp
   const getTableKey = (t: DiscoveredSourceTable): string =>
     t.full_name || (t.schema ? `${t.schema}.${t.name}` : t.name);
 
-  const handleFillDemo = () => {
-    setFormData({ ...data.sample_presets });
-    setUsedDemoPresets(true);
-    setInspectError(null);
-  };
-
   const handleTogglePassword = (key: string) => {
     setShowPasswords((prev) => ({ ...prev, [key]: !prev[key] }));
   };
@@ -75,7 +67,7 @@ export const CredentialInterceptionCard: React.FC<CredentialInterceptionCardProp
     setInspectError(null);
 
     try {
-      const res = await provisionAndInspectConnector(data.connector_type, formData, usedDemoPresets);
+      const res = await provisionAndInspectConnector(data.connector_type, formData, false);
       setInspectResult(res);
       const initialSelected: Record<string, boolean> = {};
       res.discovered_tables.forEach((t) => {
@@ -132,6 +124,9 @@ export const CredentialInterceptionCard: React.FC<CredentialInterceptionCardProp
     onConfirmResume(fallbackConnId, defaultTables, pathway);
   };
 
+  // Simplified title: PostgreSQL / Neon
+  const displayName = data.name.includes('PostgreSQL') ? 'PostgreSQL / Neon' : data.name;
+
   return createPortal(
     <div
       className="fixed inset-0 flex items-center justify-center bg-black/75 backdrop-blur-md p-4 animate-in fade-in"
@@ -150,67 +145,28 @@ export const CredentialInterceptionCard: React.FC<CredentialInterceptionCardProp
               <Database className="w-4 h-4" />
             </div>
             <div>
-              <div className="flex items-center gap-2">
-                <h2 className="text-sm font-semibold text-white tracking-wide">{data.name}</h2>
-                <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded bg-blue-500/15 text-blue-400 border border-blue-500/30">
-                  {data.category}
-                </span>
-              </div>
-              <p className="text-[11.5px] text-zinc-400">Microsoft Fabric Dynamic Connector & Schema Inspector</p>
+              <h2 className="text-sm font-semibold text-white tracking-wide">{displayName}</h2>
+              <p className="text-[11.5px] text-zinc-400">Database Connection & Schema Inspector</p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={handleFillDemo}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border border-blue-500/30 rounded-lg transition-all shadow-sm cursor-pointer"
-              title="Pre-populate with realistic demo credentials for instant testing"
-            >
-              <Zap className="w-3.5 h-3.5 text-amber-400" />
-              <span>Use Sandbox Demo</span>
-            </button>
-            <button
-              type="button"
-              onClick={onDismiss}
-              className="p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
-              title="Close dialog (Esc)"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={onDismiss}
+            className="p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+            title="Close (Esc)"
+          >
+            <X className="w-4 h-4" />
+          </button>
         </div>
 
         {/* Security Notice */}
-        <div className="px-6 py-2.5 bg-blue-500/[0.06] border-b border-blue-500/15 flex items-center gap-2 text-[11.5px] text-blue-300">
+        <div className="px-6 py-2 bg-white/[0.02] border-b border-white/[0.06] flex items-center gap-2 text-[11.5px] text-zinc-400">
           <ShieldCheck className="w-4 h-4 shrink-0 text-emerald-400" />
           <span>
-            <strong className="text-white font-medium">Zero Secret Leakage Guarantee:</strong> Credentials are sent securely to the Fabric Connection Vault and are strictly excluded from AI prompt history.
+            Credentials are securely registered in the Fabric connection vault and excluded from AI prompt history.
           </span>
         </div>
-
-        {/* Ingestion Pathway Indicator Banner */}
-        {data.is_fabric_native === false ? (
-          <div className="px-6 py-2.5 bg-amber-500/10 border-b border-amber-500/20 flex items-center justify-between text-[11px] text-amber-300">
-            <div className="flex items-center gap-2">
-              <AlertCircle className="w-4 h-4 text-amber-400 shrink-0" />
-              <span>
-                <strong>Custom PySpark Ingestion:</strong> Fabric lacks a native Copy connector for {data.name}. An automated PySpark ingestion notebook will be provisioned.
-              </span>
-            </div>
-            <span className="text-[10px] px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 font-mono whitespace-nowrap">
-              PySpark Notebook
-            </span>
-          </div>
-        ) : (
-          <div className="px-6 py-2 bg-sky-500/[0.07] border-b border-sky-500/15 flex items-center justify-between text-[11px] text-sky-300">
-            <span className="flex items-center gap-1.5 font-medium">
-              <Zap className="w-3.5 h-3.5 text-sky-400" />
-              <span><strong>Fabric Native Connector:</strong> Serverless Data Pipeline Copy Activity supported</span>
-            </span>
-            <span className="text-[10px] text-zinc-400 font-mono">/v1/connections</span>
-          </div>
-        )}
 
         {/* Modal Body: Form or Discovered Tables */}
         <div className="p-6 overflow-y-auto min-h-0 flex-1">
@@ -234,7 +190,6 @@ export const CredentialInterceptionCard: React.FC<CredentialInterceptionCardProp
                           type={isPass && !showPass ? 'password' : 'text'}
                           value={formData[param.key] || ''}
                           onChange={(e) => {
-                            setUsedDemoPresets(false);
                             setFormData({ ...formData, [param.key]: e.target.value });
                           }}
                           placeholder={param.placeholder}
@@ -291,12 +246,12 @@ export const CredentialInterceptionCard: React.FC<CredentialInterceptionCardProp
                   {isInspecting ? (
                     <>
                       <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                      <span>Running Dynamic Python Inspector...</span>
+                      <span>Testing...</span>
                     </>
                   ) : (
                     <>
                       <Play className="w-3.5 h-3.5 fill-current" />
-                      <span>Test Connection & Inspect Tables</span>
+                      <span>Test Connection</span>
                     </>
                   )}
                 </button>
