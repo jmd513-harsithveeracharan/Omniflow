@@ -333,7 +333,10 @@ export const MedallionFlowCanvas: React.FC<MedallionFlowCanvasProps> = ({
   dagNodes.forEach((n) => nodeMap.set(n.id, n));
 
   return (
-    <div className={`bolt-workbench-pane-inner ${isFullscreen ? 'fullscreen-mode' : ''}`}>
+    <div
+      className={`bolt-workbench-pane-inner ${isFullscreen ? 'fullscreen-mode' : ''}`}
+      style={{ display: 'flex', flexDirection: 'column', flex: 1, width: '100%', height: '100%', minHeight: 0, overflow: 'hidden' }}
+    >
       {/* Workbench Header */}
       <div className="workbench-header" style={{ background: '#0b0d13', borderBottom: '1px solid rgba(255, 255, 255, 0.08)' }}>
         <div className="workbench-tab-group">
@@ -343,10 +346,12 @@ export const MedallionFlowCanvas: React.FC<MedallionFlowCanvasProps> = ({
             type="button"
           >
             <Layers width={13} height={13} />
-            <span>Pipeline Flow</span>
-            <span style={{ fontSize: '9px', padding: '1px 5px', borderRadius: '4px', background: 'rgba(56, 189, 248, 0.15)', color: '#38bdf8', fontWeight: 600, marginLeft: '4px' }}>
-              {dagNodes.length} Assets
-            </span>
+            <span>Pipelines</span>
+            {dagNodes.length > 0 && (
+              <span style={{ fontSize: '9px', padding: '1px 5px', borderRadius: '4px', background: 'rgba(56, 189, 248, 0.15)', color: '#38bdf8', fontWeight: 600, marginLeft: '4px' }}>
+                {dagNodes.length}
+              </span>
+            )}
           </button>
           <button
             className={`wb-tab ${activeTab === 'wbMesh' ? 'active' : ''}`}
@@ -354,10 +359,7 @@ export const MedallionFlowCanvas: React.FC<MedallionFlowCanvasProps> = ({
             type="button"
           >
             <Network width={13} height={13} />
-            <span>Relationship Graph</span>
-            <span style={{ fontSize: '9px', padding: '1px 5px', borderRadius: '4px', background: 'rgba(16, 185, 129, 0.15)', color: '#10b981', fontWeight: 600, marginLeft: '4px' }}>
-              Lineage
-            </span>
+            <span>Graph</span>
           </button>
           <button
             className={`wb-tab ${activeTab === 'wbTree' ? 'active' : ''}`}
@@ -365,10 +367,7 @@ export const MedallionFlowCanvas: React.FC<MedallionFlowCanvasProps> = ({
             type="button"
           >
             <FolderTree width={13} height={13} />
-            <span>OneLake Tree</span>
-            <span style={{ fontSize: '9px', padding: '1px 5px', borderRadius: '4px', background: 'rgba(255, 255, 255, 0.08)', color: '#94a3b8', fontWeight: 500, marginLeft: '4px' }}>
-              Hierarchy
-            </span>
+            <span>OneLake</span>
           </button>
           <button
             className={`wb-tab ${activeTab === 'wbCode' ? 'active' : ''}`}
@@ -376,10 +375,7 @@ export const MedallionFlowCanvas: React.FC<MedallionFlowCanvasProps> = ({
             type="button"
           >
             <Code2 width={13} height={13} />
-            <span>PySpark Studio</span>
-            <span style={{ fontSize: '9px', padding: '1px 5px', borderRadius: '4px', background: 'rgba(192, 132, 252, 0.15)', color: '#c084fc', fontWeight: 600, marginLeft: '4px' }}>
-              PySpark + SQL
-            </span>
+            <span>Notebooks</span>
           </button>
           <button
             className={`wb-tab ${activeTab === 'wbTable' ? 'active' : ''}`}
@@ -387,10 +383,7 @@ export const MedallionFlowCanvas: React.FC<MedallionFlowCanvasProps> = ({
             type="button"
           >
             <Table2 width={13} height={13} />
-            <span>Delta Schema</span>
-            <span style={{ fontSize: '9px', padding: '1px 5px', borderRadius: '4px', background: 'rgba(52, 211, 153, 0.15)', color: '#34d399', fontWeight: 600, marginLeft: '4px' }}>
-              Contracts
-            </span>
+            <span>Tables</span>
           </button>
           <button
             className={`wb-tab ${activeTab === 'wbJson' ? 'active' : ''}`}
@@ -398,7 +391,7 @@ export const MedallionFlowCanvas: React.FC<MedallionFlowCanvasProps> = ({
             type="button"
           >
             <FileCode width={13} height={13} />
-            <span>Fabric JSON</span>
+            <span>JSON</span>
           </button>
         </div>
 
@@ -448,22 +441,48 @@ export const MedallionFlowCanvas: React.FC<MedallionFlowCanvasProps> = ({
       </div>
 
       {/* Workbench Tab Content */}
-      <div className="workbench-content" style={{ background: '#07090e' }}>
+      <div
+        className="workbench-content"
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          flex: 1,
+          width: '100%',
+          height: 'calc(100% - 50px)',
+          minHeight: 0,
+          overflow: 'hidden',
+          background: '#07090e',
+        }}
+      >
         {/* Knowledge Mesh Graph RAG */}
         {activeTab === 'wbMesh' && (
-          <div className="wb-view-pane active" style={{ padding: 0, overflow: 'hidden', position: 'relative', height: '100%', minHeight: '480px' }}>
+          <div className="wb-view-pane active" style={{ padding: 0, overflow: 'hidden', position: 'relative', height: '100%', flex: 1, minHeight: 0 }}>
             <GraphMeshView plan={plan as Record<string, unknown> | null} projectId={(plan as any)?.project_code || (plan as any)?.project_id} />
           </div>
         )}
 
         {/* 1. Pipeline Flow SVG Canvas */}
         {activeTab === 'wbDAG' && (
-          <div className="wb-view-pane active" style={{ position: 'relative', height: '100%', overflow: 'hidden' }}>
+          <div className="wb-view-pane active" style={{ position: 'relative', height: '100%', flex: 1, minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
             {dagNodes.length === 0 ? (
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', minHeight: '340px', color: '#94a3b8', textAlign: 'center', padding: '32px' }}>
-                <Layers width={36} height={36} style={{ opacity: 0.35, marginBottom: '12px' }} />
-                <h4 style={{ color: '#e2e8f0', margin: '0 0 6px 0', fontSize: '15px' }}>No Active Architecture Flow</h4>
-                <p style={{ maxWidth: '380px', margin: 0, fontSize: '13px', lineHeight: 1.5 }}>
+              <div
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flex: 1,
+                  width: '100%',
+                  height: '100%',
+                  minHeight: 0,
+                  color: '#94a3b8',
+                  textAlign: 'center',
+                  padding: '32px',
+                }}
+              >
+                <Layers width={44} height={44} style={{ opacity: 0.35, marginBottom: '16px', color: '#38bdf8' }} />
+                <h4 style={{ color: '#f1f5f9', margin: '0 0 8px 0', fontSize: '16px', fontWeight: 600 }}>No Active Architecture Flow</h4>
+                <p style={{ maxWidth: '420px', margin: 0, fontSize: '13px', lineHeight: 1.6, color: '#94a3b8' }}>
                   Prompt the agent or create a project to generate a dynamic Medallion DAG, PySpark curation scripts, and Fabric items.
                 </p>
               </div>

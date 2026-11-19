@@ -1142,7 +1142,7 @@ export const App: React.FC = () => {
             </div>
 
             {isWorkbenchOpen && (
-              <div className="bolt-workbench-pane">
+              <div className="bolt-workbench-pane" style={{ height: '100%', display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
                 <MedallionFlowCanvas
                   plan={currentPlan}
                   onDeploy={() => {

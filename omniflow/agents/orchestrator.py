@@ -216,7 +216,13 @@ class MultiAgentOrchestrator:
             ui.success_bullet(f"Expected Platform Deliverables: {len(deliverables)} items across Medallion tiers")
         ui.divider()
 
-        project_id = self.db_logger.upsert_project(req.project_code, req.project_name, req.prompt_text)
+        # Derive a concise human-readable project description (never raw intake JSON or prompt text)
+        clean_proj_desc = (
+            sol_summary
+            if isinstance(sol_summary, str) and not sol_summary.strip().startswith("{") and len(sol_summary) < 500
+            else f"Microsoft Fabric Medallion data engineering platform for {req.project_name}."
+        )
+        project_id = self.db_logger.upsert_project(req.project_code, req.project_name, clean_proj_desc)
         run_id = self.db_logger.create_run(project_id, req.prompt_text, req.requested_by)
 
         emit("intake_parsed", {

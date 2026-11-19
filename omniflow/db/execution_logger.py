@@ -21,20 +21,33 @@ class ExecutionDatabaseLogger:
 
     def upsert_project(self, project_code: str, project_name: str, description: str) -> str:
         with self._connect() as conn, conn.cursor() as cur:
-            cur.execute("SELECT project_id::text FROM projects WHERE project_code = %s;", (project_code,))
+            cur.execute("SELECT project_id::text, description FROM projects WHERE project_code = %s;", (project_code,))
             row = cur.fetchone()
+            is_junk = (
+                not description
+                or description.strip().startswith("{")
+                or "```" in description
+                or description.strip().startswith("Resume pipeline")
+                or len(description) > 500
+            )
             if row:
-                pid = row[0]
+                pid, existing_desc = row[0], row[1] or ""
+                # Retain existing clean description if incoming description is junk/prompt text
+                final_desc = existing_desc if (existing_desc and is_junk) else (description if not is_junk else (existing_desc or f"Microsoft Fabric Medallion data platform for {project_name}."))
                 cur.execute(
                     """
                     UPDATE projects
                     SET project_name = %s, description = %s, status = 'active', updated_at = NOW()
                     WHERE project_id = %s;
                     """,
-                    (project_name, description, pid),
+                    (project_name, final_desc, pid),
                 )
             else:
                 pid = str(uuid.uuid4())
+                clean_desc = (
+                    f"Microsoft Fabric Medallion data engineering platform for {project_name}."
+                    if is_junk else description
+                )
                 cur.execute(
                     """
                     INSERT INTO projects
@@ -42,7 +55,7 @@ class ExecutionDatabaseLogger:
                          target_platform, status, created_by)
                     VALUES (%s, %s, %s, %s, 'PySpark / T-SQL', 'Microsoft Fabric', 'active', 'omniflow_cli');
                     """,
-                    (pid, project_code, project_name, description),
+                    (pid, project_code, project_name, clean_desc),
                 )
             conn.commit()
             return pid

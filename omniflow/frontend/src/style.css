@@ -826,15 +826,13 @@ nav.sidebar-nav {
     transform: rotate(-90deg);
 }
 
-/* Smooth edge haze / blur fadeout without '...' 3 dots */
+/* Clean standard text truncation without letter slicing */
 .sidebar-fade-truncate {
     display: inline-block;
     max-width: 100%;
     overflow: hidden !important;
     white-space: nowrap !important;
-    text-overflow: clip !important;
-    mask-image: linear-gradient(to right, #000 calc(100% - 14px), transparent 100%);
-    -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 14px), transparent 100%);
+    text-overflow: ellipsis !important;
 }
 
 /* Chat list scroll area - fills 100% available vertical space flush to right sidebar edge */
@@ -3156,6 +3154,28 @@ nav.sidebar-nav {
     height: 100%;
     overflow: hidden;
     animation: fadeIn 0.25s ease;
+}
+
+.bolt-workbench-pane-inner {
+    display: flex !important;
+    flex-direction: column !important;
+    flex: 1 1 100% !important;
+    width: 100% !important;
+    height: 100% !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+    background: #090b10 !important;
+}
+
+.bolt-workbench-pane-inner.fullscreen-mode {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    z-index: 9999 !important;
 }
 
 .bolt-workspace-split.fullscreen-canvas .bolt-chat-pane {

@@ -31,7 +31,11 @@ interface DeltaSchemaPaneProps {
 
 function cleanText(str?: string): string {
   if (!str) return '';
-  return str.replace(/\$\\to\$/g, '→').replace(/\\to/g, '→').replace(/\$/g, '').trim();
+  return str
+    .replace(/\\?\$?\\to\\?\$?/g, '→')
+    .replace(/\\rightarrow/g, '→')
+    .replace(/\$/g, '')
+    .trim();
 }
 
 export const DeltaSchemaPane: React.FC<DeltaSchemaPaneProps> = ({
@@ -111,7 +115,7 @@ export const DeltaSchemaPane: React.FC<DeltaSchemaPaneProps> = ({
   const wmCol = currentTable.watermark_column || 'updated_at';
 
   return (
-    <div className="wb-view-pane active" style={{ display: 'flex', flexDirection: 'column', height: '100%', background: '#090a0f' }}>
+    <div className="wb-view-pane active" style={{ display: 'flex', flexDirection: 'column', flex: 1, width: '100%', height: '100%', minHeight: 0, background: '#090a0f' }}>
       {/* Table Selector Bar */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '10px 16px', overflowX: 'auto', borderBottom: '1px solid rgba(255, 255, 255, 0.08)', background: 'rgba(0,0,0,0.3)' }}>
         <span style={{ fontSize: '11px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', marginRight: '4px', whiteSpace: 'nowrap' }}>
@@ -162,7 +166,7 @@ export const DeltaSchemaPane: React.FC<DeltaSchemaPaneProps> = ({
       </div>
 
       {/* Table Columns View */}
-      <div style={{ flex: 1, minHeight: 0, overflow: 'auto', padding: '16px 20px' }}>
+      <div style={{ flex: 1, minHeight: 0, height: '100%', overflow: 'auto', padding: '16px 20px' }}>
         <table className="schema-data-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12.5px' }}>
           <thead>
             <tr style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.1)', textAlign: 'left', color: '#94a3b8' }}>
@@ -184,10 +188,11 @@ export const DeltaSchemaPane: React.FC<DeltaSchemaPaneProps> = ({
               let constraintText = 'None';
               if (isPk) constraintText = 'Yes (Primary Key)';
               else if (c.foreign_key) constraintText = cleanText(`FK → ${c.foreign_key}`);
+              else if ((c as any).primary_key && String((c as any).primary_key).toLowerCase() !== 'false') constraintText = cleanText(String((c as any).primary_key));
               else if (isWm) constraintText = 'Watermark (CDC)';
               else if (isAudit) constraintText = 'Audit Column';
 
-              let layerText = cleanText(c.layer || 'Silver Delta MERGE');
+              let layerText = cleanText(c.layer || (c as any).layer_treatment || 'Silver Delta MERGE');
               if (isPii) layerText = '🛡️ Salted SHA-256 Masked';
               else if (isAudit) layerText = 'System Metadata';
 
