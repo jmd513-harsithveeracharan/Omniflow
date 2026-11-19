@@ -1844,6 +1844,17 @@ async def handle_chat_stream(req: ChatRequest) -> StreamingResponse:
             yield f"data: {json.dumps({'type': 'thought_step', 'step': {'id': 'conn_interception', 'title': f'Connector Interception: Awaiting Secure Connection to {conn_def.name}', 'status': 'in_progress', 'target': 'Fabric Connection Vault'}})}\n\n"
             await asyncio.sleep(0.1)
 
+            target_tables: list[str] = []
+            intake_ref = intake_override or SESSIONS[sid].get("pending_intake")
+            if isinstance(intake_ref, dict):
+                sources = intake_ref.get("retrieved_context", {}).get("data_sources", [])
+                for s in sources:
+                    if isinstance(s, dict):
+                        for t in s.get("tables", []):
+                            tname = t.get("table_name") or t.get("name") if isinstance(t, dict) else str(t)
+                            if tname and tname not in target_tables:
+                                target_tables.append(str(tname))
+
             payload_data = {
                 "connector_type": conn_def.connector_type,
                 "name": conn_def.name,
@@ -1855,6 +1866,7 @@ async def handle_chat_stream(req: ChatRequest) -> StreamingResponse:
                 "default_gateway": conn_def.default_gateway,
                 "required_params": [p.model_dump() for p in conn_def.required_params],
                 "sample_presets": conn_def.sample_presets,
+                "target_tables": target_tables,
             }
             yield f"data: {json.dumps({'type': 'credential_request', 'connector': payload_data})}\n\n"
 

@@ -342,6 +342,7 @@ export interface CredentialRequestData {
   default_gateway?: string | null;
   required_params: InterceptionParamField[];
   sample_presets: Record<string, string>;
+  target_tables?: string[];
 }
 
 export interface DiscoveredSourceTable {
