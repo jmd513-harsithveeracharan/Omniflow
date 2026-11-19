@@ -152,6 +152,46 @@ class MultiAgentOrchestrator:
             relationships = intro_res.get("relationships", [])
             source_labels = ["Neon PostgreSQL (source_crm)"]
 
+        # Synchronize with explicit user selections from connector modal (if present in prompt)
+        if req and "selected tables:" in req.prompt_text.lower():
+            m = re.search(r"selected tables:\s*([^\n\r]+)", req.prompt_text, re.IGNORECASE)
+            if m:
+                sel_raw = [s.strip() for s in m.group(1).split(",") if s.strip()]
+                sel_names = set(sel_raw) | {s.split(".")[-1] for s in sel_raw}
+
+                # If connectionId was provided, retrieve live introspected schemas from vault
+                conn_m = re.search(r"connectionId\s*['\"]([^'\"]+)['\"]", req.prompt_text)
+                if conn_m:
+                    conn_id = conn_m.group(1)
+                    try:
+                        from omniflow.connectors.interceptor import CONNECTIONS_VAULT
+                        v_entry = CONNECTIONS_VAULT.get(conn_id)
+                        if v_entry and v_entry.get("discovered_tables"):
+                            for vt in v_entry["discovered_tables"]:
+                                vt_name = vt.get("table") or vt.get("name")
+                                vt_full = vt.get("full_name") or f"{vt.get('schema', '')}.{vt_name}".strip(".")
+                                if vt_name in sel_names or vt_full in sel_names:
+                                    pk_val = vt.get("pk")
+                                    pk_str = pk_val[0] if isinstance(pk_val, list) and pk_val else (pk_val or "id")
+                                    tables_meta[vt_name] = {
+                                        "primary_key": str(pk_str),
+                                        "watermark": str(vt.get("watermark") or "updated_at"),
+                                        "columns": vt.get("columns", []),
+                                        "row_count": vt.get("est_rows", 25000),
+                                        "pii_columns": vt.get("pii_columns", []),
+                                    }
+                    except Exception:
+                        pass
+
+                # Filter tables_meta strictly to the user-selected tables
+                if tables_meta:
+                    filtered_meta = {
+                        k: v for k, v in tables_meta.items()
+                        if k in sel_names or k.split(".")[-1] in sel_names or any(s in k for s in sel_names)
+                    }
+                    if filtered_meta:
+                        tables_meta = filtered_meta
+
         table_names = list(tables_meta.keys())
         pii_detected = sorted(list(set(pii_detected)))
         deliverables = sol_summary.get("expected_deliverables", [])
