@@ -118,7 +118,7 @@ export const CredentialInterceptionCard: React.FC<CredentialInterceptionCardProp
       const res = await provisionAndInspectConnector(data.connector_type, formData, false);
       setInspectResult(res);
 
-      // Smart Auto-Discovery: Pre-select ONLY project-relevant target tables!
+      // Smart Auto-Discovery: Pre-select ONLY project-relevant target tables
       const initialSelected: Record<string, boolean> = {};
       let matchedCount = 0;
       res.discovered_tables.forEach((t) => {
@@ -211,50 +211,52 @@ export const CredentialInterceptionCard: React.FC<CredentialInterceptionCardProp
 
   return createPortal(
     <div
-      className="fixed inset-0 flex items-center justify-center bg-black/75 backdrop-blur-md p-4 animate-in fade-in"
+      className="fixed inset-0 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in"
       style={{ position: 'fixed', inset: 0, zIndex: 100050 }}
       onClick={onDismiss}
     >
       <div
-        className="w-full max-w-3xl bg-[#141416] border border-white/10 rounded-2xl shadow-2xl flex flex-col overflow-hidden text-sans select-none animate-in zoom-in-95 duration-150"
+        className="w-full max-w-4xl bg-gradient-to-b from-[#18181c] to-[#101014] border border-white/[0.12] rounded-2xl shadow-2xl flex flex-col overflow-hidden text-sans select-none ring-1 ring-white/5 animate-in zoom-in-95 duration-150"
         style={{ position: 'relative', zIndex: 100051, maxHeight: '88vh' }}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Modal Header */}
-        <div className="h-15 px-6 border-b border-white/[0.08] flex items-center justify-between bg-white/[0.02] shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400 shadow-md">
-              <Database className="w-4 h-4" />
+        {/* Spacious, Generous Header (Dark Grey Theme - No Blue Background) */}
+        <div className="flex items-center justify-between px-8 py-6 border-b border-white/[0.08] bg-white/[0.02] shrink-0">
+          <div className="flex items-center gap-4">
+            <div className="w-11 h-11 rounded-2xl bg-white/[0.05] border border-white/10 text-zinc-200 flex items-center justify-center shadow-lg shadow-black/40">
+              <Database size={20} />
             </div>
             <div>
-              <h2 className="text-sm font-semibold text-white tracking-wide">{displayName}</h2>
-              <p className="text-[11.5px] text-zinc-400">Database Connection & Schema Inspector</p>
+              <h3 className="text-[18px] font-semibold text-white tracking-tight">{displayName}</h3>
+              <p className="text-[13px] text-zinc-400 mt-0.5">
+                {data.category || 'Enterprise Data Source'} • Microsoft Fabric Connection & Schema Inspector
+              </p>
             </div>
           </div>
 
           <button
             type="button"
             onClick={onDismiss}
-            className="p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
-            title="Close (Esc)"
+            className="p-2 rounded-xl text-zinc-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+            title="Close dialog (Esc)"
           >
-            <X className="w-4 h-4" />
+            <X size={18} />
           </button>
         </div>
 
-        {/* Security Notice */}
-        <div className="px-6 py-2 bg-white/[0.02] border-b border-white/[0.06] flex items-center gap-2 text-[11.5px] text-zinc-400 shrink-0">
-          <ShieldCheck className="w-4 h-4 shrink-0 text-emerald-400" />
-          <span>
-            Credentials are securely registered in the Fabric connection vault and excluded from AI prompt history.
-          </span>
-        </div>
+        {/* Modal Body with Generous Padding */}
+        <div className="px-8 pb-8 pt-5 overflow-y-auto min-h-0 flex-1">
+          {/* Subtle Security Pill */}
+          <div className="flex items-center gap-2.5 text-[12px] text-zinc-400 mb-6 px-4 py-3 rounded-xl bg-white/[0.03] border border-white/[0.06]">
+            <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
+            <span>
+              Credentials are encrypted in the Fabric vault and strictly excluded from AI prompt history.
+            </span>
+          </div>
 
-        {/* Modal Body */}
-        <div className="p-6 overflow-y-auto min-h-0 flex-1">
           {!inspectResult ? (
-            <form onSubmit={handleRunInspection} className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+            <form onSubmit={handleRunInspection} className="space-y-5">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {data.required_params.map((param) => {
                   const isPass = param.type === 'password';
                   const showPass = showPasswords[param.key];
@@ -262,7 +264,7 @@ export const CredentialInterceptionCard: React.FC<CredentialInterceptionCardProp
 
                   return (
                     <div key={param.key} className={`space-y-1.5 ${isFullWidth ? 'md:col-span-2' : ''}`}>
-                      <label className="text-[11px] font-medium text-zinc-300 flex items-center justify-between">
+                      <label className="text-[11.5px] font-medium text-zinc-300 flex items-center justify-between">
                         <span>
                           {param.label} {param.required && <span className="text-rose-400">*</span>}
                         </span>
@@ -276,13 +278,13 @@ export const CredentialInterceptionCard: React.FC<CredentialInterceptionCardProp
                           }}
                           placeholder={param.placeholder}
                           required={param.required}
-                          className="w-full bg-[#18181b] border border-white/10 focus:border-blue-500/60 focus:ring-1 focus:ring-blue-500/30 rounded-xl px-3.5 py-2 text-xs text-white placeholder-zinc-500 font-mono transition-all"
+                          className="w-full bg-[#16171a] border border-white/10 focus:border-white/30 focus:ring-1 focus:ring-white/20 rounded-xl px-4 py-2.5 text-xs text-white placeholder-zinc-500 font-mono transition-all"
                         />
                         {isPass && (
                           <button
                             type="button"
                             onClick={() => handleTogglePassword(param.key)}
-                            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-200 cursor-pointer"
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-200 cursor-pointer"
                           >
                             {showPass ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                           </button>
@@ -294,7 +296,7 @@ export const CredentialInterceptionCard: React.FC<CredentialInterceptionCardProp
               </div>
 
               {inspectError && (
-                <div className="p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex flex-col gap-2">
+                <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex flex-col gap-2.5">
                   <div className="flex items-center gap-2">
                     <AlertCircle className="w-4 h-4 shrink-0" />
                     <span>{inspectError}</span>
@@ -312,18 +314,19 @@ export const CredentialInterceptionCard: React.FC<CredentialInterceptionCardProp
                 </div>
               )}
 
-              <div className="flex items-center justify-end gap-3 pt-3 border-t border-white/[0.08]">
+              {/* Action Buttons: Clean Dark/Neutral Theme */}
+              <div className="flex items-center justify-end gap-3 pt-4 border-t border-white/[0.08]">
                 <button
                   type="button"
                   onClick={onDismiss}
-                  className="px-4 py-2 rounded-xl border border-white/10 hover:bg-white/5 text-xs text-zinc-300 font-medium transition-all cursor-pointer"
+                  className="px-5 py-2.5 rounded-xl border border-white/10 hover:bg-white/5 text-xs text-zinc-300 font-medium transition-all cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isInspecting}
-                  className="inline-flex items-center gap-2 px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow-lg shadow-blue-600/20 transition-all disabled:opacity-50 cursor-pointer"
+                  className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-white hover:bg-zinc-200 text-zinc-950 text-xs font-semibold shadow-lg shadow-black/20 transition-all disabled:opacity-50 cursor-pointer"
                 >
                   {isInspecting ? (
                     <>
@@ -341,9 +344,9 @@ export const CredentialInterceptionCard: React.FC<CredentialInterceptionCardProp
             </form>
           ) : (
             /* Discovered Tables & Inspection Result - Single Row Layout */
-            <div className="space-y-3.5 animate-in fade-in duration-150">
+            <div className="space-y-4 animate-in fade-in duration-150">
               {/* Subtle 1-line connection verified banner */}
-              <div className="px-3.5 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/25 flex items-center justify-between text-xs text-emerald-300">
+              <div className="px-4 py-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/25 flex items-center justify-between text-xs text-emerald-300">
                 <div className="flex items-center gap-2">
                   <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
                   <span>
@@ -357,13 +360,13 @@ export const CredentialInterceptionCard: React.FC<CredentialInterceptionCardProp
 
               {/* Filter Tabs & Search Bar */}
               <div className="flex items-center justify-between gap-3 pt-1">
-                <div className="flex items-center gap-1 bg-[#18181b] p-0.5 rounded-lg border border-white/[0.08]">
+                <div className="flex items-center gap-1.5 bg-black/40 p-1 rounded-xl border border-white/[0.08]">
                   <button
                     type="button"
                     onClick={() => setActiveTab('project')}
-                    className={`px-3 py-1 rounded-md text-xs font-medium transition-colors cursor-pointer ${
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${
                       activeTab === 'project'
-                        ? 'bg-blue-600 text-white shadow-sm'
+                        ? 'bg-[#25262c] text-white shadow-sm border border-white/10'
                         : 'text-zinc-400 hover:text-white'
                     }`}
                   >
@@ -372,9 +375,9 @@ export const CredentialInterceptionCard: React.FC<CredentialInterceptionCardProp
                   <button
                     type="button"
                     onClick={() => setActiveTab('all')}
-                    className={`px-3 py-1 rounded-md text-xs font-medium transition-colors cursor-pointer ${
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${
                       activeTab === 'all'
-                        ? 'bg-blue-600 text-white shadow-sm'
+                        ? 'bg-[#25262c] text-white shadow-sm border border-white/10'
                         : 'text-zinc-400 hover:text-white'
                     }`}
                   >
@@ -390,14 +393,14 @@ export const CredentialInterceptionCard: React.FC<CredentialInterceptionCardProp
                       value={tableFilter}
                       onChange={(e) => setTableFilter(e.target.value)}
                       placeholder="Filter tables..."
-                      className="w-44 bg-[#18181b] border border-white/10 rounded-lg pl-8 pr-2.5 py-1 text-xs text-white placeholder-zinc-500 font-mono focus:border-blue-500/60 focus:ring-0"
+                      className="w-48 bg-[#16171a] border border-white/10 rounded-lg pl-8 pr-3 py-1.5 text-xs text-white placeholder-zinc-500 font-mono focus:border-white/30 focus:ring-0"
                     />
                   </div>
                   <div className="flex items-center gap-2 text-xs">
                     <button
                       type="button"
                       onClick={() => handleSelectAll(true)}
-                      className="text-blue-400 hover:underline cursor-pointer"
+                      className="text-zinc-300 hover:text-white hover:underline cursor-pointer"
                     >
                       Select All
                     </button>
@@ -405,7 +408,7 @@ export const CredentialInterceptionCard: React.FC<CredentialInterceptionCardProp
                     <button
                       type="button"
                       onClick={() => handleSelectAll(false)}
-                      className="text-zinc-400 hover:underline cursor-pointer"
+                      className="text-zinc-400 hover:text-zinc-200 hover:underline cursor-pointer"
                     >
                       Clear
                     </button>
@@ -414,7 +417,7 @@ export const CredentialInterceptionCard: React.FC<CredentialInterceptionCardProp
               </div>
 
               {/* Single-Row Clean Table List */}
-              <div className="border border-white/[0.08] rounded-xl overflow-hidden bg-[#18181b]/50">
+              <div className="border border-white/[0.08] rounded-xl overflow-hidden bg-black/20">
                 <div className="max-h-64 overflow-y-auto divide-y divide-white/[0.04]">
                   {displayedTables.length === 0 ? (
                     <div className="p-6 text-center text-xs text-zinc-500">
@@ -430,10 +433,10 @@ export const CredentialInterceptionCard: React.FC<CredentialInterceptionCardProp
                         <div
                           key={tableKey}
                           onClick={() => handleToggleTable(tableKey)}
-                          className={`h-10 px-3.5 flex items-center justify-between transition-colors cursor-pointer ${
+                          className={`h-10 px-4 flex items-center justify-between transition-colors cursor-pointer ${
                             isChecked
-                              ? 'bg-blue-500/[0.08] hover:bg-blue-500/[0.12]'
-                              : 'hover:bg-white/[0.03]'
+                              ? 'bg-white/[0.05] hover:bg-white/[0.08]'
+                              : 'hover:bg-white/[0.02]'
                           }`}
                         >
                           <div className="flex items-center gap-3 min-w-0">
@@ -441,7 +444,7 @@ export const CredentialInterceptionCard: React.FC<CredentialInterceptionCardProp
                               type="checkbox"
                               checked={isChecked}
                               onChange={() => {}} // handled by row onClick
-                              className="rounded border-white/20 text-blue-500 focus:ring-0 focus:ring-offset-0 cursor-pointer"
+                              className="accent-zinc-100 rounded cursor-pointer"
                             />
                             <span
                               className={`text-xs font-mono truncate ${
@@ -451,7 +454,7 @@ export const CredentialInterceptionCard: React.FC<CredentialInterceptionCardProp
                               {tableKey}
                             </span>
                             {isProject && (
-                              <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-500/15 text-blue-400 border border-blue-500/25 font-sans font-medium">
+                              <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-300 border border-emerald-500/25 font-sans font-medium">
                                 Target Entity
                               </span>
                             )}
@@ -467,8 +470,8 @@ export const CredentialInterceptionCard: React.FC<CredentialInterceptionCardProp
                 </div>
               </div>
 
-              {/* Bottom Actions */}
-              <div className="flex items-center justify-between gap-3 pt-3 border-t border-white/[0.08]">
+              {/* Bottom Actions: Clean Dark/Neutral Theme */}
+              <div className="flex items-center justify-between gap-3 pt-4 border-t border-white/[0.08]">
                 <button
                   type="button"
                   onClick={() => setInspectResult(null)}
@@ -477,14 +480,14 @@ export const CredentialInterceptionCard: React.FC<CredentialInterceptionCardProp
                   ← Edit Connection
                 </button>
 
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-4">
                   <span className="text-xs text-zinc-400">
                     <strong>{selectedCount}</strong> of {allDiscovered.length} selected
                   </span>
                   <button
                     type="button"
                     onClick={handleConfirmAndResume}
-                    className="inline-flex items-center gap-2 px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow-lg shadow-blue-600/20 transition-all cursor-pointer"
+                    className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-white hover:bg-zinc-200 text-zinc-950 text-xs font-semibold shadow-lg shadow-black/20 transition-all cursor-pointer"
                   >
                     <span>Confirm Selected ({selectedCount})</span>
                     <ArrowRight className="w-3.5 h-3.5" />

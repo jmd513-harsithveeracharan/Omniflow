@@ -1,5 +1,5 @@
 """
-omniflow/connectors_catalog.py
+omniflow/connectors/catalog.py
 ------------------------------
 Microsoft Fabric Connector Intelligence & Dynamic Source Classification.
 
@@ -8,15 +8,18 @@ Determines:
 2. Ingestion Pathway:
    - NATIVE_PIPELINE: Native Fabric Copy Activity via /v1/connections
    - PYSPARK_NOTEBOOK: Custom PySpark Ingestion Notebook (API/Driver extraction)
-3. Dynamic JIT Parameter Synthesis for any enterprise source.
+3. Dynamic LLM-driven Parameter Synthesis for ANY enterprise source.
 """
 
 from __future__ import annotations
 
+import logging
 import re
 from enum import Enum
 from typing import Any
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
+
+logger = logging.getLogger("omniflow.connectors.catalog")
 
 
 class IngestionPathway(str, Enum):
@@ -84,73 +87,138 @@ def classify_source_pathway(source_slug: str) -> tuple[bool, IngestionPathway, s
             IngestionPathway.NATIVE_PIPELINE,
             "Native Microsoft Fabric Data Pipeline Copy Activity supported. High-throughput serverless extraction.",
         )
-    else:
-        return (
-            False,
-            IngestionPathway.PYSPARK_NOTEBOOK,
-            f"Microsoft Fabric does not have a native Copy connector for '{source_slug}'. An automated PySpark Ingestion Notebook with API/Driver extraction and Key Vault credentials will be synthesized.",
-        )
+    return (
+        False,
+        IngestionPathway.PYSPARK_NOTEBOOK,
+        f"Microsoft Fabric does not have a native Copy connector for '{source_slug}'. An automated PySpark Ingestion Notebook with API/Driver extraction and Key Vault credentials will be synthesized.",
+    )
 
 
-def synthesize_dynamic_connector(source_name: str) -> ConnectorDefinition:
+def synthesize_dynamic_connector(source_name: str, session_id: str | None = None) -> ConnectorDefinition:
     """
-    Dynamically synthesizes a complete ConnectorDefinition on the fly for ANY source,
-    determining whether it uses a Native Pipeline or PySpark Ingestion Notebook.
+    Dynamically synthesizes a complete ConnectorDefinition using LLM domain intelligence.
+    The AI model reasons about the specific technology (Kafka, Cassandra, MongoDB, Postgres,
+    Salesforce, Stripe, ServiceNow, etc.), inferring its required authentication credentials,
+    parameter types, Microsoft Fabric pathway, and realistic schema entities.
     """
     clean_name = source_name.strip()
     slug = re.sub(r"[^a-zA-Z0-9_]", "_", clean_name.lower()).strip("_") or "custom_source"
+
+    # 1. Attempt LLM-driven parametric synthesis
+    try:
+        from omniflow.config.llm_adapter import chat_json
+
+        prompt = f"""You are a Microsoft Fabric Enterprise Data Integration Specialist.
+A data engineering project needs to connect to the external data source: '{clean_name}'.
+
+Using your deep domain knowledge of enterprise databases, streaming brokers, SaaS APIs, and Microsoft Fabric:
+1. Classify the source category (e.g. "Relational Database", "Cloud Data Warehouse", "Streaming / Event Broker", "NoSQL Database", "SaaS API / Microservice", "Enterprise ERP").
+2. Determine whether Microsoft Fabric supports this natively via Data Pipeline Copy Activity (is_fabric_native: true, pathway: "native_pipeline") or requires an automated PySpark Ingestion Notebook / Fabric Eventstream (is_fabric_native: false, pathway: "pyspark_notebook").
+3. Determine the EXACT connection credentials & parameters required for authentication.
+   - For passwords, tokens, API keys, or private keys: set type="password".
+   - For ports or numeric rates: set type="number".
+   - For connection strings/URLs, hosts, usernames: set type="text".
+4. Recommend 3 to 6 realistic tables, collections, or topic names for this source with schema, estimated row count, and primary keys.
+
+Return ONLY valid JSON matching this schema:
+{{
+  "connector_name": "{clean_name}",
+  "category": "...",
+  "icon": "database" | "api" | "layers",
+  "is_fabric_native": true | false,
+  "pathway": "native_pipeline" | "pyspark_notebook",
+  "pathway_explanation": "...",
+  "default_gateway": "Corp-OnPremises-Data-Gateway-01" | null,
+  "required_params": [
+    {{
+      "key": "...",
+      "label": "...",
+      "type": "text" | "password" | "number",
+      "placeholder": "...",
+      "default": "...",
+      "required": true | false
+    }}
+  ],
+  "sample_presets": {{
+    "<key>": "<sample_value>"
+  }},
+  "mock_tables": [
+    {{
+      "name": "...",
+      "schema": "...",
+      "description": "...",
+      "est_rows": 50000,
+      "pk": ["..."],
+      "watermark": "..."
+    }}
+  ]
+}}"""
+
+        res = chat_json([{"role": "user", "content": prompt}], complexity="standard", session_id=session_id)
+        if isinstance(res, dict) and res.get("required_params"):
+            fields: list[ConnectorField] = []
+            for p in res.get("required_params", []):
+                fields.append(
+                    ConnectorField(
+                        key=str(p.get("key", "param")),
+                        label=str(p.get("label", p.get("key", "Parameter"))),
+                        type=str(p.get("type", "text")),
+                        placeholder=str(p.get("placeholder", "")),
+                        default=str(p.get("default", "")),
+                        required=bool(p.get("required", True)),
+                        help_text=str(p.get("help_text", "")),
+                    )
+                )
+
+            pathway_str = str(res.get("pathway", "native_pipeline")).lower()
+            pathway_enum = (
+                IngestionPathway.PYSPARK_NOTEBOOK
+                if "notebook" in pathway_str or "pyspark" in pathway_str
+                else IngestionPathway.NATIVE_PIPELINE
+            )
+
+            return ConnectorDefinition(
+                connector_type=slug,
+                name=str(res.get("connector_name", clean_name)),
+                category=str(res.get("category", "Enterprise Data Source")),
+                icon=str(res.get("icon", "database")),
+                description=f"Ingestion integration for {clean_name} into Microsoft Fabric Medallion Lakehouse.",
+                is_fabric_native=bool(res.get("is_fabric_native", True)),
+                pathway=pathway_enum,
+                pathway_explanation=str(res.get("pathway_explanation", "Microsoft Fabric data ingestion integration.")),
+                default_gateway=res.get("default_gateway"),
+                required_params=fields,
+                sample_presets=res.get("sample_presets", {}) or {},
+                mock_tables=res.get("mock_tables", []) or [],
+            )
+    except Exception as exc:
+        logger.warning("LLM dynamic connector synthesis failed for '%s': %s. Using baseline inference.", clean_name, exc)
+
+    # 2. Resilient Fallback (only if LLM call is offline)
     is_native, pathway, explanation = classify_source_pathway(slug)
-
-    # Detect if source is an API/SaaS platform or a Database
-    is_api = any(k in slug for k in [
-        "api", "rest", "stripe", "service", "workday", "hubspot", "jira",
-        "zendesk", "shopify", "marketo", "twil", "slack", "quickbooks", "auth"
-    ])
-
+    is_api = any(k in slug for k in ["api", "rest", "stripe", "service", "workday", "hubspot", "jira", "auth"])
+    
     if is_api:
         category = "SaaS API / Microservice"
         fields = [
-            ConnectorField(key="endpoint_url", label=f"{clean_name} Base URL / Endpoint", type="text", placeholder=f"https://api.{slug}.com/v1", default=f"https://api.{slug}.com/v1", required=True),
-            ConnectorField(key="api_key", label="API Key / Bearer Token", type="password", placeholder="sk_live_••••••••••••", default="", required=True),
-            ConnectorField(key="client_id", label="Client ID / Org ID (Optional)", type="text", placeholder=f"{slug}_org_12345", default="", required=False),
-            ConnectorField(key="rate_limit_rpm", label="Rate Limit (Req/min)", type="number", placeholder="120", default="120", required=False),
+            ConnectorField(key="endpoint_url", label=f"{clean_name} Base URL", type="text", placeholder=f"https://api.{slug}.com/v1", default=f"https://api.{slug}.com/v1", required=True),
+            ConnectorField(key="api_key", label="API Key / Bearer Token", type="password", placeholder="••••••••••••", default="", required=True),
+            ConnectorField(key="client_id", label="Client ID / Org ID (Optional)", type="text", placeholder=f"{slug}_org_123", default="", required=False),
         ]
-        sample_presets = {
-            "endpoint_url": f"https://api.{slug}.com/v1",
-            "api_key": f"demo_{slug}_secret_token_9921",
-            "client_id": f"{slug}_sandbox_tenant",
-            "rate_limit_rpm": "120",
-        }
-        mock_tables = [
-            {"name": f"{slug}_events", "schema": "api", "description": f"{clean_name} Raw Events Stream", "est_rows": 150000, "pk": ["id"], "watermark": "created_at"},
-            {"name": f"{slug}_entities", "schema": "api", "description": f"{clean_name} Master Entity Catalog", "est_rows": 24000, "pk": ["id"], "watermark": "updated_at"},
-            {"name": f"{slug}_logs", "schema": "api", "description": f"{clean_name} Transaction Logs", "est_rows": 820000, "pk": ["log_id"], "watermark": "timestamp"},
-        ]
+        sample_presets = {"endpoint_url": f"https://api.{slug}.com/v1", "api_key": f"demo_{slug}_token_9921"}
+        mock_tables = [{"name": f"{slug}_feed", "schema": "api", "description": f"{clean_name} Raw Feed", "est_rows": 100000, "pk": ["id"], "watermark": "updated_at"}]
     else:
-        # Default to database / data store pattern
         category = "Database / Data Store" if not is_native else "Enterprise Source"
         fields = [
             ConnectorField(key="connection_url", label="Connection URL / URI (Optional — overrides individual fields)", type="text", placeholder=f"{slug}://user:password@host:5432/database", default="", required=False),
-            ConnectorField(key="host", label=f"{clean_name} Server Host / FQDN", type="text", placeholder=f"{slug}-db.corp.internal", default="", required=False),
+            ConnectorField(key="host", label=f"{clean_name} Host / FQDN", type="text", placeholder=f"{slug}-db.corp.internal", default="", required=False),
             ConnectorField(key="port", label="Port", type="number", placeholder="5432", default="5432", required=False),
-            ConnectorField(key="database", label="Database Name / Keyspace", type="text", placeholder=f"{slug}_prod", default="", required=False),
-            ConnectorField(key="username", label="Service User", type="text", placeholder="fabric_svc", default="", required=False),
-            ConnectorField(key="password", label="Password / Secret", type="password", placeholder="••••••••••••", default="", required=False),
-            ConnectorField(key="gateway", label="Fabric Gateway Name (Optional)", type="text", placeholder="Corp-Data-Gateway-01", default="Corp-Data-Gateway-01", required=False),
+            ConnectorField(key="database", label="Database Name", type="text", placeholder=f"{slug}_db", default="", required=False),
+            ConnectorField(key="username", label="Username", type="text", placeholder="postgres", default="", required=False),
+            ConnectorField(key="password", label="Password", type="password", placeholder="••••••••••••", default="", required=False),
         ]
-        sample_presets = {
-            "host": f"{slug}-db.corp.internal",
-            "port": "5432",
-            "database": f"{slug}_prod",
-            "username": "fabric_svc",
-            "password": f"•{slug.title()}SecurePass2026•",
-            "gateway": "Corp-Data-Gateway-01",
-        }
-        mock_tables = [
-            {"name": "customers", "schema": "public", "description": f"{clean_name} Customer Records", "est_rows": 68000, "pk": ["customer_id"], "watermark": "updated_at"},
-            {"name": "transactions", "schema": "public", "description": f"{clean_name} Core Transactions", "est_rows": 1450000, "pk": ["txn_id"], "watermark": "txn_date"},
-            {"name": "master_data", "schema": "public", "description": f"{clean_name} Reference Master Data", "est_rows": 12000, "pk": ["id"], "watermark": "modified_at"},
-        ]
+        sample_presets = {"host": f"{slug}-db.corp.internal", "port": "5432", "database": f"{slug}_db"}
+        mock_tables = [{"name": "records", "schema": "public", "description": f"{clean_name} Core Records", "est_rows": 50000, "pk": ["id"], "watermark": "updated_at"}]
 
     return ConnectorDefinition(
         connector_type=slug,
@@ -166,4 +234,3 @@ def synthesize_dynamic_connector(source_name: str) -> ConnectorDefinition:
         sample_presets=sample_presets,
         mock_tables=mock_tables,
     )
-
