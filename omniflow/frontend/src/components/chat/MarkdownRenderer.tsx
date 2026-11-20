@@ -40,6 +40,23 @@ const renderWithLineBreaks = (node: React.ReactNode): React.ReactNode => {
 export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content }) => {
   if (!content) return null;
 
+  // Sanitize common LLM formatting artifacts and raw unrendered LaTeX math symbols
+  const sanitizedContent = React.useMemo(() => {
+    if (!content) return '';
+    return content
+      .replace(/\\\$/g, '$')
+      .replace(/\$\\to\$/g, '→')
+      .replace(/\\to\b/g, '→')
+      .replace(/\$\\rightarrow\$/g, '→')
+      .replace(/\\rightarrow\b/g, '→')
+      .replace(/\$\\leftarrow\$/g, '←')
+      .replace(/\\leftarrow\b/g, '←')
+      .replace(/\\times\b/g, '×')
+      .replace(/\\le\b/g, '≤')
+      .replace(/\\ge\b/g, '≥')
+      .replace(/\\approx\b/g, '≈');
+  }, [content]);
+
   const renderFabricItemBadge = (text: string): React.ReactNode | null => {
     const trimmed = text.trim();
     const lakehouseMatch = trimmed.match(/^(?:[-*•]\s+)?(?:\[Lakehouse\]|Lakehouse:\s*|Lakehouse\s*-\s*)([a-zA-Z0-9_-]+)(?::|\s*-)?\s*(.*)$/i);
@@ -206,7 +223,7 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content }) =
           ol: ({ children }: ComponentPropsWithoutRef<'ol'>) => <ol className="chat-md-ordered-list">{children}</ol>,
         }}
       >
-        {content}
+        {sanitizedContent}
       </ReactMarkdown>
     </div>
   );
