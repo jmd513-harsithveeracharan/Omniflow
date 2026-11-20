@@ -251,70 +251,75 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
       {/* Nav Items */}
       <nav className="sidebar-nav">
-        <button
-          className={`nav-item ${activeView === 'projects' ? 'active' : ''}`}
-          onClick={() => onSelectView('projects')}
-        >
-          <span className="nav-item-icon">
-            <FolderTree width={18} height={18} />
-          </span>
-          <span>Projects</span>
-        </button>
+        {/* Fixed Top Navigation Items (Permanently Pinned, Never Scroll) */}
+        <div className="sidebar-nav-fixed">
+          <button
+            className={`nav-item ${activeView === 'projects' ? 'active' : ''}`}
+            onClick={() => onSelectView('projects')}
+          >
+            <span className="nav-item-icon">
+              <FolderTree width={18} height={18} />
+            </span>
+            <span>Projects</span>
+          </button>
 
-        <button
-          className={`nav-item ${activeView === 'skills' ? 'active' : ''}`}
-          onClick={() => onSelectView('skills')}
-        >
-          <span className="nav-item-icon">
-            <BookOpen width={18} height={18} />
-          </span>
-          <span>Skills</span>
-        </button>
+          <button
+            className={`nav-item ${activeView === 'skills' ? 'active' : ''}`}
+            onClick={() => onSelectView('skills')}
+          >
+            <span className="nav-item-icon">
+              <BookOpen width={18} height={18} />
+            </span>
+            <span>Skills</span>
+          </button>
 
-        <button
-          className={`nav-item ${activeView === 'workspaces' ? 'active' : ''}`}
-          onClick={() => onSelectView('workspaces')}
-        >
-          <span className="nav-item-icon">
-            <LayoutGrid width={18} height={18} />
-          </span>
-          <span>Workspaces</span>
-        </button>
+          <button
+            className={`nav-item ${activeView === 'workspaces' ? 'active' : ''}`}
+            onClick={() => onSelectView('workspaces')}
+          >
+            <span className="nav-item-icon">
+              <LayoutGrid width={18} height={18} />
+            </span>
+            <span>Workspaces</span>
+          </button>
 
-        <button
-          className={`nav-item ${activeView === 'mesh' ? 'active' : ''}`}
-          onClick={() => onSelectView('mesh')}
-          title="Relationship Graph"
-        >
-          <span className="nav-item-icon">
-            <Network width={18} height={18} />
-          </span>
-          <span>Relationship Graph</span>
-        </button>
+          <button
+            className={`nav-item ${activeView === 'mesh' ? 'active' : ''}`}
+            onClick={() => onSelectView('mesh')}
+            title="Relationship Graph"
+          >
+            <span className="nav-item-icon">
+              <Network width={18} height={18} />
+            </span>
+            <span>Relationship Graph</span>
+          </button>
 
-        <button
-          className={`nav-item ${activeView === 'apps' ? 'active' : ''}`}
-          onClick={() => onSelectView('apps')}
-        >
-          <span className="nav-item-icon">
-            <Sliders width={18} height={18} />
-          </span>
-          <span>Apps & Connectors</span>
-        </button>
+          <button
+            className={`nav-item ${activeView === 'apps' ? 'active' : ''}`}
+            onClick={() => onSelectView('apps')}
+          >
+            <span className="nav-item-icon">
+              <Sliders width={18} height={18} />
+            </span>
+            <span>Apps & Connectors</span>
+          </button>
 
-        <button
-          className={`nav-item ${activeView === 'settings' ? 'active' : ''}`}
-          onClick={() => onSelectView('settings')}
-        >
-          <span className="nav-item-icon">
-            <Settings2 width={18} height={18} />
-          </span>
-          <span>Customize</span>
-        </button>
+          <button
+            className={`nav-item ${activeView === 'settings' ? 'active' : ''}`}
+            onClick={() => onSelectView('settings')}
+          >
+            <span className="nav-item-icon">
+              <Settings2 width={18} height={18} />
+            </span>
+            <span>Customize</span>
+          </button>
+        </div>
 
-        {/* Pinned Projects Section */}
-        {pinnedProjects.length > 0 && (
-          <div className="sidebar-section sidebar-pinned-section mb-1">
+        {/* Dedicated Scrollable Projects Area (Only Projects & Pinned Scroll) */}
+        <div className="sidebar-projects-scroll-wrap">
+          {/* Pinned Projects Section */}
+          {pinnedProjects.length > 0 && (
+            <div className="sidebar-section sidebar-pinned-section mb-1">
             <div className="sidebar-section-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div
                 className="sidebar-section-title-wrap"
@@ -532,6 +537,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             })(),
             document.body
           )}
+        </div>
         </div>
       </nav>
 
