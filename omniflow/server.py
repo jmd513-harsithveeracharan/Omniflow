@@ -2382,6 +2382,21 @@ async def handle_chat_stream(req: ChatRequest) -> StreamingResponse:
                         pipeline_err = evt_data.get("error") or "Unknown pipeline synthesis error"
                         break
 
+                    # 0. Live Stage Start (Immediate active progress for long operations)
+                    if evt_type == "stage_started":
+                        stg_id = evt_data.get("stage_id", "stage")
+                        step_item = {
+                            "id": f"stg_{stg_id}",
+                            "title": evt_data.get("title", "Processing"),
+                            "action": evt_data.get("action", "Working"),
+                            "badge": evt_data.get("badge", "TASK"),
+                            "target": evt_data.get("target", "Medallion"),
+                            "status": "in_progress",
+                            "detail": evt_data.get("detail", ""),
+                        }
+                        yield f"data: {json.dumps({'type': 'thought_step', 'step': step_item})}\n\n"
+                        continue
+
                     # 1. Granular source entity discovery
                     if evt_type == "source_entity_discovered":
                         t_ent = evt_data.get("entity", "")

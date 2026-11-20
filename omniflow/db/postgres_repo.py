@@ -24,12 +24,22 @@ _POOL: psycopg2.pool.ThreadedConnectionPool | None = None
 _POOL_LOCK = threading.Lock()
 _REGISTRY_BOOTSTRAPPED: bool = False
 
+# Robust connection parameters: aggressive TCP keepalives to prevent multi-minute socket hangs on network drops
+POSTGRES_KEEPALIVE_KWARGS = {
+    "connect_timeout": 8,
+    "keepalives": 1,
+    "keepalives_idle": 5,
+    "keepalives_interval": 2,
+    "keepalives_count": 3,
+    "options": "-c statement_timeout=45000",
+}
+
 
 def _get_connection_pool(db_uri: str, minconn: int = 1, maxconn: int = 10) -> psycopg2.pool.ThreadedConnectionPool:
     global _POOL
     with _POOL_LOCK:
         if _POOL is None or _POOL.closed:
-            _POOL = psycopg2.pool.ThreadedConnectionPool(minconn, maxconn, db_uri, connect_timeout=8)
+            _POOL = psycopg2.pool.ThreadedConnectionPool(minconn, maxconn, db_uri, **POSTGRES_KEEPALIVE_KWARGS)
         return _POOL
 
 
@@ -51,7 +61,7 @@ class PostgresRepository:
             conn = pool.getconn()
         except Exception:
             # Fallback to direct connection if pooling is unavailable
-            conn = psycopg2.connect(self.db_uri, connect_timeout=8)
+            conn = psycopg2.connect(self.db_uri, **POSTGRES_KEEPALIVE_KWARGS)
             try:
                 yield conn
             finally:

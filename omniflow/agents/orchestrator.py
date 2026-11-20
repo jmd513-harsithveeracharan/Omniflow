@@ -173,24 +173,38 @@ class MultiAgentOrchestrator:
                                 if vt_name in sel_names or vt_full in sel_names:
                                     pk_val = vt.get("pk")
                                     pk_str = pk_val[0] if isinstance(pk_val, list) and pk_val else (pk_val or "id")
-                                    tables_meta[vt_name] = {
+                                    canonical_name = vt_full if "." in vt_full else (f"{vt.get('schema')}.{vt_name}" if vt.get("schema") else vt_name)
+                                    tables_meta[canonical_name] = {
                                         "primary_key": str(pk_str),
                                         "watermark": str(vt.get("watermark") or "updated_at"),
                                         "columns": vt.get("columns", []),
                                         "row_count": vt.get("est_rows", 25000),
                                         "pii_columns": vt.get("pii_columns", []),
                                     }
+                                    if canonical_name != vt_name and vt_name in tables_meta:
+                                        del tables_meta[vt_name]
                     except Exception:
                         pass
 
                 # Filter tables_meta strictly to the user-selected tables
                 if tables_meta:
-                    filtered_meta = {
-                        k: v for k, v in tables_meta.items()
-                        if k in sel_names or k.split(".")[-1] in sel_names or any(s in k for s in sel_names)
-                    }
+                    filtered_meta = {}
+                    for k, v in tables_meta.items():
+                        k_short = k.split(".")[-1]
+                        if k in sel_raw or k_short in sel_raw or any(s == k or s == k_short for s in sel_raw):
+                            filtered_meta[k] = v
                     if filtered_meta:
                         tables_meta = filtered_meta
+
+        # Strict deduplication: remove any bare-name keys if a qualified key exists
+        deduped_meta: dict[str, Any] = {}
+        for k, v in tables_meta.items():
+            if "." not in k:
+                qualified_exists = any("." in other_k and other_k.split(".")[-1] == k for other_k in tables_meta.keys())
+                if qualified_exists:
+                    continue
+            deduped_meta[k] = v
+        tables_meta = deduped_meta
 
         table_names = list(tables_meta.keys())
         pii_detected = sorted(list(set(pii_detected)))
@@ -277,6 +291,15 @@ class MultiAgentOrchestrator:
 
         # Stage 2: Architecture Planning & DAG Scheduling
         ui.stage(2, 5, "Architectural Planning & DAG Scheduling (Planner & Task Organizer Agents)")
+        emit("stage_started", {
+            "stage_id": "planning",
+            "title": "Modeler: Formulating 5-Phase Medallion Architecture",
+            "action": "Formulating",
+            "badge": "PLAN",
+            "target": "Raw Bronze -> Silver -> Gold",
+            "status": "in_progress",
+            "detail": "Mapping Delta Bronze raw ingestion, Silver deduplication, and Gold Kimball star schema...",
+        })
         planner = DynamicAgentRuntime("planner_agent", self.repo, self.db_logger)
         plan_out = planner.run_planner(req, run_id, intake_tables=table_names, intake_pii=pii_detected)
         ui.success_bullet(f"Formulated {len(plan_out.macro_phases)} Medallion Architecture Phases:")
@@ -295,6 +318,15 @@ class MultiAgentOrchestrator:
         })
 
         self.db_logger.update_run_status(run_id, current_step="task_organizer_agent")
+        emit("stage_started", {
+            "stage_id": "dag",
+            "title": "Organizer: NetworkX Acyclic Execution DAG Scheduling",
+            "action": "Scheduling",
+            "badge": "DAG",
+            "target": "Topological Waves",
+            "status": "in_progress",
+            "detail": "Validating acyclic dependency topology and critical path sequence...",
+        })
         organizer = DynamicAgentRuntime("task_organizer_agent", self.repo, self.db_logger)
         executor_id = self.db_logger.get_agent_id("executor_agent") or ""
         dag_out = organizer.run_task_organizer(plan_out, run_id, executor_id)
@@ -311,6 +343,15 @@ class MultiAgentOrchestrator:
 
         # Tool Checker & Synthesizer Gate
         self.db_logger.update_run_status(run_id, current_step="tool_checker_agent")
+        emit("stage_started", {
+            "stage_id": "tools",
+            "title": "Tools: Verifying PySpark & Delta Synthesizers",
+            "action": "Verifying",
+            "badge": "TOOLS",
+            "target": "Synthesis Preflight",
+            "status": "in_progress",
+            "detail": "Checking AST transpilers, Delta MERGE builders, and Microsoft Fabric REST schemas...",
+        })
         checker = DynamicAgentRuntime("tool_checker_agent", self.repo, self.db_logger)
         check_pass_1 = checker.run_tool_checker(dag_out, run_id, pass_number=1)
 
@@ -328,6 +369,15 @@ class MultiAgentOrchestrator:
         # Stage 3: Dynamic Fluid Code Generation
         ui.stage(3, 5, "Fluid Code & Pipeline Generation (Azure OpenAI: omni-flow-gpt-6-luna)")
         self.db_logger.update_run_status(run_id, current_step="executor_agent")
+        emit("stage_started", {
+            "stage_id": "executor",
+            "title": "Executor: Fluid Code Generation & Synthesis",
+            "action": "Synthesizing",
+            "badge": "CODE",
+            "target": "Production Artifacts",
+            "status": "in_progress",
+            "detail": "Generating PySpark curation scripts, Gold Kimball DDL, and ADF pipelines...",
+        })
         executor = DynamicAgentRuntime("executor_agent", self.repo, self.db_logger)
 
         artifacts_dir = os.path.join(

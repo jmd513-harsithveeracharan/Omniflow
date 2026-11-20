@@ -17,7 +17,15 @@ class ExecutionDatabaseLogger:
         self.db_uri = db_uri
 
     def _connect(self):
-        return psycopg2.connect(self.db_uri, connect_timeout=8)
+        return psycopg2.connect(
+            self.db_uri,
+            connect_timeout=8,
+            keepalives=1,
+            keepalives_idle=5,
+            keepalives_interval=2,
+            keepalives_count=3,
+            options="-c statement_timeout=45000",
+        )
 
     def upsert_project(self, project_code: str, project_name: str, description: str) -> str:
         with self._connect() as conn, conn.cursor() as cur:

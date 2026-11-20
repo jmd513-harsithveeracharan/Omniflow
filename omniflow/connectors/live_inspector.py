@@ -129,7 +129,15 @@ def _pick_watermark(columns: list[LiveColumnSpec]) -> str | None:
 
 def inspect_postgres_catalog(dsn: str) -> list[dict[str, Any]]:
     """Queries live PostgreSQL system catalogs read-only and returns rich table specs."""
-    conn = psycopg2.connect(dsn, connect_timeout=8)
+    conn = psycopg2.connect(
+        dsn,
+        connect_timeout=8,
+        keepalives=1,
+        keepalives_idle=5,
+        keepalives_interval=2,
+        keepalives_count=3,
+        options="-c statement_timeout=45000",
+    )
     try:
         conn.set_session(readonly=True, autocommit=True)
         with conn.cursor() as cur:
