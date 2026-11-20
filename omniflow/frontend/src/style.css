@@ -3672,40 +3672,57 @@ nav.sidebar-nav {
     font-style: italic;
 }
 
-/* Grouped List Container & Items (Tight, Natural Spacing) */
-ul.chat-md-list {
+/* Grouped List Container & Items (Natural Flow, Native Bullets, No Layout Slicing) */
+ul.chat-md-list,
+.chat-md-bullet-list,
+.chat-markdown-renderer ul {
+    list-style-type: disc !important;
+    list-style-position: outside !important;
+    margin: 8px 0 14px 0 !important;
+    padding-left: 22px !important;
+    display: block !important;
+}
+
+ol.chat-md-ordered-list,
+.chat-markdown-renderer ol {
+    list-style-type: decimal !important;
+    list-style-position: outside !important;
+    margin: 8px 0 14px 0 !important;
+    padding-left: 22px !important;
+    display: block !important;
+}
+
+.chat-md-list-item,
+.chat-markdown-renderer li {
+    display: list-item !important;
+    margin: 0 0 5px 0 !important;
+    padding: 0 !important;
+    font-size: 14.5px;
+    line-height: 1.65;
+    color: #dcdfe4;
+    word-break: normal !important;
+    overflow-wrap: break-word !important;
+    hyphens: none !important;
+}
+
+.chat-md-list-item:last-child,
+.chat-markdown-renderer li:last-child {
+    margin-bottom: 0 !important;
+}
+
+.chat-md-list-item.badge-item {
+    display: block !important;
     list-style: none !important;
-    margin: 6px 0 10px 0 !important;
+    margin: 6px 0 !important;
     padding: 0 !important;
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
 }
 
-.chat-md-list-item {
-    display: flex;
-    align-items: flex-start;
-    gap: 8px;
-    margin: 0 !important;
-    padding: 0 !important;
-    font-size: 15px;
-    line-height: 1.5;
-    color: #d4d4d4;
-}
-
-.chat-md-list-item .list-bullet {
-    color: #9ca3af;
-    font-size: 15px;
-    line-height: 1.5;
-    flex-shrink: 0;
-    user-select: none;
-}
-
-.chat-md-list-item .list-content {
-    flex: 1;
-    font-size: 15px;
-    line-height: 1.5;
-    color: #d4d4d4;
+.chat-md-list-item strong,
+.chat-md-list-item b,
+.chat-markdown-renderer li strong,
+.chat-markdown-renderer li b {
+    color: #f8fafc;
+    font-weight: 600;
 }
 
 .chat-md-code {
@@ -3989,13 +4006,18 @@ ul.chat-md-list {
 }
 
 .chat-md-inline-code {
+    display: inline !important;
     background: rgba(255, 255, 255, 0.08);
-    color: #f3f4f6;
+    color: #38bdf8;
     border: 1px solid rgba(255, 255, 255, 0.12);
     padding: 2px 6px;
     border-radius: 4px;
-    font-family: var(--font-mono, 'JetBrains Mono', monospace);
-    font-size: 13px;
+    font-family: var(--font-mono, 'JetBrains Mono', Consolas, monospace);
+    font-size: 12.5px;
+    vertical-align: baseline !important;
+    word-break: normal !important;
+    overflow-wrap: break-word !important;
+    white-space: pre-wrap !important;
 }
 
 /* Fabric Item Cards in Chat */
@@ -4074,37 +4096,60 @@ ul.chat-md-list {
     height: 12px;
 }
 
-/* Sleek Markdown Tables - Uniform Dark, No Banded Rows */
+/* Sleek Markdown Tables - Anti-Slop, Bulletproof Typography & Layout */
 .chat-md-table-wrapper {
     width: 100%;
     overflow-x: auto;
-    margin: 16px 0;
-    border: 1px solid rgba(255, 255, 255, 0.09);
-    border-radius: 10px;
-    background: #161719;
+    margin: 18px 0;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+    background: #141518;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
+}
+
+.chat-md-table-wrapper::-webkit-scrollbar {
+    height: 5px;
+}
+
+.chat-md-table-wrapper::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 4px;
 }
 
 .chat-md-table {
     width: 100%;
-    border-collapse: collapse;
+    border-collapse: separate;
+    border-spacing: 0;
     font-size: 13.5px;
     line-height: 1.6;
     text-align: left;
+    table-layout: auto;
 }
 
 .chat-md-table th {
-    background: #1f2024;
-    color: #38bdf8;
+    background: #1a1b1f;
+    color: #94a3b8;
     font-weight: 600;
-    padding: 11px 16px;
+    font-size: 11.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 12px 18px;
     border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    white-space: nowrap;
+    vertical-align: bottom;
 }
 
 .chat-md-table td {
-    padding: 11px 16px;
+    padding: 13px 18px;
     border-bottom: 1px solid rgba(255, 255, 255, 0.06);
     color: #e2e8f0;
     background: transparent !important;
+    vertical-align: top !important;
+    word-break: normal !important;
+    overflow-wrap: break-word !important;
+    hyphens: none !important;
 }
 
 .chat-md-table tr:last-child td {
@@ -4118,7 +4163,49 @@ ul.chat-md-list {
 }
 
 .chat-md-table tr:hover td {
-    background: rgba(255, 255, 255, 0.035) !important;
+    background: rgba(255, 255, 255, 0.03) !important;
+}
+
+/* First Column Emphasis & Minimum Width (Prevents Crushing & Word Slicing) */
+.chat-md-table th:first-child,
+.chat-md-table td:first-child {
+    font-weight: 500;
+    color: #f8fafc;
+    min-width: 150px;
+}
+
+/* Two-Column Comparison / Spec Tables: Automatic 32% / 68% Ratio */
+.chat-md-table tr > th:first-child:nth-last-child(2),
+.chat-md-table tr > td:first-child:nth-last-child(2) {
+    width: 32%;
+    min-width: 180px;
+    max-width: 280px;
+    padding-right: 20px;
+    font-weight: 550;
+    color: #f8fafc;
+    border-right: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.chat-md-table tr > th:last-child:nth-child(2),
+.chat-md-table tr > td:last-child:nth-child(2) {
+    width: 68%;
+    min-width: 260px;
+    color: #cbd5e1;
+}
+
+/* Inline Code Inside Table Cells */
+.chat-md-table td code,
+.chat-md-table td .chat-md-inline-code {
+    display: inline-block;
+    vertical-align: baseline;
+    font-size: 12px;
+    padding: 1px 6px;
+    margin: 0 3px;
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    color: #38bdf8;
+    word-break: normal;
 }
 
 /* Dynamic & Collapsible Thinking Card */
@@ -11027,19 +11114,25 @@ pre:has(.code-card) {
 .bolt-chat-pane.with-workbench .chat-md-ordered-list,
 .bolt-chat-pane.with-workbench ul.chat-md-list {
     margin: 4px 0 8px 0 !important;
-    gap: 4px !important;
+    padding-left: 18px !important;
 }
 
 .bolt-chat-pane.with-workbench .chat-md-list-item,
-.bolt-chat-pane.with-workbench .chat-md-list-item .list-content {
+.bolt-chat-pane.with-workbench .chat-markdown-renderer li {
+    display: list-item !important;
     font-size: 13px !important;
-    line-height: 1.45 !important;
+    line-height: 1.5 !important;
+    margin-bottom: 3px !important;
+    word-break: normal !important;
+    overflow-wrap: break-word !important;
+    hyphens: none !important;
 }
 
 .bolt-chat-pane.with-workbench .chat-md-inline-code {
-    font-size: 12px !important;
+    font-size: 11.5px !important;
     padding: 1.5px 5px !important;
-    word-break: break-all;
+    word-break: normal !important;
+    overflow-wrap: break-word !important;
 }
 
 /* Code Blocks in Compact Mode */
@@ -11080,14 +11173,32 @@ pre:has(.code-card) {
 }
 
 .bolt-chat-pane.with-workbench .chat-md-table th {
-    padding: 7px 10px !important;
-    font-size: 11.5px !important;
+    padding: 8px 12px !important;
+    font-size: 10.5px !important;
     white-space: nowrap !important;
+    vertical-align: bottom !important;
 }
 
 .bolt-chat-pane.with-workbench .chat-md-table td {
-    padding: 6px 10px !important;
+    padding: 7px 12px !important;
     font-size: 11.5px !important;
+    vertical-align: top !important;
+    word-break: normal !important;
+    overflow-wrap: break-word !important;
+    hyphens: none !important;
+}
+
+.bolt-chat-pane.with-workbench .chat-md-table tr > th:first-child:nth-last-child(2),
+.bolt-chat-pane.with-workbench .chat-md-table tr > td:first-child:nth-last-child(2) {
+    width: 36% !important;
+    min-width: 120px !important;
+    padding-right: 10px !important;
+}
+
+.bolt-chat-pane.with-workbench .chat-md-table tr > th:last-child:nth-child(2),
+.bolt-chat-pane.with-workbench .chat-md-table tr > td:last-child:nth-child(2) {
+    width: 64% !important;
+    min-width: 160px !important;
 }
 
 /* Fabric Item Badges in Compact Mode */
@@ -11999,23 +12110,21 @@ pre[class*="language-"] {
 /* Bullet Lists with proper markers and breathing room */
 .chat-md-bullet-list,
 .chat-markdown-renderer ul {
-    list-style: disc;
-    padding-left: 22px;
-    margin: 8px 0 14px 0;
-    display: flex;
-    flex-direction: column;
-    gap: 5px;
+    list-style-type: disc !important;
+    list-style-position: outside !important;
+    padding-left: 22px !important;
+    margin: 8px 0 14px 0 !important;
+    display: block !important;
 }
 
 /* Ordered Lists with proper decimal numbers */
 .chat-md-ordered-list,
 .chat-markdown-renderer ol {
-    list-style: decimal;
-    padding-left: 22px;
-    margin: 8px 0 14px 0;
-    display: flex;
-    flex-direction: column;
-    gap: 5px;
+    list-style-type: decimal !important;
+    list-style-position: outside !important;
+    padding-left: 22px !important;
+    margin: 8px 0 14px 0 !important;
+    display: block !important;
 }
 
 .chat-md-bullet-list li,
@@ -12023,9 +12132,12 @@ pre[class*="language-"] {
 .chat-markdown-renderer li {
     line-height: 1.68;
     color: #dcdfe4;
-    font-size: 15px;
-    padding-left: 3px;
-    margin-bottom: 2px;
+    font-size: 14.5px;
+    padding-left: 2px;
+    margin-bottom: 5px;
+    word-break: normal !important;
+    overflow-wrap: break-word !important;
+    hyphens: none !important;
 }
 
 .chat-md-bullet-list li:last-child,
@@ -12204,51 +12316,7 @@ pre[class*="language-"] {
     height: 6px;
 }
 
-/* Markdown Tables */
-.chat-md-table-wrapper {
-    overflow-x: auto;
-    margin: 14px 0;
-    border-radius: 10px;
-    border: 1px solid rgba(255, 255, 255, 0.09);
-    background: #161719;
-}
 
-.chat-md-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 13.5px;
-    line-height: 1.6;
-}
-
-.chat-md-table th {
-    padding: 11px 16px;
-    background: #1f2024;
-    color: #38bdf8;
-    font-weight: 600;
-    text-align: left;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.chat-md-table td {
-    padding: 11px 16px;
-    color: #e2e8f0;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-    background: transparent !important;
-}
-
-.chat-md-table tr:last-child td {
-    border-bottom: none;
-}
-
-.chat-md-table tr td,
-.chat-md-table tr:nth-child(even) td,
-.chat-md-table tr:nth-child(odd) td {
-    background: transparent !important;
-}
-
-.chat-md-table tr:hover td {
-    background: rgba(255, 255, 255, 0.035) !important;
-}
 
 /* ═════════════════════════════════════════════════════════════════════════════
    PROJECTS VIEW STYLING (Complete Parity & Modern Polish)
