@@ -258,80 +258,93 @@ def build_rich_medallion_galaxy() -> nx.DiGraph:
 
 
 def build_mesh_from_plan(plan: dict[str, Any] | None) -> nx.DiGraph:
-    """Dynamically compiles a NetworkX graph from a provided architecture plan."""
+    """Dynamically compiles a clean, multi-tier Medallion Lineage DAG from the architecture plan."""
     if not plan or not isinstance(plan, dict) or not plan.get("lakehouses"):
         return build_rich_medallion_galaxy()
 
     g = nx.DiGraph()
-    folder = plan.get("folder", "AI_Test_Folder")
+    source_name = plan.get("sourceName") or plan.get("source_system") or "PostgreSQL Relational Source"
     lakehouses = plan.get("lakehouses", [])
     notebooks = plan.get("notebooks", [])
     pipeline = plan.get("pipeline", {})
     tables = plan.get("tables", [])
+    warehouse = plan.get("warehouse") or "wh_postgres_medallion_gold"
 
-    add_node(g, "src_lake", f"{folder} Source Gateway", "source", "source", radius=20.0, desc="OneLake Landing Zone")
+    # 1. Source System Node (Leftmost root)
+    add_node(g, "src_root", str(source_name), "source", "source", radius=16.0, desc="Relational Source Database")
 
-    from omniflow.graph.models import infer_layer_name
+    # 2. Ingestion Pipeline Node
+    pl_name = pipeline.get("name") if isinstance(pipeline, dict) else str(pipeline or "pl_bronze_ingest")
+    add_node(g, f"pl_{pl_name}", str(pl_name), "pipeline", "bronze", radius=10.0, desc="Fabric Bronze Ingestion Pipeline")
+    add_edge(g, "src_root", f"pl_{pl_name}", "FEEDS", "Batch CDC Extraction", True)
 
-    for lh in lakehouses:
-        lh_name = str(lh)
-        layer = infer_layer_name(lh_name, "", "Lakehouse")
-        add_node(g, f"lh_{lh_name}", lh_name, "lakehouse", layer, radius=13.0, desc=f"Fabric Lakehouse '{lh_name}'")
+    # 3. Lakehouses (Bronze & Silver)
+    lh_bronze = next((str(l) for l in lakehouses if "bronze" in str(l).lower()), lakehouses[0] if lakehouses else "lh_bronze")
+    lh_silver = next((str(l) for l in lakehouses if "silver" in str(l).lower()), lakehouses[1] if len(lakehouses) > 1 else "lh_silver")
 
-    for nb in notebooks:
-        nb_name = str(nb.get("name") if isinstance(nb, dict) else nb)
-        layer_raw = str(nb.get("layer", "silver") if isinstance(nb, dict) else "silver")
-        nb_layer = infer_layer_name(layer_raw) if layer_raw else "silver"
-        add_node(g, f"nb_{nb_name}", nb_name, "notebook", nb_layer, radius=7.5, desc="PySpark Curation Notebook")
+    add_node(g, f"lh_{lh_bronze}", lh_bronze, "lakehouse", "bronze", radius=14.0, desc=f"Raw Delta Lakehouse '{lh_bronze}'")
+    add_edge(g, f"pl_{pl_name}", f"lh_{lh_bronze}", "FEEDS", "Raw Parquet / Delta Landing", True)
 
-    # Connect Pipeline
-    if pipeline:
-        pl_name = pipeline.get("name") if isinstance(pipeline, dict) else str(pipeline)
-        add_node(g, f"pl_{pl_name}", str(pl_name), "pipeline", "shared", radius=9.0, desc="Fabric Pipeline Orchestrator")
-        for nb in notebooks:
-            nb_name = str(nb.get("name") if isinstance(nb, dict) else nb)
-            add_edge(g, f"pl_{pl_name}", f"nb_{nb_name}", "DEPENDS_ON", "Sequential execution")
+    add_node(g, f"lh_{lh_silver}", lh_silver, "lakehouse", "silver", radius=14.0, desc=f"Harmonized Delta Lakehouse '{lh_silver}'")
 
-    # Connect Discovered/Provided Tables
+    # 4. Notebooks (Curate / Quality)
+    curate_nb = next((n for n in notebooks if "curate" in str(n.get("name") if isinstance(n, dict) else n).lower() or "silver" in str(n.get("name") if isinstance(n, dict) else n).lower()), None)
+    curate_name = str(curate_nb.get("name") if isinstance(curate_nb, dict) else (curate_nb or "nb_curate"))
+    add_node(g, f"nb_{curate_name}", curate_name, "notebook", "stage", radius=11.0, desc="PySpark Delta MERGE & SHA-256 PII Masking")
+    add_edge(g, f"lh_{lh_bronze}", f"nb_{curate_name}", "DEPENDS_ON", "Read Raw Delta", True)
+    add_edge(g, f"nb_{curate_name}", f"lh_{lh_silver}", "TRANSFORMS_TO", "Delta MERGE Upsert", True)
+
+    quality_nb = next((n for n in notebooks if "quality" in str(n.get("name") if isinstance(n, dict) else n).lower()), None)
+    if quality_nb:
+        quality_name = str(quality_nb.get("name") if isinstance(quality_nb, dict) else quality_nb)
+        add_node(g, f"nb_{quality_name}", quality_name, "notebook", "stage", radius=9.0, desc="Great Expectations Anomaly & Schema Verification")
+        add_edge(g, f"lh_{lh_silver}", f"nb_{quality_name}", "DEPENDS_ON", "Audit Silver Datasets", True)
+
+    # 5. Gold Warehouse & Direct Lake Semantic Model
+    add_node(g, "wh_gold", str(warehouse), "warehouse", "gold", radius=14.0, desc="Kimball Star Schema T-SQL Mart")
+    add_edge(g, f"lh_{lh_silver}", "wh_gold", "FEEDS", "Direct Lake T-SQL Aggregations", True)
+
+    semantic_name = f"sm_{str(warehouse).replace('wh_', '')}_direct_lake"
+    add_node(g, "sm_direct_lake", semantic_name, "metric", "gold", radius=12.0, desc="Power BI Direct Lake Semantic Model")
+    add_edge(g, "wh_gold", "sm_direct_lake", "FEEDS", "Direct Lake Semantic Cache", True)
+
+    # 6. Entity-level table lineage: brz_* in Bronze -> nb_curate -> slv_* in Silver
     if tables and isinstance(tables, list):
-        created_schemas: set[str] = set()
+        brz_tbls: dict[str, dict[str, Any]] = {}
+        slv_tbls: dict[str, dict[str, Any]] = {}
+
         for tbl in tables:
-            raw_tname = str(tbl.get("name", "table"))
-            schema_name = str(tbl.get("schema", "") or "")
-            if not schema_name and "." in raw_tname:
-                schema_name, tname = raw_tname.split(".", 1)
+            tname = str(tbl.get("name", "table"))
+            if tname.startswith("brz_"):
+                short = tname[4:]
+                brz_tbls[short] = tbl
+            elif tname.startswith("slv_"):
+                short = tname[4:]
+                slv_tbls[short] = tbl
             else:
-                tname = raw_tname
-            layer_t = infer_layer_name(str(tbl.get("layer") or f"{schema_name}_{tname}"), "", "Table")
-            if layer_t == "workspace":
-                layer_t = "bronze"
+                brz_tbls[tname] = tbl
 
-            if schema_name:
-                sid = f"schema_{schema_name}"
-                if sid not in created_schemas:
-                    created_schemas.add(sid)
-                    add_node(g, sid, schema_name, "schema", layer_t, radius=12.5, desc=f"Schema container [{schema_name}]")
-                    add_edge(g, "src_lake", sid, "FEEDS", "Ingestion stream", True)
-                parent_hub = sid
-                rel_to_table = "CONTAINS"
-            else:
-                parent_hub = "src_lake"
-                rel_to_table = "FEEDS"
+        for short_name in set(brz_tbls.keys()) | set(slv_tbls.keys()):
+            brz_id = f"tbl_brz_{short_name}"
+            slv_id = f"tbl_slv_{short_name}"
 
-            tid = f"tbl_{schema_name}_{tname}" if schema_name else f"tbl_{tname}"
-            add_node(g, tid, tname, "table", layer_t, parent_id=parent_hub, radius=7.0, desc=f"Delta Table: {raw_tname}")
-            add_edge(g, parent_hub, tid, rel_to_table, "Schema contains table" if schema_name else "Ingestion stream", not schema_name)
+            # Bronze Delta table
+            add_node(g, brz_id, f"brz_{short_name}", "table", "bronze", parent_id=f"lh_{lh_bronze}", radius=6.5, desc=f"Raw Delta Table: {short_name}")
+            add_edge(g, f"lh_{lh_bronze}", brz_id, "CONTAINS")
+            add_edge(g, brz_id, f"nb_{curate_name}", "DEPENDS_ON", "Curation source", True)
 
-            cols = tbl.get("columns", [])
-            for c in cols:
-                cname = c.get("name") if isinstance(c, dict) else str(c)
-                cid = f"col_{tid}_{cname}"
-                dtype = c.get("type", "string") if isinstance(c, dict) else "string"
-                pk = bool(c.get("is_pk", False)) if isinstance(c, dict) else False
-                add_node(g, cid, cname, "column", layer_t, parent_id=tid, data_type=dtype, is_pk=pk, radius=3.0)
-                add_edge(g, tid, cid, "CONTAINS")
-    else:
-        # Fallback to standard enterprise tables if none attached to plan
-        return build_rich_medallion_galaxy()
+            # Silver Delta table
+            add_node(g, slv_id, f"slv_{short_name}", "table", "silver", parent_id=f"lh_{lh_silver}", radius=6.5, desc=f"Cleaned Delta Table: {short_name}")
+            add_edge(g, f"nb_{curate_name}", slv_id, "TRANSFORMS_TO", "MERGE Deduplication", True)
+            add_edge(g, f"lh_{lh_silver}", slv_id, "CONTAINS")
+
+            # Link primary silver entities to Gold Warehouse
+            if short_name in ["customers", "orders", "order_items", "products", "sales"]:
+                dim_id = f"tbl_gold_{short_name}"
+                gold_label = f"fact_{short_name}" if "order" in short_name or "sale" in short_name else f"dim_{short_name}"
+                add_node(g, dim_id, gold_label, "table", "gold", parent_id="wh_gold", radius=7.0, desc=f"Kimball Star {gold_label}")
+                add_edge(g, slv_id, dim_id, "TRANSFORMS_TO", "Kimball dimensional modeling", True)
+                add_edge(g, "wh_gold", dim_id, "CONTAINS")
+                add_edge(g, dim_id, "sm_direct_lake", "FEEDS", "Semantic relationship", True)
 
     return g

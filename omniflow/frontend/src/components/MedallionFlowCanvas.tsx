@@ -56,6 +56,34 @@ export const MedallionFlowCanvas: React.FC<MedallionFlowCanvasProps> = ({
   const [copied, setCopied] = useState(false);
   const [selectedNode, setSelectedNode] = useState<DagNode | null>(null);
   const [zoomLevel, setZoomLevel] = useState<number>(1);
+  const [panOffset, setPanOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState<boolean>(false);
+  const dragStartRef = React.useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (e.button !== 0) return;
+    const target = e.target as HTMLElement;
+    if (target.closest('button') || target.closest('.flow-node') || target.closest('.dag-inspector')) return;
+    setIsDragging(true);
+    dragStartRef.current = { x: e.clientX - panOffset.x, y: e.clientY - panOffset.y };
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isDragging) return;
+    setPanOffset({
+      x: e.clientX - dragStartRef.current.x,
+      y: e.clientY - dragStartRef.current.y,
+    });
+  };
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
+  };
+
+  const handleFitView = () => {
+    setPanOffset({ x: 10, y: 20 });
+    setZoomLevel(0.85);
+  };
 
   // Dynamic 9-item Enterprise Medallion DAG computation
   const { dagNodes, dagEdges, treeItems, pysparkCode, qualityCode, sqlCode, jsonSpec, rootFolder, domain } = React.useMemo(() => {
@@ -489,10 +517,16 @@ export const MedallionFlowCanvas: React.FC<MedallionFlowCanvasProps> = ({
             ) : (
               <div
                 className="dag-canvas-viewport"
+                onMouseDown={handleMouseDown}
+                onMouseMove={handleMouseMove}
+                onMouseUp={handleMouseUp}
+                onMouseLeave={handleMouseUp}
                 style={{
                   height: '100%',
-                  overflow: 'auto',
+                  overflow: 'hidden',
                   position: 'relative',
+                  cursor: isDragging ? 'grabbing' : 'grab',
+                  userSelect: isDragging ? 'none' : 'auto',
                   backgroundColor: '#07090e',
                   backgroundImage:
                     'radial-gradient(circle at 50% 50%, rgba(56, 189, 248, 0.04) 0%, transparent 80%), radial-gradient(rgba(255, 255, 255, 0.08) 1px, transparent 1px)',
@@ -520,7 +554,7 @@ export const MedallionFlowCanvas: React.FC<MedallionFlowCanvasProps> = ({
                 >
                   <button
                     type="button"
-                    onClick={() => setZoomLevel((z) => Math.max(0.6, z - 0.15))}
+                    onClick={() => setZoomLevel((z) => Math.max(0.4, Number((z - 0.15).toFixed(2))))}
                     title="Zoom Out"
                     style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: '4px', display: 'flex' }}
                   >
@@ -531,7 +565,7 @@ export const MedallionFlowCanvas: React.FC<MedallionFlowCanvasProps> = ({
                   </span>
                   <button
                     type="button"
-                    onClick={() => setZoomLevel((z) => Math.min(1.8, z + 0.15))}
+                    onClick={() => setZoomLevel((z) => Math.min(2.0, Number((z + 0.15).toFixed(2))))}
                     title="Zoom In"
                     style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: '4px', display: 'flex' }}
                   >
@@ -539,19 +573,37 @@ export const MedallionFlowCanvas: React.FC<MedallionFlowCanvasProps> = ({
                   </button>
                   <button
                     type="button"
-                    onClick={() => setZoomLevel(1)}
-                    title="Reset Zoom"
+                    onClick={() => { setZoomLevel(1); setPanOffset({ x: 0, y: 0 }); }}
+                    title="Reset Zoom & Pan"
                     style={{ background: 'transparent', border: 'none', color: '#64748b', cursor: 'pointer', padding: '4px', display: 'flex' }}
                   >
                     <RotateCcw width={12} height={12} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleFitView}
+                    title="Fit to Screen"
+                    style={{
+                      background: 'rgba(56, 189, 248, 0.14)',
+                      border: '1px solid rgba(56, 189, 248, 0.35)',
+                      color: '#38bdf8',
+                      cursor: 'pointer',
+                      padding: '2px 8px',
+                      borderRadius: '4px',
+                      fontSize: '10.5px',
+                      fontWeight: 600,
+                      marginLeft: '2px',
+                    }}
+                  >
+                    Fit
                   </button>
                 </div>
 
                 <div
                   style={{
-                    transform: `scale(${zoomLevel})`,
+                    transform: `translate(${panOffset.x}px, ${panOffset.y}px) scale(${zoomLevel})`,
                     transformOrigin: 'top left',
-                    transition: 'transform 0.15s ease-out',
+                    transition: isDragging ? 'none' : 'transform 0.12s ease-out',
                     minWidth: '1540px',
                     minHeight: '280px',
                   }}
@@ -630,7 +682,10 @@ export const MedallionFlowCanvas: React.FC<MedallionFlowCanvasProps> = ({
                           key={n.id}
                           className={`flow-node ${isSelected ? 'active' : ''}`}
                           transform={`translate(${n.x},${n.y})`}
-                          onClick={() => setSelectedNode(n)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedNode(n);
+                          }}
                           style={{ cursor: 'pointer' }}
                         >
                           {/* Card background with glass gradient */}
@@ -641,7 +696,7 @@ export const MedallionFlowCanvas: React.FC<MedallionFlowCanvasProps> = ({
                             height="76"
                             rx="10"
                             fill="url(#nodeBgGrad)"
-                            stroke={isSelected ? n.glowColor : 'rgba(255,255,255,0.1)'}
+                            stroke={isSelected ? n.glowColor : 'rgba(255,255,255,0.14)'}
                             strokeWidth={isSelected ? '2' : '1'}
                             style={{
                               filter: isSelected ? `drop-shadow(0 0 16px ${n.glowColor}60)` : 'drop-shadow(0 2px 8px rgba(0,0,0,0.5))',
@@ -653,8 +708,16 @@ export const MedallionFlowCanvas: React.FC<MedallionFlowCanvasProps> = ({
                           <path
                             d="M 0,10 Q 0,0 10,0 L 200,0 Q 210,0 210,10 L 210,3 L 0,3 Z"
                             fill={n.glowColor}
-                            opacity="0.9"
+                            opacity="0.95"
                           />
+
+                          {/* Connection Port Pins (Left Input, Right Output) */}
+                          {n.id !== 'node_source' && (
+                            <circle cx="0" cy="38" r="3.5" fill="#080b12" stroke={n.glowColor} strokeWidth="2" />
+                          )}
+                          {n.id !== 'node_master_orchestrator' && (
+                            <circle cx="210" cy="38" r="3.5" fill="#080b12" stroke={n.glowColor} strokeWidth="2" />
+                          )}
 
                           {/* Layer Badge & Folder Tag */}
                           <text x="14" y="24" fontSize="9" fontWeight="700" fill={n.glowColor} letterSpacing="0.06em">
@@ -684,8 +747,8 @@ export const MedallionFlowCanvas: React.FC<MedallionFlowCanvasProps> = ({
                           </text>
 
                           {/* Live Status Indicator Pulse */}
-                          <circle cx="194" cy="20" r="4" fill="#10b981" />
-                          <circle cx="194" cy="20" r="7" fill="none" stroke="#10b981" strokeWidth="1" opacity="0.4" />
+                          <circle cx="194" cy="20" r="3.5" fill="#10b981" />
+                          <circle cx="194" cy="20" r="6.5" fill="none" stroke="#10b981" strokeWidth="1" opacity="0.4" />
                         </g>
                       );
                     })}
