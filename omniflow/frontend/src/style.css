@@ -497,10 +497,30 @@ nav.sidebar-nav {
     flex-direction: column;
     flex: 1;
     min-height: 0;
-    overflow: hidden;
-    padding: 0px 8px 0 6px !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    padding: 0px 8px 12px 6px !important;
     margin: 0 !important;
     gap: 1px;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
+}
+
+.sidebar-nav::-webkit-scrollbar {
+    width: 4px;
+}
+
+.sidebar-nav::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.sidebar-nav::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.18);
+    border-radius: 4px;
+}
+
+.sidebar-nav::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.32);
 }
 
 /* + New Chat Button - Styled identically to nav items with active pill highlight */
