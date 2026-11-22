@@ -2389,7 +2389,7 @@ async def handle_chat_stream(req: ChatRequest) -> StreamingResponse:
                             "id": f"stg_{stg_id}",
                             "title": evt_data.get("title", "Processing"),
                             "action": evt_data.get("action", "Working"),
-                            "badge": evt_data.get("badge", "TASK"),
+                            "badge": evt_data.get("badge", "STAGE"),
                             "target": evt_data.get("target", "Medallion"),
                             "status": "in_progress",
                             "detail": evt_data.get("detail", ""),

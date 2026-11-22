@@ -724,7 +724,8 @@ export const App: React.FC = () => {
             const existing = last.thoughtSteps || [];
             const idx = existing.findIndex(
               (s) =>
-                (thoughtStep.target && s.target === thoughtStep.target) ||
+                (thoughtStep.id && s.id && s.id === thoughtStep.id) ||
+                (thoughtStep.target && s.target === thoughtStep.target && (s.badge === thoughtStep.badge || s.action === thoughtStep.action)) ||
                 s.title === thoughtStep.title
             );
             let updated: typeof existing;

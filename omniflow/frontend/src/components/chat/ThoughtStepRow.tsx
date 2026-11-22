@@ -106,7 +106,6 @@ const renderStepIcon = (action: string, target: string, badge?: string) => {
     return <ShieldAlert width={12} height={12} style={{ color: '#fbbf24', flexShrink: 0 }} />;
   }
 
-  // Default fallback
   return <CheckCircle2 width={12} height={12} style={{ color: '#38bdf8', flexShrink: 0 }} />;
 };
 
@@ -120,7 +119,7 @@ export const ThoughtStepRow: React.FC<ThoughtStepRowProps> = ({
   const isInProgress = step.status === 'in_progress';
   const hasDetailOrOutput = Boolean(step.detail || step.output);
 
-  // Parse action and target cleanly with zero word concatenation
+  // Parse action and target cleanly
   let action = (step.action || '').trim();
   let target = (step.target || '').trim();
   const title = (step.title || '').trim();
@@ -149,12 +148,26 @@ export const ThoughtStepRow: React.FC<ThoughtStepRowProps> = ({
   const cleanTarget = target.replace(/^[:\s-]+/, '').trim() || title;
   const displayAction = cleanTarget.toLowerCase() === action.toLowerCase() ? '' : action;
 
+  // Determine if this is a high-level macro phase (to be dimmed / greyed out)
+  const isHighLevel = Boolean(
+    step.badge === 'STAGE' ||
+    step.badge === 'PHASE' ||
+    step.badge === 'PLAN' ||
+    step.badge === 'DAG' ||
+    step.action === 'Planned' ||
+    step.action === 'Formulating' ||
+    step.action === 'Scheduling' ||
+    title.toLowerCase().startsWith('stage') ||
+    title.toLowerCase().includes('agent:') ||
+    title.toLowerCase().includes('modeler:') ||
+    title.toLowerCase().includes('organizer:')
+  );
+
   // Derive secondary stats (e.g. line count, attributes count, PK)
   let statsTag = '';
   if (step.diff) {
     statsTag = step.diff;
   } else if (step.detail && step.detail.includes('attributes')) {
-    // Extract concise stats like "(8 attributes, PK: id)"
     const attrMatch = step.detail.match(/(\d+)\s+attributes/i);
     const pkMatch = step.detail.match(/PK:\s*([^\s|]+)/i);
     if (attrMatch) {
@@ -162,7 +175,6 @@ export const ThoughtStepRow: React.FC<ThoughtStepRowProps> = ({
     }
   }
 
-  // Derive terminal command prompt for expanded view
   const terminalCommand =
     step.target?.startsWith('fabric build') || step.target?.startsWith('Select-String')
       ? step.target
@@ -171,7 +183,13 @@ export const ThoughtStepRow: React.FC<ThoughtStepRowProps> = ({
   return (
     <div
       className="antigravity-step-item"
-      style={{ display: 'flex', flexDirection: 'column', width: '100%' }}
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        width: '100%',
+        marginTop: isHighLevel ? '4px' : '0px',
+        opacity: isHighLevel ? 0.78 : 1,
+      }}
     >
       <div
         onClick={() => hasDetailOrOutput && onToggle(index)}
@@ -180,27 +198,36 @@ export const ThoughtStepRow: React.FC<ThoughtStepRowProps> = ({
           display: 'flex',
           alignItems: 'center',
           gap: '6px',
-          padding: '2.5px 6px',
+          padding: isInProgress ? '3px 8px' : isHighLevel ? '1.5px 6px' : '2.5px 6px',
           borderRadius: '4px',
           cursor: hasDetailOrOutput ? 'pointer' : 'default',
-          fontSize: '12.5px',
+          fontSize: isHighLevel ? '11.5px' : '12.5px',
           lineHeight: '1.45',
-          color: isCompleted ? '#e2e8f0' : isInProgress ? '#38bdf8' : '#94a3b8',
-          transition: 'background 0.15s ease',
+          background: isInProgress ? 'rgba(56, 189, 248, 0.08)' : 'transparent',
+          borderLeft: isInProgress ? '2px solid #38bdf8' : 'none',
+          color: isInProgress ? '#38bdf8' : isHighLevel ? '#64748b' : isCompleted ? '#e2e8f0' : '#94a3b8',
+          transition: 'all 0.15s ease',
           userSelect: 'text',
         }}
         onMouseEnter={(e) => {
-          if (hasDetailOrOutput) {
+          if (hasDetailOrOutput && !isInProgress) {
             e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.04)';
           }
         }}
         onMouseLeave={(e) => {
-          e.currentTarget.style.backgroundColor = 'transparent';
+          if (!isInProgress) {
+            e.currentTarget.style.backgroundColor = 'transparent';
+          }
         }}
       >
-        {/* Action Verb (e.g. Analyzed, Ran search, Discovered, Synthesized) */}
+        {/* Action Verb */}
         {displayAction && (
-          <span style={{ color: isInProgress ? '#38bdf8' : '#94a3b8', fontWeight: 400 }}>
+          <span
+            style={{
+              color: isInProgress ? '#38bdf8' : isHighLevel ? '#64748b' : '#94a3b8',
+              fontWeight: isHighLevel ? 500 : 400,
+            }}
+          >
             {displayAction}
           </span>
         )}
@@ -213,16 +240,16 @@ export const ThoughtStepRow: React.FC<ThoughtStepRowProps> = ({
         {/* Target Entity / File */}
         <span
           style={{
-            color: isInProgress ? '#38bdf8' : '#f1f5f9',
-            fontWeight: isInProgress ? 600 : 500,
+            color: isInProgress ? '#38bdf8' : isHighLevel ? '#94a3b8' : '#f8fafc',
+            fontWeight: isInProgress ? 600 : isHighLevel ? 400 : 500,
           }}
         >
           {cleanTarget}
         </span>
 
-        {/* Secondary Metadata / Stats (e.g. #L1-180, 8 attributes, +46 lines) */}
+        {/* Secondary Metadata / Stats */}
         {statsTag && (
-          <span style={{ color: '#64748b', fontSize: '11.5px', marginLeft: '2px' }}>
+          <span style={{ color: '#64748b', fontSize: '11px', marginLeft: '2px' }}>
             {statsTag.startsWith('+') || statsTag.startsWith('#') ? statsTag : `(${statsTag})`}
           </span>
         )}
@@ -251,6 +278,22 @@ export const ThoughtStepRow: React.FC<ThoughtStepRowProps> = ({
           </span>
         )}
       </div>
+
+      {/* Live In-Progress Sub-Detail Line (Shows what is currently happening) */}
+      {isInProgress && step.detail && (
+        <div
+          style={{
+            fontSize: '11.5px',
+            color: '#7dd3fc',
+            paddingLeft: '22px',
+            paddingBottom: '2px',
+            lineHeight: 1.4,
+            fontWeight: 400,
+          }}
+        >
+          {step.detail}
+        </div>
+      )}
 
       {/* Expanded Code & Output Drawer */}
       {isExpanded && (

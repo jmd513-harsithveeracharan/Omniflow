@@ -50,7 +50,14 @@ export const ThoughtTrace: React.FC<ThoughtTraceProps> = ({ meta, isStreaming = 
     ? formatTime(meta.elapsed)
     : formatTime(Math.max(1, elapsedSeconds));
 
-  // Compute a smart, natural summary title for the sub-group (e.g. "Discovered 4 schemas, synthesized 7 artifacts")
+  // Find the active step currently in progress
+  const activeStep = useMemo(() => {
+    const inProg = steps.find((s) => s.status === 'in_progress');
+    if (inProg) return inProg;
+    return isStreaming && steps.length > 0 ? steps[steps.length - 1] : null;
+  }, [steps, isStreaming]);
+
+  // Compute a smart, natural summary title for the sub-group matching Antigravity
   const subGroupSummary = useMemo(() => {
     if (steps.length === 0) return 'Thinking and analyzing...';
 
@@ -58,7 +65,12 @@ export const ThoughtTrace: React.FC<ThoughtTraceProps> = ({ meta, isStreaming = 
       (s) => (s.badge || '').toUpperCase() === 'SCHEMA' || (s.action || '').toLowerCase().includes('discover')
     ).length;
     const artifactCount = steps.filter(
-      (s) => (s.badge || '').toUpperCase() === 'CODE' || (s.badge || '').toUpperCase() === 'PY' || (s.action || '').toLowerCase().includes('synth')
+      (s) =>
+        (s.badge || '').toUpperCase() === 'CODE' ||
+        (s.badge || '').toUpperCase() === 'PY' ||
+        (s.badge || '').toUpperCase() === 'SQL' ||
+        (s.action || '').toLowerCase().includes('synth') ||
+        (s.action || '').toLowerCase().includes('completed')
     ).length;
 
     const parts: string[] = [];
@@ -80,7 +92,7 @@ export const ThoughtTrace: React.FC<ThoughtTraceProps> = ({ meta, isStreaming = 
         fontFamily: 'var(--font-sans)',
       }}
     >
-      {/* 1. Top Level Header: "Worked for 4m" / "Worked for 23s" */}
+      {/* 1. Top Level Header: "Worked for 4m" / "Thinking (23s)" */}
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
@@ -113,7 +125,39 @@ export const ThoughtTrace: React.FC<ThoughtTraceProps> = ({ meta, isStreaming = 
         </span>
       </button>
 
-      {/* 2. Hierarchical Activity Stream */}
+      {/* 2. Live Active Working Card (Prominently shows current active task while streaming) */}
+      {isStreaming && activeStep && (
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            padding: '5px 10px',
+            margin: '4px 0 6px 14px',
+            background: 'rgba(56, 189, 248, 0.08)',
+            border: '1px solid rgba(56, 189, 248, 0.22)',
+            borderRadius: '6px',
+            fontSize: '12px',
+          }}
+        >
+          <Loader2 width={12} height={12} className="animate-spin text-sky-400" style={{ flexShrink: 0, color: '#38bdf8' }} />
+          <span style={{ color: '#94a3b8', fontWeight: 400 }}>Currently working:</span>
+          <span
+            style={{
+              color: '#f0f9ff',
+              fontWeight: 500,
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {activeStep.action || 'Executing'} {activeStep.target || activeStep.title}
+            {activeStep.detail ? ` — ${activeStep.detail}` : ''}
+          </span>
+        </div>
+      )}
+
+      {/* 3. Hierarchical Activity Stream */}
       {isOpen && (
         <div
           className="antigravity-activity-list"
@@ -135,7 +179,7 @@ export const ThoughtTrace: React.FC<ThoughtTraceProps> = ({ meta, isStreaming = 
               padding: '2px 4px',
               cursor: 'pointer',
               color: '#94a3b8',
-              fontSize: '12.5px',
+              fontSize: '12px',
               userSelect: 'none',
               marginBottom: '2px',
             }}
@@ -158,7 +202,7 @@ export const ThoughtTrace: React.FC<ThoughtTraceProps> = ({ meta, isStreaming = 
             >
               {steps.map((st, idx) => (
                 <ThoughtStepRow
-                  key={idx}
+                  key={st.id || idx}
                   step={st}
                   index={idx}
                   isExpanded={Boolean(expandedRows[idx])}

@@ -39,6 +39,7 @@ export interface DeviceCodePollResponse {
 }
 
 export interface ThoughtStep {
+  id?: string;
   title: string;
   detail?: string;
   action?: string;
