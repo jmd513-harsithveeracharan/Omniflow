@@ -1815,6 +1815,19 @@ async def handle_chat_stream(req: ChatRequest) -> StreamingResponse:
 
     async def event_generator():
         nonlocal intake_override
+        collected_thought_steps: list[dict[str, Any]] = []
+        t_stream_start = time.time()
+
+        def _record_thought_step(st: dict[str, Any]) -> str:
+            s_id = st.get("id")
+            if s_id:
+                for existing_st in collected_thought_steps:
+                    if existing_st.get("id") == s_id:
+                        existing_st.update(st)
+                        return f"data: {json.dumps({'type': 'thought_step', 'step': st})}\n\n"
+            collected_thought_steps.append(dict(st))
+            return f"data: {json.dumps({'type': 'thought_step', 'step': st})}\n\n"
+
         yield f"data: {json.dumps({'type': 'init', 'session_id': sid, 'resuming': is_resume})}\n\n"
 
         # Restore pending Intake JSON when resuming after dynamic credential inspection
@@ -2243,7 +2256,7 @@ async def handle_chat_stream(req: ChatRequest) -> StreamingResponse:
         )
 
         if is_tier3_trigger:
-            yield f"data: {json.dumps({'type': 'thought_step', 'step': {'id': 's1', 'title': 'Architect Agent: Analyzing Intake Contracts & Source Schemas', 'status': 'in_progress', 'target': 'Architect'}})}\n\n"
+            yield _record_thought_step({'id': 's1', 'title': 'Architect Agent: Analyzing Intake Contracts & Source Schemas', 'status': 'in_progress', 'target': 'Architect'})
 
             # Execute real pipeline in background worker with live SSE callbacks & keepalives
             orch = MultiAgentOrchestrator()
@@ -2272,6 +2285,11 @@ async def handle_chat_stream(req: ChatRequest) -> StreamingResponse:
             folder_struct = sol_summary.get("target_folder_structure", {})
             root_f = folder_struct.get("root_folder") or f"{clean_dom.capitalize()}_Platform"
             sub_f = folder_struct.get("subfolders", {"raw": "01 Raw", "stage": "02 Stage", "silver": "03 Silver", "gold": "04 Gold"})
+
+            # Dynamic prompt override of containment/root folder
+            folder_m = re.search(r"(?:in|root|target)\s+folder\s*[:=]\s*['\"]?([a-zA-Z0-9_/\-]+)['\"]?", req.message, re.IGNORECASE)
+            if folder_m:
+                root_f = folder_m.group(1).strip("/")
 
             plan_req = NaturalLanguagePlanRequest(
                 project_code=proj_code,
@@ -2376,7 +2394,7 @@ async def handle_chat_stream(req: ChatRequest) -> StreamingResponse:
 
                     if evt_type == "__done__":
                         synth_res = evt_data.get("result")
-                        yield f"data: {json.dumps({'type': 'thought_step', 'step': {'id': 's7', 'title': f'Deployer: Enterprise Blueprint Ready for {ws_display}', 'action': 'Validated', 'badge': 'FABRIC', 'target': ws_display, 'status': 'completed', 'detail': f'All 9 deliverables synthesized and ready for one-click deployment into {ws_display}.'}})}\n\n"
+                        yield _record_thought_step({'id': 's7', 'title': f'Deployer: Enterprise Blueprint Ready for {ws_display}', 'action': 'Validated', 'badge': 'FABRIC', 'target': ws_display, 'status': 'completed', 'detail': f'All 9 deliverables synthesized and ready for one-click deployment into {ws_display}.'})
                         break
                     if evt_type == "__error__":
                         pipeline_err = evt_data.get("error") or "Unknown pipeline synthesis error"
@@ -2394,7 +2412,7 @@ async def handle_chat_stream(req: ChatRequest) -> StreamingResponse:
                             "status": "in_progress",
                             "detail": evt_data.get("detail", ""),
                         }
-                        yield f"data: {json.dumps({'type': 'thought_step', 'step': step_item})}\n\n"
+                        yield _record_thought_step(step_item)
                         continue
 
                     # 1. Granular source entity discovery
@@ -2409,7 +2427,7 @@ async def handle_chat_stream(req: ChatRequest) -> StreamingResponse:
                             "status": "completed",
                             "detail": f"{evt_data.get('columns_count', 0)} attributes | PK: {evt_data.get('primary_key')} | CDC Watermark: {evt_data.get('watermark')}",
                         }
-                        yield f"data: {json.dumps({'type': 'thought_step', 'step': step_item})}\n\n"
+                        yield _record_thought_step(step_item)
                         continue
 
                     # 2. PII Protection Flagging
@@ -2424,7 +2442,7 @@ async def handle_chat_stream(req: ChatRequest) -> StreamingResponse:
                             "status": "completed",
                             "detail": f"Enforcing Salted SHA-256 masking on: {', '.join(pii_cols[:5])}",
                         }
-                        yield f"data: {json.dumps({'type': 'thought_step', 'step': step_item})}\n\n"
+                        yield _record_thought_step(step_item)
                         continue
 
                     # 3. Macro Phase Formulation
@@ -2439,7 +2457,7 @@ async def handle_chat_stream(req: ChatRequest) -> StreamingResponse:
                             "status": "completed",
                             "detail": evt_data.get("objective", ""),
                         }
-                        yield f"data: {json.dumps({'type': 'thought_step', 'step': step_item})}\n\n"
+                        yield _record_thought_step(step_item)
                         continue
 
                     # 4. Live Individual Task Start (Real-time pulsing progress)
@@ -2455,7 +2473,7 @@ async def handle_chat_stream(req: ChatRequest) -> StreamingResponse:
                             "status": "in_progress",
                             "detail": f"Invoking tool {evt_data.get('tool_name')} ({evt_data.get('description', '')})...",
                         }
-                        yield f"data: {json.dumps({'type': 'thought_step', 'step': step_item})}\n\n"
+                        yield _record_thought_step(step_item)
                         continue
 
                     # 5. Live Individual Task Completed (With execution duration & code snippet)
@@ -2476,7 +2494,7 @@ async def handle_chat_stream(req: ChatRequest) -> StreamingResponse:
                             "detail": f"Generated {art_name} ({evt_data.get('lines_count', 0)} lines) via {evt_data.get('tool_used')}",
                             "output": preview,
                         }
-                        yield f"data: {json.dumps({'type': 'thought_step', 'step': step_item})}\n\n"
+                        yield _record_thought_step(step_item)
                         continue
 
                     # 6. Audit Checks
@@ -2491,7 +2509,7 @@ async def handle_chat_stream(req: ChatRequest) -> StreamingResponse:
                             "status": "completed",
                             "detail": evt_data.get("detail", ""),
                         }
-                        yield f"data: {json.dumps({'type': 'thought_step', 'step': step_item})}\n\n"
+                        yield _record_thought_step(step_item)
                         continue
 
                     # 7. Fabric Preflight Checks
@@ -2505,7 +2523,7 @@ async def handle_chat_stream(req: ChatRequest) -> StreamingResponse:
                             "status": "completed",
                             "detail": evt_data.get("detail", ""),
                         }
-                        yield f"data: {json.dumps({'type': 'thought_step', 'step': step_item})}\n\n"
+                        yield _record_thought_step(step_item)
                         continue
 
                     if evt_type == "artifact_generated":
@@ -2525,11 +2543,11 @@ async def handle_chat_stream(req: ChatRequest) -> StreamingResponse:
                             "duration": sec_str,
                             "detail": detail,
                         }
-                        yield f"data: {json.dumps({'type': 'thought_step', 'step': step_item})}\n\n"
+                        yield _record_thought_step(step_item)
                         continue
                     mapped_step = stage_map.get(evt_type)
                     if mapped_step:
-                        yield f"data: {json.dumps({'type': 'thought_step', 'step': mapped_step})}\n\n"
+                        yield _record_thought_step(mapped_step)
 
                 await worker_task
                 if pipeline_err:
@@ -2565,8 +2583,15 @@ async def handle_chat_stream(req: ChatRequest) -> StreamingResponse:
                 yield f"data: {json.dumps({'type': 'chunk', 'text': chunk + ' '})}\n\n"
                 await asyncio.sleep(0.015)
 
+            t_elapsed_sec = max(1.0, time.time() - t_stream_start)
+            assistant_entry = {
+                "role": "assistant",
+                "content": summary_text,
+                "thoughtSteps": [dict(s) for s in collected_thought_steps],
+                "thoughtElapsed": f"{t_elapsed_sec:.1f}",
+            }
             SESSIONS[sid]["active_plan"] = plan_obj
-            SESSIONS[sid]["messages"].append({"role": "assistant", "content": summary_text})
+            SESSIONS[sid]["messages"].append(assistant_entry)
             save_sessions_to_disk()
             yield f"data: {json.dumps({'type': 'done', 'session_id': sid, 'plan': plan_obj})}\n\n"
 

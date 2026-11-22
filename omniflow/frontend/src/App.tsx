@@ -22,6 +22,7 @@ import { WorkspaceExplorerView } from './components/WorkspaceExplorerView';
 import { IngestionStudioView } from './components/IngestionStudioView';
 import { GraphMeshView } from './components/graph/GraphMeshView';
 import { ProjectWorkspaceHub } from './components/project/ProjectWorkspaceHub';
+import { parseThoughtMeta } from './components/chat/thoughtUtils';
 import {
   fetchFabricStatus,
   fetchFabricAccounts,
@@ -334,15 +335,35 @@ export const App: React.FC = () => {
         localStorage.setItem('omniflow_active_view', 'chat');
       } catch {}
       const detail = await fetchSessionDetail(sid);
-      if (detail && Array.isArray(detail.messages)) {
-        setMessages(
-          detail.messages.map((m) => ({
-            role: m.role,
-            content: m.content,
-            thoughtSteps: m.thoughtSteps,
-            thoughtElapsed: m.thoughtElapsed,
-          }))
-        );
+      if (detail) {
+        // Restore active plan for Visual Canvas, OneLake, Notebooks, and Trident JSON
+        const rawDetail = detail as unknown as Record<string, unknown>;
+        const restoredPlan = (rawDetail.active_plan || rawDetail.plan) as IngestionPlan | undefined;
+        if (restoredPlan) {
+          setCurrentPlan(restoredPlan);
+        }
+        if (Array.isArray(detail.messages)) {
+          setMessages(
+            detail.messages.map((m) => {
+              let steps = m.thoughtSteps;
+              let elapsed = m.thoughtElapsed;
+              if ((!steps || steps.length === 0) && m.role === 'assistant') {
+                const parsed = parseThoughtMeta(m.content);
+                if (parsed.thoughtMeta && parsed.thoughtMeta.steps) {
+                  steps = parsed.thoughtMeta.steps;
+                  elapsed = parsed.thoughtMeta.elapsed || '14.2';
+                }
+              }
+              return {
+                role: m.role,
+                content: m.content,
+                thoughtSteps: steps,
+                thoughtElapsed: elapsed,
+                images: (m as unknown as Record<string, unknown>).images as string[] | undefined,
+              };
+            })
+          );
+        }
       }
     } catch (e) {
       console.error('Failed to load session detail', e);
