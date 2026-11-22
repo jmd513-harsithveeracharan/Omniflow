@@ -136,7 +136,6 @@ def inspect_postgres_catalog(dsn: str) -> list[dict[str, Any]]:
         keepalives_idle=5,
         keepalives_interval=2,
         keepalives_count=3,
-        options="-c statement_timeout=45000",
     )
     try:
         conn.set_session(readonly=True, autocommit=True)

@@ -31,7 +31,6 @@ POSTGRES_KEEPALIVE_KWARGS = {
     "keepalives_idle": 5,
     "keepalives_interval": 2,
     "keepalives_count": 3,
-    "options": "-c statement_timeout=45000",
 }
 
 
