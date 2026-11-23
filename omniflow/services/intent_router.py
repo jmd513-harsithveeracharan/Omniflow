@@ -54,7 +54,7 @@ PROJECT_QA_PATTERNS: list[str] = [
 ACTION_KEYWORDS: list[str] = [
     "create ", "make ", "provision ", "deploy ", "build ", "generate ",
     "synthesize ", "transpile ", "write a ", "write pyspark", "write sql",
-    "scd2", "pipeline", "ddl", "stored procedure", "alter "
+    "implement ", "alter "
 ]
 
 
@@ -79,18 +79,42 @@ def classify_prompt_intent(
     msg = message.strip()
     msg_lower = msg.lower()
 
-    # 1. Intake Spec Attached -> Always Mode 3 (Full Blueprint)
-    if has_intake:
-        return "FULL_BLUEPRINT"
-
-    # 2. Explicit Deploy Trigger -> Mode 3 (Deploy)
+    # 1. Explicit Deploy Trigger -> Mode 3 (Deploy)
     if any(p in msg_lower for p in [
         "deploy active plan", "deploy plan", "execute deployment",
         "deploy to fabric", "deploy now"
     ]):
         return "DEPLOY_TRIGGER"
 
-    # 3. Atomic Item Provisioning Fast Path (< 2s)
+    # 2. Informational Inquiry & Conceptual Q&A Detection (Fast path for questions & greetings)
+    inquiry_indicators = [
+        "what", "how", "who", "where", "why", "when", "can you", "could you",
+        "tell me", "describe", "explain", "understand", "difference between",
+        "is it", "is there", "versus", " vs ", "superior", "meaning", "definition",
+        "guide", "overview", "hear me", "do you know"
+    ]
+    is_inquiry = (
+        msg.endswith("?")
+        or any(msg_lower.startswith(w + " ") or f" {w} " in msg_lower for w in inquiry_indicators)
+        or any(re.search(pat, msg_lower) for pat in GREETING_PATTERNS)
+    )
+    has_action = any(k in msg_lower for k in ACTION_KEYWORDS)
+    is_proj_qa = any(re.search(pat, msg_lower) for pat in PROJECT_QA_PATTERNS)
+
+    if not has_action and is_inquiry:
+        is_specifically_proj = is_proj_qa or any(
+            w in msg_lower
+            for w in ["this project", "our tables", "our pipeline", "current plan", "team member", "active plan", "this folder", "silver", "bronze", "gold", "scd2", "pii"]
+        )
+        if is_specifically_proj:
+            return "PROJECT_QA"
+        return "GENERAL_CHAT"
+
+    # 3. Conversational Greetings / General Chat (Instant reply, 0 thought steps)
+    if any(re.search(pat, msg_lower) for pat in GREETING_PATTERNS) and len(msg.split()) <= 10:
+        return "GENERAL_CHAT"
+
+    # 4. Atomic Item Provisioning Fast Path (< 2s)
     atomic_match = re.search(
         r"^(?:create|make|add|provision|new)\s+(?:(?:me\s+)?(?:a\s+|an\s+|the\s+)?)?(folder|lakehouse|warehouse|notebook|pipeline|data\s+pipeline|data\s+agent|agent)\s+(?:called\s+|named\s+)?['\"]?([a-zA-Z0-9_\-]+)['\"]?(?:\s+in\s+workspace|\s*$|\.)",
         msg,
@@ -101,8 +125,8 @@ def classify_prompt_intent(
     ]):
         return "ATOMIC_CREATE"
 
-    # 4. Tier 3 Full Blueprint Trigger
-    if any(p in msg_lower for p in [
+    # 5. Tier 3 Full Blueprint Trigger
+    is_blueprint_request = any(p in msg_lower for p in [
         "full medallion blueprint", "synthesize platform blueprint",
         "build end-to-end platform", "build end to end platform",
         "launch autonomous pipeline", "full platform architecture",
@@ -110,11 +134,13 @@ def classify_prompt_intent(
         "medallion pipeline blueprint", "medallion architecture plan",
         "formulate the medallion", "formulate medallion",
         "create medallion", "build medallion", "medallion plan",
-        "architecture plan"
-    ]):
+        "architecture plan", "resume pipeline synthesis", "work on this project",
+        "create this project", "build this project"
+    ])
+    if has_intake or is_blueprint_request:
         return "FULL_BLUEPRINT"
 
-    # 5. Explicit General Mode Selected in UI
+    # 6. Explicit General Mode Selected in UI
     if mode == "general":
         is_code_request = any(k in msg_lower for k in [
             "write code", "generate sql", "write pyspark", "create table",
