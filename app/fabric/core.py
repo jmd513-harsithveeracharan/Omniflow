@@ -48,9 +48,14 @@ class WorkspaceSecurityError(Exception):
 
 
 def _assert_workspace(workspace_id: str) -> None:
-    """Validates that a target workspace ID is provided and active."""
+    """Validates that a target workspace ID is provided, active, and matches allowed workspace."""
     if not workspace_id or not str(workspace_id).strip():
         raise WorkspaceSecurityError("Target Microsoft Fabric workspace ID is required but was empty or None.")
+    if ALLOWED_WORKSPACE_ID and str(workspace_id).strip() != str(ALLOWED_WORKSPACE_ID).strip():
+        raise WorkspaceSecurityError(
+            f"SECURITY BLOCK: Workspace ID '{workspace_id}' is unauthorized. "
+            f"Operations are strictly locked to {ALLOWED_WORKSPACE_NAME} ({ALLOWED_WORKSPACE_ID})."
+        )
 
 
 def _poll_lro(location: str, headers: dict) -> bool:

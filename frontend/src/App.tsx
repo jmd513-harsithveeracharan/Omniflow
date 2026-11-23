@@ -280,7 +280,11 @@ export const App: React.FC = () => {
         } else {
           setMessages([]);
         }
-        setSessionId(`proj_${projectId}`);
+        const targetSid = detail.session_id || `proj_${projectId}`;
+        setSessionId(targetSid);
+        try {
+          localStorage.setItem('omniflow_active_session_id', targetSid);
+        } catch {}
       }
     } catch (e) {
       console.error('Failed to load project detail', e);
@@ -437,9 +441,15 @@ export const App: React.FC = () => {
           return prev;
         });
       },
-      (plan) => {
+      (plan, returnedSessionId) => {
         if (controller.signal.aborted) return;
         setIsStreaming(false);
+        if (returnedSessionId && returnedSessionId !== sessionId) {
+          setSessionId(returnedSessionId);
+          try {
+            localStorage.setItem('omniflow_active_session_id', returnedSessionId);
+          } catch {}
+        }
         if (isVoiceModeActive && finishStreamingRef.current) {
           finishStreamingRef.current();
         }

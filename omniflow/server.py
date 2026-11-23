@@ -104,11 +104,19 @@ def load_sessions_from_disk() -> dict[str, dict[str, Any]]:
             with open(SESSION_STORE_PATH, "r", encoding="utf-8") as f:
                 data = json.load(f)
                 if isinstance(data, dict):
-                    # Sanitize any legacy sessions with placeholder "Greeting" title
+                    cleaned: dict[str, dict[str, Any]] = {}
                     for sid, sdata in data.items():
-                        if sdata.get("title") == "Greeting":
-                            sdata["title"] = "Data Engineering & Peli BioThermal"
-                    return data
+                        if not isinstance(sdata, dict):
+                            continue
+                        has_msgs = len(sdata.get("messages", [])) > 0
+                        has_plan = bool(sdata.get("active_plan")) or bool(sdata.get("deployed_items"))
+                        # Prune phantom empty sessions (0 messages and no artifacts)
+                        if not has_msgs and not has_plan:
+                            continue
+                        if sdata.get("title") in ["Greeting", None, ""]:
+                            sdata["title"] = "Data Engineering & Peli BioThermal" if "peli" in sid.lower() else "Conversation"
+                        cleaned[sid] = sdata
+                    return cleaned
         except Exception as e:
             print(f"[SessionsStore] Read error: {e}")
     return {}
@@ -121,7 +129,11 @@ def save_sessions_to_disk() -> None:
     try:
         tmp_path = f"{SESSION_STORE_PATH}.tmp"
         with _session_file_lock:
-            snapshot = dict(SESSIONS)
+            # Only persist sessions that have messages or an active plan/items
+            snapshot = {
+                k: v for k, v in SESSIONS.items()
+                if len(v.get("messages", [])) > 0 or v.get("active_plan") or v.get("deployed_items")
+            }
             with open(tmp_path, "w", encoding="utf-8") as f:
                 json.dump(snapshot, f, indent=2, ensure_ascii=False)
             os.replace(tmp_path, SESSION_STORE_PATH)
@@ -463,6 +475,11 @@ async def list_sessions(user_email: str | None = None, project_id: str | None = 
     u = user_email.strip().lower() if user_email else None
 
     for sid, sdata in SESSIONS.items():
+        # Only return sessions that have at least 1 message to keep conversation history clean
+        # (Zero-message sessions are temporary / optimistic until the user sends their first turn)
+        if len(sdata.get("messages", [])) == 0:
+            continue
+
         s_proj = sdata.get("project_id") or ""
         if not s_proj and sid.startswith("proj_"):
             parts = sid.split("_")
@@ -487,10 +504,17 @@ async def list_sessions(user_email: str | None = None, project_id: str | None = 
                 continue
 
         s_user = (sdata.get("user_email") or "").strip().lower()
+        title_val = sdata.get("title") or "Conversation"
+        if title_val in ["New Conversation", "Greeting", ""] and len(sdata.get("messages", [])) > 0:
+            first_user = next((m.get("content", "") for m in sdata["messages"] if m.get("role") == "user"), "")
+            if first_user:
+                cleaned_first = re.sub(r"[#*_`\n]", " ", first_user).strip()
+                title_val = re.sub(r"\s+", " ", cleaned_first)[:42] or "Conversation"
+
         sess_list.append({
             "session_id": sid,
             "project_id": s_proj or None,
-            "title": sdata.get("title", "New Conversation"),
+            "title": title_val,
             "message_count": len(sdata.get("messages", [])),
             "run_count": 1,
             "user_email": s_user,
@@ -517,7 +541,7 @@ async def create_new_session(payload: dict[str, Any] | None = None) -> dict[str,
         "user_email": user_email,
         "updated_at": now_iso,
     }
-    save_sessions_to_disk()
+    # Do not save to disk until messages are added
     return {"session_id": sid}
 
 
@@ -1144,6 +1168,7 @@ async def get_project_detail(project_id: str) -> dict[str, Any]:
     existing_messages = session_data.get("messages", [])
     active_plan = session_data.get("active_plan", None)
     deployed_items = session_data.get("deployed_items", [])
+    active_sid = proj_session_id if existing_messages else ""
 
     # If active_plan is not on proj_session_id, look in any other session belonging to this project
     if not active_plan:
@@ -1157,10 +1182,12 @@ async def get_project_detail(project_id: str) -> dict[str, Any]:
         for other_sid, other_s in SESSIONS.items():
             if (other_s.get("project_id") == project_id or project_id in other_sid) and other_s.get("messages"):
                 existing_messages = other_s["messages"]
+                active_sid = other_sid
                 break
 
     return {
         "project": project_data,
+        "session_id": active_sid or proj_session_id,
         "plan": active_plan,
         "deployed_items": deployed_items,
         "messages": existing_messages,
@@ -1825,9 +1852,9 @@ async def handle_chat_stream(req: ChatRequest) -> StreamingResponse:
         sid_no_prefix = sid[5:]
         proj_id = sid_no_prefix.rsplit("_", 1)[0] if "_" in sid_no_prefix else sid_no_prefix
 
-    # 1. Resolve project record
-    resolved_proj = resolve_project_record(proj_id)
-    if not resolved_proj:
+    # 1. Resolve project record if explicitly targeted or project-scoped session
+    resolved_proj = resolve_project_record(proj_id) if proj_id else None
+    if not resolved_proj and (sid.startswith("proj_") or req.mode == "project"):
         cached_list = fetch_projects_cached()
         msg_l = req.message.lower()
         for p in cached_list:
@@ -2352,9 +2379,20 @@ CREATE TABLE IF NOT EXISTS gold.fact_{dom}_activity (
             SESSIONS[sid]["messages"].append(assistant_entry)
             SESSIONS[sid]["deployed_items"] = dep_items
             if proj_id:
-                p_sess = SESSIONS.setdefault(f"proj_{proj_id}", {})
-                p_sess["active_plan"] = active_plan
-                p_sess["deployed_items"] = dep_items
+                p_key = f"proj_{proj_id}"
+                if p_key in SESSIONS:
+                    SESSIONS[p_key]["active_plan"] = active_plan
+                    SESSIONS[p_key]["deployed_items"] = dep_items
+                else:
+                    SESSIONS[p_key] = {
+                        "session_id": p_key,
+                        "project_id": proj_id,
+                        "title": f"{resolved_proj.get('name', proj_id) if resolved_proj else proj_id} Platform",
+                        "messages": [assistant_entry],
+                        "active_plan": active_plan,
+                        "deployed_items": dep_items,
+                        "updated_at": get_utc_iso(),
+                    }
             save_sessions_to_disk()
             yield f"data: {json.dumps({'type': 'done', 'session_id': sid, 'plan': active_plan})}\n\n"
             return

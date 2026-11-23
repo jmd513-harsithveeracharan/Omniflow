@@ -4053,15 +4053,15 @@ ol.chat-md-ordered-list,
 }
 
 .chat-fabric-item-card.lakehouse-card {
-    border-left: 3px solid #0ea5e9;
+    border-left: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .chat-fabric-item-card.notebook-card {
-    border-left: 3px solid #10b981;
+    border-left: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .chat-fabric-item-card.pipeline-card {
-    border-left: 3px solid #a855f7;
+    border-left: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .item-badge-header {

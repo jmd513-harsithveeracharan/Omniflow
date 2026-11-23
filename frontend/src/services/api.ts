@@ -272,7 +272,7 @@ export async function streamChatTurn(
   message: string,
   sessionId: string,
   onChunk: (text: string) => void,
-  onDone: (plan?: IngestionPlan | Record<string, unknown> | null) => void,
+  onDone: (plan?: IngestionPlan | Record<string, unknown> | null, newSessionId?: string) => void,
   onError: (err: string) => void,
   model?: string,
   effort?: string,
@@ -327,7 +327,7 @@ export async function streamChatTurn(
             } else if (payload.type === 'chunk' && payload.text) {
               onChunk(payload.text);
             } else if (payload.type === 'done') {
-              onDone(payload.plan || null);
+              onDone(payload.plan || null, payload.session_id);
               return;
             } else if (payload.type === 'error') {
               onError(payload.error);
@@ -439,6 +439,7 @@ export async function deleteProject(id: string): Promise<boolean> {
 
 export async function fetchProjectDetail(id: string): Promise<{
   project: import('../types').ProjectRecord;
+  session_id?: string;
   plan: import('../types').IngestionPlan | null;
   deployed_items: Array<{ item_type: string; display_name: string; folder: string; item_id: string }>;
   messages: import('../types').ChatMessage[];

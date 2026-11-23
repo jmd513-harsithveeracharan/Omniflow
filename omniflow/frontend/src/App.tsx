@@ -295,7 +295,10 @@ export const App: React.FC = () => {
     }
     const isProjSession = sid.startsWith('proj_');
     const knownSession = sessions.find((s) => s.sessionId === sid) || projectSessions.find((s) => s.sessionId === sid);
-    const targetProjId = knownSession?.projectId || (isProjSession ? sid.split('_')[1] : null);
+    const noPrefix = sid.replace(/^proj_/, '');
+    const lastUnderscore = noPrefix.lastIndexOf('_');
+    const derivedProjId = lastUnderscore > 0 ? noPrefix.substring(0, lastUnderscore) : noPrefix;
+    const targetProjId = knownSession?.projectId || (isProjSession ? derivedProjId : null);
 
     if (knownSession && knownSession.messageCount === 0) {
       if (!isProjSession) {
@@ -510,22 +513,22 @@ export const App: React.FC = () => {
   // Projects Handlers
   const handleSelectProject = async (projectId: string, shouldSwitchToView: boolean = true) => {
     setActiveProjectId(projectId);
-    setSessionId('');
     try {
-      localStorage.removeItem('omniflow_active_session_id');
       localStorage.setItem('omniflow_active_project_id', projectId);
     } catch {}
 
     if (shouldSwitchToView) {
-      setActiveView('project');
+      const targetView = activeView === 'chat' ? 'chat' : 'project';
+      setActiveView(targetView);
       try {
-        localStorage.setItem('omniflow_active_view', 'project');
+        localStorage.setItem('omniflow_active_view', targetView);
       } catch {}
     }
 
     // Load sessions belonging to this project
+    let pSessions: ChatSession[] = [];
     try {
-      const pSessions = await fetchSessions(currentUser?.email, projectId);
+      pSessions = await fetchSessions(currentUser?.email, projectId);
       setProjectSessions(pSessions);
     } catch (e) {
       console.warn('Failed to fetch project sessions', e);
@@ -650,7 +653,11 @@ export const App: React.FC = () => {
             },
           ]);
         }
-        setSessionId(`proj_${projectId}`);
+        const targetSid = detail.session_id || (pSessions.length > 0 ? pSessions[0].sessionId : `proj_${projectId}`);
+        setSessionId(targetSid);
+        try {
+          localStorage.setItem('omniflow_active_session_id', targetSid);
+        } catch {}
       }
     } catch (e) {
       console.error('Failed to load project detail', e);
@@ -862,13 +869,19 @@ export const App: React.FC = () => {
           });
         }
       },
-      (plan) => {
+      (plan, returnedSessionId) => {
         if (pendingRafId) {
           cancelAnimationFrame(pendingRafId);
           pendingRafId = null;
         }
         if (controller.signal.aborted) return;
         setIsStreaming(false);
+        if (returnedSessionId && returnedSessionId !== sessionId) {
+          setSessionId(returnedSessionId);
+          try {
+            localStorage.setItem('omniflow_active_session_id', returnedSessionId);
+          } catch {}
+        }
         if (isVoiceModeActive && finishStreamingRef.current) {
           finishStreamingRef.current();
         }
