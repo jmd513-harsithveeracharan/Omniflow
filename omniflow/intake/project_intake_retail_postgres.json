@@ -1,0 +1,285 @@
+{
+  "schema_version": "2.0",
+  "planner_type": "enterprise_data_engineering_planner",
+  "request_context": {
+    "user_id": "architect@omniflow.ai",
+    "environment": "production",
+    "target_workspace": "PBT_DATA_AGENT",
+    "objective": "Design, provision, and deploy an end-to-end Microsoft Fabric Medallion data platform for Retail Omnichannel Sales and Fulfillment. Ingest operational PostgreSQL tables from schema 'retail_ops', enforce Bronze Delta raw landing, Silver cleansing with SHA-256 PII protection, Gold Kimball Star Schema Data Warehouse with business KPIs, Power BI Direct Lake semantic model, and a Master Data Factory pipeline orchestrator."
+  },
+  "project_context": {
+    "project_summary": {
+      "project_code": "PRJ-RETAIL-OMNICHANNEL",
+      "project_name": "Retail Omnichannel Analytics Platform",
+      "business_domain": "retail_commerce_fulfillment",
+      "business_objective": "Consolidate in-store and e-commerce transactions, inventory snapshots, carrier fulfillment logistics, and customer master records into a unified Microsoft Fabric OneLake platform for real-time executive KPI reporting.",
+      "sla_target_minutes": 15
+    },
+    "platform_summary": {
+      "target_workspace": "PBT_DATA_AGENT",
+      "primary_engine": "Microsoft Fabric Spark (Delta Lake) & T-SQL Warehouse",
+      "storage_format": "Delta Lake (V-Order & Optimize Z-Order Compaction)",
+      "containment_folder": "Retail_Omnichannel_Platform"
+    },
+    "solution_summary": {
+      "target_architecture": "Microsoft Fabric Medallion Architecture (PostgreSQL Source 'retail_ops' -> 01 Raw Bronze Lakehouse -> 02 Stage Curation Notebook -> 03 Silver Harmonized Lakehouse -> 04 Gold Kimball Star Schema Warehouse -> Direct Lake Power BI Semantic Model -> Master Orchestrator Pipeline)",
+      "target_folder_structure": {
+        "root_folder": "Retail_Omnichannel_Platform",
+        "subfolders": {
+          "raw": "01 Raw",
+          "stage": "02 Stage",
+          "silver": "03 Silver",
+          "gold": "04 Gold"
+        }
+      },
+      "engineering_best_practices": [
+        "Master Pipeline Orchestration: Deploy a top-level Data Factory pipeline ('pl_retail_medallion_master') coordinating sequential wave execution: Bronze ingestion -> Silver curation -> Gold Kimball dimensional load -> Data quality reconciliation -> Direct Lake refresh.",
+        "Bronze Layer (01 Raw): Immutable landing in 'lh_retail_bronze' with raw source fidelity preserved, augmented with audit metadata (_ingested_at, _source_schema, _batch_run_id).",
+        "Dual Ingestion Strategy: High-watermark CDC extraction on updated_at/order_date for transactional tables (orders, order_items, shipments, inventory_snapshots); full snapshot refresh for master dimensions (customers, products, stores, product_categories).",
+        "Security & Privacy: Apply deterministic salted SHA-256 masking to all sensitive customer PII fields (email, phone, street_address, first_name, last_name) before Silver promotion.",
+        "Silver Layer (03 Silver): Harmonized 'lh_retail_silver' enforcing Delta Lake ACID MERGE INTO upserts on primary keys, windowed ROW_NUMBER() deduplication, null-key quarantine routing, and decimal casting for financial attributes.",
+        "Gold Layer (04 Gold): Kimball Star Schema warehouse 'wh_retail_gold' with conformed surrogate keys (_sk), SCD Type 2 history tracking, and partitioned fact tables for sub-second Direct Lake Power BI queries.",
+        "Data Quality Gates: Great Expectations profiling suite verifying zero orphan records, non-negative monetary amounts, and referential integrity across the Star Schema."
+      ],
+      "expected_deliverables": [
+        "lh_retail_bronze (Lakehouse in 01 Raw)",
+        "pl_retail_bronze_ingest (DataPipeline in 01 Raw executing PostgreSQL copy activity)",
+        "nb_retail_curate_silver (PySpark Notebook in 02 Stage with Delta MERGE and SHA-256 PII masking)",
+        "lh_retail_silver (Lakehouse in 03 Silver)",
+        "wh_retail_gold (Warehouse in 04 Gold with Kimball Star Schema DDL)",
+        "sm_retail_direct_lake (Direct Lake Semantic Model with Executive KPIs)",
+        "nb_retail_quality_suite (PySpark Notebook in 02 Stage validating Great Expectations)",
+        "pl_retail_medallion_master (Master DataPipeline in 01 Raw orchestrating the complete end-to-end DAG)"
+      ]
+    }
+  },
+  "retrieved_context": {
+    "data_sources": [
+      {
+        "source_name": "Retail Omnichannel PostgreSQL Database",
+        "system_type": "PostgreSQL / Neon",
+        "connector_type": "postgres",
+        "is_fabric_native": true,
+        "pathway": "native_pipeline",
+        "schemas_in_scope": ["retail_ops"],
+        "discover_all_tables_on_connect": true,
+        "business_entities": [
+          {
+            "entity_name": "customers",
+            "table_name": "retail_ops.customers",
+            "primary_key": "customer_id",
+            "watermark_column": "updated_at",
+            "ingestion_strategy": "full_snapshot",
+            "pii_attributes": ["first_name", "last_name", "email", "phone", "street_address"],
+            "business_description": "Master customer entity with loyalty tier, contact attributes, and commercial segmentation."
+          },
+          {
+            "entity_name": "product_categories",
+            "table_name": "retail_ops.product_categories",
+            "primary_key": "category_id",
+            "watermark_column": "created_at",
+            "ingestion_strategy": "full_snapshot",
+            "business_description": "Product taxonomy and merchandise hierarchy."
+          },
+          {
+            "entity_name": "products",
+            "table_name": "retail_ops.products",
+            "primary_key": "product_id",
+            "watermark_column": "updated_at",
+            "ingestion_strategy": "full_scd2",
+            "business_description": "Catalog merchandise items with SKUs, brands, cost bases, and retail unit prices."
+          },
+          {
+            "entity_name": "stores",
+            "table_name": "retail_ops.stores",
+            "primary_key": "store_id",
+            "watermark_column": "opened_date",
+            "ingestion_strategy": "full_snapshot",
+            "business_description": "Physical stores (flagship, outlet) and digital online fulfillment channels."
+          },
+          {
+            "entity_name": "orders",
+            "table_name": "retail_ops.orders",
+            "primary_key": "order_id",
+            "watermark_column": "updated_at",
+            "ingestion_strategy": "incremental_watermark",
+            "business_description": "Sales order headers capturing timestamps, customer references, payment methods, and totals."
+          },
+          {
+            "entity_name": "order_items",
+            "table_name": "retail_ops.order_items",
+            "primary_key": "order_item_id",
+            "watermark_column": "order_id",
+            "ingestion_strategy": "incremental_watermark",
+            "business_description": "Granular order line items with quantities, discounts, line totals, and profit margins."
+          },
+          {
+            "entity_name": "shipments",
+            "table_name": "retail_ops.shipments",
+            "primary_key": "shipment_id",
+            "watermark_column": "shipped_at",
+            "ingestion_strategy": "incremental_watermark",
+            "business_description": "Carrier fulfillment logistics, tracking numbers, shipping costs, and delivery performance."
+          },
+          {
+            "entity_name": "inventory_snapshots",
+            "table_name": "retail_ops.inventory_snapshots",
+            "primary_key": "snapshot_id",
+            "watermark_column": "snapshot_date",
+            "ingestion_strategy": "incremental_snapshot",
+            "business_description": "Daily store-level product stock positions, quantities on hand, and reorder triggers."
+          }
+        ],
+        "relationships": [
+          "orders.customer_id -> customers.customer_id (Many-to-One)",
+          "orders.store_id -> stores.store_id (Many-to-One)",
+          "order_items.order_id -> orders.order_id (Many-to-One)",
+          "order_items.product_id -> products.product_id (Many-to-One)",
+          "products.category_id -> product_categories.category_id (Many-to-One)",
+          "shipments.order_id -> orders.order_id (Many-to-One)",
+          "inventory_snapshots.store_id -> stores.store_id (Many-to-One)",
+          "inventory_snapshots.product_id -> products.product_id (Many-to-One)"
+        ],
+        "kimball_star_schema": {
+          "dimensions": [
+            {
+              "table_name": "dim_date",
+              "surrogate_key": "date_sk",
+              "description": "Enterprise calendar dimension with year, quarter, month, day, fiscal periods, and weekend indicators."
+            },
+            {
+              "table_name": "dim_customer",
+              "surrogate_key": "customer_sk",
+              "natural_key": "customer_id",
+              "attributes": ["name_masked", "email_masked", "phone_masked", "city", "state", "country", "customer_segment", "loyalty_tier", "is_active", "effective_from", "effective_to"],
+              "description": "SCD Type 2 customer dimension with SHA-256 masked PII and loyalty categorization."
+            },
+            {
+              "table_name": "dim_product",
+              "surrogate_key": "product_sk",
+              "natural_key": "product_id",
+              "attributes": ["sku", "product_name", "category_name", "department", "brand", "unit_cost", "unit_price", "is_discontinued"],
+              "description": "Conformed product dimension denormalized with product categories and merchandise departments."
+            },
+            {
+              "table_name": "dim_store",
+              "surrogate_key": "store_sk",
+              "natural_key": "store_id",
+              "attributes": ["store_code", "store_name", "channel_type", "region", "country", "square_footage", "manager_name"],
+              "description": "Channel dimension distinguishing online web storefronts from brick-and-mortar retail locations."
+            }
+          ],
+          "facts": [
+            {
+              "table_name": "fact_sales_orders",
+              "grain": "One record per individual order line item",
+              "foreign_keys": ["date_sk", "customer_sk", "product_sk", "store_sk"],
+              "measures": ["quantity", "unit_price", "discount_rate", "line_total", "estimated_profit", "tax_allocated", "shipping_allocated"]
+            },
+            {
+              "table_name": "fact_order_fulfillment",
+              "grain": "One record per order fulfillment shipment",
+              "foreign_keys": ["date_sk", "customer_sk", "store_sk"],
+              "measures": ["actual_delivery_days", "promised_delivery_days", "shipping_cost", "is_on_time_flag", "is_delayed_flag"]
+            },
+            {
+              "table_name": "fact_inventory_daily",
+              "grain": "Daily snapshot per store-product SKU",
+              "foreign_keys": ["date_sk", "product_sk", "store_sk"],
+              "measures": ["quantity_on_hand", "quantity_reserved", "reorder_point", "stockout_risk_flag", "inventory_holding_value"]
+            }
+          ]
+        },
+        "executive_kpis": [
+          {
+            "kpi_name": "Gross Merchandise Value (GMV)",
+            "business_definition": "Total monetary volume of customer retail purchases before discounts and deductions.",
+            "formula": "SUM(fact_sales_orders[line_total])",
+            "dax_measure": "Total GMV = SUM(fact_sales_orders[line_total])"
+          },
+          {
+            "kpi_name": "Net Sales Revenue",
+            "business_definition": "Net recognized sales revenue after applying promotional discounts.",
+            "formula": "SUM(fact_sales_orders[line_total]) * (1 - fact_sales_orders[discount_rate])",
+            "dax_measure": "Net Sales Revenue = SUMX(fact_sales_orders, fact_sales_orders[line_total] * (1 - fact_sales_orders[discount_rate]))"
+          },
+          {
+            "kpi_name": "Gross Profit Margin %",
+            "business_definition": "Overall commercial profitability percentage after deducting product cost of goods sold.",
+            "formula": "(SUM(estimated_profit) / SUM(line_total)) * 100",
+            "dax_measure": "Gross Margin % = DIVIDE(SUM(fact_sales_orders[estimated_profit]), [Net Sales Revenue], 0) * 100"
+          },
+          {
+            "kpi_name": "Average Order Value (AOV)",
+            "business_definition": "Average transaction revenue generated per unique customer purchase order.",
+            "formula": "[Net Sales Revenue] / DISTINCTCOUNT(fact_sales_orders[order_id])",
+            "dax_measure": "AOV = DIVIDE([Net Sales Revenue], DISTINCTCOUNT(fact_sales_orders[order_number]), 0)"
+          },
+          {
+            "kpi_name": "On-Time In-Full Delivery (OTIF %)",
+            "business_definition": "Percentage of shipments delivered to customer within the promised delivery window.",
+            "formula": "(COUNT(shipments WHERE is_on_time_flag = 1) / COUNT(shipments)) * 100",
+            "dax_measure": "OTIF % = DIVIDE(CALCULATE(COUNTROWS(fact_order_fulfillment), fact_order_fulfillment[is_on_time_flag] = 1), COUNTROWS(fact_order_fulfillment), 0) * 100"
+          },
+          {
+            "kpi_name": "Omnichannel Revenue Split %",
+            "business_definition": "Proportion of total revenue generated by Online Direct vs. Physical Stores.",
+            "formula": "CALCULATE([Net Sales Revenue], dim_store[channel_type] = 'online') / [Net Sales Revenue]",
+            "dax_measure": "Online Revenue % = DIVIDE(CALCULATE([Net Sales Revenue], dim_store[channel_type] = \"online\"), [Net Sales Revenue], 0) * 100"
+          },
+          {
+            "kpi_name": "Inventory Stockout Risk Count",
+            "business_definition": "Number of product SKUs whose on-hand inventory has dropped below the safety reorder point.",
+            "formula": "COUNT(inventory_snapshots WHERE quantity_on_hand <= reorder_point)",
+            "dax_measure": "Stockout Risk Items = CALCULATE(DISTINCTCOUNT(fact_inventory_daily[product_sk]), fact_inventory_daily[stockout_risk_flag] = 1)"
+          }
+        ],
+        "master_orchestrator_specification": {
+          "pipeline_name": "pl_retail_medallion_master",
+          "description": "End-to-end master Data Factory DAG orchestrating ingestion, curation, dimensional modeling, and semantic model refresh.",
+          "dag_execution_waves": [
+            {
+              "wave_index": 1,
+              "name": "Bronze Raw Ingestion",
+              "activity": "ExecutePipeline",
+              "target_item": "pl_retail_bronze_ingest",
+              "description": "Extracts tables from PostgreSQL schema 'retail_ops' into Bronze Lakehouse 'lh_retail_bronze'."
+            },
+            {
+              "wave_index": 2,
+              "name": "Silver Delta Curation",
+              "activity": "TridentNotebook",
+              "target_item": "nb_retail_curate_silver",
+              "depends_on": ["Bronze Raw Ingestion"],
+              "description": "Deduplicates records, applies SHA-256 PII masking, and executes Delta MERGE INTO 'lh_retail_silver'."
+            },
+            {
+              "wave_index": 3,
+              "name": "Gold Kimball Warehouse Build",
+              "activity": "TridentNotebook",
+              "target_item": "nb_retail_gold_star_schema",
+              "depends_on": ["Silver Delta Curation"],
+              "description": "Constructs Kimball Dimensions (dim_customer, dim_product, dim_store, dim_date) and Facts (fact_sales_orders, fact_order_fulfillment, fact_inventory_daily) in 'wh_retail_gold'."
+            },
+            {
+              "wave_index": 4,
+              "name": "Data Quality Gates",
+              "activity": "TridentNotebook",
+              "target_item": "nb_retail_quality_suite",
+              "depends_on": ["Gold Kimball Warehouse Build"],
+              "description": "Executes Great Expectations assertions for schema validity, primary key uniqueness, and monetary constraints."
+            },
+            {
+              "wave_index": 5,
+              "name": "Direct Lake Semantic Model Refresh",
+              "activity": "SemanticModelRefresh",
+              "target_item": "sm_retail_direct_lake",
+              "depends_on": ["Data Quality Gates"],
+              "description": "Refreshes Power BI Direct Lake model metadata for sub-second report interactivity."
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

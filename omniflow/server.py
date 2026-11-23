@@ -1901,11 +1901,14 @@ async def handle_chat_stream(req: ChatRequest) -> StreamingResponse:
         if not intake_override and resolved_proj:
             p_text = f"{resolved_proj.get('name', '')} {resolved_proj.get('id', '')} {resolved_proj.get('description', '')}".lower()
             domain_file_map = {
+                "retail": "project_intake_retail_postgres.json",
+                "omnichannel": "project_intake_retail_postgres.json",
+                "store": "project_intake_retail_postgres.json",
                 "stripe": "project_intake_api_payments.json",
                 "api": "project_intake_api_payments.json",
                 "saas": "project_intake_api_payments.json",
                 "payment": "project_intake_api_payments.json",
-                "postgres": "project_intake_postgres_test.json",
+                "postgres": "project_intake_retail_postgres.json",
                 "fintech": "project_intake_fintech.json",
                 "health": "project_intake_healthcare.json",
                 "supply": "project_intake_supplychain.json",
