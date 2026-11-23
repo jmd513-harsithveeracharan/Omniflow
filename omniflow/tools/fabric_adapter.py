@@ -255,6 +255,23 @@ def provision_item_with_definition(
 
 def compile_notebook_update(pyspark_code: str, display_name: str = "Notebook") -> dict[str, Any]:
     """Compiles PySpark notebook code into Base64 format for Fabric."""
+    if not pyspark_code.startswith("# Fabric notebook source"):
+        pyspark_code = (
+            "# Fabric notebook source\n\n"
+            "# METADATA ********************\n\n"
+            "# META {\n"
+            '# META   "kernel_info": {\n'
+            '# META     "name": "synapse_pyspark"\n'
+            "# META   },\n"
+            '# META   "dependencies": {}\n'
+            "# META }\n\n"
+            "# CELL ********************\n\n"
+            + pyspark_code.strip()
+            + "\n\n# METADATA ********************\n\n# META {\n"
+            '# META   "language": "python",\n'
+            '# META   "language_group": "synapse_pyspark"\n'
+            "# META }\n"
+        )
     b64_content = base64.b64encode(pyspark_code.encode("utf-8")).decode("utf-8")
     platform = {
         "$schema": "https://developer.microsoft.com/json-schemas/fabric/gitIntegration/platformProperties/2.0.0/schema.json",

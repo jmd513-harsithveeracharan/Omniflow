@@ -87,6 +87,26 @@ def interpolate_placeholders(raw_text: str, guid_registry: dict[str, str]) -> st
 def compile_definition_payload(item_type: str, content: str, display_name: str) -> dict[str, Any]:
     """Compiles string content into Fabric's base64 multipart definition structure."""
     clean_type = item_type.lower()
+    
+    # Enforce mandatory Synapse prologue for notebooks so Fabric cloud PyToIPynb conversion succeeds
+    if clean_type == "notebook" and not content.startswith("# Fabric notebook source"):
+        content = (
+            "# Fabric notebook source\n\n"
+            "# METADATA ********************\n\n"
+            "# META {\n"
+            '# META   "kernel_info": {\n'
+            '# META     "name": "synapse_pyspark"\n'
+            "# META   },\n"
+            '# META   "dependencies": {}\n'
+            "# META }\n\n"
+            "# CELL ********************\n\n"
+            + content.strip()
+            + "\n\n# METADATA ********************\n\n# META {\n"
+            '# META   "language": "python",\n'
+            '# META   "language_group": "synapse_pyspark"\n'
+            "# META }\n"
+        )
+
     b64_content = base64.b64encode(content.encode("utf-8")).decode("utf-8")
     platform = {
         "$schema": "https://developer.microsoft.com/json-schemas/fabric/gitIntegration/platformProperties/2.0.0/schema.json",

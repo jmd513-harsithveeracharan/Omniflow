@@ -200,7 +200,18 @@ export const ChatTimeline: React.FC<ChatTimelineProps> = ({
                 data-raw-content={cleanContent}
               >
                 <div className="chat-content-card">
-                  <div className="chat-card-text">{cleanContent}</div>
+                  <div className="chat-card-text">
+                    {cleanContent.startsWith('Resume pipeline synthesis with connectionId') ? (
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', color: '#cbd5e1' }}>
+                        <span>Connected to data source. Resuming pipeline synthesis for:</span>
+                        <strong style={{ color: '#ffffff' }}>
+                          {cleanContent.split('selected tables:')[1] || cleanContent.split('tables:')[1] || 'selected tables'}
+                        </strong>
+                      </span>
+                    ) : (
+                      cleanContent
+                    )}
+                  </div>
                 </div>
                 <div className="chat-bubble-actions user-actions">
                   <button

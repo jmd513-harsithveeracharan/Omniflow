@@ -173,7 +173,7 @@ export const ThoughtTrace: React.FC<ThoughtTraceProps> = ({ meta, isStreaming = 
         </span>
 
         {isStreaming && (
-          <Loader2 width={12} height={12} className="animate-spin" style={{ color: '#38bdf8' }} />
+          <Loader2 width={12} height={12} className="animate-spin" style={{ color: '#38bdf8', animation: 'spin 1s linear infinite', transformOrigin: 'center' }} />
         )}
 
         <span style={{ fontWeight: 500, color: isStreaming ? '#e2e8f0' : '#94a3b8' }}>
@@ -272,7 +272,7 @@ export const ThoughtTrace: React.FC<ThoughtTraceProps> = ({ meta, isStreaming = 
                       width={11}
                       height={11}
                       className="animate-spin"
-                      style={{ color: '#38bdf8', marginLeft: '4px' }}
+                      style={{ color: '#38bdf8', marginLeft: '4px', animation: 'spin 1s linear infinite', transformOrigin: 'center' }}
                     />
                   )}
 
@@ -301,7 +301,7 @@ export const ThoughtTrace: React.FC<ThoughtTraceProps> = ({ meta, isStreaming = 
                       marginTop: '3px',
                       marginBottom: '6px',
                       paddingLeft: '10px',
-                      borderLeft: '1.5px solid rgba(255, 255, 255, 0.12)',
+                      borderLeft: 'none',
                       background: 'transparent',
                       fontSize: '12px',
                       color: '#94a3b8',
