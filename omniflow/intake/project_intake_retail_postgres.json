@@ -5,14 +5,14 @@
     "user_id": "architect@omniflow.ai",
     "environment": "production",
     "target_workspace": "PBT_DATA_AGENT",
-    "objective": "Design, provision, and deploy an end-to-end Microsoft Fabric Medallion data platform for Retail Omnichannel Sales and Fulfillment. Ingest operational PostgreSQL tables from schema 'retail_ops', enforce Bronze Delta raw landing, Silver cleansing with SHA-256 PII protection, Gold Kimball Star Schema Data Warehouse with business KPIs, Power BI Direct Lake semantic model, and a Master Data Factory pipeline orchestrator."
+    "objective": "Design, provision, and deploy an end-to-end Microsoft Fabric Medallion data platform for Retail Omnichannel Sales, Procurement, and Fulfillment. Ingest 32 operational PostgreSQL tables from schema 'retail_ops', enforce Bronze Delta raw landing in '01 Raw', Silver cleansing with salted SHA-256 PII protection in '02 Stage' -> '03 Silver', Gold Kimball Star Schema Data Warehouse in '04 Gold' with 12 business KPIs, Power BI Direct Lake semantic model, and a dedicated Master Data Factory pipeline orchestrator in 'Pipeline Orchestration'."
   },
   "project_context": {
     "project_summary": {
       "project_code": "PRJ-RETAIL-OMNICHANNEL",
       "project_name": "Retail Omnichannel Analytics Platform",
       "business_domain": "retail_commerce_fulfillment",
-      "business_objective": "Consolidate in-store and e-commerce transactions, inventory snapshots, carrier fulfillment logistics, and customer master records into a unified Microsoft Fabric OneLake platform for real-time executive KPI reporting.",
+      "business_objective": "Consolidate brick-and-mortar retail and digital e-commerce transactions, real-time inventory snapshots across warehouses and stores, supplier purchase orders, carrier shipping logistics, and customer loyalty records into a unified Microsoft Fabric OneLake platform for real-time executive KPI reporting.",
       "sla_target_minutes": 15
     },
     "platform_summary": {
@@ -22,34 +22,36 @@
       "containment_folder": "Retail_Omnichannel_Platform"
     },
     "solution_summary": {
-      "target_architecture": "Microsoft Fabric Medallion Architecture (PostgreSQL Source 'retail_ops' -> 01 Raw Bronze Lakehouse -> 02 Stage Curation Notebook -> 03 Silver Harmonized Lakehouse -> 04 Gold Kimball Star Schema Warehouse -> Direct Lake Power BI Semantic Model -> Master Orchestrator Pipeline)",
+      "target_architecture": "Microsoft Fabric Medallion Architecture (PostgreSQL Source 'retail_ops' -> 01 Raw Bronze Lakehouse -> 02 Stage Curation & Quality PySpark Notebooks -> 03 Silver Harmonized Lakehouse -> 04 Gold Kimball Star Schema Warehouse -> Direct Lake Power BI Semantic Model -> Dedicated Master Orchestrator Pipeline in 'Pipeline Orchestration')",
       "target_folder_structure": {
         "root_folder": "Retail_Omnichannel_Platform",
         "subfolders": {
           "raw": "01 Raw",
           "stage": "02 Stage",
           "silver": "03 Silver",
-          "gold": "04 Gold"
+          "gold": "04 Gold",
+          "orchestration": "Pipeline Orchestration"
         }
       },
       "engineering_best_practices": [
-        "Master Pipeline Orchestration: Deploy a top-level Data Factory pipeline ('pl_retail_medallion_master') coordinating sequential wave execution: Bronze ingestion -> Silver curation -> Gold Kimball dimensional load -> Data quality reconciliation -> Direct Lake refresh.",
-        "Bronze Layer (01 Raw): Immutable landing in 'lh_retail_bronze' with raw source fidelity preserved, augmented with audit metadata (_ingested_at, _source_schema, _batch_run_id).",
-        "Dual Ingestion Strategy: High-watermark CDC extraction on updated_at/order_date for transactional tables (orders, order_items, shipments, inventory_snapshots); full snapshot refresh for master dimensions (customers, products, stores, product_categories).",
-        "Security & Privacy: Apply deterministic salted SHA-256 masking to all sensitive customer PII fields (email, phone, street_address, first_name, last_name) before Silver promotion.",
-        "Silver Layer (03 Silver): Harmonized 'lh_retail_silver' enforcing Delta Lake ACID MERGE INTO upserts on primary keys, windowed ROW_NUMBER() deduplication, null-key quarantine routing, and decimal casting for financial attributes.",
-        "Gold Layer (04 Gold): Kimball Star Schema warehouse 'wh_retail_gold' with conformed surrogate keys (_sk), SCD Type 2 history tracking, and partitioned fact tables for sub-second Direct Lake Power BI queries.",
-        "Data Quality Gates: Great Expectations profiling suite verifying zero orphan records, non-negative monetary amounts, and referential integrity across the Star Schema."
+        "Folder Containment Isolation: Notebooks are strictly placed in '02 Stage' (never in '01 Raw'). Master DAG Orchestrator is placed in dedicated 'Pipeline Orchestration' folder.",
+        "Multi-Cell Interactive Synapse Compliance: Every PySpark notebook cell is bounded by # CELL and # METADATA blocks for interactive cell execution in Microsoft Fabric.",
+        "Bronze Layer (01 Raw): Immutable landing in 'lh_retail_bronze' preserving full source fidelity, enriched with ingestion audit metadata (_ingested_at, _source_schema, _batch_run_id).",
+        "Dual Ingestion Strategy: High-watermark CDC extraction on updated_at/ordered_at for transactional tables (orders, order_items, shipments, inventory_snapshots, returns); full snapshot refresh for dimensional master tables (customers, products, stores, suppliers, carriers).",
+        "Salted SHA-256 PII Protection: Deterministic irreversible hashing applied to customer personal attributes (email, phone, street_address, first_name, last_name) before Silver promotion.",
+        "Silver Layer (03 Silver): ACID Delta Lake tables in 'lh_retail_silver' with windowed ROW_NUMBER() deduplication, null-key quarantine, and PySpark MERGE INTO upserts on primary keys.",
+        "Gold Layer (04 Gold): Kimball Star Schema warehouse 'wh_retail_gold' with 6 Conformed Dimensions and 4 Transactional/Snapshot Fact tables with conformed surrogate keys (_sk).",
+        "Data Quality Gates: Great Expectations assertions suite verifying referential integrity, zero orphan line items, and non-negative financial values."
       ],
       "expected_deliverables": [
         "lh_retail_bronze (Lakehouse in 01 Raw)",
-        "pl_retail_bronze_ingest (DataPipeline in 01 Raw executing PostgreSQL copy activity)",
+        "pl_retail_bronze_ingest (DataPipeline in 01 Raw with 32 table ingestion activities)",
         "nb_retail_curate_silver (PySpark Notebook in 02 Stage with Delta MERGE and SHA-256 PII masking)",
+        "nb_retail_quality_suite (PySpark Notebook in 02 Stage with Great Expectations validation)",
         "lh_retail_silver (Lakehouse in 03 Silver)",
-        "wh_retail_gold (Warehouse in 04 Gold with Kimball Star Schema DDL)",
-        "sm_retail_direct_lake (Direct Lake Semantic Model with Executive KPIs)",
-        "nb_retail_quality_suite (PySpark Notebook in 02 Stage validating Great Expectations)",
-        "pl_retail_medallion_master (Master DataPipeline in 01 Raw orchestrating the complete end-to-end DAG)"
+        "wh_retail_gold (Warehouse in 04 Gold with 6 Dimensions & 4 Facts DDL)",
+        "sm_retail_direct_lake (Direct Lake Semantic Model with 12 Executive KPIs)",
+        "pl_retail_medallion_master (Master DataPipeline in Pipeline Orchestration coordinating end-to-end DAG execution)"
       ]
     }
   },
@@ -61,17 +63,92 @@
         "connector_type": "postgres",
         "is_fabric_native": true,
         "pathway": "native_pipeline",
-        "schemas_in_scope": ["retail_ops"],
+        "schemas_in_scope": [
+          "retail_ops"
+        ],
         "discover_all_tables_on_connect": true,
         "business_entities": [
+          {
+            "entity_name": "customer_segments",
+            "table_name": "retail_ops.customer_segments",
+            "primary_key": "segment_id",
+            "watermark_column": "segment_id",
+            "ingestion_strategy": "full_snapshot",
+            "business_description": "Market segmentation tiers (VIP, Preferred Gold, Loyal Silver, Standard Retail) with annual spend thresholds."
+          },
           {
             "entity_name": "customers",
             "table_name": "retail_ops.customers",
             "primary_key": "customer_id",
             "watermark_column": "updated_at",
             "ingestion_strategy": "full_snapshot",
-            "pii_attributes": ["first_name", "last_name", "email", "phone", "street_address"],
+            "pii_attributes": [
+              "first_name",
+              "last_name",
+              "email",
+              "phone",
+              "street_address"
+            ],
             "business_description": "Master customer entity with loyalty tier, contact attributes, and commercial segmentation."
+          },
+          {
+            "entity_name": "customer_addresses",
+            "table_name": "retail_ops.customer_addresses",
+            "primary_key": "address_id",
+            "watermark_column": "created_at",
+            "ingestion_strategy": "full_snapshot",
+            "pii_attributes": [
+              "street"
+            ],
+            "business_description": "Billing and shipping delivery addresses with geographic postal codes."
+          },
+          {
+            "entity_name": "customer_preferences",
+            "table_name": "retail_ops.customer_preferences",
+            "primary_key": "preference_id",
+            "watermark_column": "updated_at",
+            "ingestion_strategy": "full_snapshot",
+            "business_description": "Customer channel communication preferences, marketing opt-ins, and default currencies."
+          },
+          {
+            "entity_name": "loyalty_accounts",
+            "table_name": "retail_ops.loyalty_accounts",
+            "primary_key": "loyalty_id",
+            "watermark_column": "enrolled_at",
+            "ingestion_strategy": "full_snapshot",
+            "business_description": "Customer loyalty reward accounts, current point balances, and lifetime point metrics."
+          },
+          {
+            "entity_name": "loyalty_transactions",
+            "table_name": "retail_ops.loyalty_transactions",
+            "primary_key": "transaction_id",
+            "watermark_column": "created_at",
+            "ingestion_strategy": "incremental_watermark",
+            "business_description": "Point accruals, redemptions, and expiration logs linked to purchase orders."
+          },
+          {
+            "entity_name": "promotions_and_coupons",
+            "table_name": "retail_ops.promotions_and_coupons",
+            "primary_key": "coupon_id",
+            "watermark_column": "end_date",
+            "ingestion_strategy": "full_snapshot",
+            "business_description": "Marketing promotional codes, discount percentage/fixed amounts, and eligibility thresholds."
+          },
+          {
+            "entity_name": "coupon_redemptions",
+            "table_name": "retail_ops.coupon_redemptions",
+            "primary_key": "redemption_id",
+            "watermark_column": "redeemed_at",
+            "ingestion_strategy": "incremental_watermark",
+            "business_description": "Audit trail of promo code redemptions tied to customer orders."
+          },
+          {
+            "entity_name": "product_departments",
+            "table_name": "retail_ops.product_departments",
+            "primary_key": "department_id",
+            "watermark_column": "department_id",
+            "ingestion_strategy": "full_snapshot",
+            "business_description": "Top-level merchandise departments (Electronics, Apparel, Home Living)."
           },
           {
             "entity_name": "product_categories",
@@ -79,7 +156,15 @@
             "primary_key": "category_id",
             "watermark_column": "created_at",
             "ingestion_strategy": "full_snapshot",
-            "business_description": "Product taxonomy and merchandise hierarchy."
+            "business_description": "Product taxonomy and merchandise category hierarchy."
+          },
+          {
+            "entity_name": "product_brands",
+            "table_name": "retail_ops.product_brands",
+            "primary_key": "brand_id",
+            "watermark_column": "brand_id",
+            "ingestion_strategy": "full_snapshot",
+            "business_description": "Manufacturer brand entities, trademark designations, and market tier levels."
           },
           {
             "entity_name": "products",
@@ -87,7 +172,55 @@
             "primary_key": "product_id",
             "watermark_column": "updated_at",
             "ingestion_strategy": "full_scd2",
-            "business_description": "Catalog merchandise items with SKUs, brands, cost bases, and retail unit prices."
+            "business_description": "Catalog merchandise items with SKUs, UPC barcodes, cost bases, and retail unit prices."
+          },
+          {
+            "entity_name": "product_attributes",
+            "table_name": "retail_ops.product_attributes",
+            "primary_key": "attribute_id",
+            "watermark_column": "attribute_id",
+            "ingestion_strategy": "full_snapshot",
+            "business_description": "Product physical attributes: colors, sizes, weights, materials, and release seasons."
+          },
+          {
+            "entity_name": "product_price_history",
+            "table_name": "retail_ops.product_price_history",
+            "primary_key": "history_id",
+            "watermark_column": "effective_from",
+            "ingestion_strategy": "incremental_watermark",
+            "business_description": "Audit log of historical retail price modifications and promotional markdowns."
+          },
+          {
+            "entity_name": "suppliers",
+            "table_name": "retail_ops.suppliers",
+            "primary_key": "supplier_id",
+            "watermark_column": "supplier_id",
+            "ingestion_strategy": "full_snapshot",
+            "business_description": "Global manufacturing vendors, lead times, contact emails, and performance ratings."
+          },
+          {
+            "entity_name": "purchase_orders",
+            "table_name": "retail_ops.purchase_orders",
+            "primary_key": "po_id",
+            "watermark_column": "order_date",
+            "ingestion_strategy": "incremental_watermark",
+            "business_description": "Procurement orders placed with suppliers, delivery targets, and committed expenditure."
+          },
+          {
+            "entity_name": "purchase_order_lines",
+            "table_name": "retail_ops.purchase_order_lines",
+            "primary_key": "po_line_id",
+            "watermark_column": "po_id",
+            "ingestion_strategy": "incremental_watermark",
+            "business_description": "Itemized PO line entries, unit procurement costs, and quantities received."
+          },
+          {
+            "entity_name": "store_channels",
+            "table_name": "retail_ops.store_channels",
+            "primary_key": "channel_id",
+            "watermark_column": "channel_id",
+            "ingestion_strategy": "full_snapshot",
+            "business_description": "Sales channel classifications (online direct, flagship store, suburban outlet)."
           },
           {
             "entity_name": "stores",
@@ -95,31 +228,23 @@
             "primary_key": "store_id",
             "watermark_column": "opened_date",
             "ingestion_strategy": "full_snapshot",
-            "business_description": "Physical stores (flagship, outlet) and digital online fulfillment channels."
+            "business_description": "Physical retail stores and digital storefronts with square footage and locations."
           },
           {
-            "entity_name": "orders",
-            "table_name": "retail_ops.orders",
-            "primary_key": "order_id",
-            "watermark_column": "updated_at",
-            "ingestion_strategy": "incremental_watermark",
-            "business_description": "Sales order headers capturing timestamps, customer references, payment methods, and totals."
+            "entity_name": "warehouses_and_dc",
+            "table_name": "retail_ops.warehouses_and_dc",
+            "primary_key": "warehouse_id",
+            "watermark_column": "warehouse_id",
+            "ingestion_strategy": "full_snapshot",
+            "business_description": "Central and regional fulfillment distribution centers with square foot storage capacity."
           },
           {
-            "entity_name": "order_items",
-            "table_name": "retail_ops.order_items",
-            "primary_key": "order_item_id",
-            "watermark_column": "order_id",
+            "entity_name": "inventory_positions",
+            "table_name": "retail_ops.inventory_positions",
+            "primary_key": "position_id",
+            "watermark_column": "last_restocked_at",
             "ingestion_strategy": "incremental_watermark",
-            "business_description": "Granular order line items with quantities, discounts, line totals, and profit margins."
-          },
-          {
-            "entity_name": "shipments",
-            "table_name": "retail_ops.shipments",
-            "primary_key": "shipment_id",
-            "watermark_column": "shipped_at",
-            "ingestion_strategy": "incremental_watermark",
-            "business_description": "Carrier fulfillment logistics, tracking numbers, shipping costs, and delivery performance."
+            "business_description": "Real-time on-hand and reserved stock quantities across warehouses and stores."
           },
           {
             "entity_name": "inventory_snapshots",
@@ -127,66 +252,284 @@
             "primary_key": "snapshot_id",
             "watermark_column": "snapshot_date",
             "ingestion_strategy": "incremental_snapshot",
-            "business_description": "Daily store-level product stock positions, quantities on hand, and reorder triggers."
+            "business_description": "Daily store-level product stock positions, reorder triggers, and stockout risk indicators."
+          },
+          {
+            "entity_name": "inventory_adjustments",
+            "table_name": "retail_ops.inventory_adjustments",
+            "primary_key": "adjustment_id",
+            "watermark_column": "created_at",
+            "ingestion_strategy": "incremental_watermark",
+            "business_description": "Audit entries for damaged units, stock shrinkage, and inter-facility inventory transfers."
+          },
+          {
+            "entity_name": "orders",
+            "table_name": "retail_ops.orders",
+            "primary_key": "order_id",
+            "watermark_column": "updated_at",
+            "ingestion_strategy": "incremental_watermark",
+            "business_description": "Sales order headers capturing status, customer, store, discounts, gross and net revenues."
+          },
+          {
+            "entity_name": "order_items",
+            "table_name": "retail_ops.order_items",
+            "primary_key": "order_item_id",
+            "watermark_column": "order_id",
+            "ingestion_strategy": "incremental_watermark",
+            "business_description": "Granular order line items with quantities, discount rates, line totals, and margin metrics."
+          },
+          {
+            "entity_name": "order_taxes",
+            "table_name": "retail_ops.order_taxes",
+            "primary_key": "tax_id",
+            "watermark_column": "order_id",
+            "ingestion_strategy": "incremental_watermark",
+            "business_description": "Jurisdiction-level sales tax assessments and exemption status per order."
+          },
+          {
+            "entity_name": "order_payment_transactions",
+            "table_name": "retail_ops.order_payment_transactions",
+            "primary_key": "payment_id",
+            "watermark_column": "created_at",
+            "ingestion_strategy": "incremental_watermark",
+            "business_description": "Payment authorization settlement records, gateways, and merchant processing fees."
+          },
+          {
+            "entity_name": "carriers",
+            "table_name": "retail_ops.carriers",
+            "primary_key": "carrier_id",
+            "watermark_column": "carrier_id",
+            "ingestion_strategy": "full_snapshot",
+            "business_description": "Logistics delivery carriers (FedEx, UPS, DHL) and service-level SLA commitments."
+          },
+          {
+            "entity_name": "shipments",
+            "table_name": "retail_ops.shipments",
+            "primary_key": "shipment_id",
+            "watermark_column": "dispatched_at",
+            "ingestion_strategy": "incremental_watermark",
+            "business_description": "Order shipment tracking, shipping costs, promised vs. actual arrival, and on-time flags."
+          },
+          {
+            "entity_name": "shipment_packages",
+            "table_name": "retail_ops.shipment_packages",
+            "primary_key": "package_id",
+            "watermark_column": "shipment_id",
+            "ingestion_strategy": "incremental_watermark",
+            "business_description": "Physical parcel parcels, weights, dimensions, and barcode tracking numbers."
+          },
+          {
+            "entity_name": "customer_returns",
+            "table_name": "retail_ops.customer_returns",
+            "primary_key": "return_id",
+            "watermark_column": "requested_at",
+            "ingestion_strategy": "incremental_watermark",
+            "business_description": "RMA return authorizations, reasons, refund amounts, and settlement statuses."
+          },
+          {
+            "entity_name": "return_items",
+            "table_name": "retail_ops.return_items",
+            "primary_key": "return_item_id",
+            "watermark_column": "return_id",
+            "ingestion_strategy": "incremental_watermark",
+            "business_description": "Returned line items, restocking status, and QA inspection outcomes."
           }
         ],
         "relationships": [
-          "orders.customer_id -> customers.customer_id (Many-to-One)",
-          "orders.store_id -> stores.store_id (Many-to-One)",
-          "order_items.order_id -> orders.order_id (Many-to-One)",
-          "order_items.product_id -> products.product_id (Many-to-One)",
-          "products.category_id -> product_categories.category_id (Many-to-One)",
-          "shipments.order_id -> orders.order_id (Many-to-One)",
-          "inventory_snapshots.store_id -> stores.store_id (Many-to-One)",
-          "inventory_snapshots.product_id -> products.product_id (Many-to-One)"
+          "customers.segment_id -> customer_segments.segment_id",
+          "customer_addresses.customer_id -> customers.customer_id",
+          "customer_preferences.customer_id -> customers.customer_id",
+          "loyalty_accounts.customer_id -> customers.customer_id",
+          "loyalty_transactions.loyalty_id -> loyalty_accounts.loyalty_id",
+          "coupon_redemptions.coupon_id -> promotions_and_coupons.coupon_id",
+          "coupon_redemptions.customer_id -> customers.customer_id",
+          "product_categories.department_id -> product_departments.department_id",
+          "products.category_id -> product_categories.category_id",
+          "products.brand_id -> product_brands.brand_id",
+          "products.department_id -> product_departments.department_id",
+          "product_attributes.product_id -> products.product_id",
+          "product_price_history.product_id -> products.product_id",
+          "purchase_orders.supplier_id -> suppliers.supplier_id",
+          "purchase_order_lines.po_id -> purchase_orders.po_id",
+          "purchase_order_lines.product_id -> products.product_id",
+          "stores.channel_id -> store_channels.channel_id",
+          "inventory_positions.warehouse_id -> warehouses_and_dc.warehouse_id",
+          "inventory_positions.store_id -> stores.store_id",
+          "inventory_positions.product_id -> products.product_id",
+          "inventory_snapshots.store_id -> stores.store_id",
+          "inventory_snapshots.product_id -> products.product_id",
+          "orders.customer_id -> customers.customer_id",
+          "orders.store_id -> stores.store_id",
+          "orders.channel_id -> store_channels.channel_id",
+          "order_items.order_id -> orders.order_id",
+          "order_items.product_id -> products.product_id",
+          "order_taxes.order_id -> orders.order_id",
+          "order_payment_transactions.order_id -> orders.order_id",
+          "shipments.order_id -> orders.order_id",
+          "shipments.carrier_id -> carriers.carrier_id",
+          "shipments.warehouse_id -> warehouses_and_dc.warehouse_id",
+          "shipment_packages.shipment_id -> shipments.shipment_id",
+          "customer_returns.order_id -> orders.order_id",
+          "customer_returns.customer_id -> customers.customer_id",
+          "return_items.return_id -> customer_returns.return_id",
+          "return_items.order_item_id -> order_items.order_item_id"
         ],
         "kimball_star_schema": {
           "dimensions": [
             {
               "table_name": "dim_date",
               "surrogate_key": "date_sk",
-              "description": "Enterprise calendar dimension with year, quarter, month, day, fiscal periods, and weekend indicators."
+              "description": "Enterprise fiscal calendar dimension with year, quarter, month, day, fiscal week, and holiday indicators."
             },
             {
               "table_name": "dim_customer",
               "surrogate_key": "customer_sk",
               "natural_key": "customer_id",
-              "attributes": ["name_masked", "email_masked", "phone_masked", "city", "state", "country", "customer_segment", "loyalty_tier", "is_active", "effective_from", "effective_to"],
-              "description": "SCD Type 2 customer dimension with SHA-256 masked PII and loyalty categorization."
+              "attributes": [
+                "name_masked",
+                "email_masked",
+                "phone_masked",
+                "city",
+                "state",
+                "postal_code",
+                "country",
+                "customer_segment",
+                "loyalty_tier",
+                "is_active",
+                "effective_from",
+                "effective_to"
+              ],
+              "description": "SCD Type-2 customer dimension with salted SHA-256 masked PII and loyalty categorization."
             },
             {
               "table_name": "dim_product",
               "surrogate_key": "product_sk",
               "natural_key": "product_id",
-              "attributes": ["sku", "product_name", "category_name", "department", "brand", "unit_cost", "unit_price", "is_discontinued"],
-              "description": "Conformed product dimension denormalized with product categories and merchandise departments."
+              "attributes": [
+                "sku",
+                "barcode_upc",
+                "product_name",
+                "department_name",
+                "category_name",
+                "brand_name",
+                "tier_level",
+                "unit_cost",
+                "unit_price",
+                "is_active"
+              ],
+              "description": "Conformed product dimension denormalized across merchandise hierarchy, departments, and brands."
             },
             {
               "table_name": "dim_store",
               "surrogate_key": "store_sk",
               "natural_key": "store_id",
-              "attributes": ["store_code", "store_name", "channel_type", "region", "country", "square_footage", "manager_name"],
-              "description": "Channel dimension distinguishing online web storefronts from brick-and-mortar retail locations."
+              "attributes": [
+                "store_code",
+                "store_name",
+                "channel_type",
+                "region",
+                "city",
+                "state",
+                "square_footage",
+                "manager_name"
+              ],
+              "description": "Channel dimension distinguishing online digital storefronts from brick-and-mortar retail outlets."
+            },
+            {
+              "table_name": "dim_supplier",
+              "surrogate_key": "supplier_sk",
+              "natural_key": "supplier_id",
+              "attributes": [
+                "supplier_code",
+                "company_name",
+                "country",
+                "lead_time_days",
+                "rating"
+              ],
+              "description": "Procurement vendor dimension tracking supplier lead times and quality ratings."
+            },
+            {
+              "table_name": "dim_carrier",
+              "surrogate_key": "carrier_sk",
+              "natural_key": "carrier_id",
+              "attributes": [
+                "carrier_code",
+                "carrier_name",
+                "service_level",
+                "standard_delivery_hours"
+              ],
+              "description": "Carrier logistics dimension tracking shipping providers and transit service levels."
             }
           ],
           "facts": [
             {
               "table_name": "fact_sales_orders",
               "grain": "One record per individual order line item",
-              "foreign_keys": ["date_sk", "customer_sk", "product_sk", "store_sk"],
-              "measures": ["quantity", "unit_price", "discount_rate", "line_total", "estimated_profit", "tax_allocated", "shipping_allocated"]
+              "foreign_keys": [
+                "date_sk",
+                "customer_sk",
+                "product_sk",
+                "store_sk"
+              ],
+              "measures": [
+                "quantity",
+                "unit_price",
+                "discount_rate",
+                "line_total",
+                "estimated_profit",
+                "tax_allocated",
+                "shipping_allocated"
+              ]
             },
             {
               "table_name": "fact_order_fulfillment",
-              "grain": "One record per order fulfillment shipment",
-              "foreign_keys": ["date_sk", "customer_sk", "store_sk"],
-              "measures": ["actual_delivery_days", "promised_delivery_days", "shipping_cost", "is_on_time_flag", "is_delayed_flag"]
+              "grain": "One record per shipment package dispatch",
+              "foreign_keys": [
+                "date_sk",
+                "customer_sk",
+                "store_sk",
+                "carrier_sk"
+              ],
+              "measures": [
+                "actual_delivery_hours",
+                "promised_delivery_hours",
+                "shipping_cost",
+                "package_weight_kg",
+                "is_on_time_flag",
+                "is_delayed_flag"
+              ]
             },
             {
               "table_name": "fact_inventory_daily",
-              "grain": "Daily snapshot per store-product SKU",
-              "foreign_keys": ["date_sk", "product_sk", "store_sk"],
-              "measures": ["quantity_on_hand", "quantity_reserved", "reorder_point", "stockout_risk_flag", "inventory_holding_value"]
+              "grain": "Daily snapshot per store/warehouse product SKU",
+              "foreign_keys": [
+                "date_sk",
+                "product_sk",
+                "store_sk"
+              ],
+              "measures": [
+                "quantity_on_hand",
+                "quantity_reserved",
+                "reorder_point",
+                "stockout_risk_flag",
+                "inventory_holding_value"
+              ]
+            },
+            {
+              "table_name": "fact_customer_returns",
+              "grain": "One record per returned order line item",
+              "foreign_keys": [
+                "date_sk",
+                "customer_sk",
+                "product_sk",
+                "store_sk"
+              ],
+              "measures": [
+                "quantity_returned",
+                "refund_amount",
+                "restock_flag",
+                "days_to_return"
+              ]
             }
           ]
         },
@@ -232,50 +575,94 @@
             "business_definition": "Number of product SKUs whose on-hand inventory has dropped below the safety reorder point.",
             "formula": "COUNT(inventory_snapshots WHERE quantity_on_hand <= reorder_point)",
             "dax_measure": "Stockout Risk Items = CALCULATE(DISTINCTCOUNT(fact_inventory_daily[product_sk]), fact_inventory_daily[stockout_risk_flag] = 1)"
+          },
+          {
+            "kpi_name": "Inventory Holding Valuation ($)",
+            "business_definition": "Total monetary capital value of inventory currently held across all warehouses and stores.",
+            "formula": "SUM(fact_inventory_daily[inventory_holding_value])",
+            "dax_measure": "Total Inventory Value = SUM(fact_inventory_daily[inventory_holding_value])"
+          },
+          {
+            "kpi_name": "Return Rate %",
+            "business_definition": "Proportion of ordered merchandise returned by customers for refund.",
+            "formula": "(SUM(fact_customer_returns[refund_amount]) / [Net Sales Revenue]) * 100",
+            "dax_measure": "Return Rate % = DIVIDE(SUM(fact_customer_returns[refund_amount]), [Net Sales Revenue], 0) * 100"
+          },
+          {
+            "kpi_name": "Customer Lifetime Value (LTV)",
+            "business_definition": "Cumulative sales revenue generated per customer across all historical purchase orders.",
+            "formula": "SUM(fact_sales_orders[line_total]) / DISTINCTCOUNT(fact_sales_orders[customer_sk])",
+            "dax_measure": "Customer LTV = DIVIDE([Net Sales Revenue], DISTINCTCOUNT(fact_sales_orders[customer_sk]), 0)"
+          },
+          {
+            "kpi_name": "VIP Segment Revenue Share %",
+            "business_definition": "Percentage of net revenue contributed by VIP and Preferred Gold tier customers.",
+            "formula": "CALCULATE([Net Sales Revenue], dim_customer[loyalty_tier] IN {'PLATINUM', 'GOLD'}) / [Net Sales Revenue]",
+            "dax_measure": "VIP Revenue Share % = DIVIDE(CALCULATE([Net Sales Revenue], dim_customer[loyalty_tier] IN {\"PLATINUM\", \"GOLD\"}), [Net Sales Revenue], 0) * 100"
+          },
+          {
+            "kpi_name": "Procurement Lead Time Variance (Days)",
+            "business_definition": "Average days difference between promised supplier delivery date and actual arrival date.",
+            "formula": "AVERAGE(purchase_orders[received_date] - purchase_orders[expected_date])",
+            "dax_measure": "Avg Lead Time Variance = AVERAGE(fact_order_fulfillment[delivery_variance_hours]) / 24"
           }
         ],
         "master_orchestrator_specification": {
           "pipeline_name": "pl_retail_medallion_master",
-          "description": "End-to-end master Data Factory DAG orchestrating ingestion, curation, dimensional modeling, and semantic model refresh.",
+          "folder_location": "Pipeline Orchestration",
+          "description": "Enterprise-grade top-level Microsoft Fabric Data Factory DAG coordinating multi-wave execution across Medallion layers.",
           "dag_execution_waves": [
             {
               "wave_index": 1,
-              "name": "Bronze Raw Ingestion",
+              "name": "Bronze Raw Ingestion (32 Tables)",
               "activity": "ExecutePipeline",
               "target_item": "pl_retail_bronze_ingest",
-              "description": "Extracts tables from PostgreSQL schema 'retail_ops' into Bronze Lakehouse 'lh_retail_bronze'."
+              "folder": "01 Raw",
+              "description": "Extracts 32 operational tables from PostgreSQL schema 'retail_ops' into Bronze Lakehouse 'lh_retail_bronze' with full audit metadata."
             },
             {
               "wave_index": 2,
-              "name": "Silver Delta Curation",
+              "name": "Silver Delta Curation & PII Masking",
               "activity": "TridentNotebook",
               "target_item": "nb_retail_curate_silver",
-              "depends_on": ["Bronze Raw Ingestion"],
-              "description": "Deduplicates records, applies SHA-256 PII masking, and executes Delta MERGE INTO 'lh_retail_silver'."
+              "folder": "02 Stage",
+              "depends_on": [
+                "Bronze Raw Ingestion (32 Tables)"
+              ],
+              "description": "Executes PySpark windowed deduplication, applies salted SHA-256 hashing to sensitive customer PII, and runs Delta MERGE INTO 'lh_retail_silver'."
             },
             {
               "wave_index": 3,
-              "name": "Gold Kimball Warehouse Build",
+              "name": "Data Quality & Great Expectations Validation",
               "activity": "TridentNotebook",
-              "target_item": "nb_retail_gold_star_schema",
-              "depends_on": ["Silver Delta Curation"],
-              "description": "Constructs Kimball Dimensions (dim_customer, dim_product, dim_store, dim_date) and Facts (fact_sales_orders, fact_order_fulfillment, fact_inventory_daily) in 'wh_retail_gold'."
+              "target_item": "nb_retail_quality_suite",
+              "folder": "02 Stage",
+              "depends_on": [
+                "Silver Delta Curation & PII Masking"
+              ],
+              "description": "Validates primary key uniqueness, null-key constraints, non-negative monetary figures, and schema contract integrity."
             },
             {
               "wave_index": 4,
-              "name": "Data Quality Gates",
+              "name": "Gold Kimball Star Schema Build",
               "activity": "TridentNotebook",
-              "target_item": "nb_retail_quality_suite",
-              "depends_on": ["Gold Kimball Warehouse Build"],
-              "description": "Executes Great Expectations assertions for schema validity, primary key uniqueness, and monetary constraints."
+              "target_item": "nb_retail_gold_star_schema",
+              "folder": "02 Stage",
+              "depends_on": [
+                "Data Quality & Great Expectations Validation"
+              ],
+              "description": "Constructs Kimball Conformed Dimensions (dim_date, dim_customer, dim_product, dim_store, dim_supplier, dim_carrier) and Facts (fact_sales_orders, fact_order_fulfillment, fact_inventory_daily, fact_customer_returns) in 'wh_retail_gold'."
             },
             {
               "wave_index": 5,
-              "name": "Direct Lake Semantic Model Refresh",
+              "name": "Power BI Direct Lake Semantic Model Refresh",
               "activity": "SemanticModelRefresh",
               "target_item": "sm_retail_direct_lake",
-              "depends_on": ["Data Quality Gates"],
-              "description": "Refreshes Power BI Direct Lake model metadata for sub-second report interactivity."
+              "folder": "04 Gold",
+              "depends_on": [
+                "Gold Kimball Star Schema Build"
+              ],
+              "description": "Refreshes Direct Lake metadata in 'sm_retail_direct_lake' enabling sub-second report interactivity for all 12 Executive KPIs."
             }
           ]
         }

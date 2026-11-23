@@ -10,6 +10,7 @@ from __future__ import annotations
 import base64
 import json
 import os
+import re
 import subprocess
 import time
 import uuid
@@ -253,26 +254,61 @@ def provision_item_with_definition(
     )
 
 
+def format_synapse_notebook(raw_content: str) -> str:
+    """Formats arbitrary Python code or multi-cell scripts into Microsoft Fabric Synapse PySpark notebook format.
+    Splits multi-cell scripts (delimited by # CELL, # %%, or cell markers) and wraps each cell in compliant
+    Synapse metadata so Fabric's PyToIPynb parser renders distinct interactive cells.
+    """
+    if not raw_content or not raw_content.strip():
+        raw_content = "# Microsoft Fabric PySpark Notebook\npass\n"
+
+    cleaned = raw_content.replace("\r\n", "\n").strip()
+
+    # Split on cell markers: # CELL, # %%, or In[ ] markers
+    cell_splits = re.split(r"(?:^|\n)(?:# CELL \*+|# %%|# In\[\d*\]:)(?:\n|$)", cleaned)
+
+    cells: list[str] = []
+    for split in cell_splits:
+        # Strip out any redundant global Fabric prologues or metadata blocks inside individual cells
+        split_clean = re.sub(r"# Fabric [Nn]otebook source\s*", "", split)
+        split_clean = re.sub(r"# METADATA \*+\s*# META \{.*?\}\s*", "", split_clean, flags=re.DOTALL)
+        split_clean = split_clean.strip()
+        if split_clean:
+            cells.append(split_clean)
+
+    if not cells:
+        cells = [cleaned]
+
+    cell_meta = (
+        "# METADATA ********************\n\n"
+        "# META {\n"
+        '# META   "language": "python",\n'
+        '# META   "language_group": "synapse_pyspark"\n'
+        "# META }\n"
+    )
+
+    header = (
+        "# Fabric notebook source\n\n"
+        "# METADATA ********************\n\n"
+        "# META {\n"
+        '# META   "kernel_info": {\n'
+        '# META     "name": "synapse_pyspark"\n'
+        "# META   },\n"
+        '# META   "dependencies": {}\n'
+        "# META }\n"
+    )
+
+    out = [header]
+    for c in cells:
+        out.append(f"# CELL ********************\n\n{c}\n\n{cell_meta}")
+
+    return "\n".join(out)
+
+
 def compile_notebook_update(pyspark_code: str, display_name: str = "Notebook") -> dict[str, Any]:
-    """Compiles PySpark notebook code into Base64 format for Fabric."""
-    if not pyspark_code.startswith("# Fabric notebook source"):
-        pyspark_code = (
-            "# Fabric notebook source\n\n"
-            "# METADATA ********************\n\n"
-            "# META {\n"
-            '# META   "kernel_info": {\n'
-            '# META     "name": "synapse_pyspark"\n'
-            "# META   },\n"
-            '# META   "dependencies": {}\n'
-            "# META }\n\n"
-            "# CELL ********************\n\n"
-            + pyspark_code.strip()
-            + "\n\n# METADATA ********************\n\n# META {\n"
-            '# META   "language": "python",\n'
-            '# META   "language_group": "synapse_pyspark"\n'
-            "# META }\n"
-        )
-    b64_content = base64.b64encode(pyspark_code.encode("utf-8")).decode("utf-8")
+    """Compiles PySpark notebook code into Base64 format for Fabric with multi-cell Synapse formatting."""
+    formatted_code = format_synapse_notebook(pyspark_code)
+    b64_content = base64.b64encode(formatted_code.encode("utf-8")).decode("utf-8")
     platform = {
         "$schema": "https://developer.microsoft.com/json-schemas/fabric/gitIntegration/platformProperties/2.0.0/schema.json",
         "metadata": {"type": "Notebook", "displayName": display_name},

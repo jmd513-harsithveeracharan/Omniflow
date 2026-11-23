@@ -173,7 +173,18 @@ export const ThoughtTrace: React.FC<ThoughtTraceProps> = ({ meta, isStreaming = 
         </span>
 
         {isStreaming && (
-          <Loader2 width={12} height={12} className="animate-spin" style={{ color: '#38bdf8', animation: 'spin 1s linear infinite', transformOrigin: 'center' }} />
+          <span
+            className="animate-spin"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              animation: 'spin 1s linear infinite',
+              transformOrigin: 'center center',
+            }}
+          >
+            <Loader2 width={12} height={12} style={{ color: '#38bdf8' }} />
+          </span>
         )}
 
         <span style={{ fontWeight: 500, color: isStreaming ? '#e2e8f0' : '#94a3b8' }}>
@@ -197,7 +208,7 @@ export const ThoughtTrace: React.FC<ThoughtTraceProps> = ({ meta, isStreaming = 
             const isCompleted = st.status === 'completed';
             const isInProgress = st.status === 'in_progress';
             const hasDetailOrOutput = Boolean(st.detail || st.output);
-            const isRowExpanded = Boolean(expandedRows[idx]);
+            const isRowExpanded = expandedRows[idx] !== undefined ? expandedRows[idx] : (isInProgress || (idx === steps.length - 1 && isStreaming));
 
             // Parse or fallback fields
             const action = st.action || st.title.split(' ')[0] || 'Processed';
@@ -268,12 +279,19 @@ export const ThoughtTrace: React.FC<ThoughtTraceProps> = ({ meta, isStreaming = 
 
                   {/* In-progress spinner */}
                   {isInProgress && (
-                    <Loader2
-                      width={11}
-                      height={11}
+                    <span
                       className="animate-spin"
-                      style={{ color: '#38bdf8', marginLeft: '4px', animation: 'spin 1s linear infinite', transformOrigin: 'center' }}
-                    />
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        marginLeft: '4px',
+                        animation: 'spin 1s linear infinite',
+                        transformOrigin: 'center center',
+                      }}
+                    >
+                      <Loader2 width={11} height={11} style={{ color: '#38bdf8' }} />
+                    </span>
                   )}
 
                   {/* Expand Chevron */}

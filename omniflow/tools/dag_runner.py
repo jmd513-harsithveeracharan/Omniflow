@@ -27,6 +27,7 @@ from omniflow.config.env_loader import get_workspace_id
 from omniflow.tools.asset_indexer import AssetIndexer
 from omniflow.tools.fabric_adapter import (
     create_item,
+    format_synapse_notebook,
     get_or_create_folder,
     move_item_to_folder,
     update_definition,
@@ -88,24 +89,9 @@ def compile_definition_payload(item_type: str, content: str, display_name: str) 
     """Compiles string content into Fabric's base64 multipart definition structure."""
     clean_type = item_type.lower()
     
-    # Enforce mandatory Synapse prologue for notebooks so Fabric cloud PyToIPynb conversion succeeds
-    if clean_type == "notebook" and not content.startswith("# Fabric notebook source"):
-        content = (
-            "# Fabric notebook source\n\n"
-            "# METADATA ********************\n\n"
-            "# META {\n"
-            '# META   "kernel_info": {\n'
-            '# META     "name": "synapse_pyspark"\n'
-            "# META   },\n"
-            '# META   "dependencies": {}\n'
-            "# META }\n\n"
-            "# CELL ********************\n\n"
-            + content.strip()
-            + "\n\n# METADATA ********************\n\n# META {\n"
-            '# META   "language": "python",\n'
-            '# META   "language_group": "synapse_pyspark"\n'
-            "# META }\n"
-        )
+    # Enforce multi-cell Synapse PySpark compliance for notebooks
+    if clean_type == "notebook":
+        content = format_synapse_notebook(content)
 
     b64_content = base64.b64encode(content.encode("utf-8")).decode("utf-8")
     platform = {

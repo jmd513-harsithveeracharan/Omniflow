@@ -1711,7 +1711,7 @@ nav.sidebar-nav {
 .spin {
     animation: spin 1s linear infinite !important;
     transform-origin: center center !important;
-    display: inline-block !important;
+    display: inline-flex !important;
 }
 
 .agent-working-title {
@@ -3816,16 +3816,10 @@ ul.chat-md-list {
     border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
-.chat-fabric-item-card.lakehouse-card {
-    border-left: 3px solid #0ea5e9;
-}
-
-.chat-fabric-item-card.notebook-card {
-    border-left: 3px solid #10b981;
-}
-
+.chat-fabric-item-card.lakehouse-card,
+.chat-fabric-item-card.notebook-card,
 .chat-fabric-item-card.pipeline-card {
-    border-left: 3px solid #a855f7;
+    border-left: none;
 }
 
 .item-badge-header {
@@ -11674,12 +11668,13 @@ pre[class*="language-"] {
     border-radius: 8px;
     padding: 10px 14px;
     margin: 8px 0;
-    border-left: 3px solid;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-left: none;
     background: rgba(255, 255, 255, 0.03);
 }
 
 .chat-md-callout.callout-note {
-    border-color: #38bdf8;
+    border-left: none;
     background: rgba(56, 189, 248, 0.08);
 }
 .chat-md-callout.callout-note .callout-header {

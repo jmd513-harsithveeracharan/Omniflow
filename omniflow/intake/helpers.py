@@ -74,7 +74,7 @@ def merge_connection_into_intake(
         "target_folder_structure",
         {
             "root_folder": f"{re.sub(r'[^a-zA-Z0-9_]', '_', proj_name).strip('_').title()}_Platform",
-            "subfolders": {"raw": "01 Raw", "stage": "02 Stage", "silver": "03 Silver", "gold": "04 Gold"},
+            "subfolders": {"raw": "01 Raw", "stage": "02 Stage", "silver": "03 Silver", "gold": "04 Gold", "orchestration": "Pipeline Orchestration"},
         },
     )
     plat_sum = p_ctx.setdefault("platform_summary", {})
@@ -328,18 +328,18 @@ def build_dynamic_plan_object(
     stage_label = sub_f.get("stage", "02 Stage")
     silver_label = sub_f.get("silver", "03 Silver")
     gold_label = sub_f.get("gold", "04 Gold")
-    orch_label = "05 Orchestration"
+    orch_label = sub_f.get("orchestration", "Pipeline Orchestration")
 
     items_list = [
-        {"name": f"lh_{clean_dom}_bronze", "type": "Lakehouse", "folder_name": f"{root_f}/{raw_label}/01_lakehouse"},
-        {"name": f"pl_{clean_dom}_bronze_ingest", "type": "DataPipeline", "depends_on": [f"lh_{clean_dom}_bronze"], "folder_name": f"{root_f}/{raw_label}/02_pipelines"},
-        {"name": f"nb_{clean_dom}_curate", "type": "Notebook", "depends_on": [f"lh_{clean_dom}_bronze"], "folder_name": f"{root_f}/{stage_label}/01_notebooks", "code": pyspark_code},
-        {"name": f"nb_{clean_dom}_quality_suite", "type": "Notebook", "depends_on": [f"nb_{clean_dom}_curate"], "folder_name": f"{root_f}/{stage_label}/02_quality", "code": quality_code},
-        {"name": f"lh_{clean_dom}_silver", "type": "Lakehouse", "folder_name": f"{root_f}/{silver_label}/01_lakehouse"},
-        {"name": f"nb_silver_transformations", "type": "Notebook", "depends_on": [f"lh_{clean_dom}_silver"], "folder_name": f"{root_f}/{silver_label}/02_notebooks", "code": pyspark_code},
-        {"name": f"wh_{clean_dom}_gold", "type": "Warehouse", "folder_name": f"{root_f}/{gold_label}/01_warehouse", "sql_code": sql_code},
-        {"name": f"sm_{clean_dom}_gold_direct_lake", "type": "SemanticModel", "depends_on": [f"wh_{clean_dom}_gold"], "folder_name": f"{root_f}/{gold_label}/02_semantic_models"},
-        {"name": f"pl_master_medallion_orchestration", "type": "DataPipeline", "depends_on": [f"wh_{clean_dom}_gold"], "folder_name": f"{root_f}/{orch_label}/01_pipelines"},
+        {"name": f"lh_{clean_dom}_bronze", "type": "Lakehouse", "folder_name": f"{root_f}/{raw_label}"},
+        {"name": f"pl_{clean_dom}_bronze_ingest", "type": "DataPipeline", "depends_on": [f"lh_{clean_dom}_bronze"], "folder_name": f"{root_f}/{raw_label}"},
+        {"name": f"nb_{clean_dom}_curate", "type": "Notebook", "depends_on": [f"lh_{clean_dom}_bronze"], "folder_name": f"{root_f}/{stage_label}", "code": pyspark_code},
+        {"name": f"nb_{clean_dom}_quality_suite", "type": "Notebook", "depends_on": [f"nb_{clean_dom}_curate"], "folder_name": f"{root_f}/{stage_label}", "code": quality_code},
+        {"name": f"lh_{clean_dom}_silver", "type": "Lakehouse", "folder_name": f"{root_f}/{silver_label}"},
+        {"name": f"nb_silver_transformations", "type": "Notebook", "depends_on": [f"lh_{clean_dom}_silver"], "folder_name": f"{root_f}/{stage_label}", "code": pyspark_code},
+        {"name": f"wh_{clean_dom}_gold", "type": "Warehouse", "folder_name": f"{root_f}/{gold_label}", "sql_code": sql_code},
+        {"name": f"sm_{clean_dom}_gold_direct_lake", "type": "SemanticModel", "depends_on": [f"wh_{clean_dom}_gold"], "folder_name": f"{root_f}/{gold_label}"},
+        {"name": f"pl_master_medallion_orchestration", "type": "DataPipeline", "depends_on": [f"wh_{clean_dom}_gold"], "folder_name": f"{root_f}/{orch_label}"},
     ]
 
     audit_pct = (res or {}).get("audit_output", {}).get("compliance_score_pct", 100)
