@@ -319,6 +319,11 @@ def build_dynamic_plan_object(
             f");\n"
         )
 
+    clean_pname = re.sub(r"[^a-zA-Z0-9_]", "_", proj_name).strip("_")
+    default_proj_root = clean_pname if clean_pname.lower().endswith(("_platform", "_medallion")) else f"{clean_dom.title()}_Platform"
+    if not root_f or root_f.lower() in ("ai_test_folder", "root", "none"):
+        root_f = default_proj_root
+
     raw_label = sub_f.get("raw", "01 Raw")
     stage_label = sub_f.get("stage", "02 Stage")
     silver_label = sub_f.get("silver", "03 Silver")

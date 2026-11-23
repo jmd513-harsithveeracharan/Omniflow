@@ -227,19 +227,11 @@ def build_workspace_project_graph(project_code: str) -> nx.DiGraph:
             ntype = _map_fabric_item_node_type(itype)
             is_container = ntype in ("lakehouse", "warehouse", "schema")
 
-            parent_hub: str | None = None
-            if fname and fname.lower() != "root":
-                fnode_id = f"schema_folder_{ws_id}_{fid}"
-                if fnode_id not in seen_folders:
-                    seen_folders.add(fnode_id)
-                    f_layer = infer_layer_name(fname, fname, "Folder")
-                    add_node(g, fnode_id, fname, "schema", layer if f_layer == "workspace" else f_layer, radius=13.0, desc=f"Workspace Folder [{fname}] in {ws_name}")
-                parent_hub = fnode_id
-
+            # Folders in Fabric are organizational containers, not data lineage graph nodes.
+            # Preserve folder context in the item description without creating folder hub nodes.
             nid = f"fab_{iid}"
-            add_node(g, nid, iname, ntype, layer, parent_id=parent_hub, radius=12.5 if is_container else 7.5, desc=f"{itype} in workspace '{ws_name}'" + (f" ({fname})" if fname else ""))  # type: ignore[arg-type]
-            if parent_hub:
-                add_edge(g, parent_hub, nid, "CONTAINS", desc=f"Folder [{fname}] contains {iname}")
+            item_desc = f"{itype} in workspace '{ws_name}'" + (f" (Folder: {fname})" if fname else "")
+            add_node(g, nid, iname, ntype, layer, parent_id=None, radius=12.5 if is_container else 7.5, desc=item_desc)  # type: ignore[arg-type]
             layer_buckets.setdefault(layer, []).append(nid)
             if is_container and itype.lower() == "lakehouse" and len(iid) >= 32 and len(lh_candidates) < 2:
                 lh_candidates.append((nid, iid, iname, layer))

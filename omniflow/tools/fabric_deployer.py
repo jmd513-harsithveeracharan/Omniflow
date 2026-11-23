@@ -145,8 +145,26 @@ def deploy_medallion_architecture_to_fabric(
     silver_folder_id = None
     gold_folder_id = None
 
+    # Project-specific folder containment (1 dedicated folder per project)
+    # Default ON to isolate demo items in PBT_DATA_AGENT; toggleable via FABRIC_PROJECT_FOLDER_CONTAINMENT
+    auto_contain = os.getenv("FABRIC_PROJECT_FOLDER_CONTAINMENT", "true").lower() != "false"
+
+    if auto_contain and not target_folders:
+        clean_proj = re.sub(r"[^a-zA-Z0-9_]", "_", project_code or domain).strip("_")
+        root_default = f"{domain.title()}_Platform" if domain != "enterprise" else f"{clean_proj}_Platform"
+        target_folders = {
+            "root": root_default,
+            "raw": "01 Raw",
+            "stage": "02 Stage",
+            "silver": "03 Silver",
+            "gold": "04 Gold",
+        }
+
     if target_folders and isinstance(target_folders, dict):
-        root = target_folders.get("root") or target_folders.get("root_folder") or f"{domain.capitalize()}_Platform"
+        raw_root = target_folders.get("root") or target_folders.get("root_folder") or ""
+        clean_proj = re.sub(r"[^a-zA-Z0-9_]", "_", project_code or domain).strip("_")
+        default_root = f"{domain.title()}_Platform" if domain != "enterprise" else f"{clean_proj}_Platform"
+        root = default_root if (not raw_root or raw_root.lower() in ("ai_test_folder", "root", "none")) else raw_root
         subs = target_folders.get("subfolders") if isinstance(target_folders.get("subfolders"), dict) else {}
         raw_sub = target_folders.get("raw") or subs.get("raw") or "01 Raw"
         stage_sub = target_folders.get("stage") or subs.get("stage") or "02 Stage"

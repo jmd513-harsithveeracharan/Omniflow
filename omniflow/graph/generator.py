@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from typing import Any, Literal
 import networkx as nx
 
@@ -263,7 +264,13 @@ def build_mesh_from_plan(plan: dict[str, Any] | None) -> nx.DiGraph:
         return build_rich_medallion_galaxy()
 
     g = nx.DiGraph()
-    source_name = plan.get("sourceName") or plan.get("source_system") or "PostgreSQL Relational Source"
+    raw_source = str(plan.get("sourceName") or plan.get("source_system") or "").strip()
+    clean_src = re.sub(r"(?i)\b(ai_test_folder|folder|sandbox|directory|root)\b", "", raw_source).strip()
+    clean_src = re.sub(r"(?i)\s+gateway\b", "", clean_src).strip()
+    dom_title = str(plan.get("domain") or "PostgreSQL").replace("_", " ").title()
+    if not clean_src or len(clean_src) < 3 or clean_src.lower() in ("source", "database", "gateway", "data source", "root"):
+        clean_src = f"{dom_title} Relational Source"
+    source_name = clean_src
     lakehouses = plan.get("lakehouses", [])
     notebooks = plan.get("notebooks", [])
     pipeline = plan.get("pipeline", {})

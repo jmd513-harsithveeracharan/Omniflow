@@ -1564,18 +1564,25 @@ async def handle_pipeline_deploy(req: DeployPlanRequest) -> dict[str, Any]:
     domain = plan_data.get("domain", "fabric")
     pcode = plan_data.get("project_code") or f"PRJ-{uuid.uuid4().hex[:6].upper()}"
     clean_d = re.sub(r"[^a-zA-Z0-9_]", "_", domain).strip("_") or "fabric"
-    root_folder = plan_data.get("root_folder") or f"{clean_d.capitalize()}_Platform"
+    raw_root = plan_data.get("root_folder") or ""
+    if not raw_root or raw_root.lower() in ("ai_test_folder", "root", "none"):
+        root_folder = f"{clean_d.title()}_Platform"
+    else:
+        root_folder = raw_root
     subfolders = plan_data.get("folders") or {"raw": "01 Raw", "stage": "02 Stage", "silver": "03 Silver", "gold": "04 Gold"}
 
     items_to_deploy: list[FabricItemSpec] = []
     if plan_data.get("items"):
         for it in plan_data["items"]:
+            it_folder = it.get("folder_name") or root_folder
+            if it_folder.lower().startswith("ai_test_folder"):
+                it_folder = it_folder.replace("AI_Test_Folder", root_folder).replace("ai_test_folder", root_folder)
             items_to_deploy.append(
                 FabricItemSpec(
                     name=it.get("name") or it.get("display_name", f"item_{uuid.uuid4().hex[:4]}"),
                     item_type=it.get("type") or it.get("item_type", "Lakehouse"),
                     depends_on=it.get("depends_on", []),
-                    folder_name=it.get("folder_name") or root_folder,
+                    folder_name=it_folder,
                     description=it.get("description", ""),
                 )
             )
@@ -2282,8 +2289,11 @@ async def handle_chat_stream(req: ChatRequest) -> StreamingResponse:
                 proj_code = p_summary.get("project_code") or f"PRJ-{uuid.uuid4().hex[:6].upper()}"
 
             clean_dom = re.sub(r"[^a-zA-Z0-9_]", "_", (p_summary.get("business_domain") or proj_name).lower()).strip("_")[:48] or "fabric"
+            clean_pname = re.sub(r"[^a-zA-Z0-9_]", "_", proj_name).strip("_")
+            default_proj_root = clean_pname if clean_pname.lower().endswith(("_platform", "_medallion")) else f"{clean_dom.title()}_Platform"
             folder_struct = sol_summary.get("target_folder_structure", {})
-            root_f = folder_struct.get("root_folder") or f"{clean_dom.capitalize()}_Platform"
+            raw_root_f = folder_struct.get("root_folder") or ""
+            root_f = default_proj_root if (not raw_root_f or raw_root_f.lower() in ("ai_test_folder", "root", "none")) else raw_root_f
             sub_f = folder_struct.get("subfolders", {"raw": "01 Raw", "stage": "02 Stage", "silver": "03 Silver", "gold": "04 Gold"})
 
             # Dynamic prompt override of containment/root folder
