@@ -2210,7 +2210,17 @@ async def handle_chat_stream(req: ChatRequest) -> StreamingResponse:
             gold_f = f"{root_f}/{sub_f.get('gold', '04 Gold')}"
             orch_f = f"{root_f}/{sub_f.get('orchestration', 'Pipeline Orchestration')}"
 
-            def _resolve_spec_definition(it_n: str, it_t: str, p: dict[str, Any]) -> str | None:
+            def _resolve_spec_definition(it_n: str, it_t: str, p: dict[str, Any], it_obj: dict[str, Any] | None = None) -> str | None:
+                if it_obj:
+                    if it_obj.get("code"):
+                        return it_obj["code"]
+                    if it_obj.get("sql_code"):
+                        return it_obj["sql_code"]
+                    if it_obj.get("definition_template"):
+                        return it_obj["definition_template"]
+                    if it_obj.get("pipeline"):
+                        return json.dumps(it_obj["pipeline"], indent=2) if isinstance(it_obj["pipeline"], dict) else str(it_obj["pipeline"])
+
                 t_lower = it_t.lower()
                 n_lower = it_n.lower()
                 dom = p.get("domain") or "postgres_medallion"
@@ -2289,37 +2299,33 @@ CREATE TABLE IF NOT EXISTS gold.fact_{dom}_activity (
                     it_type = it.get("type") or it.get("item_type", "Lakehouse")
                     it_name = it.get("name") or it.get("display_name", f"item_{uuid.uuid4().hex[:4]}")
                     orig_folder = it.get("folder_name") or ""
-                    # STRICT RULE: Notebooks MUST NEVER be in 01 Raw!
-                    if it_type.lower() == "notebook":
-                        target_f = stage_f
-                    # Master Orchestration Pipeline belongs strictly in Pipeline Orchestration
-                    elif it_type.lower() in ("datapipeline", "pipeline") and any(k in it_name.lower() for k in ("master", "orchestrat")):
-                        target_f = orch_f
-                    elif "orchestrat" in orig_folder.lower():
-                        target_f = orch_f
-                    elif "01 Raw" in orig_folder or "raw" in orig_folder.lower():
-                        target_f = raw_f
-                    elif "02 Stage" in orig_folder or "stage" in orig_folder.lower() or "quality" in orig_folder.lower():
-                        target_f = stage_f
-                    elif "03 Silver" in orig_folder or "silver" in orig_folder.lower():
-                        target_f = silver_f
-                    elif "04 Gold" in orig_folder or "gold" in orig_folder.lower() or "warehouse" in it_type.lower():
-                        target_f = gold_f
-                    elif it_type.lower() in ("lakehouse", "datapipeline") and "silver" not in it_name.lower() and "gold" not in it_name.lower():
-                        target_f = raw_f
-                    elif "silver" in it_name.lower():
-                        target_f = silver_f
-                    elif "gold" in it_name.lower():
-                        target_f = gold_f
+
+                    # Respect deeply nested multi-tier subfolder hierarchy
+                    if orig_folder:
+                        if it_type.lower() == "notebook" and ("01_raw" in orig_folder.lower() or "01 raw" in orig_folder.lower()):
+                            target_f = stage_f
+                        else:
+                            target_f = orig_folder
                     else:
-                        target_f = stage_f
+                        if it_type.lower() == "notebook":
+                            target_f = stage_f
+                        elif it_type.lower() in ("datapipeline", "pipeline") and any(k in it_name.lower() for k in ("master", "orchestrat")):
+                            target_f = orch_f
+                        elif "orchestrat" in it_name.lower():
+                            target_f = orch_f
+                        elif "silver" in it_name.lower():
+                            target_f = silver_f
+                        elif "gold" in it_name.lower() or "warehouse" in it_type.lower():
+                            target_f = gold_f
+                        else:
+                            target_f = raw_f
 
                     items_to_deploy.append(
                         FabricItemSpec(
                             name=it_name,
                             item_type=it_type,
                             depends_on=it.get("depends_on", []),
-                            definition_template=_resolve_spec_definition(it_name, it_type, active_plan),
+                            definition_template=_resolve_spec_definition(it_name, it_type, active_plan, it),
                             folder_name=target_f,
                             description=it.get("description", ""),
                         )
