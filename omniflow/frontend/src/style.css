@@ -10444,7 +10444,7 @@ pre:has(.code-card) {
     flex: 1;
     overflow: auto;
     position: relative;
-    background: #0b0c0e;
+    background: #121214;
 }
 
 .wb-modern-code-editor {
@@ -11571,7 +11571,7 @@ pre:has(.code-card) {
 .code-editor-header {
     height: 44px;
     padding: 0 16px;
-    background: #14171d;
+    background: #18181b;
     border-bottom: 1px solid rgba(255, 255, 255, 0.08);
     display: flex;
     align-items: center;
@@ -11662,7 +11662,7 @@ pre:has(.code-card) {
     flex: 1;
     height: calc(100% - 44px);
     overflow: auto;
-    background: #0d0f13;
+    background: #121214;
     position: relative;
 }
 

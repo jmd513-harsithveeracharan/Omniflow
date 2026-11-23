@@ -115,9 +115,9 @@ export const DeltaSchemaPane: React.FC<DeltaSchemaPaneProps> = ({
   const wmCol = currentTable.watermark_column || 'updated_at';
 
   return (
-    <div className="wb-view-pane active" style={{ display: 'flex', flexDirection: 'column', flex: 1, width: '100%', height: '100%', minHeight: 0, background: '#090a0f' }}>
+    <div className="wb-view-pane active" style={{ display: 'flex', flexDirection: 'column', flex: 1, width: '100%', height: '100%', minHeight: 0, background: '#121214' }}>
       {/* Table Selector Bar */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '10px 16px', overflowX: 'auto', borderBottom: '1px solid rgba(255, 255, 255, 0.08)', background: 'rgba(0,0,0,0.3)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '10px 16px', overflowX: 'auto', borderBottom: '1px solid rgba(255, 255, 255, 0.08)', background: '#18181b' }}>
         <span style={{ fontSize: '11px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', marginRight: '4px', whiteSpace: 'nowrap' }}>
           Tables ({tableEntries.length}):
         </span>

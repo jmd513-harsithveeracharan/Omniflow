@@ -995,26 +995,27 @@ export const MedallionFlowCanvas: React.FC<MedallionFlowCanvasProps> = ({
 
         {/* 5. Fabric JSON Spec */}
         {activeTab === 'wbJson' && (
-          <div className="wb-view-pane active">
-            <div className="code-editor-header">
-              <div className="code-header-left">
+          <div className="wb-view-pane active" style={{ display: 'flex', flexDirection: 'column', height: '100%', background: '#121214' }}>
+            <div className="code-editor-header" style={{ background: '#18181b', borderBottom: '1px solid rgba(255, 255, 255, 0.08)', padding: '10px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div className="code-header-left" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <span className="wb-code-file-badge">fabric-plan.json</span>
                 <span className="wb-layer-pill">Trident Payload</span>
               </div>
-              <div className="code-header-right">
-                <span className="wb-code-stat-badge">{jsonSpec.split('\n').length} lines</span>
+              <div className="code-header-right" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <span className="wb-code-stat-badge" style={{ fontSize: '11.5px', color: '#64748b', fontFamily: 'monospace' }}>{jsonSpec.split('\n').length} lines</span>
                 <button
                   className="btn-copy-code"
                   type="button"
                   onClick={() => handleCopy(jsonSpec)}
+                  style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', background: 'rgba(255, 255, 255, 0.06)', border: '1px solid rgba(255, 255, 255, 0.1)', color: '#cbd5e1', padding: '4px 10px', borderRadius: '6px', cursor: 'pointer' }}
                 >
                   {copied ? <Check width={12} height={12} /> : <Copy width={12} height={12} />}
                   <span>{copied ? 'Copied' : 'Copy JSON'}</span>
                 </button>
               </div>
             </div>
-            <div className="code-editor-view-container">
-              <pre className="code-editor-view">
+            <div className="code-editor-view-container" style={{ flex: 1, minHeight: 0, overflow: 'auto', padding: '16px', background: '#121214' }}>
+              <pre className="code-editor-view" style={{ background: '#18181b', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '8px', padding: '16px', color: '#e2e8f0', margin: 0 }}>
                 <code>{jsonSpec}</code>
               </pre>
             </div>

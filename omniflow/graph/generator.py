@@ -259,99 +259,195 @@ def build_rich_medallion_galaxy() -> nx.DiGraph:
 
 
 def build_mesh_from_plan(plan: dict[str, Any] | None) -> nx.DiGraph:
-    """Dynamically compiles a clean, multi-tier Medallion Lineage DAG from the architecture plan."""
+    """Dynamically compiles a pure tabular Entity-Relationship & Lineage DAG from the architecture plan.
+    Strictly models schemas, tables, and columns with foreign keys and transformations.
+    Eliminates folder nodes, pipeline noise, and generic feeds edges.
+    """
     if not plan or not isinstance(plan, dict) or not plan.get("lakehouses"):
         return build_rich_medallion_galaxy()
 
     g = nx.DiGraph()
-    raw_source = str(plan.get("sourceName") or plan.get("source_system") or "").strip()
-    clean_src = re.sub(r"(?i)\b(ai_test_folder|folder|sandbox|directory|root)\b", "", raw_source).strip()
-    clean_src = re.sub(r"(?i)\s+gateway\b", "", clean_src).strip()
-    dom_title = str(plan.get("domain") or "PostgreSQL").replace("_", " ").title()
-    if not clean_src or len(clean_src) < 3 or clean_src.lower() in ("source", "database", "gateway", "data source", "root"):
-        clean_src = f"{dom_title} Relational Source"
-    source_name = clean_src
     lakehouses = plan.get("lakehouses", [])
-    notebooks = plan.get("notebooks", [])
-    pipeline = plan.get("pipeline", {})
     tables = plan.get("tables", [])
     warehouse = plan.get("warehouse") or "wh_postgres_medallion_gold"
 
-    # 1. Source System Node (Leftmost root)
-    add_node(g, "src_root", str(source_name), "source", "source", radius=16.0, desc="Relational Source Database")
-
-    # 2. Ingestion Pipeline Node
-    pl_name = pipeline.get("name") if isinstance(pipeline, dict) else str(pipeline or "pl_bronze_ingest")
-    add_node(g, f"pl_{pl_name}", str(pl_name), "pipeline", "bronze", radius=10.0, desc="Fabric Bronze Ingestion Pipeline")
-    add_edge(g, "src_root", f"pl_{pl_name}", "FEEDS", "Batch CDC Extraction", True)
-
-    # 3. Lakehouses (Bronze & Silver)
     lh_bronze = next((str(l) for l in lakehouses if "bronze" in str(l).lower()), lakehouses[0] if lakehouses else "lh_bronze")
     lh_silver = next((str(l) for l in lakehouses if "silver" in str(l).lower()), lakehouses[1] if len(lakehouses) > 1 else "lh_silver")
 
-    add_node(g, f"lh_{lh_bronze}", lh_bronze, "lakehouse", "bronze", radius=14.0, desc=f"Raw Delta Lakehouse '{lh_bronze}'")
-    add_edge(g, f"pl_{pl_name}", f"lh_{lh_bronze}", "FEEDS", "Raw Parquet / Delta Landing", True)
+    # 1. Clean Schema Containers (Grouping boundaries without folder noise)
+    add_node(g, "schema_source", "Source Relational Schema", "schema", "source", radius=14.0, desc="Source Tables & Entity Relations")
+    add_node(g, "schema_bronze", str(lh_bronze), "schema", "bronze", radius=14.0, desc=f"Raw Delta Lakehouse: {lh_bronze}")
+    add_node(g, "schema_silver", str(lh_silver), "schema", "silver", radius=14.0, desc=f"Harmonized Clean Delta Lakehouse: {lh_silver}")
+    add_node(g, "schema_gold", str(warehouse), "schema", "gold", radius=14.0, desc=f"Direct Lake Dimensional Mart: {warehouse}")
 
-    add_node(g, f"lh_{lh_silver}", lh_silver, "lakehouse", "silver", radius=14.0, desc=f"Harmonized Delta Lakehouse '{lh_silver}'")
+    # Standard column registry for known data entities
+    COLUMN_CATALOG: dict[str, list[tuple[str, str, bool, bool]]] = {
+        "customers": [
+            ("customer_id", "bigint", True, False),
+            ("email", "varchar(255)", False, False),
+            ("first_name", "varchar(100)", False, False),
+            ("last_name", "varchar(100)", False, False),
+            ("created_at", "timestamp", False, False),
+        ],
+        "orders": [
+            ("order_id", "bigint", True, False),
+            ("customer_id", "bigint", False, True),
+            ("order_date", "timestamp", False, False),
+            ("total_amount", "decimal(12,2)", False, False),
+            ("status", "varchar(50)", False, False),
+        ],
+        "order_items": [
+            ("item_id", "bigint", True, False),
+            ("order_id", "bigint", False, True),
+            ("product_id", "bigint", False, True),
+            ("quantity", "int", False, False),
+            ("unit_price", "decimal(10,2)", False, False),
+        ],
+        "products": [
+            ("product_id", "bigint", True, False),
+            ("sku", "varchar(50)", False, False),
+            ("product_name", "varchar(200)", False, False),
+            ("price", "decimal(10,2)", False, False),
+            ("is_active", "boolean", False, False),
+        ],
+        "runs": [
+            ("run_id", "varchar(64)", True, False),
+            ("project_code", "varchar(64)", False, True),
+            ("status", "varchar(32)", False, False),
+            ("started_at", "timestamp", False, False),
+            ("duration_ms", "bigint", False, False),
+        ],
+        "agent_runs": [
+            ("agent_run_id", "varchar(64)", True, False),
+            ("run_id", "varchar(64)", False, True),
+            ("agent_name", "varchar(100)", False, False),
+            ("status", "varchar(32)", False, False),
+        ],
+        "tool_runs": [
+            ("tool_run_id", "varchar(64)", True, False),
+            ("run_id", "varchar(64)", False, True),
+            ("tool_name", "varchar(100)", False, False),
+            ("latency_ms", "int", False, False),
+        ],
+        "fabric_items": [
+            ("item_id", "varchar(64)", True, False),
+            ("project_code", "varchar(64)", False, True),
+            ("item_name", "varchar(128)", False, False),
+            ("item_type", "varchar(64)", False, False),
+        ],
+        "projects": [
+            ("project_code", "varchar(64)", True, False),
+            ("project_name", "varchar(128)", False, False),
+            ("owner_email", "varchar(128)", False, True),
+            ("created_at", "timestamp", False, False),
+        ],
+        "users": [
+            ("user_id", "varchar(64)", True, False),
+            ("email", "varchar(128)", False, False),
+            ("role", "varchar(64)", False, False),
+        ],
+        "lineage_graph_edges": [
+            ("edge_id", "varchar(64)", True, False),
+            ("run_id", "varchar(64)", False, True),
+            ("source_node", "varchar(128)", False, False),
+            ("target_node", "varchar(128)", False, False),
+        ],
+        "llm_token_logs": [
+            ("log_id", "varchar(64)", True, False),
+            ("run_id", "varchar(64)", False, True),
+            ("prompt_tokens", "int", False, False),
+            ("completion_tokens", "int", False, False),
+        ],
+    }
 
-    # 4. Notebooks (Curate / Quality)
-    curate_nb = next((n for n in notebooks if "curate" in str(n.get("name") if isinstance(n, dict) else n).lower() or "silver" in str(n.get("name") if isinstance(n, dict) else n).lower()), None)
-    curate_name = str(curate_nb.get("name") if isinstance(curate_nb, dict) else (curate_nb or "nb_curate"))
-    add_node(g, f"nb_{curate_name}", curate_name, "notebook", "stage", radius=11.0, desc="PySpark Delta MERGE & SHA-256 PII Masking")
-    add_edge(g, f"lh_{lh_bronze}", f"nb_{curate_name}", "DEPENDS_ON", "Read Raw Delta", True)
-    add_edge(g, f"nb_{curate_name}", f"lh_{lh_silver}", "TRANSFORMS_TO", "Delta MERGE Upsert", True)
+    # Inter-table foreign key relationships
+    KNOWN_FK_EDGES = [
+        ("order_items", "orders", "order_id"),
+        ("orders", "customers", "customer_id"),
+        ("order_items", "products", "product_id"),
+        ("agent_runs", "runs", "run_id"),
+        ("tool_runs", "runs", "run_id"),
+        ("lineage_graph_edges", "runs", "run_id"),
+        ("llm_token_logs", "runs", "run_id"),
+        ("fabric_items", "projects", "project_code"),
+        ("runs", "projects", "project_code"),
+        ("projects", "users", "owner_email"),
+    ]
 
-    quality_nb = next((n for n in notebooks if "quality" in str(n.get("name") if isinstance(n, dict) else n).lower()), None)
-    if quality_nb:
-        quality_name = str(quality_nb.get("name") if isinstance(quality_nb, dict) else quality_nb)
-        add_node(g, f"nb_{quality_name}", quality_name, "notebook", "stage", radius=9.0, desc="Great Expectations Anomaly & Schema Verification")
-        add_edge(g, f"lh_{lh_silver}", f"nb_{quality_name}", "DEPENDS_ON", "Audit Silver Datasets", True)
-
-    # 5. Gold Warehouse & Direct Lake Semantic Model
-    add_node(g, "wh_gold", str(warehouse), "warehouse", "gold", radius=14.0, desc="Kimball Star Schema T-SQL Mart")
-    add_edge(g, f"lh_{lh_silver}", "wh_gold", "FEEDS", "Direct Lake T-SQL Aggregations", True)
-
-    semantic_name = f"sm_{str(warehouse).replace('wh_', '')}_direct_lake"
-    add_node(g, "sm_direct_lake", semantic_name, "metric", "gold", radius=12.0, desc="Power BI Direct Lake Semantic Model")
-    add_edge(g, "wh_gold", "sm_direct_lake", "FEEDS", "Direct Lake Semantic Cache", True)
-
-    # 6. Entity-level table lineage: brz_* in Bronze -> nb_curate -> slv_* in Silver
+    short_entities: set[str] = set()
     if tables and isinstance(tables, list):
-        brz_tbls: dict[str, dict[str, Any]] = {}
-        slv_tbls: dict[str, dict[str, Any]] = {}
-
         for tbl in tables:
             tname = str(tbl.get("name", "table"))
-            if tname.startswith("brz_"):
-                short = tname[4:]
-                brz_tbls[short] = tbl
-            elif tname.startswith("slv_"):
-                short = tname[4:]
-                slv_tbls[short] = tbl
-            else:
-                brz_tbls[tname] = tbl
+            clean_short = tname
+            if clean_short.startswith("brz_"):
+                clean_short = clean_short[4:]
+            elif clean_short.startswith("slv_"):
+                clean_short = clean_short[4:]
+            elif "." in clean_short:
+                clean_short = clean_short.split(".")[-1]
+            short_entities.add(clean_short.strip().lower())
 
-        for short_name in set(brz_tbls.keys()) | set(slv_tbls.keys()):
-            brz_id = f"tbl_brz_{short_name}"
-            slv_id = f"tbl_slv_{short_name}"
+    if not short_entities:
+        short_entities = {"customers", "orders", "order_items", "products"}
 
-            # Bronze Delta table
-            add_node(g, brz_id, f"brz_{short_name}", "table", "bronze", parent_id=f"lh_{lh_bronze}", radius=6.5, desc=f"Raw Delta Table: {short_name}")
-            add_edge(g, f"lh_{lh_bronze}", brz_id, "CONTAINS")
-            add_edge(g, brz_id, f"nb_{curate_name}", "DEPENDS_ON", "Curation source", True)
+    # 2. Build Medallion Tabular Nodes & Columns
+    for entity in short_entities:
+        src_id = f"tbl_src_{entity}"
+        brz_id = f"tbl_brz_{entity}"
+        slv_id = f"tbl_slv_{entity}"
+        gold_id = f"tbl_gold_{entity}"
+        gold_name = f"fact_{entity}" if any(w in entity for w in ("order", "run", "item", "log", "edge")) else f"dim_{entity}"
 
-            # Silver Delta table
-            add_node(g, slv_id, f"slv_{short_name}", "table", "silver", parent_id=f"lh_{lh_silver}", radius=6.5, desc=f"Cleaned Delta Table: {short_name}")
-            add_edge(g, f"nb_{curate_name}", slv_id, "TRANSFORMS_TO", "MERGE Deduplication", True)
-            add_edge(g, f"lh_{lh_silver}", slv_id, "CONTAINS")
+        # Source Table
+        add_node(g, src_id, entity, "table", "source", parent_id="schema_source", radius=7.0, desc=f"Source Relational Entity: {entity}")
+        add_edge(g, "schema_source", src_id, "CONTAINS")
 
-            # Link primary silver entities to Gold Warehouse
-            if short_name in ["customers", "orders", "order_items", "products", "sales"]:
-                dim_id = f"tbl_gold_{short_name}"
-                gold_label = f"fact_{short_name}" if "order" in short_name or "sale" in short_name else f"dim_{short_name}"
-                add_node(g, dim_id, gold_label, "table", "gold", parent_id="wh_gold", radius=7.0, desc=f"Kimball Star {gold_label}")
-                add_edge(g, slv_id, dim_id, "TRANSFORMS_TO", "Kimball dimensional modeling", True)
-                add_edge(g, "wh_gold", dim_id, "CONTAINS")
-                add_edge(g, dim_id, "sm_direct_lake", "FEEDS", "Semantic relationship", True)
+        # Bronze Delta Table
+        add_node(g, brz_id, f"brz_{entity}", "table", "bronze", parent_id="schema_bronze", radius=7.0, desc=f"Raw Bronze Delta Table: brz_{entity}")
+        add_edge(g, "schema_bronze", brz_id, "CONTAINS")
+        add_edge(g, src_id, brz_id, "TRANSFORMS_TO", "Raw Delta Append Ingest", True)
+
+        # Silver Delta Table
+        add_node(g, slv_id, f"slv_{entity}", "table", "silver", parent_id="schema_silver", radius=7.5, desc=f"Silver Curated Delta: slv_{entity} (SCD2 MERGE)")
+        add_edge(g, "schema_silver", slv_id, "CONTAINS")
+        add_edge(g, brz_id, slv_id, "TRANSFORMS_TO", "Delta MERGE Upsert & PII Mask", True)
+
+        # Gold Mart Table
+        add_node(g, gold_id, gold_name, "table", "gold", parent_id="schema_gold", radius=8.0, desc=f"Gold Dimensional Model: {gold_name}")
+        add_edge(g, "schema_gold", gold_id, "CONTAINS")
+        add_edge(g, slv_id, gold_id, "TRANSFORMS_TO", "Kimball Star Aggregation", True)
+
+        # Expand Columns for this entity
+        col_specs = COLUMN_CATALOG.get(entity, [
+            (f"{entity}_id", "bigint", True, False),
+            ("name", "varchar(100)", False, False),
+            ("updated_at", "timestamp", False, False),
+        ])
+        for col_name, col_type, is_pk, is_fk in col_specs:
+            cid = f"col_{entity}_{col_name}"
+            add_node(
+                g,
+                cid,
+                col_name,
+                "column",
+                "silver",
+                parent_id=slv_id,
+                data_type=col_type,
+                is_pk=is_pk,
+                is_fk=is_fk,
+                radius=3.2,
+                desc=f"Column [{col_name}] Type: {col_type}" + (" (Primary Key)" if is_pk else (" (Foreign Key)" if is_fk else "")),
+            )
+            add_edge(g, slv_id, cid, "CONTAINS")
+
+    # 3. Add Tabular Foreign Key Joins (Entity Relationships)
+    for child, parent, fk_col in KNOWN_FK_EDGES:
+        if child in short_entities and parent in short_entities:
+            # Source FK
+            add_edge(g, f"tbl_src_{child}", f"tbl_src_{parent}", "JOINS_WITH", f"FK: {fk_col}")
+            # Silver FK
+            add_edge(g, f"tbl_slv_{child}", f"tbl_slv_{parent}", "JOINS_WITH", f"FK: {fk_col}")
+            # Gold Star Schema FK
+            add_edge(g, f"tbl_gold_{child}", f"tbl_gold_{parent}", "JOINS_WITH", f"Fact-to-Dim: {fk_col}")
 
     return g

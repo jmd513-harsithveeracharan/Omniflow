@@ -48,8 +48,8 @@ export const CodeEditorPane: React.FC<CodeEditorPaneProps> = ({
   };
 
   return (
-    <div className="wb-view-pane active" style={{ display: 'flex', flexDirection: 'column', height: '100%', background: '#090a0f' }}>
-      <div className="code-editor-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 16px', borderBottom: '1px solid rgba(255, 255, 255, 0.08)', background: 'rgba(0,0,0,0.3)', flexWrap: 'wrap', gap: '8px' }}>
+    <div className="wb-view-pane active" style={{ display: 'flex', flexDirection: 'column', height: '100%', background: '#121214' }}>
+      <div className="code-editor-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 16px', borderBottom: '1px solid rgba(255, 255, 255, 0.08)', background: '#18181b', flexWrap: 'wrap', gap: '8px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
           <button
             type="button"

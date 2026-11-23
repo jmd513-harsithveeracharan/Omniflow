@@ -2183,7 +2183,8 @@ async def handle_chat_stream(req: ChatRequest) -> StreamingResponse:
                 status_text = f"Notice: {e}"
                 elapsed = "0.5s"
 
-            yield f"data: {json.dumps({'type': 'thought_step', 'step': {'id': 'fast_item', 'title': f'Fabric REST API: Provisioning {fabric_type} \'{item_name}\' in {ws_name}', 'status': 'completed', 'duration': elapsed, 'target': f'{fabric_type} API'}})}\n\n"
+            fast_step = {'id': 'fast_item', 'title': f'Fabric REST API: Provisioning {fabric_type} \'{item_name}\' in {ws_name}', 'status': 'completed', 'duration': elapsed, 'target': f'{fabric_type} API'}
+            yield f"data: {json.dumps({'type': 'thought_step', 'step': fast_step})}\n\n"
 
             summary = (
                 f"### {icon} Microsoft Fabric {fabric_type} Provisioned (Fast-Path)\n\n"
@@ -2199,7 +2200,14 @@ async def handle_chat_stream(req: ChatRequest) -> StreamingResponse:
                 yield f"data: {json.dumps({'type': 'chunk', 'text': chunk + ' '})}\n\n"
                 await asyncio.sleep(0.015)
 
-            SESSIONS[sid]["messages"].append({"role": "assistant", "content": summary})
+            t_elapsed_sec = max(1.0, time.time() - t_stream_start)
+            assistant_entry = {
+                "role": "assistant",
+                "content": summary,
+                "thoughtSteps": [fast_step],
+                "thoughtElapsed": f"{t_elapsed_sec:.1f}",
+            }
+            SESSIONS[sid]["messages"].append(assistant_entry)
             save_sessions_to_disk()
             yield f"data: {json.dumps({'type': 'done', 'session_id': sid, 'plan': None})}\n\n"
             return
@@ -2305,7 +2313,14 @@ async def handle_chat_stream(req: ChatRequest) -> StreamingResponse:
                 yield f"data: {json.dumps({'type': 'chunk', 'text': chunk + ' '})}\n\n"
                 await asyncio.sleep(0.015)
 
-            SESSIONS[sid]["messages"].append({"role": "assistant", "content": deploy_summary})
+            t_elapsed_sec = max(1.0, time.time() - t_stream_start)
+            assistant_entry = {
+                "role": "assistant",
+                "content": deploy_summary,
+                "thoughtSteps": [dict(s) for s in deploy_steps],
+                "thoughtElapsed": f"{t_elapsed_sec:.1f}",
+            }
+            SESSIONS[sid]["messages"].append(assistant_entry)
             save_sessions_to_disk()
             yield f"data: {json.dumps({'type': 'done', 'session_id': sid, 'plan': active_plan})}\n\n"
             return
@@ -2678,6 +2693,26 @@ async def handle_chat_stream(req: ChatRequest) -> StreamingResponse:
                 "thoughtElapsed": f"{t_elapsed_sec:.1f}",
             }
             SESSIONS[sid]["active_plan"] = plan_obj
+            # If the active project has a designated local_path, sync generated artifacts directly into it
+            target_lpath = resolved_proj.get("local_path") if resolved_proj else None
+            if not target_lpath and sid.startswith("proj_"):
+                pid_key = sid.split("_", 1)[-1]
+                prec = next((p for p in PROJECTS_CACHE if p.get("id") == pid_key or p.get("name") == pid_key), None)
+                if prec:
+                    target_lpath = prec.get("local_path")
+
+            if target_lpath and os.path.isdir(target_lpath):
+                art_src = os.path.join(BASE_DIR, "generated_artifacts", proj_code)
+                if os.path.isdir(art_src):
+                    try:
+                        import shutil
+                        for fname in os.listdir(art_src):
+                            src_f = os.path.join(art_src, fname)
+                            if os.path.isfile(src_f):
+                                shutil.copy2(src_f, os.path.join(target_lpath, fname))
+                    except Exception as copy_err:
+                        print(f"[OmniFlow Artifact Sync] Warning: {copy_err}")
+
             SESSIONS[sid]["messages"].append(assistant_entry)
             save_sessions_to_disk()
             yield f"data: {json.dumps({'type': 'done', 'session_id': sid, 'plan': plan_obj})}\n\n"
@@ -3031,7 +3066,14 @@ async def handle_chat_stream(req: ChatRequest) -> StreamingResponse:
                 }
                 SESSIONS[sid]["active_plan"] = active_plan
 
-            SESSIONS[sid]["messages"].append({"role": "assistant", "content": reply})
+            t_elapsed_sec = max(1.0, time.time() - t_stream_start)
+            assistant_entry = {
+                "role": "assistant",
+                "content": reply,
+                "thoughtSteps": [dict(s) for s in tier2_steps],
+                "thoughtElapsed": f"{t_elapsed_sec:.1f}",
+            }
+            SESSIONS[sid]["messages"].append(assistant_entry)
             save_sessions_to_disk()
             yield f"data: {json.dumps({'type': 'done', 'session_id': sid, 'plan': active_plan})}\n\n"
 

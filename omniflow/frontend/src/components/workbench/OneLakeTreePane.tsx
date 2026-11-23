@@ -32,8 +32,8 @@ export const OneLakeTreePane: React.FC<OneLakeTreePaneProps> = ({
   }
 
   return (
-    <div className="wb-view-pane active" style={{ display: 'flex', flexDirection: 'column', flex: 1, width: '100%', height: '100%', minHeight: 0 }}>
-      <div className="code-editor-header" style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.08)', padding: '10px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(0, 0, 0, 0.2)' }}>
+    <div className="wb-view-pane active" style={{ display: 'flex', flexDirection: 'column', flex: 1, width: '100%', height: '100%', minHeight: 0, background: '#121214' }}>
+      <div className="code-editor-header" style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.08)', padding: '10px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#18181b' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <FolderTree width={14} height={14} style={{ color: '#10b981' }} />
           <span style={{ fontSize: '13px', fontWeight: 600, color: '#f1f5f9' }}>{rootFolder} ({workspaceName})</span>
@@ -51,7 +51,7 @@ export const OneLakeTreePane: React.FC<OneLakeTreePaneProps> = ({
           <span>{copied ? 'Copied Tree' : 'Copy Tree'}</span>
         </button>
       </div>
-      <div className="tree-container" style={{ flex: 1, minHeight: 0, height: '100%', padding: '16px 20px', overflowY: 'auto', background: '#090a0f' }}>
+      <div className="tree-container" style={{ flex: 1, minHeight: 0, height: '100%', padding: '16px 20px', overflowY: 'auto', background: '#121214' }}>
         {treeItems.map((item, idx) => {
           const isNested = item.startsWith('    ') || item.includes('│   ├──') || item.includes('│   └──');
           const isChild = item.startsWith('├──') || item.startsWith('└──');
