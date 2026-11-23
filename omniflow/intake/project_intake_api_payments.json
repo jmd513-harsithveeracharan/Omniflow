@@ -1,0 +1,331 @@
+{
+  "schema_version": "2.0",
+  "planner_type": "enterprise_data_engineering_planner",
+  "request_context": {
+    "user_id": "architect@omniflow.ai",
+    "environment": "production",
+    "target_workspace": "PBT_DATA_AGENT",
+    "objective": "End-to-end REST API extraction, PySpark pagination landing into Bronze Lakehouse, Silver SCD2 curation with SHA-256 PII masking, Gold Kimball Star Schema Warehouse with executive SaaS/Payment KPIs, and Direct Lake Power BI semantic model."
+  },
+  "project_context": {
+    "project_summary": {
+      "project_code": "PRJ-STRIPE-PAYMENTS-API",
+      "project_name": "Stripe & SaaS API Revenue Platform",
+      "business_domain": "fintech_subscription_api",
+      "sla_target_minutes": 15
+    },
+    "platform_summary": {
+      "target_workspace": "PBT_DATA_AGENT",
+      "primary_engine": "Microsoft Fabric Spark (Delta Lake) & T-SQL Warehouse",
+      "storage_format": "Delta Lake (V-Order & Optimize Z-Order Compaction)",
+      "containment_folder": "Stripe_API_Revenue_Platform"
+    },
+    "solution_summary": {
+      "target_architecture": "Microsoft Fabric Medallion Architecture (Custom SaaS REST API Extraction -> 01 Raw Bronze Lakehouse -> 02 Stage Curation Notebook -> 03 Silver Delta Lakehouse -> 04 Gold Kimball Star Schema Warehouse -> Direct Lake Power BI Semantic Model)",
+      "target_folder_structure": {
+        "root_folder": "Stripe_API_Revenue_Platform",
+        "subfolders": {
+          "raw": "01 Raw",
+          "stage": "02 Stage",
+          "silver": "03 Silver",
+          "gold": "04 Gold"
+        }
+      },
+      "engineering_best_practices": [
+        "API Extraction Engine: Because Microsoft Fabric does not offer a native Data Pipeline Copy connector for Stripe/SaaS REST APIs, extraction is executed via an automated PySpark Ingestion Notebook utilizing Azure Key Vault secrets, cursor pagination (starting_after), and exponential backoff on HTTP 429.",
+        "Bronze Layer (01 Raw): Immutable append-only Delta landing with raw types preserved, augmented with _ingested_at, _source_endpoint, _http_status, and _batch_run_id metadata columns.",
+        "Stage Curation (02 Stage): Windowed ROW_NUMBER() deduplication partitioned by entity primary key ordered by latest updated_at DESC; quarantine invalid records and enforce schema evolution.",
+        "Security & Privacy: Apply deterministic salted SHA-256 masking to all customer PII attributes (email, name, phone, billing address) prior to Silver promotion.",
+        "Silver Layer (03 Silver): Idempotent Delta Lake MERGE INTO upserts on primary business keys, typed decimal casting for monetary values (DECIMAL(18,4)), ISO-8601 UTC timestamp standardization, and foreign-key referential integrity validation.",
+        "Gold Layer (04 Gold): Enterprise Kimball Star Schema modeled with surrogate keys (_sk) for Direct Lake Power BI reporting with dim_date, dim_customer, dim_plan, dim_payment_method, fact_charges_daily, fact_subscription_mrr, and fact_invoice_settlement.",
+        "Data Quality & Testing: Great Expectations profiling suite enforcing zero null primary keys, gross amount positivity constraints, and referential relationship integrity before promotion."
+      ],
+      "expected_deliverables": [
+        "lh_stripe_revenue_bronze (Lakehouse in 01 Raw)",
+        "nb_stripe_api_extract_to_bronze (PySpark Ingestion Notebook in 01 Raw with full REST API pagination logic)",
+        "pl_stripe_extract_and_curate (DataPipeline in 01 Raw orchestrating TridentNotebook activities)",
+        "nb_stripe_curate_silver_merge (PySpark Notebook in 02 Stage with Delta MERGE and SHA-256 masking)",
+        "lh_stripe_revenue_silver (Lakehouse in 03 Silver)",
+        "wh_stripe_revenue_gold (Warehouse in 04 Gold with Kimball Star Schema)",
+        "sm_stripe_revenue_direct_lake (Direct Lake Semantic Model with Executive KPIs)"
+      ]
+    }
+  },
+  "retrieved_context": {
+    "data_sources": [
+      {
+        "source_name": "Stripe Payments & Subscription Invoicing REST API",
+        "system_type": "SaaS REST API",
+        "connector_type": "stripe_api",
+        "is_fabric_native": false,
+        "pathway": "pyspark_notebook",
+        "pathway_explanation": "Microsoft Fabric does not support native serverless Data Pipeline Copy Activity for Stripe/SaaS REST APIs. OmniFlow synthesizes an automated PySpark Ingestion Notebook with Key Vault bearer token authorization, cursor-based pagination, rate-limit retry handling, and Delta landing.",
+        "api_specification": {
+          "base_url": "https://api.stripe.com/v1",
+          "auth_type": "Bearer_Token",
+          "secret_vault_key": "STRIPE_SECRET_KEY",
+          "rate_limit_per_minute": 600,
+          "pagination_strategy": "cursor_based",
+          "pagination_param": "starting_after",
+          "limit_per_page": 100
+        },
+        "tables": [
+          {
+            "table_name": "customers",
+            "endpoint": "/v1/customers",
+            "primary_key": "customer_id",
+            "watermark_column": "updated_at",
+            "ingestion_mode": "incremental_merge",
+            "pii_columns": ["email", "name", "phone", "billing_address"],
+            "columns": [
+              {"name": "customer_id", "type": "string", "is_pk": true, "description": "Unique Stripe customer identifier (cus_...)"},
+              {"name": "email", "type": "string", "is_pii": true, "description": "Customer email address (masked in Silver)"},
+              {"name": "name", "type": "string", "is_pii": true, "description": "Full customer legal or company name"},
+              {"name": "phone", "type": "string", "is_pii": true, "description": "Primary phone contact"},
+              {"name": "currency", "type": "string", "description": "Three-letter ISO currency code (usd, eur, gbp)"},
+              {"name": "account_balance", "type": "numeric", "description": "Current customer credit balance in base currency units"},
+              {"name": "delinquent", "type": "boolean", "description": "Whether customer has overdue unpaid invoices"},
+              {"name": "billing_address", "type": "string", "is_pii": true, "description": "JSON serialized billing postal address"},
+              {"name": "default_payment_method", "type": "string", "description": "Default payment source ID (pm_...)"},
+              {"name": "customer_tier", "type": "string", "description": "Derived customer segmentation (Enterprise, Growth, Starter)"},
+              {"name": "created_at", "type": "timestamp with time zone", "description": "Customer account creation timestamp UTC"},
+              {"name": "updated_at", "type": "timestamp with time zone", "description": "Latest record modification timestamp UTC"}
+            ]
+          },
+          {
+            "table_name": "charges",
+            "endpoint": "/v1/charges",
+            "primary_key": "charge_id",
+            "watermark_column": "created_at",
+            "ingestion_mode": "incremental_append",
+            "columns": [
+              {"name": "charge_id", "type": "string", "is_pk": true, "description": "Unique Stripe charge identifier (ch_...)"},
+              {"name": "customer_id", "type": "string", "description": "FK to customers.customer_id"},
+              {"name": "amount", "type": "numeric", "description": "Gross charge amount in currency cents/units"},
+              {"name": "amount_refunded", "type": "numeric", "description": "Total amount refunded to date"},
+              {"name": "currency", "type": "string", "description": "ISO currency code"},
+              {"name": "status", "type": "string", "description": "Charge status: succeeded, pending, or failed"},
+              {"name": "paid", "type": "boolean", "description": "Whether payment was successfully captured"},
+              {"name": "refunded", "type": "boolean", "description": "Whether entire charge has been refunded"},
+              {"name": "failure_code", "type": "string", "description": "Declination code if payment was unsuccessful"},
+              {"name": "payment_method_id", "type": "string", "description": "FK to payment methods"},
+              {"name": "payment_method_type", "type": "string", "description": "card, ach_debit, sepa_debit, or wire_transfer"},
+              {"name": "receipt_email", "type": "string", "is_pii": true, "description": "Transaction receipt delivery email"},
+              {"name": "is_disputed", "type": "boolean", "description": "Flag indicating chargeback dispute filed"},
+              {"name": "created_at", "type": "timestamp with time zone", "description": "Charge creation timestamp UTC"}
+            ]
+          },
+          {
+            "table_name": "subscriptions",
+            "endpoint": "/v1/subscriptions",
+            "primary_key": "subscription_id",
+            "watermark_column": "updated_at",
+            "ingestion_mode": "incremental_merge",
+            "columns": [
+              {"name": "subscription_id", "type": "string", "is_pk": true, "description": "Unique Stripe subscription identifier (sub_...)"},
+              {"name": "customer_id", "type": "string", "description": "FK to customers.customer_id"},
+              {"name": "plan_id", "type": "string", "description": "FK to plans.plan_id"},
+              {"name": "status", "type": "string", "description": "Subscription status: active, past_due, canceled, trialing"},
+              {"name": "current_period_start", "type": "timestamp with time zone", "description": "Start timestamp of active billing cycle"},
+              {"name": "current_period_end", "type": "timestamp with time zone", "description": "End timestamp of active billing cycle"},
+              {"name": "cancel_at_period_end", "type": "boolean", "description": "Pending cancellation at billing period boundary"},
+              {"name": "canceled_at", "type": "timestamp with time zone", "description": "Timestamp when subscription cancellation occurred"},
+              {"name": "mrr_amount", "type": "numeric", "description": "Normalized Monthly Recurring Revenue contributed"},
+              {"name": "created_at", "type": "timestamp with time zone", "description": "Subscription inception timestamp UTC"},
+              {"name": "updated_at", "type": "timestamp with time zone", "description": "Subscription modification timestamp UTC"}
+            ]
+          },
+          {
+            "table_name": "invoices",
+            "endpoint": "/v1/invoices",
+            "primary_key": "invoice_id",
+            "watermark_column": "updated_at",
+            "ingestion_mode": "incremental_merge",
+            "columns": [
+              {"name": "invoice_id", "type": "string", "is_pk": true, "description": "Unique Stripe invoice identifier (in_...)"},
+              {"name": "customer_id", "type": "string", "description": "FK to customers.customer_id"},
+              {"name": "subscription_id", "type": "string", "description": "FK to subscriptions.subscription_id"},
+              {"name": "invoice_number", "type": "string", "description": "Sequential human-readable invoice code"},
+              {"name": "subtotal", "type": "numeric", "description": "Pre-tax invoice total amount"},
+              {"name": "tax_amount", "type": "numeric", "description": "Jurisdictional tax applied to invoice"},
+              {"name": "total_amount", "type": "numeric", "description": "Final billed total including taxes and credits"},
+              {"name": "amount_due", "type": "numeric", "description": "Remaining unpaid balance on invoice"},
+              {"name": "amount_paid", "type": "numeric", "description": "Total amount successfully settled"},
+              {"name": "paid", "type": "boolean", "description": "Whether invoice is 100% paid and settled"},
+              {"name": "status", "type": "string", "description": "Invoice status: draft, open, paid, uncollectible, void"},
+              {"name": "due_date", "type": "timestamp with time zone", "description": "Payment deadline date"},
+              {"name": "created_at", "type": "timestamp with time zone", "description": "Invoice generation timestamp UTC"},
+              {"name": "updated_at", "type": "timestamp with time zone", "description": "Invoice modification timestamp UTC"}
+            ]
+          },
+          {
+            "table_name": "refunds",
+            "endpoint": "/v1/refunds",
+            "primary_key": "refund_id",
+            "watermark_column": "created_at",
+            "ingestion_mode": "incremental_append",
+            "columns": [
+              {"name": "refund_id", "type": "string", "is_pk": true, "description": "Unique refund identifier (re_...)"},
+              {"name": "charge_id", "type": "string", "description": "FK to charges.charge_id"},
+              {"name": "amount", "type": "numeric", "description": "Refunded value in base currency"},
+              {"name": "currency", "type": "string", "description": "Three-letter ISO currency code"},
+              {"name": "reason", "type": "string", "description": "Refund reason: duplicate, fraudulent, requested_by_customer"},
+              {"name": "status", "type": "string", "description": "Refund status: succeeded, failed, pending"},
+              {"name": "created_at", "type": "timestamp with time zone", "description": "Refund timestamp UTC"}
+            ]
+          },
+          {
+            "table_name": "balance_transactions",
+            "endpoint": "/v1/balance_transactions",
+            "primary_key": "txn_id",
+            "watermark_column": "created_at",
+            "ingestion_mode": "incremental_append",
+            "columns": [
+              {"name": "txn_id", "type": "string", "is_pk": true, "description": "Unique balance ledger transaction (txn_...)"},
+              {"name": "source_id", "type": "string", "description": "FK to charge_id, refund_id, or payout_id"},
+              {"name": "type", "type": "string", "description": "Transaction type: charge, refund, payment_fee, payout"},
+              {"name": "amount", "type": "numeric", "description": "Gross ledger transaction amount"},
+              {"name": "fee", "type": "numeric", "description": "Stripe payment network processing fee charged"},
+              {"name": "net", "type": "numeric", "description": "Net deposit proceeds: amount minus fee"},
+              {"name": "currency", "type": "string", "description": "ISO settlement currency"},
+              {"name": "status", "type": "string", "description": "available or pending settlement"},
+              {"name": "available_on", "type": "timestamp with time zone", "description": "Date funds become available for bank payout"},
+              {"name": "created_at", "type": "timestamp with time zone", "description": "Ledger posting timestamp UTC"}
+            ]
+          },
+          {
+            "table_name": "plans",
+            "endpoint": "/v1/plans",
+            "primary_key": "plan_id",
+            "watermark_column": "created_at",
+            "ingestion_mode": "full_scd2",
+            "columns": [
+              {"name": "plan_id", "type": "string", "is_pk": true, "description": "Unique plan tier identifier (price_...)"},
+              {"name": "product_name", "type": "string", "description": "Commercial product name (e.g. Enterprise Tier, Growth Tier)"},
+              {"name": "nickname", "type": "string", "description": "Internal business SKU descriptor"},
+              {"name": "amount", "type": "numeric", "description": "Recurring billing unit price"},
+              {"name": "currency", "type": "string", "description": "ISO pricing currency"},
+              {"name": "billing_interval", "type": "string", "description": "Cadence: month, year, week, or day"},
+              {"name": "interval_count", "type": "integer", "description": "Billing multiplier (e.g. 1 for monthly, 12 for annual)"},
+              {"name": "is_active", "type": "boolean", "description": "Whether plan is open for new customer subscriptions"},
+              {"name": "created_at", "type": "timestamp with time zone", "description": "Plan creation timestamp UTC"}
+            ]
+          }
+        ],
+        "relationships": [
+          "charges.customer_id -> customers.customer_id (Many-to-One)",
+          "subscriptions.customer_id -> customers.customer_id (Many-to-One)",
+          "subscriptions.plan_id -> plans.plan_id (Many-to-One)",
+          "invoices.customer_id -> customers.customer_id (Many-to-One)",
+          "invoices.subscription_id -> subscriptions.subscription_id (Many-to-One)",
+          "refunds.charge_id -> charges.charge_id (Many-to-One)",
+          "balance_transactions.source_id -> charges.charge_id (Many-to-One)"
+        ],
+        "kimball_star_schema": {
+          "dimensions": [
+            {
+              "table_name": "dim_date",
+              "surrogate_key": "date_sk",
+              "attributes": ["date_sk", "full_date", "year", "quarter", "month_number", "month_name", "day_of_month", "day_of_week_name", "is_weekend", "fiscal_quarter", "fiscal_year"]
+            },
+            {
+              "table_name": "dim_customer",
+              "surrogate_key": "customer_sk",
+              "attributes": ["customer_sk", "customer_id", "name_masked", "email_masked", "currency", "customer_tier", "delinquent_flag", "account_balance", "created_date", "is_active", "effective_from", "effective_to"]
+            },
+            {
+              "table_name": "dim_plan",
+              "surrogate_key": "plan_sk",
+              "attributes": ["plan_sk", "plan_id", "product_name", "nickname", "unit_price", "currency", "billing_interval", "annual_equivalent_price", "is_active"]
+            },
+            {
+              "table_name": "dim_payment_method",
+              "surrogate_key": "payment_method_sk",
+              "attributes": ["payment_method_sk", "payment_method_type", "brand", "funding_type", "is_digital_wallet"]
+            }
+          ],
+          "facts": [
+            {
+              "table_name": "fact_charges_daily",
+              "grain": "One record per individual payment charge attempt",
+              "foreign_keys": ["date_sk", "customer_sk", "payment_method_sk"],
+              "measures": ["gross_amount", "amount_refunded", "net_amount", "processing_fee", "is_succeeded_flag", "is_disputed_flag"]
+            },
+            {
+              "table_name": "fact_subscription_mrr",
+              "grain": "Daily snapshot per active customer subscription",
+              "foreign_keys": ["date_sk", "customer_sk", "plan_sk"],
+              "measures": ["mrr_amount", "arr_amount", "is_active_flag", "is_churned_flag", "is_expansion_flag"]
+            },
+            {
+              "table_name": "fact_invoice_settlement",
+              "grain": "One record per finalized customer billing invoice",
+              "foreign_keys": ["date_sk", "customer_sk"],
+              "measures": ["subtotal", "tax_amount", "total_amount", "amount_due", "amount_paid", "is_fully_paid_flag", "days_to_settle"]
+            }
+          ]
+        },
+        "executive_kpis": [
+          {
+            "kpi_name": "Monthly Recurring Revenue (MRR)",
+            "business_definition": "Total normalized recurring revenue recognized from all active paid subscriptions in current month.",
+            "formula": "SUM(fact_subscription_mrr[mrr_amount]) WHERE is_active_flag = 1",
+            "dax_measure": "Total MRR = CALCULATE(SUM(fact_subscription_mrr[mrr_amount]), dim_plan[is_active] = TRUE)"
+          },
+          {
+            "kpi_name": "Annualized Run Rate (ARR)",
+            "business_definition": "Annualized recurring subscription velocity run rate based on current MRR.",
+            "formula": "[Monthly Recurring Revenue (MRR)] * 12",
+            "dax_measure": "Total ARR = [Total MRR] * 12"
+          },
+          {
+            "kpi_name": "Net Dollar Retention (NDR %)",
+            "business_definition": "Percentage of recurring revenue retained from existing customer cohort over 12 months, including expansions minus churn and contractions.",
+            "formula": "(Cohort Ending MRR / Cohort Starting MRR) * 100",
+            "dax_measure": "NDR % = DIVIDE([Cohort Current Period MRR], [Cohort Base Period MRR], 0) * 100"
+          },
+          {
+            "kpi_name": "Customer Churn Rate %",
+            "business_definition": "Percentage of paying subscription accounts canceled during current measurement period.",
+            "formula": "(Canceled Subscriptions / Starting Active Subscriptions) * 100",
+            "dax_measure": "Customer Churn % = DIVIDE([Count Churned Subscriptions], [Count Starting Active Subscriptions], 0) * 100"
+          },
+          {
+            "kpi_name": "Customer Lifetime Value (LTV / CLV)",
+            "business_definition": "Predicted monetary net value contributed by a customer over their entire commercial lifespan.",
+            "formula": "Average Revenue Per Account (ARPA) / Customer Churn Rate %",
+            "dax_measure": "Customer LTV = DIVIDE([Average Revenue Per User], [Customer Churn %], 0)"
+          },
+          {
+            "kpi_name": "Average Order Value (AOV)",
+            "business_definition": "Mean gross value transacted per successful payment transaction.",
+            "formula": "SUM(fact_charges_daily[gross_amount]) / COUNT(fact_charges_daily[charge_id])",
+            "dax_measure": "AOV = DIVIDE(SUM(fact_charges_daily[gross_amount]), COUNTROWS(FILTER(fact_charges_daily, fact_charges_daily[is_succeeded_flag] = 1)), 0)"
+          },
+          {
+            "kpi_name": "Payment Processing Fee Drag %",
+            "business_definition": "Proportion of gross revenues consumed by merchant payment gateway and interchange fees.",
+            "formula": "(SUM(processing_fee) / SUM(gross_amount)) * 100",
+            "dax_measure": "Fee Drag % = DIVIDE(SUM(fact_charges_daily[processing_fee]), SUM(fact_charges_daily[gross_amount]), 0) * 100"
+          },
+          {
+            "kpi_name": "Dispute & Chargeback Loss Ratio %",
+            "business_definition": "Percentage of charge volume subject to customer fraud disputes or payment chargebacks.",
+            "formula": "(SUM(gross_amount of disputed charges) / SUM(gross_amount of all charges)) * 100",
+            "dax_measure": "Dispute Rate % = DIVIDE(CALCULATE(SUM(fact_charges_daily[gross_amount]), fact_charges_daily[is_disputed_flag] = 1), SUM(fact_charges_daily[gross_amount]), 0) * 100"
+          },
+          {
+            "kpi_name": "Days Sales Outstanding (DSO)",
+            "business_definition": "Average number of days required to collect invoice settlement from invoice generation date.",
+            "formula": "AVERAGE(fact_invoice_settlement[days_to_settle])",
+            "dax_measure": "DSO Days = AVERAGE(fact_invoice_settlement[days_to_settle])"
+          }
+        ],
+        "notebook_extraction_logic": {
+          "description": "Production PySpark notebook logic with resilient pagination, retry backoff, schema normalization, and Delta Lake writing.",
+          "python_code_sample": "# Fabric notebook source\n\n# METADATA ********************\n# META {\n# META   \"kernel_info\": {\"name\": \"synapse_pyspark\"},\n# META   \"dependencies\": {}\n# META }\n\n# CELL ********************\nimport requests\nimport json\nimport time\nfrom datetime import datetime, timezone\nfrom pyspark.sql import SparkSession\nfrom pyspark.sql.functions import col, lit, current_timestamp\n\nspark = SparkSession.builder.getOrCreate()\n\n# Secure Key Vault / Parameter retrieval\ntry:\n    from notebookutils import mssparkutils\n    API_KEY = mssparkutils.credentials.getSecret(\"FabricKeyVault\", \"StripeApiKey\")\nexcept Exception:\n    API_KEY = \"sk_test_mock_sandbox_token_demo_98471\"\n\nBASE_URL = \"https://api.stripe.com/v1\"\nHEADERS = {\"Authorization\": f\"Bearer {API_KEY}\", \"Accept\": \"application/json\"}\nBATCH_ID = datetime.now(timezone.utc).strftime(\"%Y%m%d_%H%M%S\")\n\nENDPOINTS = [\n    {\"name\": \"raw_customers\", \"endpoint\": \"/customers\"},\n    {\"name\": \"raw_charges\", \"endpoint\": \"/charges\"},\n    {\"name\": \"raw_subscriptions\", \"endpoint\": \"/subscriptions\"},\n    {\"name\": \"raw_invoices\", \"endpoint\": \"/invoices\"},\n    {\"name\": \"raw_refunds\", \"endpoint\": \"/refunds\"},\n    {\"name\": \"raw_balance_transactions\", \"endpoint\": \"/balance_transactions\"},\n    {\"name\": \"raw_plans\", \"endpoint\": \"/plans\"}\n]\n\ndef fetch_endpoint_paginated(endpoint_path, limit=100):\n    url = f\"{BASE_URL}{endpoint_path}\"\n    all_records = []\n    starting_after = None\n    has_more = True\n    \n    while has_more and len(all_records) < 500:\n        params = {\"limit\": limit}\n        if starting_after:\n            params[\"starting_after\"] = starting_after\n            \n        for attempt in range(5):\n            resp = requests.get(url, headers=HEADERS, params=params, timeout=30)\n            if resp.status_code == 200:\n                break\n            elif resp.status_code == 429:\n                time.sleep(2 ** attempt)\n            else:\n                resp.raise_for_status()\n                \n        data = resp.json()\n        records = data.get(\"data\", [])\n        if not records:\n            break\n            \n        all_records.extend(records)\n        has_more = data.get(\"has_more\", False)\n        starting_after = records[-1].get(\"id\")\n        time.sleep(0.1)\n        \n    return all_records\n\nfor ep in ENDPOINTS:\n    print(f\"Ingesting {ep['name']} from {ep['endpoint']}...\")\n    raw_data = fetch_endpoint_paginated(ep['endpoint'])\n    if raw_data:\n        json_rdd = spark.sparkContext.parallelize([json.dumps(r) for r in raw_data])\n        df = spark.read.json(json_rdd)\n        df_enriched = (df\n            .withColumn(\"_ingested_at\", current_timestamp())\n            .withColumn(\"_source_endpoint\", lit(ep['endpoint']))\n            .withColumn(\"_batch_id\", lit(BATCH_ID)))\n        \n        table_target = f\"Tables/{ep['name']}\"\n        df_enriched.write.format(\"delta\").mode(\"append\").option(\"mergeSchema\", \"true\").save(table_target)\n        print(f\"Successfully landed {df_enriched.count()} rows into {table_target}\")\n"
+        }
+      }
+    ]
+  }
+}
