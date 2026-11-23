@@ -93,6 +93,8 @@ export async function fetchSessionDetail(
 ): Promise<{
   sessionId: string;
   title: string;
+  active_plan?: import('../types').IngestionPlan;
+  plan?: import('../types').IngestionPlan;
   messages: {
     role: 'user' | 'assistant' | 'system';
     content: string;
@@ -103,9 +105,12 @@ export async function fetchSessionDetail(
   const res = await fetch(`${API_BASE}/sessions/${sessionId}`);
   if (!res.ok) throw new Error(`Failed to fetch session detail: ${res.statusText}`);
   const data = await res.json();
+  const rawPlan = (data.active_plan || data.plan) as import('../types').IngestionPlan | undefined;
   return {
-    sessionId: data.session_id,
+    sessionId: data.session_id || data.sessionId || sessionId,
     title: data.title || 'Conversation',
+    active_plan: rawPlan,
+    plan: rawPlan,
     messages: (data.messages || []).map((m: Record<string, unknown>) => ({
       role: (m.role as 'user' | 'assistant' | 'system') || 'user',
       content: String(m.content || ''),

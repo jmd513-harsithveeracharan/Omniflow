@@ -366,17 +366,48 @@ export const MedallionFlowCanvas: React.FC<MedallionFlowCanvasProps> = ({
       style={{ display: 'flex', flexDirection: 'column', flex: 1, width: '100%', height: '100%', minHeight: 0, overflow: 'hidden' }}
     >
       {/* Workbench Header */}
-      <div className="workbench-header" style={{ background: '#0b0d13', borderBottom: '1px solid rgba(255, 255, 255, 0.08)' }}>
-        <div className="workbench-tab-group">
+      <div
+        className="workbench-header"
+        style={{
+          background: '#18181b',
+          borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+          padding: '0 8px',
+          height: '46px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: '8px',
+          minWidth: 0,
+          overflow: 'hidden',
+          flexShrink: 0,
+        }}
+      >
+        <div
+          className="workbench-tab-group"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '2px',
+            minWidth: 0,
+            flexShrink: 1,
+            overflowX: 'auto',
+            scrollbarWidth: 'none',
+            msOverflowStyle: 'none',
+            padding: '2px',
+            background: 'rgba(0, 0, 0, 0.25)',
+            borderRadius: '7px',
+          }}
+        >
           <button
             className={`wb-tab ${activeTab === 'wbDAG' ? 'active' : ''}`}
             onClick={() => setActiveTab('wbDAG')}
             type="button"
+            style={{ padding: '4px 8px', fontSize: '11.5px', gap: '5px', whiteSpace: 'nowrap', flexShrink: 0 }}
           >
             <Layers width={13} height={13} />
             <span>Pipelines</span>
             {dagNodes.length > 0 && (
-              <span style={{ fontSize: '9px', padding: '1px 5px', borderRadius: '4px', background: 'rgba(56, 189, 248, 0.15)', color: '#38bdf8', fontWeight: 600, marginLeft: '4px' }}>
+              <span style={{ fontSize: '9px', padding: '1px 5px', borderRadius: '4px', background: 'rgba(56, 189, 248, 0.15)', color: '#38bdf8', fontWeight: 600, marginLeft: '3px' }}>
                 {dagNodes.length}
               </span>
             )}
@@ -385,6 +416,7 @@ export const MedallionFlowCanvas: React.FC<MedallionFlowCanvasProps> = ({
             className={`wb-tab ${activeTab === 'wbMesh' ? 'active' : ''}`}
             onClick={() => setActiveTab('wbMesh')}
             type="button"
+            style={{ padding: '4px 8px', fontSize: '11.5px', gap: '5px', whiteSpace: 'nowrap', flexShrink: 0 }}
           >
             <Network width={13} height={13} />
             <span>Graph</span>
@@ -393,6 +425,7 @@ export const MedallionFlowCanvas: React.FC<MedallionFlowCanvasProps> = ({
             className={`wb-tab ${activeTab === 'wbTree' ? 'active' : ''}`}
             onClick={() => setActiveTab('wbTree')}
             type="button"
+            style={{ padding: '4px 8px', fontSize: '11.5px', gap: '5px', whiteSpace: 'nowrap', flexShrink: 0 }}
           >
             <FolderTree width={13} height={13} />
             <span>OneLake</span>
@@ -401,6 +434,7 @@ export const MedallionFlowCanvas: React.FC<MedallionFlowCanvasProps> = ({
             className={`wb-tab ${activeTab === 'wbCode' ? 'active' : ''}`}
             onClick={() => setActiveTab('wbCode')}
             type="button"
+            style={{ padding: '4px 8px', fontSize: '11.5px', gap: '5px', whiteSpace: 'nowrap', flexShrink: 0 }}
           >
             <Code2 width={13} height={13} />
             <span>Notebooks</span>
@@ -409,6 +443,7 @@ export const MedallionFlowCanvas: React.FC<MedallionFlowCanvasProps> = ({
             className={`wb-tab ${activeTab === 'wbTable' ? 'active' : ''}`}
             onClick={() => setActiveTab('wbTable')}
             type="button"
+            style={{ padding: '4px 8px', fontSize: '11.5px', gap: '5px', whiteSpace: 'nowrap', flexShrink: 0 }}
           >
             <Table2 width={13} height={13} />
             <span>Tables</span>
@@ -417,13 +452,23 @@ export const MedallionFlowCanvas: React.FC<MedallionFlowCanvasProps> = ({
             className={`wb-tab ${activeTab === 'wbJson' ? 'active' : ''}`}
             onClick={() => setActiveTab('wbJson')}
             type="button"
+            style={{ padding: '4px 8px', fontSize: '11.5px', gap: '5px', whiteSpace: 'nowrap', flexShrink: 0 }}
           >
             <FileCode width={13} height={13} />
             <span>JSON</span>
           </button>
         </div>
 
-        <div className="workbench-actions">
+        <div
+          className="workbench-actions"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            flexShrink: 0,
+            marginLeft: 'auto',
+          }}
+        >
           {onDeploy && (
             <button
               className="btn-xs-action"
@@ -432,15 +477,17 @@ export const MedallionFlowCanvas: React.FC<MedallionFlowCanvasProps> = ({
               type="button"
               style={{
                 background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
-                boxShadow: '0 0 14px rgba(2, 132, 199, 0.35)',
-                border: '1px solid rgba(56, 189, 248, 0.4)',
-                padding: '4px 12px',
+                boxShadow: '0 0 10px rgba(2, 132, 199, 0.25)',
+                border: '1px solid rgba(56, 189, 248, 0.35)',
+                padding: '4px 10px',
                 borderRadius: '6px',
                 color: '#fff',
+                fontSize: '11.5px',
                 fontWeight: 600,
                 display: 'flex',
                 alignItems: 'center',
-                gap: '6px',
+                gap: '5px',
+                whiteSpace: 'nowrap',
               }}
             >
               <Play width={12} height={12} fill="#fff" />
@@ -476,22 +523,22 @@ export const MedallionFlowCanvas: React.FC<MedallionFlowCanvasProps> = ({
           flexDirection: 'column',
           flex: 1,
           width: '100%',
-          height: 'calc(100% - 50px)',
+          height: 'calc(100% - 46px)',
           minHeight: 0,
           overflow: 'hidden',
-          background: '#07090e',
+          background: '#121214',
         }}
       >
         {/* Knowledge Mesh Graph RAG */}
         {activeTab === 'wbMesh' && (
-          <div className="wb-view-pane active" style={{ padding: 0, overflow: 'hidden', position: 'relative', height: '100%', flex: 1, minHeight: 0 }}>
+          <div className="wb-view-pane active" style={{ padding: 0, overflow: 'hidden', position: 'relative', height: '100%', flex: 1, minHeight: 0, background: '#121214' }}>
             <GraphMeshView plan={plan as Record<string, unknown> | null} projectId={(plan as any)?.project_code || (plan as any)?.project_id} />
           </div>
         )}
 
         {/* 1. Pipeline Flow SVG Canvas */}
         {activeTab === 'wbDAG' && (
-          <div className="wb-view-pane active" style={{ position: 'relative', height: '100%', flex: 1, minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+          <div className="wb-view-pane active" style={{ position: 'relative', height: '100%', flex: 1, minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column', background: '#121214' }}>
             {dagNodes.length === 0 ? (
               <div
                 style={{
@@ -506,9 +553,10 @@ export const MedallionFlowCanvas: React.FC<MedallionFlowCanvasProps> = ({
                   color: '#94a3b8',
                   textAlign: 'center',
                   padding: '32px',
+                  background: '#121214',
                 }}
               >
-                <Layers width={44} height={44} style={{ opacity: 0.35, marginBottom: '16px', color: '#38bdf8' }} />
+                <Layers width={44} height={44} style={{ opacity: 0.35, marginBottom: '16px', color: '#71717a' }} />
                 <h4 style={{ color: '#f1f5f9', margin: '0 0 8px 0', fontSize: '16px', fontWeight: 600 }}>No Active Architecture Flow</h4>
                 <p style={{ maxWidth: '420px', margin: 0, fontSize: '13px', lineHeight: 1.6, color: '#94a3b8' }}>
                   Prompt the agent or create a project to generate a dynamic Medallion DAG, PySpark curation scripts, and Fabric items.
@@ -527,9 +575,9 @@ export const MedallionFlowCanvas: React.FC<MedallionFlowCanvasProps> = ({
                   position: 'relative',
                   cursor: isDragging ? 'grabbing' : 'grab',
                   userSelect: isDragging ? 'none' : 'auto',
-                  backgroundColor: '#07090e',
+                  backgroundColor: '#121214',
                   backgroundImage:
-                    'radial-gradient(circle at 50% 50%, rgba(56, 189, 248, 0.04) 0%, transparent 80%), radial-gradient(rgba(255, 255, 255, 0.08) 1px, transparent 1px)',
+                    'radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.02) 0%, transparent 80%), radial-gradient(rgba(255, 255, 255, 0.08) 1px, transparent 1px)',
                   backgroundSize: '100% 100%, 26px 26px',
                   padding: '24px 30px',
                 }}
@@ -544,7 +592,7 @@ export const MedallionFlowCanvas: React.FC<MedallionFlowCanvasProps> = ({
                     display: 'flex',
                     alignItems: 'center',
                     gap: '4px',
-                    background: 'rgba(15, 20, 30, 0.85)',
+                    background: 'rgba(24, 24, 27, 0.85)',
                     backdropFilter: 'blur(12px)',
                     border: '1px solid rgba(255, 255, 255, 0.1)',
                     borderRadius: '8px',
@@ -621,8 +669,8 @@ export const MedallionFlowCanvas: React.FC<MedallionFlowCanvasProps> = ({
                         <stop offset="100%" stopColor="#38bdf8" stopOpacity="0.9" />
                       </linearGradient>
                       <linearGradient id="nodeBgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                        <stop offset="0%" stopColor="#111624" />
-                        <stop offset="100%" stopColor="#080b12" />
+                        <stop offset="0%" stopColor="#222226" />
+                        <stop offset="100%" stopColor="#18181b" />
                       </linearGradient>
                       <filter id="nodeGlow" x="-20%" y="-20%" width="140%" height="140%">
                         <feDropShadow dx="0" dy="4" stdDeviation="8" floodColor="rgba(56, 189, 248, 0.25)" />
@@ -713,10 +761,10 @@ export const MedallionFlowCanvas: React.FC<MedallionFlowCanvasProps> = ({
 
                           {/* Connection Port Pins (Left Input, Right Output) */}
                           {n.id !== 'node_source' && (
-                            <circle cx="0" cy="38" r="3.5" fill="#080b12" stroke={n.glowColor} strokeWidth="2" />
+                            <circle cx="0" cy="38" r="3.5" fill="#18181b" stroke={n.glowColor} strokeWidth="2" />
                           )}
                           {n.id !== 'node_master_orchestrator' && (
-                            <circle cx="210" cy="38" r="3.5" fill="#080b12" stroke={n.glowColor} strokeWidth="2" />
+                            <circle cx="210" cy="38" r="3.5" fill="#18181b" stroke={n.glowColor} strokeWidth="2" />
                           )}
 
                           {/* Layer Badge & Folder Tag */}
