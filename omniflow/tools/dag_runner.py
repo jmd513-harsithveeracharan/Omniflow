@@ -172,6 +172,7 @@ class GenericDAGProvisioner:
         # -------------------------------------------------------------
         def _mint_shell(spec: FabricItemSpec) -> tuple[str, dict[str, Any]]:
             shell_def = _build_minimal_shell_payload(spec.item_type, spec.name)
+            target_fid = folder_ids.get(spec.folder_name) if spec.folder_name else None
             try:
                 res = create_item(
                     display_name=spec.name,
@@ -179,6 +180,7 @@ class GenericDAGProvisioner:
                     workspace_id=self.workspace_id,
                     definition=shell_def,
                     description=spec.description,
+                    folder_id=target_fid,
                 )
                 return spec.name, res
             except Exception as e:

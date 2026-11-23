@@ -560,15 +560,15 @@ async def get_session_detail(session_id: str) -> dict[str, Any]:
                         {"name": f"nb_{clean_dom}_quality_suite", "layer": "quality"},
                     ],
                     "items": [
-                        {"name": f"lh_{clean_dom}_bronze", "type": "Lakehouse", "folder_name": f"{root_f}/01 Raw/01_lakehouse"},
-                        {"name": f"pl_{clean_dom}_bronze_ingest", "type": "DataPipeline", "folder_name": f"{root_f}/01 Raw/02_pipelines"},
-                        {"name": f"nb_{clean_dom}_curate", "type": "Notebook", "folder_name": f"{root_f}/02 Stage/01_notebooks"},
-                        {"name": f"nb_{clean_dom}_quality_suite", "type": "Notebook", "folder_name": f"{root_f}/02 Stage/02_quality"},
-                        {"name": f"lh_{clean_dom}_silver", "type": "Lakehouse", "folder_name": f"{root_f}/03 Silver/01_lakehouse"},
-                        {"name": f"nb_silver_transformations", "type": "Notebook", "folder_name": f"{root_f}/03 Silver/02_notebooks"},
-                        {"name": f"wh_{clean_dom}_gold", "type": "Warehouse", "folder_name": f"{root_f}/04 Gold/01_warehouse"},
-                        {"name": f"sm_{clean_dom}_gold_direct_lake", "type": "SemanticModel", "folder_name": f"{root_f}/04 Gold/02_semantic_models"},
-                        {"name": f"pl_master_medallion_orchestration", "type": "DataPipeline", "folder_name": f"{root_f}/05 Orchestration/01_pipelines"},
+                        {"name": f"lh_{clean_dom}_bronze", "type": "Lakehouse", "folder_name": f"{root_f}/01 Raw"},
+                        {"name": f"pl_{clean_dom}_bronze_ingest", "type": "DataPipeline", "folder_name": f"{root_f}/01 Raw"},
+                        {"name": f"nb_{clean_dom}_curate", "type": "Notebook", "folder_name": f"{root_f}/02 Stage"},
+                        {"name": f"nb_{clean_dom}_quality_suite", "type": "Notebook", "folder_name": f"{root_f}/02 Stage"},
+                        {"name": f"lh_{clean_dom}_silver", "type": "Lakehouse", "folder_name": f"{root_f}/03 Silver"},
+                        {"name": f"nb_silver_transformations", "type": "Notebook", "folder_name": f"{root_f}/03 Silver"},
+                        {"name": f"wh_{clean_dom}_gold", "type": "Warehouse", "folder_name": f"{root_f}/04 Gold"},
+                        {"name": f"sm_{clean_dom}_gold_direct_lake", "type": "SemanticModel", "folder_name": f"{root_f}/04 Gold"},
+                        {"name": f"pl_master_medallion_orchestration", "type": "DataPipeline", "folder_name": f"{root_f}/01 Raw"},
                     ],
                     "tables": [
                         {"name": "brz_agent_runs", "target": "01 Raw / public.agent_runs"},
@@ -1981,6 +1981,10 @@ async def handle_chat_stream(req: ChatRequest) -> StreamingResponse:
                         clean_dom = p_name.lower().replace("-", "_").replace(" ", "_").strip("_") or "postgres_medallion"
                         root_f = f"{clean_dom.capitalize()}_Platform"
                         sub_f = {"raw": "01 Raw", "stage": "02 Stage", "silver": "03 Silver", "gold": "04 Gold"}
+                        raw_target = f"{root_f}/{sub_f.get('raw', '01 Raw')}"
+                        stage_target = f"{root_f}/{sub_f.get('stage', '02 Stage')}"
+                        silver_target = f"{root_f}/{sub_f.get('silver', '03 Silver')}"
+                        gold_target = f"{root_f}/{sub_f.get('gold', '04 Gold')}"
                         active_plan = {
                             "project_code": proj_id or "PRJ-POSTGRESQL-MEDALLION",
                             "domain": clean_dom,
@@ -1988,15 +1992,15 @@ async def handle_chat_stream(req: ChatRequest) -> StreamingResponse:
                             "folders": sub_f,
                             "target_workspace": os.getenv("ALLOWED_WORKSPACE_NAME") or "Fabric Workspace",
                             "items": [
-                                {"name": f"lh_{clean_dom}_bronze", "type": "Lakehouse", "folder_name": f"{root_f}/01 Raw/01_lakehouse"},
-                                {"name": f"pl_{clean_dom}_bronze_ingest", "type": "DataPipeline", "folder_name": f"{root_f}/01 Raw/02_pipelines"},
-                                {"name": f"nb_{clean_dom}_curate", "type": "Notebook", "folder_name": f"{root_f}/02 Stage/01_notebooks"},
-                                {"name": f"nb_{clean_dom}_quality_suite", "type": "Notebook", "folder_name": f"{root_f}/02 Stage/02_quality"},
-                                {"name": f"lh_{clean_dom}_silver", "type": "Lakehouse", "folder_name": f"{root_f}/03 Silver/01_lakehouse"},
-                                {"name": "nb_silver_transformations", "type": "Notebook", "folder_name": f"{root_f}/03 Silver/02_notebooks"},
-                                {"name": f"wh_{clean_dom}_gold", "type": "Warehouse", "folder_name": f"{root_f}/04 Gold/01_warehouse"},
-                                {"name": f"sm_{clean_dom}_gold_direct_lake", "type": "SemanticModel", "folder_name": f"{root_f}/04 Gold/02_semantic_models"},
-                                {"name": "pl_master_medallion_orchestration", "type": "DataPipeline", "folder_name": f"{root_f}/05 Orchestration/01_pipelines"},
+                                {"name": f"lh_{clean_dom}_bronze", "type": "Lakehouse", "folder_name": raw_target},
+                                {"name": f"pl_{clean_dom}_bronze_ingest", "type": "DataPipeline", "folder_name": raw_target},
+                                {"name": f"nb_{clean_dom}_curate", "type": "Notebook", "folder_name": stage_target},
+                                {"name": f"nb_{clean_dom}_quality_suite", "type": "Notebook", "folder_name": stage_target},
+                                {"name": f"lh_{clean_dom}_silver", "type": "Lakehouse", "folder_name": silver_target},
+                                {"name": "nb_silver_transformations", "type": "Notebook", "folder_name": silver_target},
+                                {"name": f"wh_{clean_dom}_gold", "type": "Warehouse", "folder_name": gold_target},
+                                {"name": f"sm_{clean_dom}_gold_direct_lake", "type": "SemanticModel", "folder_name": gold_target},
+                                {"name": "pl_master_medallion_orchestration", "type": "DataPipeline", "folder_name": raw_target},
                             ],
                         }
                         SESSIONS[sid]["active_plan"] = active_plan
@@ -2008,6 +2012,10 @@ async def handle_chat_stream(req: ChatRequest) -> StreamingResponse:
                 clean_dom = p_sum.get("business_domain", "platform").lower().replace(" ", "_").replace("-", "_").strip("_") or "postgres_medallion"
                 root_f = f"{p_name.replace(' ', '_')}"
                 sub_f = {"raw": "01 Raw", "stage": "02 Stage", "silver": "03 Silver", "gold": "04 Gold"}
+                raw_target = f"{root_f}/{sub_f.get('raw', '01 Raw')}"
+                stage_target = f"{root_f}/{sub_f.get('stage', '02 Stage')}"
+                silver_target = f"{root_f}/{sub_f.get('silver', '03 Silver')}"
+                gold_target = f"{root_f}/{sub_f.get('gold', '04 Gold')}"
                 active_plan = {
                     "project_code": proj_id or p_sum.get("project_code", "PRJ-DEPLOY"),
                     "domain": clean_dom,
@@ -2015,15 +2023,15 @@ async def handle_chat_stream(req: ChatRequest) -> StreamingResponse:
                     "folders": sub_f,
                     "target_workspace": intake_override.get("project_context", {}).get("platform_summary", {}).get("target_workspace") or os.getenv("ALLOWED_WORKSPACE_NAME") or "Fabric Workspace",
                     "items": [
-                        {"name": f"lh_{clean_dom}_bronze", "type": "Lakehouse", "folder_name": f"{root_f}/01 Raw/01_lakehouse"},
-                        {"name": f"pl_{clean_dom}_bronze_ingest", "type": "DataPipeline", "folder_name": f"{root_f}/01 Raw/02_pipelines"},
-                        {"name": f"nb_{clean_dom}_curate", "type": "Notebook", "folder_name": f"{root_f}/02 Stage/01_notebooks"},
-                        {"name": f"nb_{clean_dom}_quality_suite", "type": "Notebook", "folder_name": f"{root_f}/02 Stage/02_quality"},
-                        {"name": f"lh_{clean_dom}_silver", "type": "Lakehouse", "folder_name": f"{root_f}/03 Silver/01_lakehouse"},
-                        {"name": "nb_silver_transformations", "type": "Notebook", "folder_name": f"{root_f}/03 Silver/02_notebooks"},
-                        {"name": f"wh_{clean_dom}_gold", "type": "Warehouse", "folder_name": f"{root_f}/04 Gold/01_warehouse"},
-                        {"name": f"sm_{clean_dom}_gold_direct_lake", "type": "SemanticModel", "folder_name": f"{root_f}/04 Gold/02_semantic_models"},
-                        {"name": "pl_master_medallion_orchestration", "type": "DataPipeline", "folder_name": f"{root_f}/05 Orchestration/01_pipelines"},
+                        {"name": f"lh_{clean_dom}_bronze", "type": "Lakehouse", "folder_name": raw_target},
+                        {"name": f"pl_{clean_dom}_bronze_ingest", "type": "DataPipeline", "folder_name": raw_target},
+                        {"name": f"nb_{clean_dom}_curate", "type": "Notebook", "folder_name": stage_target},
+                        {"name": f"nb_{clean_dom}_quality_suite", "type": "Notebook", "folder_name": stage_target},
+                        {"name": f"lh_{clean_dom}_silver", "type": "Lakehouse", "folder_name": silver_target},
+                        {"name": "nb_silver_transformations", "type": "Notebook", "folder_name": silver_target},
+                        {"name": f"wh_{clean_dom}_gold", "type": "Warehouse", "folder_name": gold_target},
+                        {"name": f"sm_{clean_dom}_gold_direct_lake", "type": "SemanticModel", "folder_name": gold_target},
+                        {"name": "pl_master_medallion_orchestration", "type": "DataPipeline", "folder_name": raw_target},
                     ],
                 }
                 SESSIONS[sid]["active_plan"] = active_plan
@@ -2064,16 +2072,38 @@ async def handle_chat_stream(req: ChatRequest) -> StreamingResponse:
             silver_f = f"{root_f}/{sub_f.get('silver', '03 Silver')}"
             gold_f = f"{root_f}/{sub_f.get('gold', '04 Gold')}"
             if active_plan.get("items"):
-                items_to_deploy = [
-                    FabricItemSpec(
-                        name=it.get("name") or it.get("display_name", f"item_{uuid.uuid4().hex[:4]}"),
-                        item_type=it.get("type") or it.get("item_type", "Lakehouse"),
-                        depends_on=it.get("depends_on", []),
-                        folder_name=it.get("folder_name") or root_f,
-                        description=it.get("description", ""),
+                items_to_deploy = []
+                for it in active_plan["items"]:
+                    it_type = it.get("type") or it.get("item_type", "Lakehouse")
+                    it_name = it.get("name") or it.get("display_name", f"item_{uuid.uuid4().hex[:4]}")
+                    orig_folder = it.get("folder_name") or ""
+                    # Normalize target containment to the 4 main medallion folders
+                    if "01 Raw" in orig_folder or "raw" in orig_folder.lower():
+                        target_f = raw_f
+                    elif "02 Stage" in orig_folder or "stage" in orig_folder.lower() or "quality" in orig_folder.lower():
+                        target_f = stage_f
+                    elif "03 Silver" in orig_folder or "silver" in orig_folder.lower():
+                        target_f = silver_f
+                    elif "04 Gold" in orig_folder or "gold" in orig_folder.lower():
+                        target_f = gold_f
+                    elif it_type.lower() in ("lakehouse", "datapipeline") and "silver" not in it_name.lower() and "gold" not in it_name.lower():
+                        target_f = raw_f
+                    elif "silver" in it_name.lower():
+                        target_f = silver_f
+                    elif "gold" in it_name.lower() or it_type.lower() == "warehouse":
+                        target_f = gold_f
+                    else:
+                        target_f = stage_f
+
+                    items_to_deploy.append(
+                        FabricItemSpec(
+                            name=it_name,
+                            item_type=it_type,
+                            depends_on=it.get("depends_on", []),
+                            folder_name=target_f,
+                            description=it.get("description", ""),
+                        )
                     )
-                    for it in active_plan["items"]
-                ]
             else:
                 items_to_deploy = [
                     FabricItemSpec(name=f"lh_{clean_dom}_bronze", item_type="Lakehouse", folder_name=raw_f),

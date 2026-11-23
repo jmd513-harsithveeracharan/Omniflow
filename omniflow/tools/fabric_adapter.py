@@ -116,11 +116,11 @@ def get_or_create_folder(folder_name: str, workspace_id: str) -> dict[str, Any]:
 
 
 def move_item_to_folder(item_id: str, folder_id: str, workspace_id: str) -> bool:
-    """Moves a provisioned Fabric item into its target folder."""
+    """Moves a provisioned Fabric item into its target folder using official /move API."""
     if not item_id or not folder_id or item_id in ("provisioned_async", "local-sim"):
         return False
     h = _headers()
-    url = f"{_BASE}/workspaces/{workspace_id}/items/{item_id}/moveToFolder"
+    url = f"{_BASE}/workspaces/{workspace_id}/items/{item_id}/move"
     try:
         r = requests.post(url, headers=h, json={"targetFolderId": folder_id}, timeout=15)
         return r.status_code in (200, 201)
@@ -134,8 +134,9 @@ def create_item(
     workspace_id: str,
     definition: dict[str, Any] | None = None,
     description: str = "",
+    folder_id: str | None = None,
 ) -> dict[str, Any]:
-    """Provisions a Fabric item (Lakehouse, Warehouse, Notebook, Pipeline)."""
+    """Provisions a Fabric item (Lakehouse, Warehouse, Notebook, Pipeline) directly in a folder."""
     h = _headers()
     # Check if item exists
     list_url = f"{_BASE}/workspaces/{workspace_id}/items"
@@ -143,9 +144,12 @@ def create_item(
     if r.status_code == 200:
         for item in r.json().get("value", []):
             if item.get("displayName") == display_name and item.get("type") == item_type:
+                existing_id = item.get("id")
+                if folder_id and existing_id and item.get("folderId") != folder_id:
+                    move_item_to_folder(existing_id, folder_id, workspace_id)
                 return {
                     "success": True,
-                    "item_id": item.get("id"),
+                    "item_id": existing_id,
                     "already_existed": True,
                     "display_name": display_name,
                     "item_type": item_type,
@@ -157,6 +161,8 @@ def create_item(
         body["description"] = description
     if definition:
         body["definition"] = definition
+    if folder_id:
+        body["folderId"] = folder_id
 
     r = requests.post(url, headers=h, json=body, timeout=30)
     if r.status_code in (200, 201, 202):
@@ -182,6 +188,9 @@ def create_item(
                         break
             except Exception:
                 pass
+
+        if item_id and folder_id and data.get("folderId") != folder_id:
+            move_item_to_folder(item_id, folder_id, workspace_id)
 
         return {
             "success": True,
