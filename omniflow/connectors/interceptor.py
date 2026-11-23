@@ -222,14 +222,36 @@ def detect_connector_need(
 ) -> ConnectorDefinition | None:
     """
     TRULY DYNAMIC connector detection:
-    1. If connectionId, --resume, or resume pipeline is present, returns None.
-    2. Parses Intake JSON `retrieved_context.data_sources` dynamically when present (from intake_override or message).
-    3. Matches known presets cleanly or synthesizes a connector for arbitrary source names.
+    1. If message is a deployment command, returns None immediately.
+    2. If connectionId, --resume, or resume pipeline is present, returns None.
+    3. If session already has an active architecture/plan/connection, does not intercept unless explicitly requested.
+    4. Parses Intake JSON `retrieved_context.data_sources` dynamically when present (from intake_override or message).
+    5. Matches known presets cleanly or synthesizes a connector for arbitrary source names.
     """
-    msg_lower = message.lower()
+    msg_lower = message.lower().strip()
 
+    # 1. Never intercept deployment requests
+    deploy_phrases = ["deploy", "deployment", "deploy active plan", "deploy plan", "deploy to fabric", "deploy now", "execute deployment"]
+    if any(phrase in msg_lower for phrase in deploy_phrases):
+        return None
+
+    # 2. Never intercept if already resumed or connection id provided
     if "connectionid" in msg_lower or "conn_" in msg_lower or "resume pipeline" in msg_lower or "--resume" in msg_lower:
         return None
+
+    # 3. If session already has an active plan, active connection, or synthesized architecture, do not intercept
+    if session_data:
+        has_plan = bool(session_data.get("active_plan"))
+        has_active_conn = bool(session_data.get("connection_id") or session_data.get("active_connection"))
+        has_synth = any(
+            isinstance(m, dict) and any(k in m.get("content", "") for k in ["Microsoft Fabric Architecture Synthesized", "Medallion Hierarchy", "Target Workspace"])
+            for m in session_data.get("messages", [])
+        )
+        is_explicit_connect = any(
+            p in msg_lower for p in ["connect to", "integrate with", "ingest from", "source from", "new connection", "change connection", "inspect source"]
+        )
+        if (has_plan or has_synth or has_active_conn) and not is_explicit_connect:
+            return None
 
     intake = intake_override or extract_intake_json(message)
     if intake:
