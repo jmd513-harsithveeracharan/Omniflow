@@ -271,7 +271,7 @@ export const App: React.FC = () => {
 
   const handleSelectSession = async (sid: string) => {
     if (isStreaming) return;
-    if (sid === sessionId) {
+    if (sid === sessionId && currentPlan) {
       if (activeView !== 'chat') {
         setActiveView('chat');
         try {
@@ -312,7 +312,6 @@ export const App: React.FC = () => {
         setActiveProjectId(targetProjId);
         try { localStorage.setItem('omniflow_active_project_id', targetProjId); } catch {}
       }
-      setCurrentPlan(null);
       setActiveView('chat');
       setSessionId(sid);
       try {
@@ -330,6 +329,16 @@ export const App: React.FC = () => {
           try {
             const cachedRaw = localStorage.getItem(`omniflow_active_plan_${sid}`);
             if (cachedRaw) restoredPlan = JSON.parse(cachedRaw);
+          } catch {}
+        }
+
+        // Project-level cache fallback
+        if (!restoredPlan && targetProjId) {
+          try {
+            const cachedProj =
+              localStorage.getItem(`omniflow_active_plan_proj_${targetProjId}`) ||
+              localStorage.getItem(`omniflow_active_plan_${targetProjId}`);
+            if (cachedProj) restoredPlan = JSON.parse(cachedProj);
           } catch {}
         }
 
@@ -742,7 +751,8 @@ export const App: React.FC = () => {
     effort?: string,
     mode?: 'auto' | 'general' | 'project',
     images?: string[],
-    overrideSessionId?: string
+    overrideSessionId?: string,
+    displayContent?: string
   ) => {
     if (!text.trim() && (!images || images.length === 0)) return;
     const targetSessionId = overrideSessionId || sessionId;
@@ -766,7 +776,7 @@ export const App: React.FC = () => {
     const startTime = Date.now();
     const userMsg: ChatMessage = {
       role: 'user',
-      content: text,
+      content: displayContent || text,
       images: images && images.length > 0 ? images : undefined,
     };
     const placeholderAssistantMsg: ChatMessage = {
@@ -799,6 +809,8 @@ export const App: React.FC = () => {
     setIsStreaming(true);
 
     let assistantContent = '';
+    let lastRenderTime = 0;
+    let pendingRafId: number | null = null;
 
     await streamChatTurn(
       text,
@@ -809,15 +821,39 @@ export const App: React.FC = () => {
         if (isVoiceModeActive && feedStreamingChunkRef.current) {
           feedStreamingChunkRef.current(chunk);
         }
-        setMessages((prev) => {
-          const last = prev[prev.length - 1];
-          if (last && last.role === 'assistant') {
-            return [...prev.slice(0, -1), { ...last, content: assistantContent, isStreaming: true }];
+        const now = Date.now();
+        if (now - lastRenderTime > 40) {
+          lastRenderTime = now;
+          if (pendingRafId) {
+            cancelAnimationFrame(pendingRafId);
+            pendingRafId = null;
           }
-          return prev;
-        });
+          setMessages((prev) => {
+            const last = prev[prev.length - 1];
+            if (last && last.role === 'assistant') {
+              return [...prev.slice(0, -1), { ...last, content: assistantContent, isStreaming: true }];
+            }
+            return prev;
+          });
+        } else if (!pendingRafId) {
+          pendingRafId = requestAnimationFrame(() => {
+            pendingRafId = null;
+            lastRenderTime = Date.now();
+            setMessages((prev) => {
+              const last = prev[prev.length - 1];
+              if (last && last.role === 'assistant') {
+                return [...prev.slice(0, -1), { ...last, content: assistantContent, isStreaming: true }];
+              }
+              return prev;
+            });
+          });
+        }
       },
       (plan) => {
+        if (pendingRafId) {
+          cancelAnimationFrame(pendingRafId);
+          pendingRafId = null;
+        }
         if (controller.signal.aborted) return;
         setIsStreaming(false);
         if (isVoiceModeActive && finishStreamingRef.current) {
@@ -926,7 +962,8 @@ export const App: React.FC = () => {
         }
       },
       activeProjectId || localStorage.getItem('omniflow_active_project_id') || undefined,
-      images
+      images,
+      displayContent
     );
   };
 
@@ -938,7 +975,8 @@ export const App: React.FC = () => {
     setActiveCredentialRequest(null);
     const pathwayTag = pathway === 'pyspark_notebook' ? ' via PySpark Notebook Ingestion' : '';
     const resumePrompt = `Resume pipeline synthesis with connectionId '${connectionId}'${pathwayTag} for selected tables: ${selectedTables.join(', ')}`;
-    handleSendMessage(resumePrompt);
+    const displayMsg = `⚡ PostgreSQL connection verified (${connectionId.slice(0, 16)}...). Resuming Medallion synthesis for ${selectedTables.length} tables...`;
+    handleSendMessage(resumePrompt, undefined, undefined, 'project', undefined, undefined, displayMsg);
   };
 
   // ChatGPT-Style Hands-Free Voice Mode Hook
@@ -1141,7 +1179,18 @@ export const App: React.FC = () => {
               handleSelectSession(sid);
             }}
             onStartNewChat={(prompt, model, effort) => {
-              const newSid = `proj_${activeProjectId}_${Math.random().toString(36).substring(2, 9)}`;
+              // Deduplicate project sessions: reuse existing project session if one exists
+              const existingSess = projectSessions.find(
+                (s) => s.sessionId === `proj_${activeProjectId}` || s.projectId === activeProjectId
+              );
+              if (existingSess) {
+                handleSelectSession(existingSess.sessionId).then(() => {
+                  handleSendMessage(prompt, model, effort, 'project', undefined, existingSess.sessionId);
+                });
+                return;
+              }
+
+              const newSid = `proj_${activeProjectId}`;
               const optimisticSession: ChatSession = {
                 sessionId: newSid,
                 projectId: activeProjectId,

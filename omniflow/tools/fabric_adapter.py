@@ -21,10 +21,16 @@ _BASE = "https://api.fabric.microsoft.com/v1"
 
 
 def _get_fabric_token() -> str:
-    """Acquires a Fabric Bearer token via static environment variables or Azure CLI."""
+    """Acquires a Fabric Bearer token via cached auth helper, static env, or Azure CLI."""
     static = os.getenv("FABRIC_BEARER_TOKEN") or os.getenv("AZURE_ACCESS_TOKEN")
     if static:
         return static.strip()
+
+    try:
+        from app.auth import get_fabric_token
+        return get_fabric_token()
+    except Exception:
+        pass
 
     try:
         proc = subprocess.run(

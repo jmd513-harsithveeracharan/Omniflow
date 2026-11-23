@@ -14344,3 +14344,20 @@ pre[class*="language-"] {
     from { opacity: 0.7; transform: translateY(4px); }
     to { opacity: 1; transform: translateY(0); }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════════
+   GPU COMPOSITING & SMOOTH HARDWARE-ACCELERATED SPINNERS
+   ═══════════════════════════════════════════════════════════════════════════════ */
+.animate-spin,
+.agent-working-spinner,
+.conn-spinner,
+.conn-spinner-mini,
+.voice-orb-thinking-spin,
+.ws-btn-sync.loading svg,
+.btn-tree-refresh.loading svg {
+    transform: translateZ(0);
+    will-change: transform;
+    backface-visibility: hidden;
+    perspective: 1000px;
+}
+

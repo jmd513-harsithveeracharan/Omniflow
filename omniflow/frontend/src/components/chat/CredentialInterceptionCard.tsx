@@ -22,6 +22,25 @@ interface CredentialInterceptionCardProps {
   onDismiss: () => void;
 }
 
+function parseConnectionUrl(raw: string) {
+  try {
+    const trimmed = raw.trim();
+    if (!trimmed.includes('://')) return null;
+    const clean = trimmed.replace(/^postgresql:\/\//i, 'http://').replace(/^postgres:\/\//i, 'http://');
+    const u = new URL(clean);
+    return {
+      host: u.hostname,
+      port: u.port || '5432',
+      user: decodeURIComponent(u.username || ''),
+      pass: decodeURIComponent(u.password || ''),
+      db: u.pathname.replace(/^\//, '') || '',
+      sslmode: u.searchParams.get('sslmode') || 'require',
+    };
+  } catch {
+    return null;
+  }
+}
+
 export const CredentialInterceptionCard: React.FC<CredentialInterceptionCardProps> = ({
   data,
   onConfirmResume,
@@ -34,6 +53,28 @@ export const CredentialInterceptionCard: React.FC<CredentialInterceptionCardProp
     });
     return initial;
   });
+
+  const [inputMode, setInputMode] = useState<'url' | 'manual'>('url');
+  const [connectionUrl, setConnectionUrl] = useState<string>(() => formData.connection_url || '');
+
+  const handleUrlChange = (urlStr: string) => {
+    setConnectionUrl(urlStr);
+    const parsed = parseConnectionUrl(urlStr);
+    if (parsed) {
+      setFormData((prev) => ({
+        ...prev,
+        connection_url: urlStr,
+        host: parsed.host,
+        port: parsed.port,
+        database: parsed.db,
+        username: parsed.user,
+        password: parsed.pass,
+        sslmode: parsed.sslmode,
+      }));
+    } else {
+      setFormData((prev) => ({ ...prev, connection_url: urlStr }));
+    }
+  };
 
   const [showPasswords, setShowPasswords] = useState<Record<string, boolean>>({});
   const [isInspecting, setIsInspecting] = useState<boolean>(false);
@@ -256,44 +297,88 @@ export const CredentialInterceptionCard: React.FC<CredentialInterceptionCardProp
 
           {!inspectResult ? (
             <form onSubmit={handleRunInspection} className="space-y-5">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {data.required_params.map((param) => {
-                  const isPass = param.type === 'password';
-                  const showPass = showPasswords[param.key];
-                  const isFullWidth = param.key === 'connection_url' || param.key === 'endpoint_url';
-
-                  return (
-                    <div key={param.key} className={`space-y-1.5 ${isFullWidth ? 'md:col-span-2' : ''}`}>
-                      <label className="text-[11.5px] font-medium text-zinc-300 flex items-center justify-between">
-                        <span>
-                          {param.label} {param.required && <span className="text-rose-400">*</span>}
-                        </span>
-                      </label>
-                      <div className="relative">
-                        <input
-                          type={isPass && !showPass ? 'password' : 'text'}
-                          value={formData[param.key] || ''}
-                          onChange={(e) => {
-                            setFormData({ ...formData, [param.key]: e.target.value });
-                          }}
-                          placeholder={param.placeholder}
-                          required={param.required}
-                          className="w-full bg-[#16171a] border border-white/10 focus:border-white/30 focus:ring-1 focus:ring-white/20 rounded-xl px-4 py-2.5 text-xs text-white placeholder-zinc-500 font-mono transition-all"
-                        />
-                        {isPass && (
-                          <button
-                            type="button"
-                            onClick={() => handleTogglePassword(param.key)}
-                            className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-200 cursor-pointer"
-                          >
-                            {showPass ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
+              {/* Connection Mode Switcher */}
+              <div className="flex items-center gap-2 p-1 bg-white/[0.04] rounded-xl border border-white/[0.08] w-fit">
+                <button
+                  type="button"
+                  onClick={() => setInputMode('url')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${
+                    inputMode === 'url' ? 'bg-white/10 text-white shadow-sm' : 'text-zinc-400 hover:text-white'
+                  }`}
+                >
+                  ⚡ Connection URL (Neon / Cloud)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setInputMode('manual')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${
+                    inputMode === 'manual' ? 'bg-white/10 text-white shadow-sm' : 'text-zinc-400 hover:text-white'
+                  }`}
+                >
+                  Manual Parameters
+                </button>
               </div>
+
+              {inputMode === 'url' ? (
+                <div className="space-y-2">
+                  <label className="text-[12px] font-medium text-zinc-300 flex items-center justify-between">
+                    <span>Database Connection URL <span className="text-rose-400">*</span></span>
+                    <span className="text-[11px] text-zinc-500 font-mono">postgresql://user:pass@host/db</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={connectionUrl}
+                    onChange={(e) => handleUrlChange(e.target.value)}
+                    placeholder="postgresql://user:password@ep-sample-pooler.us-east-2.aws.neon.tech/neondb?sslmode=require"
+                    className="w-full bg-[#16171a] border border-white/10 focus:border-white/30 focus:ring-1 focus:ring-white/20 rounded-xl px-4 py-3 text-xs text-white placeholder-zinc-500 font-mono transition-all"
+                    required
+                  />
+                  <p className="text-[11.5px] text-zinc-400 leading-relaxed">
+                    Pasting your database URL automatically populates the host, port, credentials, and SSL settings.
+                  </p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {data.required_params
+                    .filter((param) => param.key !== 'connection_url')
+                    .map((param) => {
+                      const isPass = param.type === 'password';
+                      const showPass = showPasswords[param.key];
+                      const isFullWidth = param.key === 'endpoint_url';
+
+                      return (
+                        <div key={param.key} className={`space-y-1.5 ${isFullWidth ? 'md:col-span-2' : ''}`}>
+                          <label className="text-[11.5px] font-medium text-zinc-300 flex items-center justify-between">
+                            <span>
+                              {param.label} {param.required && <span className="text-rose-400">*</span>}
+                            </span>
+                          </label>
+                          <div className="relative">
+                            <input
+                              type={isPass && !showPass ? 'password' : 'text'}
+                              value={formData[param.key] || ''}
+                              onChange={(e) => {
+                                setFormData({ ...formData, [param.key]: e.target.value });
+                              }}
+                              placeholder={param.placeholder}
+                              required={param.required}
+                              className="w-full bg-[#16171a] border border-white/10 focus:border-white/30 focus:ring-1 focus:ring-white/20 rounded-xl px-4 py-2.5 text-xs text-white placeholder-zinc-500 font-mono transition-all"
+                            />
+                            {isPass && (
+                              <button
+                                type="button"
+                                onClick={() => handleTogglePassword(param.key)}
+                                className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-200 cursor-pointer"
+                              >
+                                {showPass ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                </div>
+              )}
 
               {inspectError && (
                 <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex flex-col gap-2.5">

@@ -327,7 +327,8 @@ export async function streamChatTurn(
   userEmail?: string,
   onCredentialRequest?: (data: import('../types').CredentialRequestData) => void,
   projectId?: string,
-  images?: string[]
+  images?: string[],
+  displayMessage?: string
 ): Promise<void> {
   try {
     const res = await fetch(`${API_BASE}/chat/stream`, {
@@ -335,6 +336,7 @@ export async function streamChatTurn(
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         message,
+        display_message: displayMessage || undefined,
         session_id: sessionId,
         stream: true,
         model: model || undefined,
