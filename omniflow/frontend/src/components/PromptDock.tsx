@@ -683,12 +683,21 @@ export const PromptDock: React.FC<PromptDockProps> = ({
                         }}
                       >
                         {isStreaming ? (
-                          <span style={{ display: 'inline-flex', animation: 'spin 1s linear infinite', transformOrigin: 'center center' }}>
+                          <span
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              animation: 'spin 0.8s linear infinite',
+                              transformOrigin: 'center center',
+                            }}
+                          >
                             <Loader2
                               width={14}
                               height={14}
+                              stroke="#09090b"
                               style={{
-                                color: '#fff',
+                                color: '#09090b',
                               }}
                             />
                           </span>

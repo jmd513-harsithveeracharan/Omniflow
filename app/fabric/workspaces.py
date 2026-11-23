@@ -186,6 +186,9 @@ def get_or_create_folder(
         return None
 
     clean_name = folder_name.strip().strip("/")
+    if "/" not in clean_name and parent_folder_id is None and clean_name != "AI_Test_Folder":
+        clean_name = f"AI_Test_Folder/{clean_name}"
+
     if "/" in clean_name:
         parts = [p.strip() for p in clean_name.split("/") if p.strip()]
         current_parent = parent_folder_id

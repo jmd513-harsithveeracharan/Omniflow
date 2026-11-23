@@ -302,7 +302,7 @@ export const ThoughtStepRow: React.FC<ThoughtStepRowProps> = ({
             marginTop: '3px',
             marginBottom: '6px',
             paddingLeft: '10px',
-            borderLeft: '1.5px solid rgba(255, 255, 255, 0.12)',
+            borderLeft: 'none',
             fontSize: '12px',
           }}
         >

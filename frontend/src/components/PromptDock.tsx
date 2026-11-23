@@ -656,16 +656,22 @@ export const PromptDock: React.FC<PromptDockProps> = ({
                       >
                         {isStreaming ? (
                           <span
-                            className="animate-spin"
                             style={{
                               display: 'inline-flex',
                               alignItems: 'center',
                               justifyContent: 'center',
-                              animation: 'spin 1s linear infinite',
+                              animation: 'spin 0.8s linear infinite',
                               transformOrigin: 'center center',
                             }}
                           >
-                            <Loader2 width={14} height={14} />
+                            <Loader2
+                              width={14}
+                              height={14}
+                              stroke="#09090b"
+                              style={{
+                                color: '#09090b',
+                              }}
+                            />
                           </span>
                         ) : (
                           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">

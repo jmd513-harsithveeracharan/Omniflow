@@ -476,8 +476,9 @@ def build_warehouse_ddl_tool(
             f"Requirements:\n"
             f"1. Create dimension tables with BIGINT surrogate keys (*_sk), business keys, SCD2 tracking (effective_from, is_current).\n"
             f"2. Create fact tables with surrogate keys, dimension foreign keys, business measures (net_amount, quantity, line_total), and _loaded_at.\n"
-            f"3. Use standard Fabric T-SQL DDL syntax ([dbo].[table_name]).\n"
-            f"Return ONLY clean executable T-SQL DDL statements. No markdown fences."
+            f"3. Generate T-SQL Stored Procedures ([dbo].[sp_load_dim_*], [dbo].[sp_load_fact_*], [dbo].[sp_load_gold_star_schema]) that load dimensions and facts into the warehouse.\n"
+            f"4. Use standard Fabric T-SQL DDL syntax ([dbo].[table_name]).\n"
+            f"Return ONLY clean executable T-SQL DDL and Stored Procedure statements. No markdown fences."
         )
         llm_resp = chat(
             [{"role": "user", "content": llm_prompt}],
@@ -496,27 +497,9 @@ def build_warehouse_ddl_tool(
     except Exception:
         sql_str = None
 
-    if not sql_str:
-        sql_blocks = [f"-- OmniFlow Analytical Warehouse Star Schema DDL ({project_code})"]
-        for dim in dimensions:
-            sql_blocks.append(
-                f"CREATE TABLE [dbo].[{dim}] (\n"
-                f"    [{dim}_sk] BIGINT NOT NULL,\n"
-                f"    [business_key] VARCHAR(128) NOT NULL,\n"
-                f"    [effective_from] DATETIME2(6) NOT NULL,\n"
-                f"    [is_current] BIT NOT NULL\n"
-                f");"
-            )
-        for fact in facts:
-            sql_blocks.append(
-                f"CREATE TABLE [dbo].[{fact}] (\n"
-                f"    [settlement_sk] BIGINT NOT NULL,\n"
-                f"    [dim_customer_sk] BIGINT NOT NULL,\n"
-                f"    [net_amount_usd] DECIMAL(18, 2) NOT NULL,\n"
-                f"    [_loaded_at] DATETIME2(6) NOT NULL\n"
-                f");"
-            )
-        sql_str = "\n\n".join(sql_blocks)
+    if not sql_str or "sp_load" not in sql_str.lower():
+        from omniflow.intake.code_generators import generate_gold_warehouse_sql
+        sql_str = generate_gold_warehouse_sql(domain, project_code, dimensions, facts)
 
     return {
         "file_extension": "sql",

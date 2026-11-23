@@ -12,6 +12,13 @@ import os
 import re
 from typing import Any
 
+from omniflow.intake.code_generators import (
+    generate_curate_notebook_code,
+    generate_gold_warehouse_sql,
+    generate_quality_suite_code,
+    generate_silver_transformations_code,
+)
+
 
 def extract_intake_json(message: str) -> dict[str, Any] | None:
     """Extracts an Enterprise Intake JSON payload from fenced markdown or raw chat text."""
@@ -171,10 +178,23 @@ def build_dynamic_plan_object(
 
     for src in sources:
         source_names.append(str(src.get("source_name") or src.get("system_type") or "Source System"))
-        for tbl in src.get("tables", []):
-            tdict = {"table_name": tbl} if isinstance(tbl, str) else tbl
+        raw_tables = (
+            src.get("tables")
+            or src.get("business_entities")
+            or src.get("entities")
+            or []
+        )
+        for tbl in raw_tables:
+            if isinstance(tbl, str):
+                tdict = {"table_name": tbl}
+            elif isinstance(tbl, dict):
+                tdict = dict(tbl)
+                if not tdict.get("table_name"):
+                    tdict["table_name"] = tdict.get("entity_name") or tdict.get("name") or "entity"
+            else:
+                continue
             source_tables.append(tdict)
-            for p_col in tdict.get("pii_columns", []):
+            for p_col in (tdict.get("pii_columns") or tdict.get("pii_attributes") or []):
                 if p_col not in pii_total:
                     pii_total.append(p_col)
 
@@ -182,26 +202,33 @@ def build_dynamic_plan_object(
     stage_label = sub_f.get("stage", "02 Stage")
     silver_label = sub_f.get("silver", "03 Silver")
     gold_label = sub_f.get("gold", "04 Gold")
+    orch_label = sub_f.get("orchestration", "Pipeline Orchestration")
+
+    clean_pname = re.sub(r"[^a-zA-Z0-9_]", "_", proj_name).strip("_")
+    default_proj_root = clean_pname if clean_pname.lower().endswith(("_platform", "_medallion")) else f"{clean_dom.title()}_Platform"
+    if not root_f or root_f.lower() in ("ai_test_folder", "root", "none"):
+        root_f = default_proj_root
 
     plan_tables: list[dict[str, str]] = []
     schema_contracts: dict[str, Any] = {}
+    table_configs_list: list[dict[str, Any]] = []
+
     for tbl in source_tables[:60]:
-        tname = str(tbl.get("table_name", "entity")).strip()
+        tname = str(tbl.get("table_name") or tbl.get("entity_name") or "entity").strip()
         short = tname.split(".")[-1].lower()
-        wm = tbl.get("watermark_column") or "full_load"
-        pk = tbl.get("primary_key") or "id"
-        plan_tables.append(
-            {
-                "name": f"brz_{short}",
-                "target": f"{raw_label} / lh_{clean_dom}_bronze ({wm})",
-            }
+        wm = tbl.get("watermark_column") or (
+            "updated_at" if "updated_at" in str(tbl) else "created_at" if "created_at" in str(tbl) else "id"
         )
-        plan_tables.append(
-            {
-                "name": f"slv_{short}",
-                "target": f"{silver_label} / lh_{clean_dom}_silver (Delta MERGE)",
-            }
-        )
+        pk = tbl.get("primary_key") or ("id" if not short.endswith("s") else f"{short[:-1]}_id")
+
+        pii_attrs = tbl.get("pii_attributes") or tbl.get("pii_columns") or []
+        if not pii_attrs and any(k in short for k in ("customer", "user", "address", "account")):
+            pii_attrs = ["email", "phone", "street_address", "first_name", "last_name"]
+
+        table_configs_list.append({"table": tname, "pk": pk, "wm": wm, "pii": pii_attrs})
+        plan_tables.append({"name": f"brz_{short}", "target": f"{raw_label} / lh_{clean_dom}_bronze ({wm})"})
+        plan_tables.append({"name": f"slv_{short}", "target": f"{silver_label} / lh_{clean_dom}_silver (Delta MERGE)"})
+
         cols = tbl.get("columns", [])
         if not cols:
             cols = [
@@ -217,24 +244,31 @@ def build_dynamic_plan_object(
             "columns": cols,
         }
 
-    # Extract synthesized PySpark, SQL, and Quality code from execution result
+    # Extract or generate code for all 3 Medallion PySpark Notebooks and Gold Warehouse
     pyspark_code = (res or {}).get("pyspark_code") or ""
+    quality_code = (res or {}).get("quality_code") or ""
+    silver_code = (res or {}).get("silver_code") or ""
     sql_code = (res or {}).get("sql_code") or ""
-    quality_code = ""
     art_dir = (res or {}).get("artifacts_dir") or ""
 
     if art_dir and os.path.exists(art_dir):
         for f in os.listdir(art_dir):
-            if not pyspark_code and f.endswith(".py") and ("curate" in f or "silver" in f or "transform" in f):
+            if not pyspark_code and f.endswith(".py") and ("curate" in f or "bronze_silver" in f):
                 try:
                     with open(os.path.join(art_dir, f), "r", encoding="utf-8") as pf:
                         pyspark_code = pf.read()
                 except Exception:
                     pass
-            elif not quality_code and f.endswith(".py") and ("quality" in f or "suite" in f or "audit" in f):
+            elif not quality_code and f.endswith(".py") and ("quality" in f or "suite" in f):
                 try:
                     with open(os.path.join(art_dir, f), "r", encoding="utf-8") as qf:
                         quality_code = qf.read()
+                except Exception:
+                    pass
+            elif not silver_code and f.endswith(".py") and ("silver" in f or "transform" in f):
+                try:
+                    with open(os.path.join(art_dir, f), "r", encoding="utf-8") as tf:
+                        silver_code = tf.read()
                 except Exception:
                     pass
             elif not sql_code and f.endswith(".sql") and ("gold" in f or "warehouse" in f):
@@ -244,91 +278,15 @@ def build_dynamic_plan_object(
                 except Exception:
                     pass
 
-    # High-quality fallback code if none on disk
-    if not pyspark_code:
-        tbl_names_str = ", ".join(f'"{t.get("table_name")}"' for t in source_tables) or '"source_crm.customers", "source_crm.orders"'
-        pyspark_code = (
-            f"# Fabric PySpark Notebook: nb_{clean_dom}_curate\n"
-            f"# Runtime: Microsoft Fabric Synapse PySpark (Delta Lake)\n\n"
-            f"from delta.tables import DeltaTable\n"
-            f"from pyspark.sql import functions as F\n"
-            f"from pyspark.sql.window import Window\n\n"
-            f"RAW_LAKEHOUSE = \"lh_{clean_dom}_bronze\"\n"
-            f"SILVER_LAKEHOUSE = \"lh_{clean_dom}_silver\"\n\n"
-            f"TABLE_TARGETS = [{tbl_names_str}]\n\n"
-            f"def curate_and_merge(table_name: str, pk_col: str = \"id\", wm_col: str = \"updated_at\"):\n"
-            f"    raw_df = spark.read.table(f\"{{RAW_LAKEHOUSE}}.{{table_name}}\")\n"
-            f"    # Deduplicate within batch using latest watermark\n"
-            f"    window_spec = Window.partitionBy(pk_col).orderBy(F.col(wm_col).desc())\n"
-            f"    dedup_df = raw_df.withColumn(\"_rn\", F.row_number().over(window_spec)).filter(F.col(\"_rn\") == 1).drop(\"_rn\")\n\n"
-            f"    # Salted SHA-256 deterministic PII masking on sensitive fields\n"
-            f"    for col in dedup_df.columns:\n"
-            f"        if any(pii_term in col.lower() for pii_term in [\"email\", \"phone\", \"address\", \"ssn\", \"tax\"]):\n"
-            f"            dedup_df = dedup_df.withColumn(col, F.sha2(F.concat(F.lit(\"ms_salt_\"), F.col(col)), 256))\n\n"
-            f"    target_table = f\"{{SILVER_LAKEHOUSE}}.{{table_name}}\"\n"
-            f"    if DeltaTable.isDeltaTable(spark, target_table):\n"
-            f"        delta = DeltaTable.forName(spark, target_table)\n"
-            f"        delta.alias(\"t\").merge(\n"
-            f"            dedup_df.alias(\"s\"),\n"
-            f"            f\"t.{{pk_col}} = s.{{pk_col}}\"\n"
-            f"        ).whenMatchedUpdateAll().whenNotMatchedInsertAll().execute()\n"
-            f"    else:\n"
-            f"        dedup_df.write.format(\"delta\").mode(\"overwrite\").saveAsTable(target_table)\n\n"
-            f"for t in TABLE_TARGETS:\n"
-            f"    curate_and_merge(t)\n"
-        )
-
-    if not quality_code:
-        quality_code = (
-            f"# Fabric PySpark Notebook: nb_{clean_dom}_quality_suite\n"
-            f"# Data Quality, Anomaly Detection & Great Expectations Schema Assertions\n\n"
-            f"from pyspark.sql import functions as F\n\n"
-            f"def assert_data_quality(table_name: str, pk_col: str):\n"
-            f"    df = spark.read.table(table_name)\n"
-            f"    # 1. Primary Key Uniqueness Check\n"
-            f"    total_count = df.count()\n"
-            f"    distinct_pk = df.select(pk_col).distinct().count()\n"
-            f"    assert total_count == distinct_pk, f'PK Uniqueness violation on {{table_name}}'\n\n"
-            f"    # 2. Null Checks on Key Columns\n"
-            f"    null_pks = df.filter(F.col(pk_col).isNull()).count()\n"
-            f"    assert null_pks == 0, f'Null primary keys detected in {{table_name}}'\n"
-            f"    print(f'✅ {{table_name}} passed all quality constraints.')\n"
-        )
-
-    if not sql_code:
-        sql_code = (
-            f"-- Microsoft Fabric Gold Warehouse: wh_{clean_dom}_gold\n"
-            f"-- Kimball Star Schema & Direct Lake Analytical Marts\n\n"
-            f"CREATE TABLE [dbo].[dim_customer]\n"
-            f"(\n"
-            f"    [customer_sk] BIGINT IDENTITY(1,1) NOT NULL,\n"
-            f"    [customer_id] VARCHAR(64) NOT NULL,\n"
-            f"    [masked_email] VARCHAR(64) NULL,\n"
-            f"    [masked_phone] VARCHAR(64) NULL,\n"
-            f"    [is_active] BIT DEFAULT 1,\n"
-            f"    [_loaded_at] DATETIME2(6) NOT NULL\n"
-            f");\n\n"
-            f"CREATE TABLE [dbo].[fact_orders]\n"
-            f"(\n"
-            f"    [order_sk] BIGINT IDENTITY(1,1) NOT NULL,\n"
-            f"    [order_id] VARCHAR(64) NOT NULL,\n"
-            f"    [customer_sk] BIGINT NOT NULL,\n"
-            f"    [total_amount] DECIMAL(12,2) NOT NULL,\n"
-            f"    [order_date] DATE NOT NULL,\n"
-            f"    [_loaded_at] DATETIME2(6) NOT NULL\n"
-            f");\n"
-        )
-
-    clean_pname = re.sub(r"[^a-zA-Z0-9_]", "_", proj_name).strip("_")
-    default_proj_root = clean_pname if clean_pname.lower().endswith(("_platform", "_medallion")) else f"{clean_dom.title()}_Platform"
-    if not root_f or root_f.lower() in ("ai_test_folder", "root", "none"):
-        root_f = default_proj_root
-
-    raw_label = sub_f.get("raw", "01 Raw")
-    stage_label = sub_f.get("stage", "02 Stage")
-    silver_label = sub_f.get("silver", "03 Silver")
-    gold_label = sub_f.get("gold", "04 Gold")
-    orch_label = sub_f.get("orchestration", "Pipeline Orchestration")
+    # High-quality generators if not already on disk
+    if not pyspark_code or "curate_and_merge" not in pyspark_code:
+        pyspark_code = generate_curate_notebook_code(clean_dom, proj_name, table_configs_list)
+    if not quality_code or "audit_entity_quality" not in quality_code:
+        quality_code = generate_quality_suite_code(clean_dom, proj_name, table_configs_list)
+    if not silver_code or "conformed" not in silver_code.lower():
+        silver_code = generate_silver_transformations_code(clean_dom, proj_name, table_configs_list)
+    if not sql_code or "sp_load" not in sql_code:
+        sql_code = generate_gold_warehouse_sql(clean_dom, proj_name)
 
     items_list = [
         {"name": f"lh_{clean_dom}_bronze", "type": "Lakehouse", "folder_name": f"{root_f}/{raw_label}"},
@@ -336,7 +294,7 @@ def build_dynamic_plan_object(
         {"name": f"nb_{clean_dom}_curate", "type": "Notebook", "depends_on": [f"lh_{clean_dom}_bronze"], "folder_name": f"{root_f}/{stage_label}", "code": pyspark_code},
         {"name": f"nb_{clean_dom}_quality_suite", "type": "Notebook", "depends_on": [f"nb_{clean_dom}_curate"], "folder_name": f"{root_f}/{stage_label}", "code": quality_code},
         {"name": f"lh_{clean_dom}_silver", "type": "Lakehouse", "folder_name": f"{root_f}/{silver_label}"},
-        {"name": f"nb_silver_transformations", "type": "Notebook", "depends_on": [f"lh_{clean_dom}_silver"], "folder_name": f"{root_f}/{stage_label}", "code": pyspark_code},
+        {"name": f"nb_silver_transformations", "type": "Notebook", "depends_on": [f"lh_{clean_dom}_silver"], "folder_name": f"{root_f}/{stage_label}", "code": silver_code},
         {"name": f"wh_{clean_dom}_gold", "type": "Warehouse", "folder_name": f"{root_f}/{gold_label}", "sql_code": sql_code},
         {"name": f"sm_{clean_dom}_gold_direct_lake", "type": "SemanticModel", "depends_on": [f"wh_{clean_dom}_gold"], "folder_name": f"{root_f}/{gold_label}"},
         {"name": f"pl_master_medallion_orchestration", "type": "DataPipeline", "depends_on": [f"wh_{clean_dom}_gold"], "folder_name": f"{root_f}/{orch_label}"},
@@ -353,6 +311,7 @@ def build_dynamic_plan_object(
         "folders": sub_f,
         "pyspark_code": pyspark_code,
         "quality_code": quality_code,
+        "silver_code": silver_code,
         "sql_code": sql_code,
         "schema_contracts": schema_contracts,
         "lakehouses": [f"lh_{clean_dom}_bronze", f"lh_{clean_dom}_silver"],
@@ -371,16 +330,21 @@ def build_dynamic_plan_object(
                 "pyspark_code": quality_code,
                 "code": quality_code,
             },
+            {
+                "name": f"nb_silver_transformations",
+                "layer": "stage",
+                "pyspark_code": silver_code,
+                "code": silver_code,
+            },
         ],
         "pipeline": f"pl_{clean_dom}_bronze_ingest",
         "items": items_list,
         "tables": plan_tables,
     }
 
-    # Entity Table Markdown
     table_rows = "\n".join(
-        f"| `{t.get('table_name')}` | `{t.get('primary_key', 'id')}` | `{t.get('watermark_column', 'updated_at')}` | {'🛡️ SHA-256 Masked' if any(c.get('is_pii') for c in t.get('columns', [])) or t.get('pii_columns') else 'Standard'} |"
-        for t in source_tables[:12]
+        f"| `{t.get('table_name')}` | `{t.get('primary_key', 'id')}` | `{t.get('watermark_column', 'updated_at')}` | {'🛡️ SHA-256 Masked' if any(c.get('is_pii') for c in t.get('columns', [])) or t.get('pii_columns') or t.get('pii_attributes') or any(k in str(t.get('table_name')).lower() for k in ('customer', 'user', 'address', 'account')) else 'Standard'} |"
+        for t in source_tables[:20]
     )
     if not table_rows:
         table_rows = "| `source_crm.customers` | `customer_id` | `updated_at` | 🛡️ SHA-256 Masked |\n| `source_crm.orders` | `order_id` | `updated_at` | Standard |"
@@ -412,7 +376,11 @@ def build_dynamic_plan_object(
         f"{table_rows}\n\n"
         f"#### ⚡ PySpark Curation Logic (`nb_{clean_dom}_curate.py`)\n\n"
         f"```python\n{pyspark_code.strip()}\n```\n\n"
-        f"#### 📊 Gold Kimball Warehouse DDL (`wh_{clean_dom}_gold.sql`)\n\n"
+        f"#### 🛡️ Data Quality & Anomaly Suite (`nb_{clean_dom}_quality_suite.py`)\n\n"
+        f"```python\n{quality_code.strip()}\n```\n\n"
+        f"#### 🔄 Silver SCD Type 2 & Conformed Transformations (`nb_silver_transformations.py`)\n\n"
+        f"```python\n{silver_code.strip()}\n```\n\n"
+        f"#### 📊 Gold Kimball Warehouse DDL & Stored Procedures (`wh_{clean_dom}_gold.sql`)\n\n"
         f"```sql\n{sql_code.strip()}\n```\n\n"
         f"✨ **Deployment Ready**: All 9 enterprise architecture artifacts are verified and saved. "
         f"Click **Deploy to Fabric** below or open the **Visual Canvas** to provision them directly into `{ws_display}`."

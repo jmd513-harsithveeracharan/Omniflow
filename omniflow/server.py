@@ -2228,7 +2228,7 @@ print("✅ Verified Silver Lakehouse: lh_{dom}_silver")
 print("✨ 100% Quality Scorecard: Zero Schema Violations Detected.")
 """
                     elif "silver" in n_lower or "transform" in n_lower:
-                        return p.get("pyspark_code") or f"""# Fabric PySpark Silver SCD Type-2 Transformation: {it_n}
+                        return p.get("silver_code") or p.get("pyspark_code") or f"""# Fabric PySpark Silver SCD Type-2 Transformation: {it_n}
 from pyspark.sql import SparkSession
 spark = SparkSession.builder.appName("{it_n}").getOrCreate()
 print("🚀 Running Silver Medallion Deduplication and MERGE Upsert...")
