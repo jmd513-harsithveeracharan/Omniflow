@@ -2,6 +2,25 @@
 @tailwind components;
 @tailwind utilities;
 
+@keyframes omniContinuousSpin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-spin,
+svg.animate-spin,
+.lucide-loader-2,
+[data-lucide="loader-2"] {
+  animation: omniContinuousSpin 0.85s linear infinite !important;
+  transform-origin: center center !important;
+  display: inline-block !important;
+  will-change: transform;
+}
+
 @layer base {
   body {
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";

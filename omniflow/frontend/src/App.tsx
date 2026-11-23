@@ -250,8 +250,21 @@ export const App: React.FC = () => {
     const projId = explicitProjectId !== undefined ? explicitProjectId : (activeProjectId || storedPid || null);
     if (projId) {
       setActiveProjectId(projId);
+      try {
+        const cachedPlan =
+          localStorage.getItem(`omniflow_active_plan_proj_${projId}`) ||
+          localStorage.getItem(`omniflow_active_plan_${projId}`);
+        if (cachedPlan) {
+          setCurrentPlan(JSON.parse(cachedPlan));
+        } else {
+          setCurrentPlan(null);
+        }
+      } catch {
+        setCurrentPlan(null);
+      }
+    } else {
+      setCurrentPlan(null);
     }
-    setCurrentPlan(null);
     const newSid = projId
       ? `proj_${projId}_${Math.random().toString(36).substring(2, 9)}`
       : generateNewSessionId();
@@ -975,7 +988,7 @@ export const App: React.FC = () => {
     setActiveCredentialRequest(null);
     const pathwayTag = pathway === 'pyspark_notebook' ? ' via PySpark Notebook Ingestion' : '';
     const resumePrompt = `Resume pipeline synthesis with connectionId '${connectionId}'${pathwayTag} for selected tables: ${selectedTables.join(', ')}`;
-    const displayMsg = `⚡ PostgreSQL connection verified (${connectionId.slice(0, 16)}...). Resuming Medallion synthesis for ${selectedTables.length} tables...`;
+    const displayMsg = `⚡ PostgreSQL connection verified. Resuming Medallion synthesis for ${selectedTables.length} tables...`;
     handleSendMessage(resumePrompt, undefined, undefined, 'project', undefined, undefined, displayMsg);
   };
 
@@ -1179,18 +1192,7 @@ export const App: React.FC = () => {
               handleSelectSession(sid);
             }}
             onStartNewChat={(prompt, model, effort) => {
-              // Deduplicate project sessions: reuse existing project session if one exists
-              const existingSess = projectSessions.find(
-                (s) => s.sessionId === `proj_${activeProjectId}` || s.projectId === activeProjectId
-              );
-              if (existingSess) {
-                handleSelectSession(existingSess.sessionId).then(() => {
-                  handleSendMessage(prompt, model, effort, 'project', undefined, existingSess.sessionId);
-                });
-                return;
-              }
-
-              const newSid = `proj_${activeProjectId}`;
+              const newSid = `proj_${activeProjectId}_${Date.now().toString(36)}`;
               const optimisticSession: ChatSession = {
                 sessionId: newSid,
                 projectId: activeProjectId,
@@ -1200,9 +1202,17 @@ export const App: React.FC = () => {
                 runCount: 1,
                 lastActive: new Date().toISOString(),
               };
-              setProjectSessions((prev) => [optimisticSession, ...prev.filter((s) => s.sessionId !== newSid)]);
+              setProjectSessions((prev) => [optimisticSession, ...prev]);
               setSessionId(newSid);
               setMessages([]);
+              try {
+                const cachedPlan =
+                  localStorage.getItem(`omniflow_active_plan_proj_${activeProjectId}`) ||
+                  localStorage.getItem(`omniflow_active_plan_${activeProjectId}`);
+                if (cachedPlan) {
+                  setCurrentPlan(JSON.parse(cachedPlan));
+                }
+              } catch {}
               setActiveView('chat');
               try {
                 localStorage.setItem('omniflow_active_session_id', newSid);

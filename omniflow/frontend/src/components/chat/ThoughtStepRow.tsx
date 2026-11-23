@@ -106,7 +106,7 @@ const renderStepIcon = (action: string, target: string, badge?: string) => {
     return <ShieldAlert width={12} height={12} style={{ color: '#fbbf24', flexShrink: 0 }} />;
   }
 
-  return <CheckCircle2 width={12} height={12} style={{ color: '#38bdf8', flexShrink: 0 }} />;
+  return <CheckCircle2 width={12} height={12} style={{ color: '#10b981', flexShrink: 0 }} />;
 };
 
 export const ThoughtStepRow: React.FC<ThoughtStepRowProps> = ({
@@ -198,33 +198,31 @@ export const ThoughtStepRow: React.FC<ThoughtStepRowProps> = ({
           display: 'flex',
           alignItems: 'center',
           gap: '6px',
-          padding: isInProgress ? '3px 8px' : isHighLevel ? '1.5px 6px' : '2.5px 6px',
+          padding: isHighLevel ? '1.5px 6px' : '2.5px 6px',
           borderRadius: '4px',
           cursor: hasDetailOrOutput ? 'pointer' : 'default',
           fontSize: isHighLevel ? '11.5px' : '12.5px',
           lineHeight: '1.45',
-          background: isInProgress ? 'rgba(56, 189, 248, 0.08)' : 'transparent',
-          borderLeft: isInProgress ? '2px solid #38bdf8' : 'none',
-          color: isInProgress ? '#38bdf8' : isHighLevel ? '#64748b' : isCompleted ? '#e2e8f0' : '#94a3b8',
+          background: 'transparent',
+          borderLeft: 'none',
+          color: isInProgress ? '#e2e8f0' : isHighLevel ? '#64748b' : isCompleted ? '#e2e8f0' : '#94a3b8',
           transition: 'all 0.15s ease',
           userSelect: 'text',
         }}
         onMouseEnter={(e) => {
-          if (hasDetailOrOutput && !isInProgress) {
+          if (hasDetailOrOutput) {
             e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.04)';
           }
         }}
         onMouseLeave={(e) => {
-          if (!isInProgress) {
-            e.currentTarget.style.backgroundColor = 'transparent';
-          }
+          e.currentTarget.style.backgroundColor = 'transparent';
         }}
       >
         {/* Action Verb */}
         {displayAction && (
           <span
             style={{
-              color: isInProgress ? '#38bdf8' : isHighLevel ? '#64748b' : '#94a3b8',
+              color: isInProgress ? '#e2e8f0' : isHighLevel ? '#64748b' : '#94a3b8',
               fontWeight: isHighLevel ? 500 : 400,
             }}
           >
@@ -240,7 +238,7 @@ export const ThoughtStepRow: React.FC<ThoughtStepRowProps> = ({
         {/* Target Entity / File */}
         <span
           style={{
-            color: isInProgress ? '#38bdf8' : isHighLevel ? '#94a3b8' : '#f8fafc',
+            color: isInProgress ? '#f1f5f9' : isHighLevel ? '#94a3b8' : '#f8fafc',
             fontWeight: isInProgress ? 600 : isHighLevel ? 400 : 500,
           }}
         >
@@ -260,7 +258,7 @@ export const ThoughtStepRow: React.FC<ThoughtStepRowProps> = ({
             width={11}
             height={11}
             className="animate-spin"
-            style={{ color: '#38bdf8', marginLeft: '4px' }}
+            style={{ color: '#a1a1aa', marginLeft: '4px' }}
           />
         )}
 
@@ -329,7 +327,7 @@ export const ThoughtStepRow: React.FC<ThoughtStepRowProps> = ({
             >
               <div
                 style={{
-                  color: '#38bdf8',
+                  color: '#a1a1aa',
                   marginBottom: '4px',
                   fontSize: '10.5px',
                   fontWeight: 600,

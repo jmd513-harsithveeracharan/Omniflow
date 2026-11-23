@@ -16,6 +16,7 @@ import base64
 import json
 import re
 import time
+import uuid
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any, Optional
 
@@ -87,23 +88,32 @@ def compile_definition_payload(item_type: str, content: str, display_name: str) 
     """Compiles string content into Fabric's base64 multipart definition structure."""
     clean_type = item_type.lower()
     b64_content = base64.b64encode(content.encode("utf-8")).decode("utf-8")
+    platform = {
+        "$schema": "https://developer.microsoft.com/json-schemas/fabric/gitIntegration/platformProperties/2.0.0/schema.json",
+        "metadata": {"type": item_type, "displayName": display_name},
+        "config": {"version": "2.0", "logicalId": str(uuid.uuid4())},
+    }
+    b64_platform = base64.b64encode(json.dumps(platform).encode("utf-8")).decode("utf-8")
 
     if clean_type in ("datapipeline", "pipeline"):
         return {
             "parts": [
-                {"path": "pipeline-content.json", "payload": b64_content, "payloadType": "InlineBase64"}
+                {"path": "pipeline-content.json", "payload": b64_content, "payloadType": "InlineBase64"},
+                {"path": ".platform", "payload": b64_platform, "payloadType": "InlineBase64"},
             ]
         }
     elif clean_type == "notebook":
         return {
             "parts": [
-                {"path": "notebook-content.py", "payload": b64_content, "payloadType": "InlineBase64"}
+                {"path": "notebook-content.py", "payload": b64_content, "payloadType": "InlineBase64"},
+                {"path": ".platform", "payload": b64_platform, "payloadType": "InlineBase64"},
             ]
         }
     else:
         return {
             "parts": [
-                {"path": f"{display_name}-definition.json", "payload": b64_content, "payloadType": "InlineBase64"}
+                {"path": f"{display_name}-definition.json", "payload": b64_content, "payloadType": "InlineBase64"},
+                {"path": ".platform", "payload": b64_platform, "payloadType": "InlineBase64"},
             ]
         }
 
@@ -155,7 +165,10 @@ class GenericDAGProvisioner:
             item.name: ItemExecutionStatus(name=item.name, item_type=item.item_type)
             for item in items
         }
-        guid_registry: dict[str, str] = {}
+        guid_registry: dict[str, str] = {
+            "workspace": self.workspace_id,
+            "workspace.id": self.workspace_id,
+        }
 
         # Pre-resolve any requested folders
         folder_ids: dict[str, str] = {}
@@ -231,6 +244,10 @@ class GenericDAGProvisioner:
 
             def _hydrate_definition(spec: FabricItemSpec) -> tuple[str, dict[str, Any]]:
                 if not spec.definition_template:
+                    return spec.name, {"status": "NOT_REQUIRED"}
+
+                clean_t = spec.item_type.lower()
+                if clean_t in ("warehouse", "lakehouse", "folder"):
                     return spec.name, {"status": "NOT_REQUIRED"}
 
                 target_id = guid_registry.get(spec.name)

@@ -105,7 +105,7 @@ export const ThoughtTrace: React.FC<ThoughtTraceProps> = ({ meta, isStreaming = 
           border: 'none',
           padding: '3px 6px',
           cursor: 'pointer',
-          color: isStreaming ? '#38bdf8' : '#94a3b8',
+          color: '#94a3b8',
           fontSize: '12.5px',
           borderRadius: '4px',
           transition: 'all 0.15s ease',
@@ -117,7 +117,7 @@ export const ThoughtTrace: React.FC<ThoughtTraceProps> = ({ meta, isStreaming = 
         </span>
 
         {isStreaming && (
-          <Loader2 width={12} height={12} className="animate-spin" style={{ color: '#38bdf8' }} />
+          <Loader2 width={12} height={12} className="animate-spin" style={{ color: '#a1a1aa' }} />
         )}
 
         <span style={{ fontWeight: 500, color: isStreaming ? '#e2e8f0' : '#94a3b8' }}>
@@ -125,26 +125,25 @@ export const ThoughtTrace: React.FC<ThoughtTraceProps> = ({ meta, isStreaming = 
         </span>
       </button>
 
-      {/* 2. Live Active Working Card (Prominently shows current active task while streaming) */}
+      {/* 2. Live Active Working Card (Clean Minimal Row - No Blue Background Box) */}
       {isStreaming && activeStep && (
         <div
           style={{
             display: 'flex',
             alignItems: 'center',
             gap: '8px',
-            padding: '5px 10px',
-            margin: '4px 0 6px 14px',
-            background: 'rgba(56, 189, 248, 0.08)',
-            border: '1px solid rgba(56, 189, 248, 0.22)',
-            borderRadius: '6px',
+            padding: '3px 0',
+            margin: '2px 0 4px 14px',
+            background: 'transparent',
+            border: 'none',
             fontSize: '12px',
           }}
         >
-          <Loader2 width={12} height={12} className="animate-spin text-sky-400" style={{ flexShrink: 0, color: '#38bdf8' }} />
-          <span style={{ color: '#94a3b8', fontWeight: 400 }}>Currently working:</span>
+          <Loader2 width={12} height={12} className="animate-spin" style={{ flexShrink: 0, color: '#a1a1aa' }} />
+          <span style={{ color: '#71717a', fontWeight: 400 }}>Currently working:</span>
           <span
             style={{
-              color: '#f0f9ff',
+              color: '#d4d4d8',
               fontWeight: 500,
               overflow: 'hidden',
               textOverflow: 'ellipsis',

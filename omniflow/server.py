@@ -2302,9 +2302,11 @@ CREATE TABLE IF NOT EXISTS gold.fact_{dom}_activity (
                     f"Microsoft Fabric supports a native **Data Pipeline Copy Activity** for {conn_def.name}. "
                     f"Pipelines reference external connections via **`externalConnections.connectionId`** "
                     f"(registered in `/v1/connections`) rather than embedding raw credentials in the pipeline JSON.\n\n"
-                    f"**Process Halted for Security**: Credentials are kept strictly in the secure vault and are never leaked into prompt history. "
-                    f"You can either **paste your complete Database Connection URL** (e.g. Neon, Supabase, Cloud Postgres: `postgresql://user:pass@host/db`) "
-                    f"or fill in the individual parameters in the form below, or click **⚡ Use Sandbox Demo Credentials** to inspect the source catalog."
+                    f"**Connection Options**:\n"
+                    f"- **Option A (Fastest)**: Paste your complete **Database Connection URL** (e.g. Neon, Supabase, Cloud Postgres: `postgresql://user:pass@host/db`) — all connection fields will auto-populate instantly.\n"
+                    f"- **Option B**: Enter individual parameters (Host, Database, Username, Password) in the form below.\n"
+                    f"- **Option C**: Click **⚡ Use Sandbox Demo Credentials** to immediately inspect the live database schema.\n\n"
+                    f"🔒 *Credentials are encrypted strictly in session memory and never stored in LLM history.*"
                 )
             else:
                 interception_msg = (
@@ -2312,7 +2314,10 @@ CREATE TABLE IF NOT EXISTS gold.fact_{dom}_activity (
                     f"**Notice**: Microsoft Fabric does not have a native Copy Activity connector for **{conn_def.name}**.\n\n"
                     f"**Strategy**: We will generate an automated **PySpark Ingestion Notebook** that retrieves credentials securely from Azure Key Vault (`mssparkutils.credentials.getSecret`), "
                     f"connects to the {conn_def.name} API/driver with error-handled pagination, and appends records directly into your Bronze Delta Lakehouse.\n\n"
-                    f"**Process Halted for Security**: Please provide your connection parameters below or click **⚡ Use Sandbox Demo Credentials** to run the live Python inspection."
+                    f"**Connection Options**:\n"
+                    f"- **Option A (Fastest)**: Paste your complete **Database Connection URL** — all fields will auto-fill.\n"
+                    f"- **Option B**: Enter individual credentials in the form below.\n"
+                    f"- **Option C**: Click **⚡ Use Sandbox Demo Credentials** to inspect the live schema."
                 )
 
             for chunk in interception_msg.split(" "):
