@@ -2152,7 +2152,7 @@ async def handle_chat_stream(req: ChatRequest) -> StreamingResponse:
                     "action": "Deploy",
                     "badge": "LAKEHOUSE",
                     "detail": "POST /v1/workspaces/.../items (Lakehouse & Ingestion Pipeline)",
-                    "output": f"lh_{clean_dom}_bronze -> Provisioned\npl_{clean_dom}_bronze_ingest -> Configured for 32 PostgreSQL retail_ops tables",
+                    "output": f"lh_{clean_dom}_bronze -> Provisioned\npl_{clean_dom}_ingest -> Configured for PostgreSQL extraction",
                 },
                 {
                     "id": "d4",
@@ -2163,7 +2163,7 @@ async def handle_chat_stream(req: ChatRequest) -> StreamingResponse:
                     "action": "Transpile",
                     "badge": "PY",
                     "detail": "Formatting Synapse PySpark multi-cell interactive definitions with Delta MERGE",
-                    "output": f"nb_{clean_dom}_curate -> Multi-cell Synapse format (SCD2 + SHA-256 PII masking)\nnb_{clean_dom}_quality_suite -> Great Expectations assertions suite",
+                    "output": f"nb_00_ingest_postgres_raw -> Direct JDBC extraction\nnb_{clean_dom}_curate -> Multi-cell Synapse format (SCD2 + SHA-256 PII masking)\nnb_07_quality_suite -> Great Expectations assertions suite",
                 },
                 {
                     "id": "d5",
@@ -2185,7 +2185,7 @@ async def handle_chat_stream(req: ChatRequest) -> StreamingResponse:
                     "action": "Deploy",
                     "badge": "SQL",
                     "detail": "POST /v1/workspaces/.../items (Star-Schema Warehouse & Semantic Model)",
-                    "output": f"wh_{clean_dom}_gold -> Kimball Star Schema DDL provisioned (6 Dimensions, 4 Facts)\nsm_{clean_dom}_gold_direct_lake -> Direct Lake Semantic Model with 12 Executive KPIs",
+                    "output": f"wh_{clean_dom}_gold -> Kimball Star Schema DDL provisioned (6 Dimensions, 4 Facts)\nsm_{clean_dom}_gold -> Direct Lake Semantic Model with 12 Executive KPIs",
                 },
                 {
                     "id": "d7",
@@ -2196,7 +2196,7 @@ async def handle_chat_stream(req: ChatRequest) -> StreamingResponse:
                     "action": "Deploy",
                     "badge": "DAG",
                     "detail": "POST /v1/workspaces/.../items (Master Pipeline Orchestrator)",
-                    "output": f"pl_master_medallion_orchestration -> Master 5-wave DAG pipeline provisioned in Pipeline Orchestration folder",
+                    "output": f"pl_master_orchestration -> Master 5-wave DAG pipeline provisioned in Pipeline Orchestration folder",
                 },
             ]
             for st in deploy_steps:
@@ -2270,9 +2270,16 @@ print("✅ Curation completed: Bronze -> Silver Delta upsert committed.")
                                         "name": "Trigger_Curation_Notebook",
                                         "type": "TridentNotebook",
                                         "dependsOn": [],
+                                        "policy": {
+                                            "timeout": "0.12:00:00",
+                                            "retry": 0,
+                                            "retryIntervalInSeconds": 30,
+                                            "secureInput": False,
+                                            "secureOutput": False,
+                                        },
                                         "typeProperties": {
                                             "notebookId": f"{{{{{curate_nb}.id}}}}",
-                                            "workspaceId": "{{workspace.id}}"
+                                            "workspaceId": "00000000-0000-0000-0000-000000000000"
                                         }
                                     }
                                 ],
@@ -2333,13 +2340,15 @@ CREATE TABLE IF NOT EXISTS gold.fact_{dom}_activity (
             else:
                 items_to_deploy = [
                     FabricItemSpec(name=f"lh_{clean_dom}_bronze", item_type="Lakehouse", folder_name=raw_f),
-                    FabricItemSpec(name=f"pl_{clean_dom}_bronze_ingest", item_type="DataPipeline", depends_on=[f"lh_{clean_dom}_bronze"], folder_name=raw_f, definition_template=_resolve_spec_definition(f"pl_{clean_dom}_bronze_ingest", "DataPipeline", active_plan)),
+                    FabricItemSpec(name=f"pl_{clean_dom}_ingest", item_type="DataPipeline", depends_on=[f"lh_{clean_dom}_bronze"], folder_name=raw_f, definition_template=_resolve_spec_definition(f"pl_{clean_dom}_ingest", "DataPipeline", active_plan)),
+                    FabricItemSpec(name="nb_00_ingest_postgres_raw", item_type="Notebook", depends_on=[f"lh_{clean_dom}_bronze"], folder_name=stage_f, definition_template=_resolve_spec_definition("nb_00_ingest_postgres_raw", "Notebook", active_plan)),
                     FabricItemSpec(name=f"lh_{clean_dom}_silver", item_type="Lakehouse", folder_name=silver_f),
                     FabricItemSpec(name=f"wh_{clean_dom}_gold", item_type="Warehouse", folder_name=gold_f, definition_template=_resolve_spec_definition(f"wh_{clean_dom}_gold", "Warehouse", active_plan)),
-                    FabricItemSpec(name=f"nb_{clean_dom}_curate", item_type="Notebook", depends_on=[f"lh_{clean_dom}_bronze"], folder_name=stage_f, definition_template=_resolve_spec_definition(f"nb_{clean_dom}_curate", "Notebook", active_plan)),
-                    FabricItemSpec(name=f"nb_{clean_dom}_quality_suite", item_type="Notebook", depends_on=[f"lh_{clean_dom}_bronze"], folder_name=stage_f, definition_template=_resolve_spec_definition(f"nb_{clean_dom}_quality_suite", "Notebook", active_plan)),
-                    FabricItemSpec(name=f"sm_{clean_dom}_gold_direct_lake", item_type="SemanticModel", folder_name=gold_f),
-                    FabricItemSpec(name=f"pl_master_medallion_orchestration", item_type="DataPipeline", depends_on=[f"nb_{clean_dom}_curate"], folder_name=orch_f, definition_template=_resolve_spec_definition(f"pl_master_medallion_orchestration", "DataPipeline", active_plan)),
+                    FabricItemSpec(name=f"nb_01_curate_{clean_dom}", item_type="Notebook", depends_on=[f"lh_{clean_dom}_bronze"], folder_name=stage_f, definition_template=_resolve_spec_definition(f"nb_01_curate_{clean_dom}", "Notebook", active_plan)),
+                    FabricItemSpec(name="nb_06_silver_conformed", item_type="Notebook", depends_on=[f"lh_{clean_dom}_silver"], folder_name=silver_f, definition_template=_resolve_spec_definition("nb_06_silver_conformed", "Notebook", active_plan)),
+                    FabricItemSpec(name="nb_07_quality_suite", item_type="Notebook", depends_on=[f"lh_{clean_dom}_bronze"], folder_name=stage_f, definition_template=_resolve_spec_definition("nb_07_quality_suite", "Notebook", active_plan)),
+                    FabricItemSpec(name=f"sm_{clean_dom}_gold", item_type="SemanticModel", folder_name=gold_f),
+                    FabricItemSpec(name="pl_master_orchestration", item_type="DataPipeline", depends_on=[f"wh_{clean_dom}_gold"], folder_name=orch_f, definition_template=_resolve_spec_definition("pl_master_orchestration", "DataPipeline", active_plan)),
                 ]
             ws_id, ws_name = resolve_project_workspace(proj_id or proj_code)
             plan_ws = active_plan.get("target_workspace")

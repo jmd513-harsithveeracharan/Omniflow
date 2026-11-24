@@ -15,8 +15,10 @@ from typing import Any
 from omniflow.intake.code_generators import (
     generate_domain_curate_notebook,
     generate_gold_warehouse_sql,
+    generate_ingest_pipeline_json,
     generate_master_pipeline_json,
     generate_quality_suite_code,
+    generate_raw_ingest_notebook_code,
     generate_silver_transformations_code,
     partition_tables_by_domain,
 )
@@ -211,6 +213,20 @@ def build_dynamic_plan_object(
     if not root_f or root_f.lower() in ("ai_test_folder", "root", "none"):
         root_f = default_proj_root
 
+    clean_short = (
+        "retail"
+        if any(k in clean_dom.lower() for k in ("retail", "commerce", "store"))
+        else (
+            "healthcare"
+            if any(k in clean_dom.lower() for k in ("health", "clinic", "patient"))
+            else (
+                "fintech"
+                if any(k in clean_dom.lower() for k in ("fin", "bank", "pay"))
+                else (clean_dom.split("_")[0] if "_" in clean_dom else clean_dom)
+            )
+        )
+    )
+
     # Nested 5-Tier Medallion Folder Structure
     raw_lakehouse_f = f"{root_f}/01_Raw_Ingestion/01_Lakehouse"
     raw_pipeline_f = f"{root_f}/01_Raw_Ingestion/02_Pipelines"
@@ -239,8 +255,8 @@ def build_dynamic_plan_object(
             pii_attrs = ["email", "phone", "street_address", "first_name", "last_name"]
 
         table_configs_list.append({"table": tname, "pk": pk, "wm": wm, "pii": pii_attrs})
-        plan_tables.append({"name": f"brz_{short}", "target": f"{raw_lakehouse_f} / lh_{clean_dom}_bronze ({wm})"})
-        plan_tables.append({"name": f"slv_{short}", "target": f"{silver_lakehouse_f} / lh_{clean_dom}_silver (Delta MERGE)"})
+        plan_tables.append({"name": f"brz_{short}", "target": f"{raw_lakehouse_f} / lh_{clean_short}_bronze ({wm})"})
+        plan_tables.append({"name": f"slv_{short}", "target": f"{silver_lakehouse_f} / lh_{clean_short}_silver (Delta MERGE)"})
 
         cols = tbl.get("columns", [])
         if not cols:
@@ -276,7 +292,7 @@ def build_dynamic_plan_object(
         domain_nb_names.append(nb_name)
         domain_idx += 1
 
-        nb_code = generate_domain_curate_notebook(clean_dom, proj_name, d_key, d_label, d_tables)
+        nb_code = generate_domain_curate_notebook(clean_short, proj_name, d_key, d_label, d_tables)
         domain_notebooks_meta.append({
             "name": nb_name,
             "domain": d_key,
@@ -290,92 +306,111 @@ def build_dynamic_plan_object(
             f"```python\n{nb_code.strip()}\n```"
         )
 
+    # Generate Ingestion PySpark Notebook and Pipeline
+    raw_ingest_code = generate_raw_ingest_notebook_code(clean_short, proj_name, table_configs_list)
+    ingest_pipeline_json = generate_ingest_pipeline_json(clean_short, "nb_00_ingest_postgres_raw")
+
     # Generate Cross-Domain Silver Conformed SCD2 & Data Quality Suite Notebooks
-    silver_scd2_code = generate_silver_transformations_code(clean_dom, proj_name, table_configs_list)
-    quality_suite_code = generate_quality_suite_code(clean_dom, proj_name, table_configs_list)
+    silver_scd2_code = generate_silver_transformations_code(clean_short, proj_name, table_configs_list)
+    quality_suite_code = generate_quality_suite_code(clean_short, proj_name, table_configs_list)
 
     # Generate Gold Analytical Warehouse DDL with T-SQL Stored Procedures
-    gold_warehouse_sql = generate_gold_warehouse_sql(clean_dom, proj_name, table_configs=table_configs_list)
+    gold_warehouse_sql = generate_gold_warehouse_sql(clean_short, proj_name, table_configs=table_configs_list)
 
     # Generate Master 5-Wave Pipeline Orchestration DAG
-    master_pipeline_json = generate_master_pipeline_json(clean_dom, domain_nb_names)
+    master_pipeline_json = generate_master_pipeline_json(
+        clean_short,
+        domain_nb_names,
+        ingest_nb_name="nb_00_ingest_postgres_raw",
+        scd2_nb_name="nb_06_silver_conformed",
+        dq_nb_name="nb_07_quality_suite",
+    )
 
-    # Assemble 13 First-Class Fabric Items across 5 Medallion Tiers
+    # Assemble 14 First-Class Fabric Items across 5 Medallion Tiers
     items_list: list[dict[str, Any]] = [
         # 01 Raw Tier
         {
-            "name": f"lh_{clean_dom}_bronze",
+            "name": f"lh_{clean_short}_bronze",
             "type": "Lakehouse",
             "folder_name": raw_lakehouse_f,
             "description": "Immutable raw landing zone with high-watermark extraction",
         },
         {
-            "name": f"pl_{clean_dom}_bronze_ingest",
+            "name": f"pl_{clean_short}_ingest",
             "type": "DataPipeline",
-            "depends_on": [f"lh_{clean_dom}_bronze"],
+            "depends_on": [f"lh_{clean_short}_bronze"],
             "folder_name": raw_pipeline_f,
+            "pipeline": json.loads(ingest_pipeline_json),
             "description": "PostgreSQL batch copy ingestion pipeline",
+        },
+        {
+            "name": "nb_00_ingest_postgres_raw",
+            "type": "Notebook",
+            "depends_on": [f"lh_{clean_short}_bronze"],
+            "folder_name": stage_curate_f,
+            "code": raw_ingest_code,
+            "description": f"Direct SSL JDBC ingestion from PostgreSQL to lh_{clean_short}_bronze",
         },
     ]
 
-    # Add the 5 domain curation notebooks
+    # Add the domain curation notebooks
     for nb in domain_notebooks_meta:
         items_list.append({
             "name": nb["name"],
             "type": "Notebook",
-            "depends_on": [f"lh_{clean_dom}_bronze"],
+            "depends_on": ["nb_00_ingest_postgres_raw"],
             "folder_name": nb["folder"],
             "code": nb["code"],
             "description": f"Delta MERGE and salted SHA-256 PII curation for {nb['label']}",
         })
 
-    # Add Quality Testing and Silver Conformed Notebooks
+    # Add Silver Lakehouse, Conformed Dimensions, Quality Suite
     items_list.append({
-        "name": "nb_07_data_quality_reconciliation_suite",
-        "type": "Notebook",
-        "depends_on": [nb["name"] for nb in domain_notebooks_meta],
-        "folder_name": stage_quality_f,
-        "code": quality_suite_code,
-        "description": "Automated Great Expectations and schema anomaly testing suite",
-    })
-    items_list.append({
-        "name": f"lh_{clean_dom}_silver",
+        "name": f"lh_{clean_short}_silver",
         "type": "Lakehouse",
         "depends_on": [nb["name"] for nb in domain_notebooks_meta],
         "folder_name": silver_lakehouse_f,
         "description": "Harmonized, deduplicated Delta Lake tables with ACID guarantees",
     })
     items_list.append({
-        "name": "nb_06_silver_conformed_dimensions",
+        "name": "nb_06_silver_conformed",
         "type": "Notebook",
-        "depends_on": [f"lh_{clean_dom}_silver"],
+        "depends_on": [f"lh_{clean_short}_silver"],
         "folder_name": silver_transform_f,
         "code": silver_scd2_code,
         "description": "Conformed Dimensions and SCD Type 2 history tracking",
     })
+    items_list.append({
+        "name": "nb_07_quality_suite",
+        "type": "Notebook",
+        "depends_on": ["nb_06_silver_conformed"],
+        "folder_name": stage_quality_f,
+        "code": quality_suite_code,
+        "description": "Automated Great Expectations and schema anomaly testing suite",
+    })
 
     # 04 Gold Tier
     items_list.append({
-        "name": f"wh_{clean_dom}_gold",
+        "name": f"wh_{clean_short}_gold",
         "type": "Warehouse",
-        "depends_on": ["nb_06_silver_conformed_dimensions"],
+        "depends_on": ["nb_06_silver_conformed"],
         "folder_name": gold_warehouse_f,
         "sql_code": gold_warehouse_sql,
         "description": "Kimball Star Schema DDL (6 Dims, 4 Facts, 2 Audit Tables) and 12 ELT Stored Procedures",
     })
     items_list.append({
-        "name": f"sm_{clean_dom}_gold_direct_lake",
+        "name": f"sm_{clean_short}_gold",
         "type": "SemanticModel",
-        "depends_on": [f"wh_{clean_dom}_gold"],
+        "depends_on": [f"wh_{clean_short}_gold"],
         "folder_name": gold_semantic_f,
         "description": "Direct Lake Power BI semantic model with executive DAX KPIs",
     })
 
     # 05 Master Orchestration Tier
     items_list.append({
-        "name": "pl_master_medallion_orchestration",
+        "name": "pl_master_orchestration",
         "type": "DataPipeline",
-        "depends_on": [f"wh_{clean_dom}_gold"],
+        "depends_on": [f"wh_{clean_short}_gold"],
         "folder_name": master_orch_f,
         "pipeline": json.loads(master_pipeline_json),
         "description": "Master 5-wave end-to-end DAG orchestrating Bronze ➔ Silver ➔ Gold execution",
@@ -383,18 +418,21 @@ def build_dynamic_plan_object(
 
     audit_pct = (res or {}).get("audit_output", {}).get("compliance_score_pct", 100)
     all_notebooks_plan = [
-        {"name": nb["name"], "layer": "stage", "pyspark_code": nb["code"], "code": nb["code"]}
-        for nb in domain_notebooks_meta
+        {"name": "nb_00_ingest_postgres_raw", "layer": "raw", "pyspark_code": raw_ingest_code, "code": raw_ingest_code}
     ]
     all_notebooks_plan.extend([
-        {"name": "nb_06_silver_conformed_dimensions", "layer": "silver", "pyspark_code": silver_scd2_code, "code": silver_scd2_code},
-        {"name": "nb_07_data_quality_reconciliation_suite", "layer": "quality", "pyspark_code": quality_suite_code, "code": quality_suite_code},
+        {"name": nb["name"], "layer": "stage", "pyspark_code": nb["code"], "code": nb["code"]}
+        for nb in domain_notebooks_meta
+    ])
+    all_notebooks_plan.extend([
+        {"name": "nb_06_silver_conformed", "layer": "silver", "pyspark_code": silver_scd2_code, "code": silver_scd2_code},
+        {"name": "nb_07_quality_suite", "layer": "quality", "pyspark_code": quality_suite_code, "code": quality_suite_code},
     ])
 
     plan_obj: dict[str, Any] = {
         "sourceName": proj_name,
         "project_code": proj_code,
-        "domain": clean_dom,
+        "domain": clean_short,
         "connection_id": connection_id,
         "schedule": "Incremental Watermark / Hourly Micro-Batch",
         "root_folder": root_f,
@@ -409,14 +447,14 @@ def build_dynamic_plan_object(
             "gold_semantic": gold_semantic_f,
             "master_orch": master_orch_f,
         },
-        "pyspark_code": domain_notebooks_meta[0]["code"] if domain_notebooks_meta else "",
+        "pyspark_code": raw_ingest_code,
         "quality_code": quality_suite_code,
         "silver_code": silver_scd2_code,
         "sql_code": gold_warehouse_sql,
         "pipeline": json.loads(master_pipeline_json),
         "schema_contracts": schema_contracts,
-        "lakehouses": [f"lh_{clean_dom}_bronze", f"lh_{clean_dom}_silver"],
-        "warehouse": f"wh_{clean_dom}_gold",
+        "lakehouses": [f"lh_{clean_short}_bronze", f"lh_{clean_short}_silver"],
+        "warehouse": f"wh_{clean_short}_gold",
         "notebooks": all_notebooks_plan,
         "items": items_list,
         "tables": plan_tables,
@@ -441,30 +479,33 @@ def build_dynamic_plan_object(
         f"#### 📦 Fabric Medallion Hierarchy & Enterprise Deliverables ({len(items_list)} Items across 9 Nested Categories)\n\n"
         f"| Medallion Tier | Subfolder Category | Fabric Deliverable | Item Type | Description & Controls |\n"
         f"| :--- | :--- | :--- | :--- | :--- |\n"
-        f"| **01 Raw Ingestion** | `01_Lakehouse` | `lh_{clean_dom}_bronze` | Delta Lakehouse | Immutable raw landing zone preserving source schemas and ingestion metadata |\n"
-        f"| **01 Raw Ingestion** | `02_Pipelines` | `pl_{clean_dom}_bronze_ingest` | Data Pipeline | Fabric Data Factory Copy Activity with high-watermark CDC extraction |\n"
+        f"| **01 Raw Ingestion** | `01_Lakehouse` | `lh_{clean_short}_bronze` | Delta Lakehouse | Immutable raw landing zone preserving source schemas and ingestion metadata |\n"
+        f"| **01 Raw Ingestion** | `02_Pipelines` | `pl_{clean_short}_ingest` | Data Pipeline | Fabric Data Factory Copy Activity with high-watermark CDC extraction |\n"
+        f"| **01 Raw Ingestion** | `01_Curate_Notebooks` | `nb_00_ingest_postgres_raw` | PySpark Notebook | Direct SSL JDBC extraction from live PostgreSQL into Bronze Delta tables |\n"
         f"| **02 Stage Curation** | `01_Curate_Notebooks` | `nb_01_curate_customers_loyalty` | PySpark Notebook | Delta MERGE, deduplication, and salted SHA-256 PII masking for Customer domain |\n"
         f"| **02 Stage Curation** | `01_Curate_Notebooks` | `nb_02_curate_products_catalog` | PySpark Notebook | Delta MERGE upsert and deduplication for Products, Categories & Hierarchy |\n"
         f"| **02 Stage Curation** | `01_Curate_Notebooks` | `nb_03_curate_orders_sales` | PySpark Notebook | Delta MERGE upsert and financial audit tracking for Orders & Transactions |\n"
         f"| **02 Stage Curation** | `01_Curate_Notebooks` | `nb_04_curate_inventory_supply` | PySpark Notebook | Delta MERGE upsert for Snapshots, Adjustments & Purchase Orders |\n"
         f"| **02 Stage Curation** | `01_Curate_Notebooks` | `nb_05_curate_promotions_marketing` | PySpark Notebook | Delta MERGE upsert for Promotions, CRM Entities & Web Activity |\n"
-        f"| **02 Stage Curation** | `02_Quality_Testing` | `nb_07_data_quality_reconciliation_suite` | PySpark Notebook | Great Expectations schema anomaly and null-quarantine validation suite |\n"
-        f"| **03 Silver Harmonized** | `01_Lakehouse` | `lh_{clean_dom}_silver` | Delta Lakehouse | Deduplicated, conformed, and harmonized Delta Lake tables with ACID guarantees |\n"
-        f"| **03 Silver Harmonized** | `02_Transformations` | `nb_06_silver_conformed_dimensions` | PySpark Notebook | SCD Type 2 history tracking and referential integrity validations |\n"
-        f"| **04 Gold Analytical** | `01_Warehouse` | `wh_{clean_dom}_gold` | T-SQL Warehouse | Kimball Star Schema (6 Dims, 4 Facts, 2 Audit Tables) with Direct Lake support |\n"
-        f"| **04 Gold Analytical** | `02_Semantic_Models` | `sm_{clean_dom}_gold_direct_lake` | Semantic Model | Direct Lake Power BI semantic model with automated measure definitions |\n"
-        f"| **05 Orchestration** | `01_Pipelines` | `pl_master_medallion_orchestration` | Data Pipeline | Master 5-wave end-to-end DAG orchestrating Bronze ➔ Silver ➔ Gold execution |\n\n"
+        f"| **02 Stage Curation** | `02_Quality_Testing` | `nb_07_quality_suite` | PySpark Notebook | Great Expectations schema anomaly and null-quarantine validation suite |\n"
+        f"| **03 Silver Harmonized** | `01_Lakehouse` | `lh_{clean_short}_silver` | Delta Lakehouse | Deduplicated, conformed, and harmonized Delta Lake tables with ACID guarantees |\n"
+        f"| **03 Silver Harmonized** | `02_Transformations` | `nb_06_silver_conformed` | PySpark Notebook | SCD Type 2 history tracking and referential integrity validations |\n"
+        f"| **04 Gold Analytical** | `01_Warehouse` | `wh_{clean_short}_gold` | T-SQL Warehouse | Kimball Star Schema (6 Dims, 4 Facts, 2 Audit Tables) with Direct Lake support |\n"
+        f"| **04 Gold Analytical** | `02_Semantic_Models` | `sm_{clean_short}_gold` | Semantic Model | Direct Lake Power BI semantic model with automated measure definitions |\n"
+        f"| **05 Orchestration** | `01_Pipelines` | `pl_master_orchestration` | Data Pipeline | Master 5-wave end-to-end DAG orchestrating Bronze ➔ Silver ➔ Gold execution |\n\n"
         f"#### 📋 Ingested Source Entities ({len(source_tables)} tables in scope)\n\n"
         f"| Source Entity | Primary Key | Watermark (CDC) | PII Treatment |\n"
         f"| :--- | :--- | :--- | :--- | :--- |\n"
         f"{table_rows}\n\n"
+        f"#### ⚡ PySpark Raw Ingestion Notebook (`nb_00_ingest_postgres_raw.py`)\n\n"
+        f"```python\n{raw_ingest_code.strip()}\n```\n\n"
         f"#### ⚡ PySpark Domain Curation Suite (5 Dedicated Notebooks)\n\n"
         + "\n\n".join(domain_code_blocks)
-        + f"\n\n#### 🔄 Silver SCD Type 2 & Conformed Transformations (`nb_06_silver_conformed_dimensions.py`)\n\n"
+        + f"\n\n#### 🔄 Silver SCD Type 2 & Conformed Transformations (`nb_06_silver_conformed.py`)\n\n"
         f"```python\n{silver_scd2_code.strip()}\n```\n\n"
-        f"#### 🛡️ Data Quality & Anomaly Suite (`nb_07_data_quality_reconciliation_suite.py`)\n\n"
+        f"#### 🛡️ Data Quality & Anomaly Suite (`nb_07_quality_suite.py`)\n\n"
         f"```python\n{quality_suite_code.strip()}\n```\n\n"
-        f"#### 📊 Gold Kimball Warehouse DDL & 12 Stored Procedures (`wh_{clean_dom}_gold.sql`)\n\n"
+        f"#### 📊 Gold Kimball Warehouse DDL & 12 Stored Procedures (`wh_{clean_short}_gold.sql`)\n\n"
         f"```sql\n{gold_warehouse_sql.strip()}\n```\n\n"
         f"✨ **Deployment Ready**: All {len(items_list)} enterprise architecture artifacts across 9 subfolder categories are verified and saved. "
         f"Click **Deploy to Fabric** below or open the **Visual Canvas** to provision them directly into `{ws_display}`."
