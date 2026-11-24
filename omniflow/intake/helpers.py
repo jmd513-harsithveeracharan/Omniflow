@@ -265,20 +265,16 @@ def build_dynamic_plan_object(
     domain_nb_names: list[str] = []
     domain_code_blocks: list[str] = []
 
-    domain_order = [
-        ("customers_loyalty", "01"),
-        ("products_catalog", "02"),
-        ("orders_sales", "03"),
-        ("inventory_supply", "04"),
-        ("promotions_marketing", "05"),
-    ]
-
-    for d_key, d_num in domain_order:
-        d_info = domain_map.get(d_key, {})
+    domain_idx = 1
+    for d_key, d_info in domain_map.items():
         d_tables = d_info.get("tables", [])
+        if not d_tables:
+            continue
         d_label = d_info.get("label", d_key.replace("_", " ").title())
+        d_num = f"{domain_idx:02d}"
         nb_name = f"nb_{d_num}_curate_{d_key}"
         domain_nb_names.append(nb_name)
+        domain_idx += 1
 
         nb_code = generate_domain_curate_notebook(clean_dom, proj_name, d_key, d_label, d_tables)
         domain_notebooks_meta.append({
@@ -295,11 +291,11 @@ def build_dynamic_plan_object(
         )
 
     # Generate Cross-Domain Silver Conformed SCD2 & Data Quality Suite Notebooks
-    silver_scd2_code = generate_silver_transformations_code(clean_dom, proj_name)
+    silver_scd2_code = generate_silver_transformations_code(clean_dom, proj_name, table_configs_list)
     quality_suite_code = generate_quality_suite_code(clean_dom, proj_name, table_configs_list)
 
-    # Generate Gold Analytical Warehouse DDL with 12 T-SQL Stored Procedures
-    gold_warehouse_sql = generate_gold_warehouse_sql(clean_dom, proj_name)
+    # Generate Gold Analytical Warehouse DDL with T-SQL Stored Procedures
+    gold_warehouse_sql = generate_gold_warehouse_sql(clean_dom, proj_name, table_configs=table_configs_list)
 
     # Generate Master 5-Wave Pipeline Orchestration DAG
     master_pipeline_json = generate_master_pipeline_json(clean_dom, domain_nb_names)

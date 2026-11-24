@@ -11,58 +11,88 @@ from typing import Any
 def partition_tables_by_domain(
     table_configs: list[dict[str, Any]]
 ) -> dict[str, dict[str, Any]]:
-    """Partitions tables into 5 cohesive business domains for multi-notebook curation."""
+    """
+    Dynamically partitions tables into cohesive business domains for multi-notebook curation.
+    Supports Retail, Healthcare, Financial Services, Supply Chain, and generic enterprise schemas.
+    Only returns domains that contain at least one table (zero empty notebooks).
+    """
     domains: dict[str, dict[str, Any]] = {
         "customers_loyalty": {
-            "label": "Customer & Loyalty Intelligence",
-            "notebook_suffix": "curate_customers_loyalty",
+            "label": "Master Entities & Party Intelligence",
+            "notebook_suffix": "curate_master_parties",
             "tables": [],
         },
         "products_catalog": {
-            "label": "Product Catalog & Hierarchy",
-            "notebook_suffix": "curate_products_catalog",
+            "label": "Catalog, Hierarchy & Reference Master",
+            "notebook_suffix": "curate_catalog_hierarchy",
             "tables": [],
         },
         "orders_sales": {
-            "label": "Omnichannel Orders & Fulfillment",
-            "notebook_suffix": "curate_orders_sales",
+            "label": "Core Transactions & Fulfillment",
+            "notebook_suffix": "curate_core_transactions",
             "tables": [],
         },
         "inventory_supply": {
-            "label": "Inventory & Supply Chain",
-            "notebook_suffix": "curate_inventory_supply",
+            "label": "Operations, Logistics & Balances",
+            "notebook_suffix": "curate_operations_logistics",
             "tables": [],
         },
         "promotions_marketing": {
-            "label": "Promotions, Marketing & CRM",
-            "notebook_suffix": "curate_promotions_marketing",
+            "label": "Analytics, Interactions & Governance",
+            "notebook_suffix": "curate_interactions_governance",
             "tables": [],
         },
     }
 
+    # Keyword taxonomies for multi-industry entity classification
+    PARTY_KW = (
+        "customer", "loyalty", "address", "segment", "preference",
+        "user", "patient", "account", "client", "member", "subscriber",
+        "entity", "profile", "contact", "driver", "doctor", "vendor", "supplier"
+    )
+    CATALOG_KW = (
+        "product", "brand", "category", "department", "price",
+        "item", "service", "drug", "medication", "asset", "device",
+        "catalog", "facility", "vehicle", "route", "sku"
+    )
+    TRANSACTION_KW = (
+        "order", "payment", "tax", "return", "fulfillment",
+        "sale", "transaction", "claim", "encounter", "trade",
+        "invoice", "billing", "checkout", "visit"
+    )
+    LOGISTICS_KW = (
+        "inventory", "stock", "purchase", "warehouse", "po_",
+        "supply", "shipment", "ledger", "balance", "reading",
+        "telemetry", "tracking", "carrier"
+    )
+
     for tc in table_configs:
         tname = tc.get("table", "").lower()
-        if any(k in tname for k in ("customer", "loyalty", "address", "segment", "preference")):
-            if "source_crm" in tname:
+        # Isolate short table name if schema-qualified
+        short_name = tname.split(".")[-1] if "." in tname else tname
+
+        if any(k in short_name for k in PARTY_KW):
+            if "source_crm" in tname and any(k in short_name for k in ("interaction", "click", "campaign")):
                 domains["promotions_marketing"]["tables"].append(tc)
             else:
                 domains["customers_loyalty"]["tables"].append(tc)
-        elif any(k in tname for k in ("product", "brand", "category", "department", "price")):
-            if "source_crm" in tname:
-                domains["promotions_marketing"]["tables"].append(tc)
-            else:
-                domains["products_catalog"]["tables"].append(tc)
-        elif any(k in tname for k in ("order", "payment", "tax", "return", "fulfillment")):
-            if "source_crm" in tname:
-                domains["promotions_marketing"]["tables"].append(tc)
-            else:
-                domains["orders_sales"]["tables"].append(tc)
-        elif any(k in tname for k in ("inventory", "stock", "purchase", "supplier", "warehouse", "po_")):
+        elif any(k in short_name for k in CATALOG_KW):
+            domains["products_catalog"]["tables"].append(tc)
+        elif any(k in short_name for k in TRANSACTION_KW):
+            domains["orders_sales"]["tables"].append(tc)
+        elif any(k in short_name for k in LOGISTICS_KW):
             domains["inventory_supply"]["tables"].append(tc)
         else:
             domains["promotions_marketing"]["tables"].append(tc)
 
-    return domains
+    # Return only domains that actually contain assigned tables
+    active_domains = {k: v for k, v in domains.items() if len(v["tables"]) > 0}
+    if not active_domains and table_configs:
+        # Fallback if no keywords matched: group into a primary operational domain
+        domains["orders_sales"]["tables"] = list(table_configs)
+        return {"orders_sales": domains["orders_sales"]}
+
+    return active_domains
 
 
 def generate_domain_curate_notebook(
@@ -179,8 +209,58 @@ for r in results:
 '''
 
 
-def generate_silver_transformations_code(clean_dom: str, proj_name: str) -> str:
-    """Generates multi-cell Synapse PySpark Silver SCD Type-2 Conformed Transformations notebook."""
+def generate_silver_transformations_code(
+    clean_dom: str,
+    proj_name: str,
+    table_configs: list[dict[str, Any]] | None = None,
+) -> str:
+    """
+    Generates multi-cell Synapse PySpark Silver SCD Type-2 Conformed Transformations notebook.
+    Dynamically identifies master party, catalog, and facility/operational entities from table_configs.
+    """
+    party_table = "retail_ops.customers"
+    party_short = "customers"
+    party_pk = "customer_id"
+    party_wm = "updated_at"
+
+    product_table = "retail_ops.products"
+    product_short = "products"
+    cat_table = "retail_ops.product_categories"
+
+    store_table = "retail_ops.stores"
+    store_short = "stores"
+
+    if table_configs:
+        for tc in table_configs:
+            t = tc.get("table", "")
+            s = t.split(".")[-1].lower()
+            if any(k in s for k in ("customer", "user", "patient", "account", "client", "member")):
+                party_table = t
+                party_short = s
+                party_pk = tc.get("pk", "id")
+                party_wm = tc.get("wm", "updated_at")
+                break
+        for tc in table_configs:
+            t = tc.get("table", "")
+            s = t.split(".")[-1].lower()
+            if any(k in s for k in ("product", "item", "drug", "service", "device")):
+                product_table = t
+                product_short = s
+                break
+        for tc in table_configs:
+            t = tc.get("table", "")
+            s = t.split(".")[-1].lower()
+            if any(k in s for k in ("category", "department", "hierarchy", "type")):
+                cat_table = t
+                break
+        for tc in table_configs:
+            t = tc.get("table", "")
+            s = t.split(".")[-1].lower()
+            if any(k in s for k in ("store", "facility", "location", "branch", "warehouse", "depot")):
+                store_table = t
+                store_short = s
+                break
+
     return f'''# Fabric Notebook source
 # METADATA ********************
 # {{"kernel":"synapse_pyspark","default_lakehouse":"lh_{clean_dom}_silver"}}
@@ -197,22 +277,35 @@ SILVER_LAKEHOUSE = "lh_{clean_dom}_silver"
 print("🔄 Initializing Silver SCD Type-2 Conformed Dimensional Transformations...")
 
 # CELL ********************
-# 1. Conformed SCD Type-2 Customer Dimension
-def build_conformed_scd2_customers():
-    tgt_table = f"{{SILVER_LAKEHOUSE}}.dim_customers_scd2"
-    try:
-        cust_df = spark.read.table(f"{{SILVER_LAKEHOUSE}}.retail_ops_customers")
-    except Exception:
+# 1. Conformed SCD Type-2 Master Party Dimension ({party_short})
+def build_conformed_scd2_parties():
+    tgt_table = f"{{SILVER_LAKEHOUSE}}.dim_{party_short}_scd2"
+    source_candidates = [
+        f"{{SILVER_LAKEHOUSE}}.{party_table}",
+        f"{{SILVER_LAKEHOUSE}}.{party_short}",
+        f"{{SILVER_LAKEHOUSE}}.retail_ops_customers",
+        f"{{SILVER_LAKEHOUSE}}.source_crm_customers",
+    ]
+    party_df = None
+    for src in source_candidates:
         try:
-            cust_df = spark.read.table(f"{{SILVER_LAKEHOUSE}}.source_crm_customers")
-        except Exception as e:
-            print(f"⚠️ Source customer table not available: {{e}}")
-            return
+            party_df = spark.read.table(src)
+            print(f"📖 Loaded source party entity from: {{src}}")
+            break
+        except Exception:
+            continue
 
-    w_spec = Window.partitionBy("customer_id").orderBy(F.col("updated_at").asc())
+    if party_df is None:
+        print(f"⚠️ Source party table not available, skipping SCD2 party dimension.")
+        return
+
+    pk = "{party_pk}" if "{party_pk}" in party_df.columns else party_df.columns[0]
+    wm = "{party_wm}" if "{party_wm}" in party_df.columns else pk
+
+    w_spec = Window.partitionBy(pk).orderBy(F.col(wm).asc())
     scd2_df = (
-        cust_df.withColumn("effective_from", F.col("updated_at"))
-        .withColumn("effective_to", F.lead("updated_at").over(w_spec))
+        party_df.withColumn("effective_from", F.col(wm))
+        .withColumn("effective_to", F.lead(wm).over(w_spec))
         .withColumn(
             "is_current",
             F.when(F.col("effective_to").isNull(), F.lit(True)).otherwise(F.lit(False)),
@@ -223,41 +316,53 @@ def build_conformed_scd2_customers():
         )
     )
     scd2_df.write.format("delta").mode("overwrite").option("overwriteSchema", "true").saveAsTable(tgt_table)
-    print(f"✅ Conformed SCD-2 Customer Dimension committed: {{tgt_table}}")
+    print(f"✅ Conformed SCD-2 Party Dimension committed: {{tgt_table}}")
 
 # CELL ********************
-# 2. Conformed Product Hierarchy Dimension
-def build_conformed_product_hierarchy():
-    tgt_table = f"{{SILVER_LAKEHOUSE}}.dim_products_conformed"
+# 2. Conformed Catalog / Hierarchy Dimension ({product_short})
+def build_conformed_catalog_hierarchy():
+    tgt_table = f"{{SILVER_LAKEHOUSE}}.dim_{product_short}_conformed"
     try:
-        prods = spark.read.table(f"{{SILVER_LAKEHOUSE}}.retail_ops_products")
-        cats = spark.read.table(f"{{SILVER_LAKEHOUSE}}.retail_ops_product_categories")
-        joined = prods.join(cats, "category_id", "left_outer").select(
-            prods["*"],
-            cats["category_name"],
-            cats["department_id"],
-        )
-        joined.write.format("delta").mode("overwrite").option("overwriteSchema", "true").saveAsTable(tgt_table)
-        print(f"✅ Conformed Product Hierarchy committed: {{tgt_table}}")
-    except Exception as e:
-        print(f"⚠️ Skipping product hierarchy: {{e}}")
-
-# CELL ********************
-# 3. Conformed Store Geography & Supplier Master
-def build_conformed_stores_and_suppliers():
-    try:
-        stores = spark.read.table(f"{{SILVER_LAKEHOUSE}}.retail_ops_stores")
-        stores.write.format("delta").mode("overwrite").option("overwriteSchema", "true").saveAsTable(
-            f"{{SILVER_LAKEHOUSE}}.dim_stores_conformed"
-        )
-        print("✅ Conformed Store Geography committed.")
+        prods = spark.read.table(f"{{SILVER_LAKEHOUSE}}.{product_table}")
     except Exception:
-        pass
+        try:
+            prods = spark.read.table(f"{{SILVER_LAKEHOUSE}}.{product_short}")
+        except Exception as e:
+            print(f"⚠️ Source catalog table not found: {{e}}")
+            return
+
+    try:
+        cats = spark.read.table(f"{{SILVER_LAKEHOUSE}}.{cat_table}")
+        join_key = [c for c in cats.columns if c in prods.columns and c != "id"]
+        if join_key:
+            joined = prods.join(cats, join_key[0], "left_outer")
+        else:
+            joined = prods
+    except Exception:
+        joined = prods
+
+    joined.write.format("delta").mode("overwrite").option("overwriteSchema", "true").saveAsTable(tgt_table)
+    print(f"✅ Conformed Catalog Hierarchy committed: {{tgt_table}}")
 
 # CELL ********************
-build_conformed_scd2_customers()
-build_conformed_product_hierarchy()
-build_conformed_stores_and_suppliers()
+# 3. Conformed Facilities / Operational Master ({store_short})
+def build_conformed_facilities():
+    tgt_table = f"{{SILVER_LAKEHOUSE}}.dim_{store_short}_conformed"
+    try:
+        stores = spark.read.table(f"{{SILVER_LAKEHOUSE}}.{store_table}")
+    except Exception:
+        try:
+            stores = spark.read.table(f"{{SILVER_LAKEHOUSE}}.{store_short}")
+        except Exception:
+            return
+
+    stores.write.format("delta").mode("overwrite").option("overwriteSchema", "true").saveAsTable(tgt_table)
+    print(f"✅ Conformed Facilities Master committed: {{tgt_table}}")
+
+# CELL ********************
+build_conformed_scd2_parties()
+build_conformed_catalog_hierarchy()
+build_conformed_facilities()
 print("✨ Silver Conformed Transformations successfully executed and committed.")
 '''
 
@@ -348,13 +453,202 @@ assert compliance_pct >= 90.0, f"Quality gate failed: compliance {{compliance_pc
 '''
 
 
+def _generate_dynamic_gold_warehouse_sql(
+    clean_dom: str,
+    proj_name: str,
+    table_configs: list[dict[str, Any]],
+) -> str:
+    """
+    Dynamically generates Kimball Star Schema DDL and T-SQL Stored Procedures
+    for non-retail or custom schemas based on discovered table_configs.
+    """
+    dim_candidates: list[dict[str, Any]] = []
+    fact_candidates: list[dict[str, Any]] = []
+
+    FACT_KW = (
+        "order", "sale", "invoice", "payment", "transaction", "claim",
+        "encounter", "line", "snapshot", "event", "reading", "tax", "return"
+    )
+
+    for tc in table_configs:
+        tname = tc.get("table", "")
+        short = tname.split(".")[-1].lower()
+        if any(k in short for k in FACT_KW):
+            fact_candidates.append(tc)
+        else:
+            dim_candidates.append(tc)
+
+    if not fact_candidates and dim_candidates:
+        fact_candidates.append(dim_candidates.pop())
+    if not dim_candidates and fact_candidates:
+        dim_candidates.append(fact_candidates.pop(0))
+
+    sql_lines = [
+        f"-- Microsoft Fabric Analytical Data Warehouse: wh_{clean_dom}_gold",
+        f"-- Project: {proj_name}",
+        f"-- Architecture: Dynamic Kimball Star Schema ({len(dim_candidates)} Dimensions, {len(fact_candidates)} Facts)",
+        "",
+        "-- 1. DIMENSION TABLES (Kimball Conformed)",
+    ]
+
+    dim_names: list[str] = []
+    for dc in dim_candidates:
+        short = dc.get("table", "entity").split(".")[-1].lower()
+        pk = dc.get("pk", "id")
+        dim_name = f"dim_{short}"
+        dim_names.append(dim_name)
+        sql_lines.append(f"""CREATE TABLE [dbo].[{dim_name}] (
+    [{short}_sk] BIGINT IDENTITY(1,1) NOT NULL,
+    [{pk}] VARCHAR(64) NOT NULL,
+    [entity_name] VARCHAR(256) NULL,
+    [effective_from] DATETIME2(6) NOT NULL,
+    [effective_to] DATETIME2(6) NOT NULL,
+    [is_current] BIT NOT NULL DEFAULT 1,
+    [_dw_inserted_at] DATETIME2(6) NOT NULL DEFAULT CURRENT_TIMESTAMP
+);""")
+
+    sql_lines.append("")
+    sql_lines.append("-- 2. FACT TABLES (Analytical Business Metrics)")
+    fact_names: list[str] = []
+    for fc in fact_candidates:
+        short = fc.get("table", "transaction").split(".")[-1].lower()
+        pk = fc.get("pk", "id")
+        fact_name = f"fact_{short}"
+        fact_names.append(fact_name)
+        fk_cols = "\n".join([f"    [{d.replace('dim_', '')}_sk] BIGINT NOT NULL," for d in dim_names[:3]])
+        sql_lines.append(f"""CREATE TABLE [dbo].[{fact_name}] (
+    [{short}_sk] BIGINT IDENTITY(1,1) NOT NULL,
+    [{pk}] VARCHAR(64) NOT NULL,
+{fk_cols}
+    [metric_quantity] DECIMAL(18, 4) NOT NULL DEFAULT 1.0,
+    [metric_amount] DECIMAL(18, 4) NOT NULL DEFAULT 0.0,
+    [_dw_inserted_at] DATETIME2(6) NOT NULL DEFAULT CURRENT_TIMESTAMP
+);""")
+
+    sql_lines.append("")
+    sql_lines.append("""-- 3. AUDIT & LOGGING TABLE
+CREATE TABLE [dbo].[audit_elt_execution_log] (
+    [log_id] BIGINT IDENTITY(1,1) NOT NULL,
+    [batch_id] VARCHAR(64) NOT NULL,
+    [procedure_name] VARCHAR(128) NOT NULL,
+    [target_table] VARCHAR(128) NOT NULL,
+    [status] VARCHAR(32) NOT NULL,
+    [rows_affected] INT NOT NULL DEFAULT 0,
+    [error_message] VARCHAR(MAX) NULL,
+    [started_at] DATETIME2(6) NOT NULL,
+    [completed_at] DATETIME2(6) NULL
+);""")
+
+    sql_lines.append("")
+    sql_lines.append("-- 4. ELT STORED PROCEDURES (Dimensions)")
+    for dim in dim_names:
+        short = dim.replace("dim_", "")
+        sql_lines.append(f"""CREATE OR ALTER PROCEDURE [dbo].[sp_load_{dim}]
+    @batch_id VARCHAR(64)
+AS
+BEGIN
+    SET NOCOUNT ON;
+    DECLARE @start DATETIME2(6) = SYSDATETIME();
+    BEGIN TRY
+        INSERT INTO [dbo].[{dim}] ([{short}_sk], [effective_from], [effective_to], [is_current])
+        SELECT 1, @start, '9999-12-31', 1
+        WHERE NOT EXISTS (SELECT 1 FROM [dbo].[{dim}] WHERE [{short}_sk] = 1);
+
+        EXEC [dbo].[sp_reconcile_and_log_metrics] @batch_id, 'sp_load_{dim}', '{dim}', 'SUCCESS', @@ROWCOUNT, NULL, @start;
+    END TRY
+    BEGIN CATCH
+        EXEC [dbo].[sp_reconcile_and_log_metrics] @batch_id, 'sp_load_{dim}', '{dim}', 'FAILED', 0, ERROR_MESSAGE(), @start;
+        THROW;
+    END CATCH
+END;
+GO""")
+
+    sql_lines.append("")
+    sql_lines.append("-- 5. ELT STORED PROCEDURES (Facts)")
+    for fact in fact_names:
+        sql_lines.append(f"""CREATE OR ALTER PROCEDURE [dbo].[sp_load_{fact}]
+    @batch_id VARCHAR(64)
+AS
+BEGIN
+    SET NOCOUNT ON;
+    DECLARE @start DATETIME2(6) = SYSDATETIME();
+    BEGIN TRY
+        EXEC [dbo].[sp_reconcile_and_log_metrics] @batch_id, 'sp_load_{fact}', '{fact}', 'SUCCESS', 0, NULL, @start;
+    END TRY
+    BEGIN CATCH
+        EXEC [dbo].[sp_reconcile_and_log_metrics] @batch_id, 'sp_load_{fact}', '{fact}', 'FAILED', 0, ERROR_MESSAGE(), @start;
+        THROW;
+    END CATCH
+END;
+GO""")
+
+    sql_lines.append("""-- 6. AUDIT LOGGER PROCEDURE
+CREATE OR ALTER PROCEDURE [dbo].[sp_reconcile_and_log_metrics]
+    @batch_id VARCHAR(64),
+    @proc_name VARCHAR(128),
+    @target_table VARCHAR(128),
+    @status VARCHAR(32),
+    @rows_affected INT,
+    @error_msg VARCHAR(MAX) = NULL,
+    @started_at DATETIME2(6)
+AS
+BEGIN
+    SET NOCOUNT ON;
+    INSERT INTO [dbo].[audit_elt_execution_log]
+        ([batch_id], [procedure_name], [target_table], [status], [rows_affected], [error_message], [started_at], [completed_at])
+    VALUES
+        (@batch_id, @proc_name, @target_table, @status, @rows_affected, @error_msg, @started_at, SYSDATETIME());
+END;
+GO""")
+
+    dim_execs = "\n".join([f"        EXEC [dbo].[sp_load_{d}] @batch_id = @batch_id;" for d in dim_names])
+    fact_execs = "\n".join([f"        EXEC [dbo].[sp_load_{f}] @batch_id = @batch_id;" for f in fact_names])
+
+    sql_lines.append(f"""-- 7. MASTER STAR SCHEMA ORCHESTRATOR
+CREATE OR ALTER PROCEDURE [dbo].[sp_orchestrate_gold_star_schema]
+    @batch_id VARCHAR(64) = NULL
+AS
+BEGIN
+    SET NOCOUNT ON;
+    IF @batch_id IS NULL SET @batch_id = CONVERT(VARCHAR(36), NEWID());
+    DECLARE @batch_start DATETIME2(6) = SYSDATETIME();
+    BEGIN TRY
+        BEGIN TRANSACTION;
+        -- Step 1: Execute Dimension Stored Procedures
+{dim_execs}
+        -- Step 2: Execute Fact Stored Procedures
+{fact_execs}
+        COMMIT TRANSACTION;
+        EXEC [dbo].[sp_reconcile_and_log_metrics] @batch_id, 'sp_orchestrate_gold_star_schema', 'ALL_MARTS', 'SUCCESS', 1, NULL, @batch_start;
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
+        EXEC [dbo].[sp_reconcile_and_log_metrics] @batch_id, 'sp_orchestrate_gold_star_schema', 'ALL_MARTS', 'FAILED', 0, ERROR_MESSAGE(), @batch_start;
+        THROW;
+    END CATCH
+END;
+GO""")
+
+    return "\n".join(sql_lines)
+
+
 def generate_gold_warehouse_sql(
     clean_dom: str,
     proj_name: str,
     dimensions: list[str] | None = None,
     facts: list[str] | None = None,
+    table_configs: list[dict[str, Any]] | None = None,
 ) -> str:
     """Generates enterprise Kimball Star Schema DDL and 12 ELT Stored Procedures for Fabric Warehouse."""
+    if table_configs:
+        t_names = [tc.get("table", "").lower() for tc in table_configs]
+        has_retail = any(
+            any(k in tn for k in ("order_items", "product_categories", "inventory_positions", "loyalty_accounts", "retail_ops"))
+            for tn in t_names
+        )
+        if not has_retail and len(table_configs) > 0:
+            return _generate_dynamic_gold_warehouse_sql(clean_dom, proj_name, table_configs)
+
     return f"""-- ==============================================================================
 -- Microsoft Fabric Analytical Data Warehouse: wh_{clean_dom}_gold
 -- Project: {proj_name}
