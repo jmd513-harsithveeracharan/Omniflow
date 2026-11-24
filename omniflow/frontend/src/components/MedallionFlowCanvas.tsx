@@ -17,12 +17,14 @@ import {
   RotateCcw,
   ArrowRight,
   Database,
+  Zap,
 } from 'lucide-react';
 import { IngestionPlan } from '../types';
 import { GraphMeshView } from './graph/GraphMeshView';
 import { OneLakeTreePane } from './workbench/OneLakeTreePane';
 import { CodeEditorPane } from './workbench/CodeEditorPane';
 import { DeltaSchemaPane } from './workbench/DeltaSchemaPane';
+import { PipelinePane } from './workbench/PipelinePane';
 
 interface MedallionFlowCanvasProps {
   plan?: IngestionPlan | Record<string, unknown> | null;
@@ -51,7 +53,7 @@ export const MedallionFlowCanvas: React.FC<MedallionFlowCanvasProps> = ({
   onDeploy,
   onClose,
 }) => {
-  const [activeTab, setActiveTab] = useState<'wbDAG' | 'wbMesh' | 'wbTree' | 'wbCode' | 'wbTable' | 'wbJson'>('wbDAG');
+  const [activeTab, setActiveTab] = useState<'wbPipelines' | 'wbDAG' | 'wbMesh' | 'wbTree' | 'wbCode' | 'wbTable' | 'wbJson'>('wbPipelines');
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [copied, setCopied] = useState(false);
   const [selectedNode, setSelectedNode] = useState<DagNode | null>(null);
@@ -59,6 +61,16 @@ export const MedallionFlowCanvas: React.FC<MedallionFlowCanvasProps> = ({
   const [panOffset, setPanOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState<boolean>(false);
   const dragStartRef = React.useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+
+  const pipelineCount = React.useMemo(() => {
+    if (!plan || typeof plan !== 'object') return 2;
+    const items = (plan as any).items as Array<Record<string, unknown>> | undefined;
+    if (items) {
+      const cnt = items.filter((it) => String(it.type || '').toLowerCase().includes('pipeline')).length;
+      if (cnt > 0) return cnt;
+    }
+    return 2;
+  }, [plan]);
 
   const handleMouseDown = (e: React.MouseEvent) => {
     if (e.button !== 0) return;
@@ -399,18 +411,27 @@ export const MedallionFlowCanvas: React.FC<MedallionFlowCanvasProps> = ({
           }}
         >
           <button
+            className={`wb-tab ${activeTab === 'wbPipelines' ? 'active' : ''}`}
+            onClick={() => setActiveTab('wbPipelines')}
+            type="button"
+            style={{ padding: '4px 8px', fontSize: '11.5px', gap: '5px', whiteSpace: 'nowrap', flexShrink: 0 }}
+          >
+            <Zap width={13} height={13} />
+            <span>Pipelines</span>
+            {pipelineCount > 0 && (
+              <span style={{ fontSize: '9px', padding: '1px 5px', borderRadius: '4px', background: 'rgba(56, 189, 248, 0.15)', color: '#38bdf8', fontWeight: 600, marginLeft: '3px' }}>
+                {pipelineCount}
+              </span>
+            )}
+          </button>
+          <button
             className={`wb-tab ${activeTab === 'wbDAG' ? 'active' : ''}`}
             onClick={() => setActiveTab('wbDAG')}
             type="button"
             style={{ padding: '4px 8px', fontSize: '11.5px', gap: '5px', whiteSpace: 'nowrap', flexShrink: 0 }}
           >
             <Layers width={13} height={13} />
-            <span>Pipelines</span>
-            {dagNodes.length > 0 && (
-              <span style={{ fontSize: '9px', padding: '1px 5px', borderRadius: '4px', background: 'rgba(56, 189, 248, 0.15)', color: '#38bdf8', fontWeight: 600, marginLeft: '3px' }}>
-                {dagNodes.length}
-              </span>
-            )}
+            <span>Architecture</span>
           </button>
           <button
             className={`wb-tab ${activeTab === 'wbMesh' ? 'active' : ''}`}
@@ -529,6 +550,11 @@ export const MedallionFlowCanvas: React.FC<MedallionFlowCanvasProps> = ({
           background: '#121214',
         }}
       >
+        {/* 0. Dedicated Pipelines View: Activities Table & Activity Flow Canvas */}
+        {activeTab === 'wbPipelines' && (
+          <PipelinePane plan={plan as any} domain={domain} />
+        )}
+
         {/* Knowledge Mesh Graph RAG */}
         {activeTab === 'wbMesh' && (
           <div className="wb-view-pane active" style={{ padding: 0, overflow: 'hidden', position: 'relative', height: '100%', flex: 1, minHeight: 0, background: '#121214' }}>
