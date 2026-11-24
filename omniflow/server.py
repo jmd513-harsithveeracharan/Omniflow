@@ -1718,6 +1718,14 @@ async def handle_pipeline_deploy(req: DeployPlanRequest) -> dict[str, Any]:
             it_folder = it.get("folder_name") or root_folder
             if it_folder.lower().startswith("ai_test_folder"):
                 it_folder = it_folder.replace("AI_Test_Folder", root_folder).replace("ai_test_folder", root_folder)
+            def_template = (
+                it.get("definition_template")
+                or it.get("code")
+                or it.get("pyspark_code")
+                or (json.dumps(it["pipeline"]) if it.get("pipeline") else None)
+                or it.get("sql_code")
+                or None
+            )
             items_to_deploy.append(
                 FabricItemSpec(
                     name=it.get("name") or it.get("display_name", f"item_{uuid.uuid4().hex[:4]}"),
@@ -1725,6 +1733,7 @@ async def handle_pipeline_deploy(req: DeployPlanRequest) -> dict[str, Any]:
                     depends_on=it.get("depends_on", []),
                     folder_name=it_folder,
                     description=it.get("description", ""),
+                    definition_template=def_template,
                 )
             )
     else:

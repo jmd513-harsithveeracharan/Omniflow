@@ -1201,14 +1201,14 @@ def ingest_table_to_bronze(spec: dict) -> dict:
         .withColumn("_batch_run_id", F.lit(batch_run_id))
     )
 
-    # 3. Write Atomic Delta Table into Bronze Lakehouse
+    # 3. Write Atomic Delta Table into Bronze Lakehouse (Single-part managed table)
     (
         ingested_df.write.format("delta")
         .mode("overwrite")
         .option("overwriteSchema", "true")
-        .saveAsTable(target_path)
+        .saveAsTable(clean_target)
     )
-    print(f"✨ Successfully committed {{row_count}} records into Bronze Delta table: {{target_path}}")
+    print(f"✨ Successfully committed {{row_count}} records into Bronze Delta table: {{clean_target}}")
     return {{"table": source_table, "status": "SUCCESS", "rows": row_count}}
 
 # CELL ********************

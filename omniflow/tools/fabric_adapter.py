@@ -267,13 +267,24 @@ def format_synapse_notebook(raw_content: str) -> str:
     # Split on cell markers: # CELL, # %%, or In[ ] markers
     cell_splits = re.split(r"(?:^|\n)(?:# CELL \*+|# %%|# In\[\d*\]:)(?:\n|$)", cleaned)
 
+    deps_obj: dict[str, Any] = {}
+    lh_match = re.search(r'["\']default_lakehouse["\']\s*:\s*["\']([^"\']+)["\']', raw_content)
+    if lh_match:
+        lh_val = lh_match.group(1).strip()
+        is_guid = len(lh_val) == 36 and lh_val.count("-") == 4
+        deps_obj["lakehouse"] = {
+            "default_lakehouse": lh_val if is_guid else "",
+            "default_lakehouse_name": lh_val if not is_guid else "",
+            "known_lakehouses": [{"id": lh_val}] if is_guid else [],
+        }
+
     cells: list[str] = []
     for split in cell_splits:
-        # Strip out any redundant global Fabric prologues or metadata blocks inside individual cells
         split_clean = re.sub(r"# Fabric [Nn]otebook source\s*", "", split)
         split_clean = re.sub(r"# METADATA \*+\s*# META \{.*?\}\s*", "", split_clean, flags=re.DOTALL)
+        split_clean = re.sub(r"# METADATA \*+\s*# \{.*?\}\s*", "", split_clean, flags=re.DOTALL)
         split_clean = split_clean.strip()
-        if split_clean:
+        if split_clean and not split_clean.startswith("# METADATA"):
             cells.append(split_clean)
 
     if not cells:
@@ -287,16 +298,12 @@ def format_synapse_notebook(raw_content: str) -> str:
         "# META }\n"
     )
 
-    header = (
-        "# Fabric notebook source\n\n"
-        "# METADATA ********************\n\n"
-        "# META {\n"
-        '# META   "kernel_info": {\n'
-        '# META     "name": "synapse_pyspark"\n'
-        "# META   },\n"
-        '# META   "dependencies": {}\n'
-        "# META }\n"
-    )
+    meta_dict = {
+        "kernel_info": {"name": "synapse_pyspark"},
+        "dependencies": deps_obj,
+    }
+    meta_lines = "\n".join(["# META " + l for l in json.dumps(meta_dict, indent=2).splitlines()])
+    header = f"# Fabric notebook source\n\n# METADATA ********************\n\n{meta_lines}\n"
 
     out = [header]
     for c in cells:
@@ -350,7 +357,9 @@ def update_definition(
 ) -> dict[str, Any]:
     """Updates the definition of an existing Fabric item (e.g. Notebook)."""
     h = _headers()
-    url = f"{_BASE}/workspaces/{workspace_id}/items/{item_id}/updateDefinition"
+    parts = definition.get("parts", []) if isinstance(definition, dict) else []
+    has_meta = any(p.get("path") in (".platform", "item.metadata.json") for p in parts)
+    url = f"{_BASE}/workspaces/{workspace_id}/items/{item_id}/updateDefinition" + ("?updateMetadata=true" if has_meta else "")
     try:
         r = requests.post(url, headers=h, json={"definition": definition}, timeout=30)
         if r.status_code in (200, 202):
